@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "72502010427",
+    "project_id": "secondary-sales-6ec10",
+    "storage_bucket": "secondary-sales-6ec10.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:72502010427:android:69ef0109111ea515bfb21e",
+        "android_client_info": {
+          "package_name": "com.example.secondary_sales"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDQDioz_A1oj1AvDI7S-5MzB261d4jfZaA"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

@@ -1,0 +1,34 @@
+import 'package:secondary_sales/core/util/parse.dart';
+class Product {
+  final int id;
+  final String name;
+  final String? code;
+  final double price;
+  final String? uom;
+  final double? stock;
+
+  Product({
+    required this.id,
+    required this.name,
+    this.code,
+    required this.price,
+    this.uom,
+    this.stock,
+  });
+
+  factory Product.fromMap(Map<String, dynamic> map) {
+    return Product(
+      id: asInt(map['id']),
+      name: map['name'] ?? '',
+      code: map['default_code'],
+      price: asDouble(map['list_price']),
+      uom: map['uom_name'] ?? map['uom']?['name'] ?? 'Unit',
+      stock: _nullableDouble(map['qty_available'] ?? map['stock']),
+    );
+  }
+
+  static double? _nullableDouble(dynamic value) {
+    if (value == null) return null;
+    return asDouble(value);
+  }
+}
