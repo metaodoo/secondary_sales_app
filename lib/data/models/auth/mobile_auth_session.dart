@@ -1,4 +1,6 @@
 import 'package:secondary_sales/core/util/parse.dart';
+import 'package:secondary_sales/core/access/access_control.dart';
+
 class MobileAuthSession {
   const MobileAuthSession({
     required this.accessToken,
@@ -8,6 +10,7 @@ class MobileAuthSession {
     required this.expiresIn,
     required this.user,
     this.expiresAt,
+    this.access = const AccessControl(),
   });
 
   final String accessToken;
@@ -18,9 +21,14 @@ class MobileAuthSession {
   final MobileAuthUser user;
   final DateTime? expiresAt;
 
+  /// Backend-driven screen/action access for this user's group. Empty (allow
+  /// all) until the backend ships the `access` block in the login response.
+  final AccessControl access;
+
   factory MobileAuthSession.fromMap(Map<String, dynamic> map) {
     final expiresIn = asIntOrNull(map['expires_in']) ?? 0;
     final userValue = map['user'];
+    final accessValue = map['access'];
     return MobileAuthSession(
       accessToken: (map['access_token'] ?? '').toString(),
       refreshToken: (map['refresh_token'] ?? '').toString(),
@@ -32,6 +40,9 @@ class MobileAuthSession {
             ? userValue.cast<String, dynamic>()
             : <String, dynamic>{},
       ),
+      access: accessValue is Map
+          ? AccessControl.fromMap(accessValue.cast<String, dynamic>())
+          : const AccessControl(),
       expiresAt:
           asDateTime(map['expires_at']) ??
           DateTime.now().add(Duration(seconds: expiresIn)),
@@ -46,6 +57,7 @@ class MobileAuthSession {
     int? expiresIn,
     MobileAuthUser? user,
     DateTime? expiresAt,
+    AccessControl? access,
   }) {
     return MobileAuthSession(
       accessToken: accessToken ?? this.accessToken,
@@ -55,6 +67,7 @@ class MobileAuthSession {
       expiresIn: expiresIn ?? this.expiresIn,
       user: user ?? this.user,
       expiresAt: expiresAt ?? this.expiresAt,
+      access: access ?? this.access,
     );
   }
 
@@ -67,6 +80,7 @@ class MobileAuthSession {
       'expires_in': expiresIn,
       'expires_at': expiresAt?.toIso8601String(),
       'user': user.toMap(),
+      'access': access.toMap(),
     };
   }
 }
@@ -100,6 +114,7 @@ class MobileAuthUser {
     required this.name,
     this.role,
     this.group,
+    this.permissions,
     this.employeeId,
     this.employeeName,
   });
@@ -108,6 +123,7 @@ class MobileAuthUser {
   final String name;
   final String? role;
   final MobileAuthGroup? group;
+  final MobileAuthPermissions? permissions;
   final int? employeeId;
   final String? employeeName;
 
@@ -115,12 +131,16 @@ class MobileAuthUser {
 
   factory MobileAuthUser.fromMap(Map<String, dynamic> map) {
     final groupValue = map['group'];
+    final permsValue = map['permissions'];
     return MobileAuthUser(
       id: asIntOrNull(map['id']) ?? 0,
       name: (map['name'] ?? '').toString(),
       role: asNullableString(map['role']),
       group: groupValue is Map
           ? MobileAuthGroup.fromMap(groupValue.cast<String, dynamic>())
+          : null,
+      permissions: permsValue is Map
+          ? MobileAuthPermissions.fromMap(permsValue.cast<String, dynamic>())
           : null,
       employeeId: asIntOrNull(map['employee_id']),
       employeeName: asNullableString(map['employee_name']),
@@ -133,8 +153,45 @@ class MobileAuthUser {
       'name': name,
       'role': role,
       'group': group?.toMap(),
+      'permissions': permissions?.toMap(),
       'employee_id': employeeId,
       'employee_name': employeeName,
+    };
+  }
+}
+
+class MobileAuthPermissions {
+  const MobileAuthPermissions({
+    this.canViewAllReturns = false,
+    this.canEditSoQty = false,
+    this.canEditQcQty = false,
+    this.canEditEffectiveQty = false,
+    this.skipAttendanceGeolocation = false,
+  });
+
+  final bool canViewAllReturns;
+  final bool canEditSoQty;
+  final bool canEditQcQty;
+  final bool canEditEffectiveQty;
+  final bool skipAttendanceGeolocation;
+
+  factory MobileAuthPermissions.fromMap(Map<String, dynamic> map) {
+    return MobileAuthPermissions(
+      canViewAllReturns: map['can_view_all_returns'] == true,
+      canEditSoQty: map['can_edit_so_qty'] == true,
+      canEditQcQty: map['can_edit_qc_qty'] == true,
+      canEditEffectiveQty: map['can_edit_effective_qty'] == true,
+      skipAttendanceGeolocation: map['skip_attendance_geolocation'] == true,
+    );
+  }
+
+  Map<String, dynamic> toMap() {
+    return {
+      'can_view_all_returns': canViewAllReturns,
+      'can_edit_so_qty': canEditSoQty,
+      'can_edit_qc_qty': canEditQcQty,
+      'can_edit_effective_qty': canEditEffectiveQty,
+      'skip_attendance_geolocation': skipAttendanceGeolocation,
     };
   }
 }

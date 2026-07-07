@@ -8,6 +8,8 @@ import 'package:secondary_sales/features/returns/return_provider.dart';
 import 'package:secondary_sales/data/models/return_scrap_summary.dart';
 import 'package:secondary_sales/core/widgets/ss_ui.dart';
 import 'package:secondary_sales/features/returns/screens/create_return_screen.dart';
+import 'package:secondary_sales/features/auth/auth_provider.dart';
+import 'package:secondary_sales/core/access/access_resources.dart';
 
 class ReturnsListScreen extends StatefulWidget {
   final String moduleType;
@@ -159,6 +161,7 @@ class _ReturnsListScreenState extends State<ReturnsListScreen> {
   @override
   Widget build(BuildContext context) {
     final provider = context.watch<ReturnProvider>();
+    final auth = context.watch<AuthProvider>();
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -314,28 +317,30 @@ class _ReturnsListScreenState extends State<ReturnsListScreen> {
               const SizedBox(height: 24),
 
               // Create Return Button
-              ElevatedButton.icon(
-                onPressed: _openCreateReturn,
-                icon: const Icon(Icons.add, color: Colors.white, size: 22),
-                label: const Text(
-                  'New Return',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 16,
+              if (auth.canDo(AppAction.returnCreate)) ...[
+                ElevatedButton.icon(
+                  onPressed: _openCreateReturn,
+                  icon: const Icon(Icons.add, color: Colors.white, size: 22),
+                  label: const Text(
+                    'New Return',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                    ),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                    elevation: 0,
+                    shadowColor: Colors.transparent,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
                   ),
                 ),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.primary,
-                  elevation: 0,
-                  shadowColor: Colors.transparent,
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 32),
+                const SizedBox(height: 32),
+              ],
 
               if (provider.isLoading && _returns.isEmpty)
                 const Padding(

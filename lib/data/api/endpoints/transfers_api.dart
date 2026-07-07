@@ -134,29 +134,21 @@ extension TransfersApi on ApiService {
         }
       };
 
-      if (line.product.requiresLots) {
-        if (line.lotLines.isNotEmpty) {
-          // Manual lot selection
-          payload['lot_lines'] = line.lotLines
-              .where((l) => l.lot != null && ((l.freshQty ?? l.quantity) > 0 || (l.scrapQty ?? 0) > 0))
-              .map((l) => {
-                    'lot_id': l.lot!.lotId,
-                    if (vanOperationType == 'unload') ...{
-                      'fresh_qty': l.freshQty ?? l.quantity,
-                      'scrap_qty': l.scrapQty ?? 0.0,
-                    } else ...{
-                      'quantity': l.quantity,
-                    }
-                  })
-              .toList();
-        } else {
-          // Auto-assign using FIFO
-          payload['lot_lines'] = await _buildTransferLotPayload(
-            line,
-            destinationLocationId,
-            vanOperationType: vanOperationType,
-          );
-        }
+      if (line.product.requiresLots && line.lotLines.isNotEmpty) {
+        // Lots are resolved up-front by TransferProvider before this call, so
+        // here we only serialize the resolved/selected lot lines.
+        payload['lot_lines'] = line.lotLines
+            .where((l) => l.lot != null && ((l.freshQty ?? l.quantity) > 0 || (l.scrapQty ?? 0) > 0))
+            .map((l) => {
+                  'lot_id': l.lot!.lotId,
+                  if (vanOperationType == 'unload') ...{
+                    'fresh_qty': l.freshQty ?? l.quantity,
+                    'scrap_qty': l.scrapQty ?? 0.0,
+                  } else ...{
+                    'quantity': l.quantity,
+                  }
+                })
+            .toList();
       }
       payloadLines.add(payload);
     }
@@ -196,27 +188,21 @@ extension TransfersApi on ApiService {
         }
       };
 
-      if (line.product.requiresLots) {
-        if (line.lotLines.isNotEmpty) {
-          payload['lot_lines'] = line.lotLines
-              .where((l) => l.lot != null && ((l.freshQty ?? l.quantity) > 0 || (l.scrapQty ?? 0) > 0))
-              .map((l) => {
-                    'lot_id': l.lot!.lotId,
-                    if (vanOperationType == 'unload') ...{
-                      'fresh_qty': l.freshQty ?? l.quantity,
-                      'scrap_qty': l.scrapQty ?? 0.0,
-                    } else ...{
-                      'quantity': l.quantity,
-                    }
-                  })
-              .toList();
-        } else {
-          payload['lot_lines'] = await _buildTransferLotPayload(
-            line,
-            destinationLocationId,
-            vanOperationType: vanOperationType,
-          );
-        }
+      if (line.product.requiresLots && line.lotLines.isNotEmpty) {
+        // Lots are resolved up-front by TransferProvider before this call, so
+        // here we only serialize the resolved/selected lot lines.
+        payload['lot_lines'] = line.lotLines
+            .where((l) => l.lot != null && ((l.freshQty ?? l.quantity) > 0 || (l.scrapQty ?? 0) > 0))
+            .map((l) => {
+                  'lot_id': l.lot!.lotId,
+                  if (vanOperationType == 'unload') ...{
+                    'fresh_qty': l.freshQty ?? l.quantity,
+                    'scrap_qty': l.scrapQty ?? 0.0,
+                  } else ...{
+                    'quantity': l.quantity,
+                  }
+                })
+            .toList();
       }
       payloadLines.add(payload);
     }

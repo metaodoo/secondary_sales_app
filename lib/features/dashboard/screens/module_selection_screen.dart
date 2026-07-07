@@ -4,18 +4,23 @@ import 'package:secondary_sales/core/theme/app_theme.dart';
 import 'package:secondary_sales/core/widgets/ss_ui.dart';
 import 'package:secondary_sales/app/navigation/app_shell.dart';
 import 'package:secondary_sales/features/auth/auth_provider.dart';
+import 'package:secondary_sales/core/access/access_resources.dart';
 import 'package:secondary_sales/features/settings/screens/settings_tab.dart';
 import 'package:secondary_sales/features/hr/screens/attendance_screen.dart';
-import 'package:secondary_sales/features/hr/screens/leave_request_screen.dart';
+import 'package:secondary_sales/features/hr/screens/leave_dashboard_screen.dart';
+import 'package:secondary_sales/features/hr/screens/expense_dashboard_screen.dart';
+import 'package:secondary_sales/features/my_team/screens/my_team_screen.dart';
 
 class ModuleSelectionScreen extends StatelessWidget {
   const ModuleSelectionScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
-    // Primary (Company -> Distributor) is restricted to managers/TSMs.
-    // Sales Officers (role/group "SO") only get the Secondary module.
-    final canAccessPrimary = context.watch<AuthProvider>().canAccessPrimarySales;
+    // Module picker cards are gated by the backend access config (which
+    // ss.module records the group is assigned).
+    final auth = context.watch<AuthProvider>();
+    final canAccessPrimary = auth.canAccessPrimarySales;
+    final canAccessSecondary = auth.canAccessSecondarySales;
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -38,9 +43,8 @@ class ModuleSelectionScreen extends StatelessWidget {
                 Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (_) => SettingsTab(
-                      onBack: () => Navigator.of(context).pop(),
-                    ),
+                    builder: (_) =>
+                        SettingsTab(onBack: () => Navigator.of(context).pop()),
                   ),
                 );
               },
@@ -92,54 +96,97 @@ class ModuleSelectionScreen extends StatelessWidget {
                 const SizedBox(height: 24),
               ],
 
-              _buildLargeModuleCard(
-                context,
-                title: 'Secondary',
-                description:
-                    'Sales, routes, outlets, van loading, delivery, and returns.',
-                icon: Icons.storefront_outlined,
-                color: const Color(0xFF10B981), // Emerald green to distinguish
-                onTap: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => const AppShell(moduleType: 'secondary'),
-                    ),
-                  );
-                },
-              ),
-              const SizedBox(height: 24),
-              _buildLargeModuleCard(
-                context,
-                title: 'Attendance',
-                description: 'Manage your daily check-ins and check-outs.',
-                icon: Icons.access_time_filled_outlined,
-                color: const Color(0xFFF59E0B), // Amber color
-                onTap: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => const AttendanceScreen(),
-                    ),
-                  );
-                },
-              ),
-              const SizedBox(height: 24),
-              _buildLargeModuleCard(
-                context,
-                title: 'Leave Request',
-                description: 'Apply for leaves and track your requests.',
-                icon: Icons.event_busy_outlined,
-                color: const Color(0xFFEF4444), // Red color
-                onTap: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => const LeaveRequestScreen(),
-                    ),
-                  );
-                },
-              ),
+              if (canAccessSecondary)
+                _buildLargeModuleCard(
+                  context,
+                  title: 'Secondary',
+                  description:
+                      'Sales, routes, outlets, van loading, delivery, and returns.',
+                  icon: Icons.storefront_outlined,
+                  color: const Color(
+                    0xFF10B981,
+                  ), // Emerald green to distinguish
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const AppShell(moduleType: 'secondary'),
+                      ),
+                    );
+                  },
+                ),
+              if (auth.canView(AppScreen.moduleAttendance)) ...[
+                const SizedBox(height: 24),
+                _buildLargeModuleCard(
+                  context,
+                  title: 'Attendance',
+                  description: 'Manage your daily check-ins and check-outs.',
+                  icon: Icons.access_time_filled_outlined,
+                  color: const Color(0xFFF59E0B), // Amber color
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const AttendanceScreen(),
+                      ),
+                    );
+                  },
+                ),
+              ],
+              if (auth.canView(AppScreen.moduleLeave)) ...[
+                const SizedBox(height: 24),
+                _buildLargeModuleCard(
+                  context,
+                  title: 'Leave Request',
+                  description: 'Apply for leaves and track your requests.',
+                  icon: Icons.event_busy_outlined,
+                  color: const Color(0xFFEF4444), // Red color
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const LeaveDashboardScreen(),
+                      ),
+                    );
+                  },
+                ),
+              ],
+              if (auth.canView(AppScreen.moduleExpense)) ...[
+                const SizedBox(height: 24),
+                _buildLargeModuleCard(
+                  context,
+                  title: 'Expense',
+                  description: 'Submit business expenses and track approvals.',
+                  icon: Icons.receipt_long_outlined,
+                  color: const Color(0xFF6366F1), // Indigo color
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const ExpenseDashboardScreen(),
+                      ),
+                    );
+                  },
+                ),
+              ],
+              if (auth.canView(AppScreen.moduleMyTeam)) ...[
+                const SizedBox(height: 24),
+                _buildLargeModuleCard(
+                  context,
+                  title: 'My Team',
+                  description: 'Track subordinate checkpoints and attendance shifts.',
+                  icon: Icons.group_outlined,
+                  color: const Color(0xFF8B5CF6), // Purple color
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const MyTeamScreen(),
+                      ),
+                    );
+                  },
+                ),
+              ],
             ],
           ),
         ),

@@ -9,6 +9,8 @@ import 'package:secondary_sales/features/transfers/transfer_provider.dart';
 import 'package:secondary_sales/features/transfers/screens/create_virtual_transfer_screen.dart';
 import 'package:secondary_sales/features/transfers/screens/virtual_transfer_detail_screen.dart';
 import 'package:secondary_sales/core/widgets/ss_ui.dart';
+import 'package:secondary_sales/core/access/permission_gate.dart';
+import 'package:secondary_sales/core/access/access_resources.dart';
 
 class VirtualTransferListScreen extends StatefulWidget {
   const VirtualTransferListScreen({super.key});
@@ -116,9 +118,12 @@ class _VirtualTransferListScreenState extends State<VirtualTransferListScreen> {
                 onPressed: () => Navigator.pop(context),
                 icon: const Icon(Icons.arrow_back, color: Colors.white),
               ),
-              trailing: IconButton(
-                onPressed: _openCreateTransfer,
-                icon: const Icon(Icons.add, color: Colors.white),
+              trailing: PermissionGate(
+                resourceKey: AppAction.transferCreate,
+                child: IconButton(
+                  onPressed: _openCreateTransfer,
+                  icon: const Icon(Icons.add, color: Colors.white),
+                ),
               ),
             ),
             Expanded(

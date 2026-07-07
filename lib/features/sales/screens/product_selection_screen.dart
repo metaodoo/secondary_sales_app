@@ -7,6 +7,7 @@ import 'package:provider/provider.dart';
 import 'package:secondary_sales/data/models/sales/order_line_entry.dart';
 import 'package:secondary_sales/data/models/sales/product.dart';
 import 'package:secondary_sales/features/sales/primary_sale_provider.dart';
+import 'package:secondary_sales/core/widgets/ss_ui.dart';
 
 class ProductSelectionScreen extends StatefulWidget {
   final String saleType;
@@ -172,37 +173,61 @@ class _ProductSelectionScreenState extends State<ProductSelectionScreen> {
 
             // Products list
             Expanded(
-              child: provider.isLoading && provider.products.isEmpty
-                  ? const Center(child: CircularProgressIndicator())
-                  : provider.products.isEmpty
-                  ? const Center(
-                      child: Text(
-                        'No products found',
-                        style: TextStyle(
-                          color: AppColors.textSecondary,
-                          fontSize: 16,
+              child: RefreshIndicator(
+                onRefresh: () async {
+                  await provider.searchProducts(_searchController.text, saleType: widget.saleType);
+                },
+                child: provider.isLoading && provider.products.isEmpty
+                    ? const Center(child: CircularProgressIndicator())
+                    : provider.products.isEmpty
+                    ? ListView(
+                        physics: const AlwaysScrollableScrollPhysics(),
+                        children: const [
+                          SizedBox(height: 100),
+                          Center(
+                            child: Text(
+                              'No products found',
+                              style: TextStyle(
+                                color: AppColors.textSecondary,
+                                fontSize: 16,
+                              ),
+                            ),
+                          ),
+                        ],
+                      )
+                    : ListView.builder(
+                        physics: const AlwaysScrollableScrollPhysics(),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 24,
+                          vertical: 12,
                         ),
+                        itemCount: provider.products.length,
+                        itemBuilder: (context, index) {
+                          final product = provider.products[index];
+                          final selectedLine = _selectedLines[product.id];
+                          final qty = selectedLine?.quantity ?? 0;
+                          return ProductSelectionCard(
+                            product: product,
+                            quantity: qty,
+                            onTap: () => _toggleProduct(product),
+                            onDecrease: () => _changeQuantity(product, -1),
+                            onIncrease: () => _changeQuantity(product, 1),
+                            onQuantityChanged: (newQty) {
+                              setState(() {
+                                if (newQty <= 0) {
+                                  _selectedLines.remove(product.id);
+                                } else {
+                                  _selectedLines[product.id] = OrderLineEntry(
+                                    product: product,
+                                    quantity: newQty,
+                                  );
+                                }
+                              });
+                            },
+                          );
+                        },
                       ),
-                    )
-                  : ListView.builder(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 24,
-                        vertical: 12,
-                      ),
-                      itemCount: provider.products.length,
-                      itemBuilder: (context, index) {
-                        final product = provider.products[index];
-                        final selectedLine = _selectedLines[product.id];
-                        final qty = selectedLine?.quantity ?? 0;
-                        return ProductSelectionCard(
-                          product: product,
-                          quantity: qty,
-                          onTap: () => _toggleProduct(product),
-                          onDecrease: () => _changeQuantity(product, -1),
-                          onIncrease: () => _changeQuantity(product, 1),
-                        );
-                      },
-                    ),
+              ),
             ),
 
             // Bottom Confirm Button
@@ -257,6 +282,7 @@ class ProductSelectionCard extends StatelessWidget {
     required this.onTap,
     required this.onDecrease,
     required this.onIncrease,
+    this.onQuantityChanged,
   });
 
   final Product product;
@@ -264,6 +290,7 @@ class ProductSelectionCard extends StatelessWidget {
   final VoidCallback onTap;
   final VoidCallback onDecrease;
   final VoidCallback onIncrease;
+  final ValueChanged<int>? onQuantityChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -333,12 +360,42 @@ class ProductSelectionCard extends StatelessWidget {
                         ),
                       ),
                       const SizedBox(width: 12),
-                      Text(
-                        '$quantity',
-                        style: const TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 15,
-                          color: AppColors.textPrimary,
+                      SizedBox(
+                        width: 52,
+                        height: 38,
+                        child: TextField(
+                          keyboardType: const TextInputType.numberWithOptions(decimal: false),
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 15,
+                            color: AppColors.textPrimary,
+                          ),
+                          decoration: InputDecoration(
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 4, vertical: 0),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(8),
+                              borderSide: const BorderSide(color: AppColors.borderSoft),
+                            ),
+                            enabledBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(8),
+                              borderSide: const BorderSide(color: AppColors.borderSoft),
+                            ),
+                            focusedBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(8),
+                              borderSide: const BorderSide(color: AppColors.primary, width: 2),
+                            ),
+                          ),
+                          enabled: isSelected,
+                          onChanged: (val) {
+                            final parsed = int.tryParse(val);
+                            if (parsed != null && parsed >= 0 && onQuantityChanged != null) {
+                              onQuantityChanged!(parsed);
+                            }
+                          },
+                          controller: TextEditingController(
+                            text: '$quantity',
+                          )..selection = TextSelection.collapsed(offset: '$quantity'.length),
                         ),
                       ),
                       const SizedBox(width: 12),

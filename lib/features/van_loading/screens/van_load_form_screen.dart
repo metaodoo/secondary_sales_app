@@ -58,6 +58,7 @@ class _VanLoadFormScreenState extends State<VanLoadFormScreen> {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<TransferProvider>().prepareVirtualTransfer().then((_) {
+        if (!mounted) return;
         final prepare = context.read<TransferProvider>().transferPrepare;
         final destinations = _uniqueDestinations(prepare?.destinationLocations ?? []);
         if (widget.existingTransfer != null) {
@@ -474,7 +475,7 @@ class _VanLoadFormScreenState extends State<VanLoadFormScreen> {
                               shrinkWrap: true,
                               physics: const NeverScrollableScrollPhysics(),
                               itemCount: _items.length,
-                              separatorBuilder: (_, __) => const Divider(height: 1, color: Color(0xFFDDE6F2)),
+                              separatorBuilder: (_, _) => const Divider(height: 1, color: Color(0xFFDDE6F2)),
                               itemBuilder: (context, index) {
                                 final item = _items[index];
                                 return Padding(
@@ -642,7 +643,7 @@ class _VanLoadFormScreenState extends State<VanLoadFormScreen> {
                             shrinkWrap: true,
                             physics: const NeverScrollableScrollPhysics(),
                             itemCount: _items.length,
-                            separatorBuilder: (_, __) => const SizedBox(height: 12),
+                            separatorBuilder: (_, _) => const SizedBox(height: 12),
                             itemBuilder: (context, index) {
                               final item = _items[index];
                               return Container(

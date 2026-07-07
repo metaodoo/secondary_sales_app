@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import 'package:secondary_sales/features/auth/auth_provider.dart';
 import 'package:secondary_sales/data/api/api_service.dart';
 import 'package:secondary_sales/core/services/location_service.dart';
+import 'package:secondary_sales/core/access/access_resources.dart';
 import 'package:secondary_sales/core/widgets/ss_ui.dart';
 
 class CheckInScreen extends StatefulWidget {
@@ -60,11 +61,9 @@ class _CheckInScreenState extends State<CheckInScreen> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Failed to check out: $e'),
-            backgroundColor: Colors.red,
-          ),
+        ssShowLocationErrorDialog(
+          context,
+          e.toString().replaceAll('Exception: ', ''),
         );
         setState(() => _isLoading = false);
       }
@@ -130,19 +129,22 @@ class _CheckInScreenState extends State<CheckInScreen> {
                       ),
                     ),
                     const SizedBox(height: 16),
-                    ElevatedButton.icon(
-                      onPressed: _checkOut,
-                      icon: const Icon(Icons.logout),
-                      label: const Text('Check Out'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.primaryStrong,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
+                    if (context.watch<AuthProvider>().canDo(
+                      AppAction.visitCheckOut,
+                    ))
+                      ElevatedButton.icon(
+                        onPressed: _checkOut,
+                        icon: const Icon(Icons.logout),
+                        label: const Text('Check Out'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.primaryStrong,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
                         ),
                       ),
-                    ),
                   ],
                 ),
               ),

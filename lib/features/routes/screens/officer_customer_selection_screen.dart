@@ -6,6 +6,7 @@ import 'package:secondary_sales/data/models/routes/route.dart';
 import 'package:secondary_sales/features/routes/screens/customer_action_bottom_sheet.dart';
 import 'package:secondary_sales/features/routes/screens/create_outlet_screen.dart';
 import 'package:secondary_sales/features/auth/auth_provider.dart';
+import 'package:secondary_sales/core/widgets/ss_ui.dart';
 
 class OfficerCustomerSelectionScreen extends StatefulWidget {
   final int routeId;
@@ -378,14 +379,9 @@ class _OfficerCustomerSelectionScreenState
                                           );
                                         } catch (e) {
                                           if (context.mounted) {
-                                            ScaffoldMessenger.of(
+                                            ssShowLocationErrorDialog(
                                               context,
-                                            ).showSnackBar(
-                                              SnackBar(
-                                                content: Text(
-                                                  'Check-in failed: $e',
-                                                ),
-                                              ),
+                                              e.toString().replaceAll('Exception: ', ''),
                                             );
                                           }
                                         }

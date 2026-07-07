@@ -11,9 +11,7 @@ extension CatalogApi on ApiService {
     }
     if (saleType != null) {
       params['sale_type'] = saleType;
-      if (_activeEmployeeId != null) {
-        params['employee_id'] = _activeEmployeeId;
-      }
+      params['employee_id'] = _activeEmployeeId;
     }
 
     final result = await _post(AppConstants.productsEndpoint, params);

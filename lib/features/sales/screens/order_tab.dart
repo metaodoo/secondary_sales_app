@@ -37,41 +37,47 @@ class OrderTab extends StatelessWidget {
                 : null,
           ),
           Expanded(
-            child: ListView(
-              padding: const EdgeInsets.all(16),
-              children: [
-                TextField(
-                  controller: searchController,
-                  decoration: ssInputDecoration(
-                    'Search customer...',
-                    Icons.search,
-                  ),
-                  onChanged: onSearchChanged,
-                ),
-                const SizedBox(height: 16),
-                if (provider.error != null) ErrorPanel(provider.error!),
-                if (provider.isLoading && hubs.isEmpty)
-                  const Padding(
-                    padding: EdgeInsets.all(32),
-                    child: Center(child: CircularProgressIndicator()),
-                  )
-                else if (hubs.isEmpty)
-                  const EmptyPanel(message: 'No distributors found')
-                else
-                  ...hubs.map(
-                    (hub) => DistributorCard(
-                      hub: hub,
-                      onTap: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => CreatePrimarySaleScreen(hub: hub),
-                          ),
-                        );
-                      },
+            child: RefreshIndicator(
+              onRefresh: () async {
+                await provider.searchHubs(searchController.text);
+              },
+              child: ListView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                padding: const EdgeInsets.all(16),
+                children: [
+                  TextField(
+                    controller: searchController,
+                    decoration: ssInputDecoration(
+                      'Search customer...',
+                      Icons.search,
                     ),
+                    onChanged: onSearchChanged,
                   ),
-              ],
+                  const SizedBox(height: 16),
+                  if (provider.error != null) ErrorPanel(provider.error!),
+                  if (provider.isLoading && hubs.isEmpty)
+                    const Padding(
+                      padding: EdgeInsets.all(32),
+                      child: Center(child: CircularProgressIndicator()),
+                    )
+                  else if (hubs.isEmpty)
+                    const EmptyPanel(message: 'No distributors found')
+                  else
+                    ...hubs.map(
+                      (hub) => DistributorCard(
+                        hub: hub,
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => CreatePrimarySaleScreen(hub: hub),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                ],
+              ),
             ),
           ),
         ],

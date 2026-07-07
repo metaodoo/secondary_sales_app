@@ -9,6 +9,7 @@ import 'package:secondary_sales/features/returns/return_provider.dart';
 import 'package:secondary_sales/features/scraps/scrap_provider.dart';
 import 'package:secondary_sales/features/employees/employee_provider.dart';
 import 'package:secondary_sales/features/routes/route_provider.dart';
+import 'package:secondary_sales/features/my_team/my_team_provider.dart';
 import 'package:secondary_sales/features/auth/screens/auth_gate.dart';
 import 'package:secondary_sales/features/dashboard/screens/module_selection_screen.dart';
 import 'package:secondary_sales/data/api/api_service.dart';
@@ -103,6 +104,18 @@ Future<void> main() async {
           create: (_) => RouteProvider(),
           update: (_, auth, route) {
             final provider = route ?? RouteProvider();
+            provider.updateAuth(
+              accessToken: auth.accessToken,
+              sessionId: auth.sessionId,
+              employeeId: auth.employeeId,
+            );
+            return provider;
+          },
+        ),
+        ChangeNotifierProxyProvider<AuthProvider, MyTeamProvider>(
+          create: (_) => MyTeamProvider(),
+          update: (_, auth, myTeam) {
+            final provider = myTeam ?? MyTeamProvider();
             provider.updateAuth(
               accessToken: auth.accessToken,
               sessionId: auth.sessionId,

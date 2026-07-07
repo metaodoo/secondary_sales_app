@@ -8,6 +8,8 @@ import 'package:secondary_sales/features/scraps/scrap_provider.dart';
 import 'package:secondary_sales/data/models/return_scrap_summary.dart';
 import 'package:secondary_sales/core/widgets/ss_ui.dart';
 import 'package:secondary_sales/features/scraps/screens/create_scrap_screen.dart';
+import 'package:secondary_sales/features/auth/auth_provider.dart';
+import 'package:secondary_sales/core/access/access_resources.dart';
 
 class ScrapsListScreen extends StatefulWidget {
   final String moduleType;
@@ -159,6 +161,7 @@ class _ScrapsListScreenState extends State<ScrapsListScreen> {
   @override
   Widget build(BuildContext context) {
     final provider = context.watch<ScrapProvider>();
+    final auth = context.watch<AuthProvider>();
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -314,7 +317,8 @@ class _ScrapsListScreenState extends State<ScrapsListScreen> {
               const SizedBox(height: 24),
 
               // Create Scrap Button
-              if (widget.moduleType == 'primary') ...[
+              if (widget.moduleType == 'primary' &&
+                  auth.canDo(AppAction.scrapCreate)) ...[
                 ElevatedButton.icon(
                   onPressed: _openCreateScrap,
                   icon: const Icon(Icons.add, color: Colors.white, size: 22),

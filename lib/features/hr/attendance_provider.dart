@@ -35,6 +35,11 @@ class AttendanceProvider extends ChangeNotifier {
     _loadHistory();
   }
 
+  Future<void> refresh() async {
+    await _loadStatus();
+    await _loadHistory();
+  }
+
   int get _employeeId => _authProvider.user?.employeeId ?? 0;
 
   void clearError() {
@@ -112,8 +117,10 @@ class AttendanceProvider extends ChangeNotifier {
 
     try {
       return await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.high,
-        timeLimit: const Duration(seconds: 10),
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.high,
+          timeLimit: Duration(seconds: 10),
+        ),
       );
     } catch (e) {
       debugPrint("GPS Timeout, falling back to last known position.");

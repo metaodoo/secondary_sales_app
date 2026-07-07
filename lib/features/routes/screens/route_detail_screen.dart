@@ -6,6 +6,8 @@ import 'package:secondary_sales/data/models/routes/route.dart';
 import 'package:secondary_sales/features/routes/route_provider.dart';
 import 'package:secondary_sales/core/services/location_service.dart';
 import 'package:secondary_sales/features/visits/screens/route_sessions_screen.dart';
+import 'package:secondary_sales/features/auth/auth_provider.dart';
+import 'package:secondary_sales/core/access/access_resources.dart';
 import 'package:secondary_sales/core/widgets/ss_ui.dart';
 
 class RouteDetailScreen extends StatefulWidget {
@@ -173,18 +175,21 @@ class _RouteDetailScreenState extends State<RouteDetailScreen> {
                           ),
                         ],
                       ),
-                      TextButton.icon(
-                        onPressed: _openAddOutletSheet,
-                        icon: const Icon(Icons.add, size: 18),
-                        label: const Text('Add Outlet'),
-                        style: TextButton.styleFrom(
-                          foregroundColor: AppColors.primaryStrong,
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 6,
+                      if (context.watch<AuthProvider>().canDo(
+                        AppAction.routeAddOutlet,
+                      ))
+                        TextButton.icon(
+                          onPressed: _openAddOutletSheet,
+                          icon: const Icon(Icons.add, size: 18),
+                          label: const Text('Add Outlet'),
+                          style: TextButton.styleFrom(
+                            foregroundColor: AppColors.primaryStrong,
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 6,
+                            ),
                           ),
                         ),
-                      ),
                     ],
                   ),
                   const SizedBox(height: 8),

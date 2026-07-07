@@ -2,12 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:secondary_sales/core/theme/app_theme.dart';
 import 'package:secondary_sales/data/api/api_service.dart';
-import 'package:secondary_sales/data/models/sales/product.dart';
 import 'package:secondary_sales/features/auth/auth_provider.dart';
 import 'package:secondary_sales/features/sales/screens/order_detail_screen.dart';
 import 'package:secondary_sales/data/models/sales/order_line_entry.dart';
 import 'package:secondary_sales/features/sales/primary_sale_provider.dart';
 import 'package:secondary_sales/features/sales/screens/product_selection_screen.dart';
+import 'package:secondary_sales/core/widgets/ss_ui.dart';
 
 class OrderLineModel {
   final int productId;
@@ -282,7 +282,7 @@ class _OrderCreationScreenState extends State<OrderCreationScreen> {
                         ),
                       )
                     else
-                      ...lines.map((line) => _buildProductCard(line)).toList(),
+                      ...lines.map((line) => _buildProductCard(line)),
 
                     const SizedBox(height: 12),
 
@@ -573,12 +573,35 @@ class _OrderCreationScreenState extends State<OrderCreationScreen> {
                 padding: EdgeInsets.zero,
                 constraints: const BoxConstraints(minWidth: 32),
               ),
-              Text(
-                value.toString(),
-                style: const TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.bold,
-                  color: AppColors.textPrimary,
+              SizedBox(
+                width: 48,
+                height: 32,
+                child: TextField(
+                  keyboardType: const TextInputType.numberWithOptions(decimal: false),
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.textPrimary,
+                  ),
+                  decoration: const InputDecoration(
+                    isDense: true,
+                    contentPadding: EdgeInsets.symmetric(horizontal: 4, vertical: 6),
+                    border: InputBorder.none,
+                    enabledBorder: InputBorder.none,
+                    focusedBorder: UnderlineInputBorder(
+                      borderSide: BorderSide(color: AppColors.primary, width: 2),
+                    ),
+                  ),
+                  onChanged: (val) {
+                    final parsed = int.tryParse(val);
+                    if (parsed != null && parsed >= 0) {
+                      onChanged(parsed);
+                    }
+                  },
+                  controller: TextEditingController(
+                    text: value.toString(),
+                  )..selection = TextSelection.collapsed(offset: value.toString().length),
                 ),
               ),
               IconButton(

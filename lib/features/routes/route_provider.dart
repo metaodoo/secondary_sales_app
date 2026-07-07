@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:secondary_sales/data/models/routes/route.dart';
 import 'package:secondary_sales/data/api/api_service.dart';
+import 'package:secondary_sales/core/services/location_service.dart';
 
 class RouteProvider with ChangeNotifier {
   final ApiService _apiService = ApiService.instance;
@@ -284,7 +285,13 @@ class RouteProvider with ChangeNotifier {
     _error = null;
     notifyListeners();
     try {
-      final res = await _apiService.createVisit(employeeId, outletId);
+      final position = await LocationService.getCurrentPosition();
+      final res = await _apiService.createVisit(
+        employeeId,
+        outletId,
+        latitude: position.latitude,
+        longitude: position.longitude,
+      );
       _checkedInOutletId = outletId;
       _currentVisitId = res['id'];
       _checkInTime = DateTime.now();

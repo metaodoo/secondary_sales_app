@@ -107,6 +107,8 @@ class ReturnProvider with ChangeNotifier {
     required List<Map<String, dynamic>> lines,
     int? distributorId,
     String? type,
+    String? challanNumber,
+    String? damageType,
   }) async {
     _loadingCount++;
     _error = null;
@@ -117,6 +119,8 @@ class ReturnProvider with ChangeNotifier {
         lines: lines,
         distributorId: distributorId,
         type: type,
+        challanNumber: challanNumber,
+        damageType: damageType,
       );
     } catch (e) {
       _error = e.toString();
@@ -150,13 +154,21 @@ class ReturnProvider with ChangeNotifier {
     int returnId, {
     required List<Map<String, dynamic>> lines,
     String? type,
+    String? challanNumber,
+    String? damageType,
   }) async {
     _loadingCount++;
     _error = null;
     notifyListeners();
 
     try {
-      return await _apiService.updateReturn(returnId, lines: lines, type: type);
+      return await _apiService.updateReturn(
+        returnId,
+        lines: lines,
+        type: type,
+        challanNumber: challanNumber,
+        damageType: damageType,
+      );
     } catch (e) {
       _error = e.toString();
       return null;

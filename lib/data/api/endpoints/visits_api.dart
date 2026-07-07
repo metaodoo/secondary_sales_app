@@ -7,6 +7,8 @@ extension VisitsApi on ApiService {
     int employeeId,
     int outletId, {
     String visitType = 'standard',
+    double? latitude,
+    double? longitude,
   }) async {
     final params = <String, dynamic>{
       'employee_id': employeeId,
@@ -14,6 +16,8 @@ extension VisitsApi on ApiService {
       'visit_type': visitType,
       'check_in_time': DateTime.now().toUtc().toIso8601String(),
     };
+    if (latitude != null) params['latitude'] = latitude;
+    if (longitude != null) params['longitude'] = longitude;
 
     final result = await _post(
       '${AppConstants.apiPrefix}/visits/create',

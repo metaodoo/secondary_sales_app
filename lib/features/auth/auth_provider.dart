@@ -4,9 +4,12 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'package:secondary_sales/core/access/access_control.dart';
+import 'package:secondary_sales/core/access/access_resources.dart';
 import 'package:secondary_sales/core/constants.dart';
 import 'package:secondary_sales/core/services/push_notification_service.dart';
 import 'package:secondary_sales/data/models/auth/mobile_auth_session.dart';
+import 'package:secondary_sales/data/api/api_service.dart';
 import 'package:secondary_sales/data/api/auth_service.dart';
 
 class AuthProvider with ChangeNotifier {
@@ -33,7 +36,9 @@ class AuthProvider with ChangeNotifier {
   String? get sessionId => _session?.sessionId ?? _odooSessionId;
   String get baseUrl => AppConstants.baseUrl;
   String get dbName => AppConstants.dbName;
-  bool get canAccessDealers {
+  /// Legacy "is manager/TSM (not a Sales Officer)" rule. Used as the fallback
+  /// for module gates until the matching screen key is enforced server-side.
+  bool get _legacyManagerAccess {
     final groupCode = _session?.user.groupCode?.trim().toLowerCase();
     if (groupCode != null && groupCode.isNotEmpty) {
       return groupCode != 'so';
@@ -42,20 +47,54 @@ class AuthProvider with ChangeNotifier {
     return role != 'so' && role != 'sales officer';
   }
 
-  bool get canAccessPrimarySales {
-    // By default, Primary Sales (Company -> Distributor) is restricted to managers/TSMs
-    final groupCode = _session?.user.groupCode?.trim().toLowerCase();
-    if (groupCode != null && groupCode.isNotEmpty) {
-      return groupCode != 'so';
-    }
-    final role = _session?.user.role?.trim().toLowerCase();
-    return role != 'so' && role != 'sales officer';
-  }
+  bool get canAccessDealers =>
+      _enforcedOr(AppScreen.dealers, _legacyManagerAccess);
 
-  bool get canAccessSecondarySales {
-    // Secondary Sales (Distributor -> Outlet) is accessible by SOs and TSMs
-    return true;
-  }
+  // By default, Primary Sales (Company -> Distributor) is restricted to managers/TSMs.
+  bool get canAccessPrimarySales =>
+      _enforcedOr(AppScreen.modulePrimary, _legacyManagerAccess);
+
+  // Secondary Sales (Distributor -> Outlet) is accessible by SOs and TSMs.
+  bool get canAccessSecondarySales =>
+      _enforcedOr(AppScreen.moduleSecondary, true);
+
+  /// Backend-driven screen/action access for the current user's group.
+  /// Empty (allow-all) until the backend ships grants — see ACCESS_CONTROL_PLAN.md.
+  AccessControl get access => _session?.access ?? const AccessControl();
+
+  /// Whether a screen key (from `AppScreen`) should be shown.
+  bool canView(String screenKey) => access.allows(screenKey);
+
+  /// Whether an action key (from `AppAction`) should be shown/enabled.
+  bool canDo(String actionKey) => access.allows(actionKey);
+
+  /// Hybrid gate: use the registry only once [key] is enforced server-side;
+  /// otherwise fall back to [legacy] so behavior is unchanged pre-rollout.
+  bool _enforcedOr(String key, bool legacy) =>
+      access.enforced.contains(key) ? access.allows(key) : legacy;
+
+  // Returns/scrap field permissions — hybrid: the registry when the action is
+  // enforced, else the group's permission flags from the login payload.
+  bool get canViewAllReturns => _enforcedOr(
+    AppAction.returnsViewAll,
+    user?.permissions?.canViewAllReturns ?? false,
+  );
+  bool get canEditSoQty => _enforcedOr(
+    AppAction.returnsEditSoQty,
+    user?.permissions?.canEditSoQty ?? false,
+  );
+  bool get canEditQcQty => _enforcedOr(
+    AppAction.returnsEditQcQty,
+    user?.permissions?.canEditQcQty ?? false,
+  );
+  bool get canEditEffectiveQty => _enforcedOr(
+    AppAction.returnsEditEffectiveQty,
+    user?.permissions?.canEditEffectiveQty ?? false,
+  );
+  bool get canSkipAttendanceGeo => _enforcedOr(
+    AppAction.attendanceSkipGeo,
+    user?.permissions?.skipAttendanceGeolocation ?? false,
+  );
 
   Future<List<String>> fetchDatabases(String baseUrl) {
     return _authService.fetchDatabaseList(baseUrl);
@@ -103,6 +142,15 @@ class AuthProvider with ChangeNotifier {
         return;
       }
 
+      final accessRaw = prefs.getString(AppConstants.accessControlKey);
+      var access = const AccessControl();
+      if (accessRaw != null && accessRaw.isNotEmpty) {
+        final decodedAccess = jsonDecode(accessRaw);
+        if (decodedAccess is Map<String, dynamic>) {
+          access = AccessControl.fromMap(decodedAccess);
+        }
+      }
+
       final expiresAt = DateTime.tryParse(expiresAtValue ?? '');
       _session = MobileAuthSession(
         accessToken: accessToken,
@@ -112,6 +160,7 @@ class AuthProvider with ChangeNotifier {
         expiresIn: 0,
         expiresAt: expiresAt,
         user: MobileAuthUser.fromMap(userMap),
+        access: access,
       );
       _odooSessionId = _session!.sessionId;
       _authService.updateSessionId(_session!.sessionId);
@@ -126,6 +175,7 @@ class AuthProvider with ChangeNotifier {
           ),
         );
       }
+      unawaited(refreshAccessControl());
     } catch (e) {
       _error = e.toString();
       _session = null;
@@ -158,6 +208,7 @@ class AuthProvider with ChangeNotifier {
           sessionId: session.sessionId,
         ),
       );
+      unawaited(refreshAccessControl());
       return true;
     } catch (e) {
       _error = e.toString();
@@ -197,6 +248,50 @@ class AuthProvider with ChangeNotifier {
       await logout(callServer: false);
       return false;
     }
+  }
+
+  /// Best-effort refresh of the current user's UI access grants (e.g. on
+  /// resume or after an admin changes grants). Keeps the login-embedded access
+  /// if the call fails (backend not upgraded, offline, etc.).
+  Future<void> refreshAccessControl() async {
+    final session = _session;
+    if (session == null) return;
+    try {
+      _primeApiService(session);
+      final access = await ApiService.instance.getAccessPermissions();
+      _session = session.copyWith(access: access);
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(
+        AppConstants.accessControlKey,
+        jsonEncode(access.toMap()),
+      );
+      notifyListeners();
+    } catch (_) {
+      // Non-fatal: keep the existing (login-embedded) access.
+    }
+  }
+
+  /// Pushes the app's screen/action catalog to Odoo so admins can grant it.
+  /// Server-gated to groups with `can_manage_access`. Returns the sync counts
+  /// and refreshes our own grants afterwards.
+  Future<Map<String, dynamic>> syncAccessCatalog() async {
+    final session = _session;
+    if (session == null) {
+      throw Exception('You must be logged in to sync the access catalog.');
+    }
+    _primeApiService(session);
+    final result = await ApiService.instance.syncAccessCatalog(
+      accessCatalog,
+      appVersion: AppConstants.appVersion,
+    );
+    await refreshAccessControl();
+    return result;
+  }
+
+  void _primeApiService(MobileAuthSession session) {
+    ApiService.instance.updateAccessToken(session.accessToken);
+    ApiService.instance.updateSessionId(session.sessionId);
+    ApiService.instance.updateEmployeeId(session.user.employeeId);
   }
 
   Future<void> logout({bool callServer = true}) async {
@@ -242,6 +337,10 @@ class AuthProvider with ChangeNotifier {
       AppConstants.userDataKey,
       jsonEncode(session.user.toMap()),
     );
+    await prefs.setString(
+      AppConstants.accessControlKey,
+      jsonEncode(session.access.toMap()),
+    );
     if (session.expiresAt != null) {
       await prefs.setString(
         AppConstants.tokenExpiresAtKey,
@@ -257,5 +356,6 @@ class AuthProvider with ChangeNotifier {
     await prefs.remove(AppConstants.tokenExpiresAtKey);
     await prefs.remove(AppConstants.userRoleKey);
     await prefs.remove(AppConstants.userDataKey);
+    await prefs.remove(AppConstants.accessControlKey);
   }
 }

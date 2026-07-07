@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:secondary_sales/core/theme/app_theme.dart';
 import 'package:provider/provider.dart';
 import 'package:secondary_sales/features/routes/route_provider.dart';
+import 'package:secondary_sales/core/services/location_service.dart';
 
 class CreateOutletScreen extends StatefulWidget {
   final int routeId;
@@ -42,26 +43,39 @@ class _CreateOutletScreenState extends State<CreateOutletScreen> {
 
     final provider = Provider.of<RouteProvider>(context, listen: false);
 
-    final newOutlet = await provider.addOutletToRoute(
-      widget.routeId,
-      name: _nameController.text.trim(),
-      mobile: _phoneController.text.trim(),
-      street: _addressController.text.trim(),
-    );
+    try {
+      final position = await LocationService.getCurrentPosition();
 
-    setState(() => _isSaving = false);
-
-    if (!mounted) return;
-
-    if (newOutlet != null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Outlet created successfully')),
+      final newOutlet = await provider.addOutletToRoute(
+        widget.routeId,
+        name: _nameController.text.trim(),
+        mobile: _phoneController.text.trim(),
+        street: _addressController.text.trim(),
+        partnerLatitude: position.latitude,
+        partnerLongitude: position.longitude,
       );
-      Navigator.pop(context, true);
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(provider.error ?? 'Failed to create outlet')),
-      );
+
+      setState(() => _isSaving = false);
+
+      if (!mounted) return;
+
+      if (newOutlet != null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Outlet created successfully')),
+        );
+        Navigator.pop(context, true);
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(provider.error ?? 'Failed to create outlet')),
+        );
+      }
+    } catch (e) {
+      setState(() => _isSaving = false);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(e.toString().replaceAll('Exception: ', ''))),
+        );
+      }
     }
   }
 

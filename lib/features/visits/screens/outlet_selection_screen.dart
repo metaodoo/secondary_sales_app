@@ -80,11 +80,9 @@ class _OutletSelectionScreenState extends State<OutletSelectionScreen> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Failed to check in: $e'),
-            backgroundColor: Colors.red,
-          ),
+        ssShowLocationErrorDialog(
+          context,
+          e.toString().replaceAll('Exception: ', ''),
         );
         setState(() => _isLoading = false);
       }

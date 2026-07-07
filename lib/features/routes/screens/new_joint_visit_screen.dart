@@ -45,6 +45,7 @@ class _NewJointVisitScreenState extends State<NewJointVisitScreen> {
         _officers = officers;
       });
     } catch (e) {
+      if (!mounted) return;
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: Text('Failed to load officers: $e')));

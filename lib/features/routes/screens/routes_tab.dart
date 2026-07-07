@@ -6,6 +6,9 @@ import 'package:provider/provider.dart';
 import 'package:secondary_sales/data/models/routes/route.dart';
 import 'package:secondary_sales/features/routes/route_provider.dart';
 import 'package:secondary_sales/core/widgets/ss_ui.dart';
+import 'package:secondary_sales/features/auth/auth_provider.dart';
+import 'package:secondary_sales/core/access/access_resources.dart';
+import 'package:secondary_sales/core/access/permission_gate.dart';
 import 'package:secondary_sales/features/routes/screens/create_route_screen.dart';
 import 'package:secondary_sales/features/routes/screens/route_detail_screen.dart';
 
@@ -98,9 +101,12 @@ class _RoutesTabState extends State<RoutesTab> {
             BlueHeader(
               title: 'Route List',
               subtitle: 'Manage sales routes and outlets',
-              trailing: IconButton(
-                onPressed: _openCreateRoute,
-                icon: const Icon(Icons.add, color: Colors.white),
+              trailing: PermissionGate(
+                resourceKey: AppAction.routeCreate,
+                child: IconButton(
+                  onPressed: _openCreateRoute,
+                  icon: const Icon(Icons.add, color: Colors.white),
+                ),
               ),
             ),
 
@@ -297,16 +303,19 @@ class _RoutesTabState extends State<RoutesTab> {
             ),
           ],
         ),
-        floatingActionButton: FloatingActionButton(
-          heroTag: null,
-          onPressed: _openCreateRoute,
-          backgroundColor: AppColors.primaryStrong,
-          foregroundColor: Colors.white,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: const Icon(Icons.add, size: 28),
-        ),
+        floatingActionButton:
+            context.watch<AuthProvider>().canDo(AppAction.routeCreate)
+            ? FloatingActionButton(
+                heroTag: null,
+                onPressed: _openCreateRoute,
+                backgroundColor: AppColors.primaryStrong,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Icon(Icons.add, size: 28),
+              )
+            : null,
       ),
     );
   }

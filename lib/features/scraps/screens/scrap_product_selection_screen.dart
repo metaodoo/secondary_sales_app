@@ -182,6 +182,7 @@ class _ScrapProductSelectionScreenState
                         onTap: () => _toggleProduct(product),
                         onDecrease: () => _changeQuantity(product, -1),
                         onIncrease: () => _changeQuantity(product, 1),
+                        onQuantityInput: (newVal) => _changeQuantity(product, newVal - (line?.quantity ?? 1)),
                       );
                     }),
                 ],
@@ -202,6 +203,7 @@ class _ScrapProductCard extends StatelessWidget {
     required this.onTap,
     required this.onDecrease,
     required this.onIncrease,
+    this.onQuantityInput,
   });
 
   final TransferProduct product;
@@ -210,6 +212,7 @@ class _ScrapProductCard extends StatelessWidget {
   final VoidCallback onTap;
   final VoidCallback onDecrease;
   final VoidCallback onIncrease;
+  final ValueChanged<double>? onQuantityInput;
 
   @override
   Widget build(BuildContext context) {
@@ -259,6 +262,12 @@ class _ScrapProductCard extends StatelessWidget {
                 value: quantity.toStringAsFixed(0),
                 onMinus: onDecrease,
                 onPlus: onIncrease,
+                onValueInput: (val) {
+                  final parsed = double.tryParse(val);
+                  if (parsed != null && onQuantityInput != null) {
+                    onQuantityInput!(parsed);
+                  }
+                },
               ),
             ],
           ],

@@ -13,6 +13,7 @@ import 'package:secondary_sales/features/sales/screens/home_tab.dart';
 import 'package:secondary_sales/features/sales/screens/order_tab.dart';
 import 'package:secondary_sales/features/routes/screens/officer_route_selection_screen.dart';
 import 'package:secondary_sales/features/settings/screens/settings_tab.dart';
+import 'package:secondary_sales/core/access/access_resources.dart';
 import 'package:secondary_sales/core/theme/app_theme.dart';
 
 class AppShell extends StatefulWidget {
@@ -151,7 +152,10 @@ class _AppShellState extends State<AppShell> {
   Widget build(BuildContext context) {
     final auth = context.watch<AuthProvider>();
     final canAccessDealers = auth.canAccessDealers;
-    final canAccessPrimary = auth.canAccessPrimarySales;
+    // "Primary Sales" feature (Sales card + Primary Sales nav) is gated by the
+    // sales-list key, decoupled from module entry (screen.module.primary) so a
+    // group can be let into the Primary module without seeing the Sales feature.
+    final canAccessPrimary = auth.canView(AppScreen.primarySalesList);
     final canAccessSecondary = auth.canAccessSecondarySales;
 
     final currentIndex = !canAccessDealers && _currentIndex == 1
@@ -164,6 +168,7 @@ class _AppShellState extends State<AppShell> {
       canAccessPrimary,
       canAccessSecondary,
       widget.moduleType,
+      auth.canView,
     );
 
     // Ensure the tab being shown is always built, even if it was reached
@@ -172,63 +177,66 @@ class _AppShellState extends State<AppShell> {
 
     final tabBuilders = <Widget Function()>[
       () => DashboardTab(
-              showDealerModule: canAccessDealers,
-              showPrimarySalesModule: canAccessPrimary,
-              showSecondarySalesModule: canAccessSecondary,
-              moduleType: widget.moduleType,
-              onBackToModules: _exitModule,
-              onModuleSelected: (index) {
-                _setIndex(index);
-              },
-            ),
+        showDealerModule: canAccessDealers,
+        showPrimarySalesModule: canAccessPrimary,
+        showSecondarySalesModule: canAccessSecondary,
+        moduleType: widget.moduleType,
+        onBackToModules: _exitModule,
+        onModuleSelected: (index) {
+          _setIndex(index);
+        },
+      ),
       () => DealersTab(onProfileTap: () => _setIndex(5), onBack: _goBack),
       () => OfficerRouteSelectionScreen(
-              onProfileTap: () => _setIndex(5),
-              onBack: _goBack,
-            ),
+        onProfileTap: () => _setIndex(5),
+        onBack: _goBack,
+      ),
       () => HomeTab(
-              orderSearchController: _orderSearchController,
-              statusFilter: _statusFilter,
-              dateFromFilter: _dateFromFilter,
-              dateToFilter: _dateToFilter,
-              onSearchChanged: _onOrderSearchChanged,
-              onStatusChanged: (value) {
-                setState(() => _statusFilter = value ?? 'all');
-                _refreshOrders();
-              },
-              onDateTap: _pickDate,
-              onNewOrderTap: () => _setIndex(4),
-              onProfileTap: () => _setIndex(5),
-              onBack: _goBack,
-              onClearDate: () {
-                setState(() {
-                  _dateFromFilter = null;
-                  _dateToFilter = null;
-                });
-                _refreshOrders();
-              },
-              onClearStatus: () {
-                setState(() {
-                  _statusFilter = 'all';
-                });
-                _refreshOrders();
-              },
-              onClearAllFilters: () {
-                setState(() {
-                  _statusFilter = 'all';
-                  _dateFromFilter = null;
-                  _dateToFilter = null;
-                });
-                _refreshOrders();
-              },
-            ),
+        orderSearchController: _orderSearchController,
+        statusFilter: _statusFilter,
+        dateFromFilter: _dateFromFilter,
+        dateToFilter: _dateToFilter,
+        onSearchChanged: _onOrderSearchChanged,
+        onStatusChanged: (value) {
+          setState(() => _statusFilter = value ?? 'all');
+          _refreshOrders();
+        },
+        onDateTap: _pickDate,
+        onNewOrderTap: () => _setIndex(4),
+        onProfileTap: () => _setIndex(5),
+        onBack: _goBack,
+        onClearDate: () {
+          setState(() {
+            _dateFromFilter = null;
+            _dateToFilter = null;
+          });
+          _refreshOrders();
+        },
+        onClearStatus: () {
+          setState(() {
+            _statusFilter = 'all';
+          });
+          _refreshOrders();
+        },
+        onClearAllFilters: () {
+          setState(() {
+            _statusFilter = 'all';
+            _dateFromFilter = null;
+            _dateToFilter = null;
+          });
+          _refreshOrders();
+        },
+      ),
       () => OrderTab(
-              searchController: _distributorSearchController,
-              onSearchChanged: _onDistributorSearchChanged,
-              onBack: _goBack,
-            ),
+        searchController: _distributorSearchController,
+        onSearchChanged: _onDistributorSearchChanged,
+        onBack: _goBack,
+      ),
       () => SettingsTab(onBack: _goBack),
-      () => VanOperationsListScreen(onProfileTap: () => _setIndex(5), onBack: _goBack),
+      () => VanOperationsListScreen(
+        onProfileTap: () => _setIndex(5),
+        onBack: _goBack,
+      ),
     ];
 
     return PopScope(
@@ -258,6 +266,7 @@ class _AppShellState extends State<AppShell> {
                   canAccessPrimary,
                   canAccessSecondary,
                   widget.moduleType,
+                  auth.canView,
                 ),
                 onDestinationSelected: (index) => _setIndex(
                   stackIndexForBottomNavIndex(
@@ -266,6 +275,7 @@ class _AppShellState extends State<AppShell> {
                     canAccessPrimary,
                     canAccessSecondary,
                     widget.moduleType,
+                    auth.canView,
                   ),
                 ),
                 destinations: navItems

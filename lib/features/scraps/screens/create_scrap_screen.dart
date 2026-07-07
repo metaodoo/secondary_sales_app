@@ -541,6 +541,19 @@ class _CreateScrapScreenState extends State<CreateScrapScreen> {
                               ),
                               allocatedQty: _allocatedQty(line),
                               isReadOnly: _isReadOnly,
+                              onQuantityChanged: (newQty) {
+                                setState(() {
+                                  line.quantity = newQty.clamp(1, line.product.availableQty);
+                                  // trigger rebuild
+                                  _allocatedQty(line);
+                                });
+                              },
+                              onLotQtyInput: (lotInput, newLotQty) {
+                                setState(() {
+                                  final maxQty = lotInput.lot?.availableQty ?? line.quantity;
+                                  lotInput.quantity = newLotQty.clamp(0, maxQty);
+                                });
+                              },
                             ),
                           ),
                       ],
@@ -591,6 +604,8 @@ class _ScrapLineCard extends StatelessWidget {
     required this.onLotPlus,
     required this.allocatedQty,
     this.isReadOnly = false,
+    this.onQuantityChanged,
+    this.onLotQtyInput,
   });
 
   final VirtualTransferLineEntry line;
@@ -605,6 +620,8 @@ class _ScrapLineCard extends StatelessWidget {
   final ValueChanged<TransferLotInput> onLotPlus;
   final double allocatedQty;
   final bool isReadOnly;
+  final ValueChanged<double>? onQuantityChanged;
+  final void Function(TransferLotInput lotInput, double quantity)? onLotQtyInput;
 
   @override
   Widget build(BuildContext context) {
@@ -710,6 +727,9 @@ class _ScrapLineCard extends StatelessWidget {
                         onMinus: () => onLotMinus(lotInput),
                         onPlus: () => onLotPlus(lotInput),
                         isReadOnly: isReadOnly,
+                        onQuantityChanged: onLotQtyInput != null
+                            ? (newVal) => onLotQtyInput!(lotInput, newVal)
+                            : null,
                       ),
                     ),
                   ),
@@ -764,7 +784,7 @@ class _ScrapLineCard extends StatelessWidget {
                   const Spacer(),
                   if (isReadOnly)
                     Text(
-                      '${line.quantity.toStringAsFixed(0)}',
+                      line.quantity.toStringAsFixed(0),
                       style: const TextStyle(
                         fontWeight: FontWeight.bold,
                         fontSize: 16,
@@ -775,16 +795,18 @@ class _ScrapLineCard extends StatelessWidget {
                       value: line.quantity.toStringAsFixed(0),
                       onMinus: () {
                         if (line.quantity > 1) {
-                          line.quantity--;
-                          onRemoveLot(
-                            TransferLotInput(),
-                          ); // just to trigger rebuild in parent
+                          onQuantityChanged?.call(line.quantity - 1);
                         }
                       },
                       onPlus: () {
                         if (line.quantity < line.product.availableQty) {
-                          line.quantity++;
-                          onRemoveLot(TransferLotInput());
+                          onQuantityChanged?.call(line.quantity + 1);
+                        }
+                      },
+                      onValueInput: (val) {
+                        final parsed = double.tryParse(val);
+                        if (parsed != null) {
+                          onQuantityChanged?.call(parsed);
                         }
                       },
                     ),
@@ -807,6 +829,7 @@ class _ScrapLotRow extends StatelessWidget {
     required this.onMinus,
     required this.onPlus,
     this.isReadOnly = false,
+    this.onQuantityChanged,
   });
 
   final TransferLotInput lotInput;
@@ -816,6 +839,7 @@ class _ScrapLotRow extends StatelessWidget {
   final VoidCallback onMinus;
   final VoidCallback onPlus;
   final bool isReadOnly;
+  final ValueChanged<double>? onQuantityChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -895,9 +919,33 @@ class _ScrapLotRow extends StatelessWidget {
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text(
-                      lotInput.quantity.toStringAsFixed(0),
-                      style: const TextStyle(fontSize: 14),
+                    SizedBox(
+                      width: 52,
+                      height: 32,
+                      child: TextField(
+                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                        textAlign: TextAlign.center,
+                        enabled: !isReadOnly && onQuantityChanged != null,
+                        style: const TextStyle(fontSize: 14),
+                        decoration: const InputDecoration(
+                          isDense: true,
+                          contentPadding: EdgeInsets.symmetric(horizontal: 4, vertical: 6),
+                          border: InputBorder.none,
+                          enabledBorder: InputBorder.none,
+                          focusedBorder: UnderlineInputBorder(
+                            borderSide: BorderSide(color: AppColors.primary, width: 2),
+                          ),
+                        ),
+                        onChanged: (val) {
+                          final parsed = double.tryParse(val);
+                          if (parsed != null && onQuantityChanged != null) {
+                            onQuantityChanged!(parsed);
+                          }
+                        },
+                        controller: TextEditingController(
+                          text: lotInput.quantity.toStringAsFixed(0),
+                        )..selection = TextSelection.collapsed(offset: lotInput.quantity.toStringAsFixed(0).length),
+                      ),
                     ),
                     if (!isReadOnly)
                       Row(

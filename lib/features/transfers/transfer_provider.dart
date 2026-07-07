@@ -243,6 +243,11 @@ class TransferProvider with ChangeNotifier {
     notifyListeners();
 
     try {
+      await _resolveLotLines(
+        lines,
+        destinationLocationId: destinationLocationId,
+        vanOperationType: vanOperationType,
+      );
       return await _apiService.createVirtualTransfer(
         destinationLocationId: destinationLocationId,
         lines: lines,
@@ -268,6 +273,11 @@ class TransferProvider with ChangeNotifier {
     notifyListeners();
 
     try {
+      await _resolveLotLines(
+        lines,
+        destinationLocationId: destinationLocationId,
+        vanOperationType: vanOperationType,
+      );
       return await _apiService.updateVirtualTransfer(
         transferId,
         destinationLocationId: destinationLocationId,
@@ -316,6 +326,27 @@ class TransferProvider with ChangeNotifier {
     } finally {
       if (_loadingCount > 0) _loadingCount--;
       notifyListeners();
+    }
+  }
+
+  /// Resolves lots (FIFO) for any lot-tracked line that doesn't already carry
+  /// an explicit lot selection, mutating each line's [lotLines] in place. Run
+  /// before create/update so lots are determined as a distinct, surfaced step
+  /// instead of being resolved implicitly inside the API serialize path.
+  Future<void> _resolveLotLines(
+    List<VirtualTransferLineEntry> lines, {
+    required int destinationLocationId,
+    String? vanOperationType,
+  }) async {
+    for (final line in lines) {
+      if (line.product.requiresLots && line.lotLines.isEmpty) {
+        final resolved = await _apiService.resolveTransferLotInputs(
+          line,
+          destinationLocationId: destinationLocationId,
+          vanOperationType: vanOperationType,
+        );
+        line.lotLines.addAll(resolved);
+      }
     }
   }
 }

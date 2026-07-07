@@ -156,22 +156,43 @@ class OrderLineCard extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 8),
-              // Qty text
-              Container(
+              // Qty input field
+              SizedBox(
                 width: 50,
                 height: 38,
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  border: Border.all(color: AppColors.borderSoft),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Text(
-                  '${line.quantity}',
+                child: TextField(
+                  keyboardType: const TextInputType.numberWithOptions(decimal: false),
+                  textAlign: TextAlign.center,
                   style: const TextStyle(
                     fontWeight: FontWeight.bold,
                     fontSize: 15,
                     color: AppColors.textPrimary,
                   ),
+                  decoration: InputDecoration(
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 4, vertical: 0),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      borderSide: const BorderSide(color: AppColors.borderSoft),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      borderSide: const BorderSide(color: AppColors.borderSoft),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      borderSide: const BorderSide(color: AppColors.primary, width: 2),
+                    ),
+                  ),
+                  onChanged: (val) {
+                    final parsed = int.tryParse(val);
+                    if (parsed != null && parsed > 0) {
+                      line.quantity = parsed;
+                      onChanged();
+                    }
+                  },
+                  controller: TextEditingController(
+                    text: '${line.quantity}',
+                  )..selection = TextSelection.collapsed(offset: '${line.quantity}'.length),
                 ),
               ),
               const SizedBox(width: 8),
@@ -235,6 +256,7 @@ class ProductCard extends StatelessWidget {
     required this.onTap,
     required this.onDecrease,
     required this.onIncrease,
+    this.onQuantityInput,
   });
 
   final Product product;
@@ -243,6 +265,7 @@ class ProductCard extends StatelessWidget {
   final VoidCallback onTap;
   final VoidCallback onDecrease;
   final VoidCallback onIncrease;
+  final ValueChanged<int>? onQuantityInput;
 
   @override
   Widget build(BuildContext context) {
@@ -296,6 +319,12 @@ class ProductCard extends StatelessWidget {
                 value: '$quantity',
                 onMinus: onDecrease,
                 onPlus: onIncrease,
+                onValueInput: (val) {
+                  final parsed = int.tryParse(val);
+                  if (parsed != null && onQuantityInput != null) {
+                    onQuantityInput!(parsed);
+                  }
+                },
               ),
             ],
           ],

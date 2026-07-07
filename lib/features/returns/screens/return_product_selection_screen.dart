@@ -152,38 +152,43 @@ class _ReturnProductSelectionScreenState
               ),
             ),
             Expanded(
-              child: ListView(
-                padding: const EdgeInsets.all(16),
-                children: [
-                  TextField(
-                    controller: _searchController,
-                    decoration: ssInputDecoration(
-                      'Search products...',
-                      Icons.search,
+              child: RefreshIndicator(
+                onRefresh: _fetchProducts,
+                child: ListView(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  padding: const EdgeInsets.all(16),
+                  children: [
+                    TextField(
+                      controller: _searchController,
+                      decoration: ssInputDecoration(
+                        'Search products...',
+                        Icons.search,
+                      ),
+                      onChanged: _onSearchChanged,
                     ),
-                    onChanged: _onSearchChanged,
-                  ),
-                  const SizedBox(height: 16),
-                  if (_isLoading && _products.isEmpty)
-                    const Padding(
-                      padding: EdgeInsets.all(32),
-                      child: Center(child: CircularProgressIndicator()),
-                    )
-                  else if (_products.isEmpty)
-                    const EmptyPanel(message: 'No available products found')
-                  else
-                    ..._products.map((product) {
-                      final line = _selectedLines[product.id];
-                      return _ReturnProductCard(
-                        product: product,
-                        quantity: line?.quantity ?? 1,
-                        isSelected: line != null,
-                        onTap: () => _toggleProduct(product),
-                        onDecrease: () => _changeQuantity(product, -1),
-                        onIncrease: () => _changeQuantity(product, 1),
-                      );
-                    }),
-                ],
+                    const SizedBox(height: 16),
+                    if (_isLoading && _products.isEmpty)
+                      const Padding(
+                        padding: EdgeInsets.all(32),
+                        child: Center(child: CircularProgressIndicator()),
+                      )
+                    else if (_products.isEmpty)
+                      const EmptyPanel(message: 'No available products found')
+                    else
+                      ..._products.map((product) {
+                        final line = _selectedLines[product.id];
+                        return _ReturnProductCard(
+                          product: product,
+                          quantity: line?.quantity ?? 1,
+                          isSelected: line != null,
+                          onTap: () => _toggleProduct(product),
+                          onDecrease: () => _changeQuantity(product, -1),
+                          onIncrease: () => _changeQuantity(product, 1),
+                          onQuantityInput: (newVal) => _changeQuantity(product, newVal - (line?.quantity ?? 1)),
+                        );
+                      }),
+                  ],
+                ),
               ),
             ),
           ],
@@ -201,6 +206,7 @@ class _ReturnProductCard extends StatelessWidget {
     required this.onTap,
     required this.onDecrease,
     required this.onIncrease,
+    this.onQuantityInput,
   });
 
   final TransferProduct product;
@@ -209,6 +215,7 @@ class _ReturnProductCard extends StatelessWidget {
   final VoidCallback onTap;
   final VoidCallback onDecrease;
   final VoidCallback onIncrease;
+  final ValueChanged<double>? onQuantityInput;
 
   @override
   Widget build(BuildContext context) {
@@ -258,6 +265,12 @@ class _ReturnProductCard extends StatelessWidget {
                 value: quantity.toStringAsFixed(0),
                 onMinus: onDecrease,
                 onPlus: onIncrease,
+                onValueInput: (val) {
+                  final parsed = double.tryParse(val);
+                  if (parsed != null && onQuantityInput != null) {
+                    onQuantityInput!(parsed);
+                  }
+                },
               ),
             ],
           ],

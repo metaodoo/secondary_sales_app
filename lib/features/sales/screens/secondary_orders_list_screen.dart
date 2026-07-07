@@ -7,21 +7,19 @@ import 'package:secondary_sales/core/widgets/ss_ui.dart';
 import 'package:secondary_sales/data/models/sales/primary_order.dart';
 import 'package:secondary_sales/features/sales/primary_sale_provider.dart';
 import 'package:secondary_sales/features/sales/screens/order_detail_screen.dart';
-import 'package:secondary_sales/features/contacts/screens/outlets_list_screen.dart';
 import 'package:secondary_sales/features/routes/screens/officer_route_selection_screen.dart';
+import 'package:secondary_sales/features/auth/auth_provider.dart';
+import 'package:secondary_sales/core/access/access_resources.dart';
 import 'package:secondary_sales/data/api/api_service.dart';
 
 class SecondaryOrdersListScreen extends StatefulWidget {
   final int? outletId;
   final String? outletName;
-  const SecondaryOrdersListScreen({
-    super.key,
-    this.outletId,
-    this.outletName,
-  });
+  const SecondaryOrdersListScreen({super.key, this.outletId, this.outletName});
 
   @override
-  State<SecondaryOrdersListScreen> createState() => _SecondaryOrdersListScreenState();
+  State<SecondaryOrdersListScreen> createState() =>
+      _SecondaryOrdersListScreenState();
 }
 
 class _SecondaryOrdersListScreenState extends State<SecondaryOrdersListScreen> {
@@ -86,10 +84,7 @@ class _SecondaryOrdersListScreenState extends State<SecondaryOrdersListScreen> {
 
   void _onSearchChanged(String value) {
     _searchDebounce?.cancel();
-    _searchDebounce = Timer(
-      const Duration(milliseconds: 350),
-      _fetchOrders,
-    );
+    _searchDebounce = Timer(const Duration(milliseconds: 350), _fetchOrders);
   }
 
   Future<void> _pickDate() async {
@@ -386,33 +381,36 @@ class _SecondaryOrdersListScreenState extends State<SecondaryOrdersListScreen> {
               const SizedBox(height: 24),
 
               // Create Order Button
-              ElevatedButton.icon(
-                onPressed: () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (_) => const OfficerRouteSelectionScreen(),
+              if (context.watch<AuthProvider>().canView(AppScreen.orderCreate))
+                ElevatedButton.icon(
+                  onPressed: () {
+                    Navigator.of(context)
+                        .push(
+                          MaterialPageRoute(
+                            builder: (_) => const OfficerRouteSelectionScreen(),
+                          ),
+                        )
+                        .then((_) => _fetchOrders());
+                  },
+                  icon: const Icon(Icons.add, color: Colors.white, size: 22),
+                  label: const Text(
+                    'New Sales Order',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
                     ),
-                  ).then((_) => _fetchOrders());
-                },
-                icon: const Icon(Icons.add, color: Colors.white, size: 22),
-                label: const Text(
-                  'New Sales Order',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 16,
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                    elevation: 0,
+                    shadowColor: Colors.transparent,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
                   ),
                 ),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.primary,
-                  elevation: 0,
-                  shadowColor: Colors.transparent,
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-              ),
               const SizedBox(height: 32),
 
               // List Header

@@ -88,6 +88,8 @@ class VirtualTransferLineEntry {
   VirtualTransferLineEntry({
     required this.product,
     required this.quantity,
+    this.soQty,
+    this.qcQty,
     this.freshQty,
     this.scrapQty,
     List<TransferLotInput>? lotLines,
@@ -95,6 +97,8 @@ class VirtualTransferLineEntry {
 
   final TransferProduct product;
   double quantity;
+  double? soQty;
+  double? qcQty;
   double? freshQty;
   double? scrapQty;
   final List<TransferLotInput> lotLines;
@@ -104,12 +108,16 @@ class TransferLotInput {
   TransferLotInput({
     this.lot,
     this.quantity = 0,
+    this.soQty,
+    this.qcQty,
     this.freshQty,
     this.scrapQty,
   });
 
   TransferLot? lot;
   double quantity;
+  double? soQty;
+  double? qcQty;
   double? freshQty;
   double? scrapQty;
 }
@@ -166,6 +174,8 @@ class VirtualTransferLine {
   final Map<String, dynamic>? product;
   final double demandQty;
   final double quantity;
+  final double soQty;
+  final double qcQty;
   final double scrapQty;
   final Map<String, dynamic>? uom;
   final List<Map<String, dynamic>> lotLines;
@@ -176,6 +186,8 @@ class VirtualTransferLine {
     this.product,
     required this.demandQty,
     required this.quantity,
+    this.soQty = 0,
+    this.qcQty = 0,
     required this.scrapQty,
     this.uom,
     required this.lotLines,
@@ -189,6 +201,8 @@ class VirtualTransferLine {
       product: asMapOrNull(map['product']),
       demandQty: asDouble(map['demand_qty']),
       quantity: asDouble(map['quantity']),
+      soQty: asDouble(map['so_qty']),
+      qcQty: asDouble(map['qc_qty']),
       scrapQty: asDouble(map['scrap_qty']),
       uom: asMapOrNull(map['uom']),
       lotLines: rawLots is List ? rawLots.map(asMap).toList() : [],

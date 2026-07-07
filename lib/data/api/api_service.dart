@@ -15,6 +15,8 @@ import 'package:secondary_sales/data/models/sales/delivery_prepare.dart';
 import 'package:secondary_sales/data/models/delivery_item.dart';
 import 'package:secondary_sales/data/models/inventory/warehouse.dart';
 import 'package:secondary_sales/data/models/inventory/virtual_transfer.dart';
+import 'package:secondary_sales/core/access/access_control.dart';
+import 'package:secondary_sales/core/access/access_resources.dart';
 import 'package:secondary_sales/core/util/parse.dart';
 
 part 'endpoints/device_api.dart';
@@ -29,6 +31,10 @@ part 'endpoints/transfers_api.dart';
 part 'endpoints/returns_api.dart';
 part 'endpoints/scraps_api.dart';
 part 'endpoints/attendance_api.dart';
+part 'endpoints/leave_api.dart';
+part 'endpoints/expense_api.dart';
+part 'endpoints/access_api.dart';
+part 'endpoints/my_team_api.dart';
 
 class ApiService {
   ApiService._internal();
@@ -133,11 +139,16 @@ class ApiService {
 
       if (decoded.containsKey('error')) {
         final error = decoded['error'];
-        final message = error is Map
-            ? (error['message'] ??
-                  error['data']?['message'] ??
-                  'Odoo Server Error')
-            : 'Odoo Server Error';
+        String message = 'Odoo Server Error';
+        if (error is Map) {
+          final dataMsg = error['data']?['message'];
+          final errMsg = error['message'];
+          if (dataMsg != null && dataMsg.toString().trim().isNotEmpty) {
+            message = dataMsg.toString();
+          } else if (errMsg != null && errMsg.toString().trim().isNotEmpty) {
+            message = errMsg.toString();
+          }
+        }
 
         if (message.toString().contains('token expired') &&
             !isRetry &&
@@ -199,9 +210,15 @@ class ApiService {
     }
   }
 
-  Future<List<Map<String, dynamic>>> _buildTransferLotPayload(
-    VirtualTransferLineEntry line,
-    int destinationLocationId, {
+  /// Resolves which lots to draw from for a lot-tracked line, allocating the
+  /// requested quantity FIFO across the available lots. Returns typed
+  /// [TransferLotInput]s so the caller (the provider) can resolve lots as an
+  /// explicit step *before* creating a transfer — rather than this network
+  /// call being hidden inside the create/serialize path. Throws with a
+  /// product-specific message when there isn't enough lot quantity.
+  Future<List<TransferLotInput>> resolveTransferLotInputs(
+    VirtualTransferLineEntry line, {
+    required int destinationLocationId,
     String? vanOperationType,
   }) async {
     final lots = await getTransferProductLots(
@@ -211,13 +228,13 @@ class ApiService {
     );
 
     if (vanOperationType == 'unload') {
-      final payload = <Map<String, dynamic>>[];
+      final inputs = <TransferLotInput>[];
       var freshRemaining = line.freshQty ?? line.quantity;
       var scrapRemaining = line.scrapQty ?? 0.0;
 
       for (final lot in lots) {
         if (freshRemaining <= 0 && scrapRemaining <= 0) break;
-        
+
         double allocatedFresh = 0.0;
         double allocatedScrap = 0.0;
 
@@ -232,11 +249,11 @@ class ApiService {
         }
 
         if (allocatedFresh > 0 || allocatedScrap > 0) {
-          payload.add({
-            'lot_id': lot.lotId,
-            'fresh_qty': allocatedFresh,
-            'scrap_qty': allocatedScrap,
-          });
+          inputs.add(TransferLotInput(
+            lot: lot,
+            freshQty: allocatedFresh,
+            scrapQty: allocatedScrap,
+          ));
         }
       }
 
@@ -251,10 +268,10 @@ class ApiService {
         );
       }
 
-      return payload;
+      return inputs;
     } else {
       var remaining = line.quantity;
-      final payload = <Map<String, dynamic>>[];
+      final inputs = <TransferLotInput>[];
 
       for (final lot in lots) {
         if (remaining <= 0) break;
@@ -262,7 +279,7 @@ class ApiService {
             ? remaining
             : lot.availableQty;
         if (quantity <= 0) continue;
-        payload.add({'lot_id': lot.lotId, 'quantity': quantity});
+        inputs.add(TransferLotInput(lot: lot, quantity: quantity));
         remaining -= quantity;
       }
 
@@ -272,7 +289,7 @@ class ApiService {
         );
       }
 
-      return payload;
+      return inputs;
     }
   }
 

@@ -60,6 +60,7 @@ class AppConstants {
   }
 
   static const String appName = 'Secondary Sales';
+  static const String appVersion = '1.0.0+1';
   static const String apiPrefix = '/api/v1';
 
   // API Endpoints
@@ -88,6 +89,9 @@ class AppConstants {
   static const String routesEndpoint = '$apiPrefix/routes';
   static const String returnsEndpoint = '$apiPrefix/returns';
   static const String scrapsEndpoint = '$apiPrefix/scraps';
+  static const String accessPermissionsEndpoint = '$apiPrefix/access/permissions';
+  static const String accessCatalogSyncEndpoint =
+      '$apiPrefix/access/catalog/sync';
   // Storage Keys
   static const String accessTokenKey = 'mobile_access_token';
   static const String refreshTokenKey = 'mobile_refresh_token';
@@ -98,4 +102,5 @@ class AppConstants {
   static const String tokenExpiresAtKey = 'mobile_token_expires_at';
   static const String userRoleKey = 'user_role';
   static const String userDataKey = 'user_data';
+  static const String accessControlKey = 'mobile_access_control';
 }

@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import 'package:secondary_sales/core/access/access_resources.dart';
+
 class AppShellIndex {
   static const int dashboard = 0;
   static const int dealers = 1;
@@ -19,6 +21,7 @@ class AppShellNavItem {
     this.requiresDealerAccess = false,
     this.requiresPrimarySalesAccess = false,
     this.requiresSecondarySalesAccess = false,
+    this.screenKey,
   });
 
   final int stackIndex;
@@ -29,18 +32,37 @@ class AppShellNavItem {
   final bool requiresPrimarySalesAccess;
   final bool requiresSecondarySalesAccess;
 
-  bool isVisible(bool canAccessDealers, bool canAccessPrimary, bool canAccessSecondary, String moduleType) {
+  /// Optional access-catalog screen key gating this nav item. When set, the item
+  /// is hidden unless [canView] allows it (backend-driven access config).
+  final String? screenKey;
+
+  bool isVisible(
+    bool canAccessDealers,
+    bool canAccessPrimary,
+    bool canAccessSecondary,
+    String moduleType, [
+    bool Function(String key)? canView,
+  ]) {
     if (requiresDealerAccess && !canAccessDealers) return false;
     if (requiresPrimarySalesAccess && !canAccessPrimary) return false;
     if (requiresSecondarySalesAccess && !canAccessSecondary) return false;
-    
+    if (screenKey != null && canView != null && !canView(screenKey!)) {
+      return false;
+    }
+
     // Filter by moduleType
     if (moduleType == 'primary') {
-      if (stackIndex == AppShellIndex.routes || stackIndex == AppShellIndex.vanLoading) return false;
+      if (stackIndex == AppShellIndex.routes ||
+          stackIndex == AppShellIndex.vanLoading) {
+        return false;
+      }
     } else if (moduleType == 'secondary') {
-      if (stackIndex == AppShellIndex.dealers || stackIndex == AppShellIndex.sales) return false;
+      if (stackIndex == AppShellIndex.dealers ||
+          stackIndex == AppShellIndex.sales) {
+        return false;
+      }
     }
-    
+
     return true;
   }
 }
@@ -64,6 +86,7 @@ const List<AppShellNavItem> appShellNavItems = [
     label: 'Routes',
     icon: Icons.alt_route_outlined,
     selectedIcon: Icons.alt_route,
+    screenKey: AppScreen.routesList,
   ),
   AppShellNavItem(
     stackIndex: AppShellIndex.sales,
@@ -77,19 +100,45 @@ const List<AppShellNavItem> appShellNavItems = [
     label: 'Van Operations',
     icon: Icons.local_shipping_outlined,
     selectedIcon: Icons.local_shipping,
+    screenKey: AppScreen.vanOperationsList,
   ),
 ];
 
 List<AppShellNavItem> visibleAppShellNavItems(
-    bool canAccessDealers, bool canAccessPrimary, bool canAccessSecondary, String moduleType) {
+  bool canAccessDealers,
+  bool canAccessPrimary,
+  bool canAccessSecondary,
+  String moduleType, [
+  bool Function(String key)? canView,
+]) {
   return appShellNavItems
-      .where((item) => item.isVisible(canAccessDealers, canAccessPrimary, canAccessSecondary, moduleType))
+      .where(
+        (item) => item.isVisible(
+          canAccessDealers,
+          canAccessPrimary,
+          canAccessSecondary,
+          moduleType,
+          canView,
+        ),
+      )
       .toList(growable: false);
 }
 
-int bottomNavIndexForStackIndex(int stackIndex, 
-    bool canAccessDealers, bool canAccessPrimary, bool canAccessSecondary, String moduleType) {
-  final items = visibleAppShellNavItems(canAccessDealers, canAccessPrimary, canAccessSecondary, moduleType);
+int bottomNavIndexForStackIndex(
+  int stackIndex,
+  bool canAccessDealers,
+  bool canAccessPrimary,
+  bool canAccessSecondary,
+  String moduleType, [
+  bool Function(String key)? canView,
+]) {
+  final items = visibleAppShellNavItems(
+    canAccessDealers,
+    canAccessPrimary,
+    canAccessSecondary,
+    moduleType,
+    canView,
+  );
   final selected = items.indexWhere((item) => item.stackIndex == stackIndex);
   if (selected != -1) return selected;
 
@@ -99,9 +148,21 @@ int bottomNavIndexForStackIndex(int stackIndex,
   return items.indexWhere((item) => item.stackIndex == AppShellIndex.dashboard);
 }
 
-int stackIndexForBottomNavIndex(int navIndex, 
-    bool canAccessDealers, bool canAccessPrimary, bool canAccessSecondary, String moduleType) {
-  final items = visibleAppShellNavItems(canAccessDealers, canAccessPrimary, canAccessSecondary, moduleType);
+int stackIndexForBottomNavIndex(
+  int navIndex,
+  bool canAccessDealers,
+  bool canAccessPrimary,
+  bool canAccessSecondary,
+  String moduleType, [
+  bool Function(String key)? canView,
+]) {
+  final items = visibleAppShellNavItems(
+    canAccessDealers,
+    canAccessPrimary,
+    canAccessSecondary,
+    moduleType,
+    canView,
+  );
   if (navIndex < 0 || navIndex >= items.length) {
     return AppShellIndex.dashboard;
   }

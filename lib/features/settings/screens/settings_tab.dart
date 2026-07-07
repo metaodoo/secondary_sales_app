@@ -3,6 +3,7 @@ import 'package:secondary_sales/core/theme/app_theme.dart';
 import 'package:provider/provider.dart';
 
 import 'package:secondary_sales/features/auth/auth_provider.dart';
+import 'package:secondary_sales/core/access/access_resources.dart';
 import 'package:secondary_sales/features/employees/screens/sales_officer_list_screen.dart';
 import 'package:secondary_sales/features/hr/screens/attendance_screen.dart';
 import 'package:secondary_sales/features/hr/screens/leave_request_screen.dart';
@@ -142,42 +143,77 @@ class SettingsTab extends StatelessWidget {
               ),
               child: Column(
                 children: [
+                  if (auth.canView(AppScreen.moduleAttendance)) ...[
+                    _buildSettingItem(
+                      icon: Icons.access_time_filled_outlined,
+                      title: 'Attendance',
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const AttendanceScreen(),
+                          ),
+                        );
+                      },
+                    ),
+                    const Divider(height: 1, color: AppColors.borderMuted),
+                  ],
+                  if (auth.canView(AppScreen.moduleLeave)) ...[
+                    _buildSettingItem(
+                      icon: Icons.event_busy_outlined,
+                      title: 'Leave Request',
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const LeaveRequestScreen(),
+                          ),
+                        );
+                      },
+                    ),
+                    const Divider(height: 1, color: AppColors.borderMuted),
+                  ],
+                  if (auth.canView(AppScreen.salesOfficerList)) ...[
+                    _buildSettingItem(
+                      icon: Icons.people_outline,
+                      title: 'Sales Officers',
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const SalesOfficerListScreen(),
+                          ),
+                        );
+                      },
+                    ),
+                    const Divider(height: 1, color: AppColors.borderMuted),
+                  ],
                   _buildSettingItem(
-                    icon: Icons.access_time_filled_outlined,
-                    title: 'Attendance',
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => const AttendanceScreen(),
-                        ),
-                      );
-                    },
-                  ),
-                  const Divider(height: 1, color: AppColors.borderMuted),
-                  _buildSettingItem(
-                    icon: Icons.event_busy_outlined,
-                    title: 'Leave Request',
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => const LeaveRequestScreen(),
-                        ),
-                      );
-                    },
-                  ),
-                  const Divider(height: 1, color: AppColors.borderMuted),
-                  _buildSettingItem(
-                    icon: Icons.people_outline,
-                    title: 'Sales Officers',
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => const SalesOfficerListScreen(),
-                        ),
-                      );
+                    icon: Icons.sync,
+                    title: 'Sync Access Catalog',
+                    onTap: () async {
+                      final messenger = ScaffoldMessenger.of(context);
+                      try {
+                        final result = await context
+                            .read<AuthProvider>()
+                            .syncAccessCatalog();
+                        messenger.showSnackBar(
+                          SnackBar(
+                            content: Text(
+                              'Access catalog synced '
+                              '(+${result['added'] ?? 0}, ~${result['updated'] ?? 0}).',
+                            ),
+                          ),
+                        );
+                      } catch (e) {
+                        messenger.showSnackBar(
+                          SnackBar(
+                            content: Text(
+                              e.toString().replaceAll('Exception: ', ''),
+                            ),
+                          ),
+                        );
+                      }
                     },
                   ),
                   const Divider(height: 1, color: AppColors.borderMuted),

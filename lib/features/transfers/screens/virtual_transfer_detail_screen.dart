@@ -5,6 +5,8 @@ import 'package:provider/provider.dart';
 import 'package:secondary_sales/data/models/inventory/virtual_transfer.dart';
 import 'package:secondary_sales/features/transfers/transfer_provider.dart';
 import 'package:secondary_sales/core/widgets/ss_ui.dart';
+import 'package:secondary_sales/core/access/permission_gate.dart';
+import 'package:secondary_sales/core/access/access_resources.dart';
 import 'package:secondary_sales/features/van_loading/screens/van_load_form_screen.dart';
 
 class VirtualTransferDetailScreen extends StatefulWidget {
@@ -145,7 +147,11 @@ class _VirtualTransferDetailScreenState
                 future: _transferFuture,
                 builder: (context, snapshot) {
                   final transfer = snapshot.data;
-                  if (transfer != null && !['done', 'cancel'].contains(transfer.state.toLowerCase())) {
+                  if (transfer != null &&
+                      ![
+                        'done',
+                        'cancel',
+                      ].contains(transfer.state.toLowerCase())) {
                     return IconButton(
                       icon: const Icon(Icons.edit, color: Colors.white),
                       onPressed: () => _editTransfer(transfer),
@@ -289,20 +295,23 @@ class _VirtualTransferDetailScreenState
                         SizedBox(
                           width: double.infinity,
                           height: 48,
-                          child: TextButton(
-                            onPressed: provider.isLoading
-                                ? null
-                                : () => _cancel(transfer),
-                            style: TextButton.styleFrom(
-                              backgroundColor: Colors.red.shade50,
-                              foregroundColor: Colors.red,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(10),
+                          child: PermissionGate(
+                            resourceKey: AppAction.transferCancel,
+                            child: TextButton(
+                              onPressed: provider.isLoading
+                                  ? null
+                                  : () => _cancel(transfer),
+                              style: TextButton.styleFrom(
+                                backgroundColor: Colors.red.shade50,
+                                foregroundColor: Colors.red,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
                               ),
-                            ),
-                            child: const Text(
-                              'Cancel Transfer',
-                              style: TextStyle(fontWeight: FontWeight.w800),
+                              child: const Text(
+                                'Cancel Transfer',
+                                style: TextStyle(fontWeight: FontWeight.w800),
+                              ),
                             ),
                           ),
                         ),

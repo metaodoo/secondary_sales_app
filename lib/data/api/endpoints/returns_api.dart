@@ -84,6 +84,8 @@ extension ReturnsApi on ApiService {
     required List<Map<String, dynamic>> lines,
     int? distributorId,
     String? type,
+    String? challanNumber,
+    String? damageType,
   }) async {
     final params = <String, dynamic>{
       'employee_id': _activeEmployeeId,
@@ -91,6 +93,12 @@ extension ReturnsApi on ApiService {
     };
     if (distributorId != null) params['distributor_id'] = distributorId;
     if (type != null && type.isNotEmpty) params['type'] = type;
+    if (challanNumber != null && challanNumber.isNotEmpty) {
+      params['challan_number'] = challanNumber;
+    }
+    if (damageType != null && damageType.isNotEmpty) {
+      params['damage_type'] = damageType;
+    }
 
     final result = await _post(
       '${AppConstants.returnsEndpoint}/create',
@@ -120,12 +128,20 @@ extension ReturnsApi on ApiService {
     int returnId, {
     required List<Map<String, dynamic>> lines,
     String? type,
+    String? challanNumber,
+    String? damageType,
   }) async {
     final params = <String, dynamic>{
       'employee_id': _activeEmployeeId,
       'lines': lines,
     };
     if (type != null && type.isNotEmpty) params['type'] = type;
+    if (challanNumber != null && challanNumber.isNotEmpty) {
+      params['challan_number'] = challanNumber;
+    }
+    if (damageType != null && damageType.isNotEmpty) {
+      params['damage_type'] = damageType;
+    }
 
     final result = await _post(
       '${AppConstants.returnsEndpoint}/$returnId/update',

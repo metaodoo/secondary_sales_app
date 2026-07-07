@@ -142,11 +142,20 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                       SizedBox(
                         height: 50,
                         child: OutlinedButton.icon(
-                          onPressed: _printOrder,
-                          icon: const Icon(Icons.print_outlined),
-                          label: const Text(
-                            'Print Order',
-                            style: TextStyle(fontWeight: FontWeight.w800),
+                          onPressed: provider.isLoading ? null : _printOrder,
+                          icon: provider.isLoading
+                              ? const SizedBox(
+                                  width: 20,
+                                  height: 20,
+                                  child: CircularProgressIndicator(
+                                    color: Color(0xFF2563EB),
+                                    strokeWidth: 2,
+                                  ),
+                                )
+                              : const Icon(Icons.print_outlined),
+                          label: Text(
+                            provider.isLoading ? 'Downloading...' : 'Print Order',
+                            style: const TextStyle(fontWeight: FontWeight.w800),
                           ),
                           style: OutlinedButton.styleFrom(
                             foregroundColor: const Color(0xFF2563EB),

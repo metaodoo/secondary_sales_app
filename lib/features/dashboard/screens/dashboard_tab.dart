@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 
 import 'package:secondary_sales/app/navigation/app_shell_config.dart';
 import 'package:secondary_sales/features/auth/auth_provider.dart';
+import 'package:secondary_sales/core/access/access_resources.dart';
 import 'package:secondary_sales/features/contacts/screens/outlets_list_screen.dart';
 import 'package:secondary_sales/features/sales/screens/deliveries_list_screen.dart';
 import 'package:secondary_sales/features/returns/screens/returns_list_screen.dart';
@@ -124,91 +125,103 @@ class DashboardTab extends StatelessWidget {
                         circleColor: AppColors.primary,
                         onTap: () => onModuleSelected(AppShellIndex.dealers),
                       ),
-                    _buildModuleCard(
-                      title: 'Delivery',
-                      icon: Icons.local_shipping_outlined,
-                      iconColor: AppColors.primary,
-                      circleColor: AppColors.primarySoft,
-                      onTap: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => const DeliveriesListScreen(moduleType: 'primary'),
-                          ),
-                        );
-                      },
-                    ),
-                    _buildModuleCard(
-                      title: 'Return Delivery',
-                      icon: Icons.assignment_return_outlined,
-                      iconColor: AppColors.primary,
-                      circleColor: AppColors.borderMuted,
-                      onTap: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => const ReturnsListScreen(moduleType: 'primary'),
-                          ),
-                        );
-                      },
-                    ),
-                    _buildModuleCard(
-                      title: 'Return Scrap',
-                      icon: Icons.recycling_outlined,
-                      iconColor: AppColors.primary,
-                      circleColor: AppColors.borderMuted,
-                      onTap: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => const ScrapsListScreen(moduleType: 'primary'),
-                          ),
-                        );
-                      },
-                    ),
+                    if (auth.canView(AppScreen.deliveriesList))
+                      _buildModuleCard(
+                        title: 'Delivery',
+                        icon: Icons.local_shipping_outlined,
+                        iconColor: AppColors.primary,
+                        circleColor: AppColors.primarySoft,
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => const DeliveriesListScreen(
+                                moduleType: 'primary',
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    if (auth.canView(AppScreen.returnsList))
+                      _buildModuleCard(
+                        title: 'Return Delivery',
+                        icon: Icons.assignment_return_outlined,
+                        iconColor: AppColors.primary,
+                        circleColor: AppColors.borderMuted,
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => const ReturnsListScreen(
+                                moduleType: 'primary',
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    if (auth.canView(AppScreen.scrapsList))
+                      _buildModuleCard(
+                        title: 'Return Scrap',
+                        icon: Icons.recycling_outlined,
+                        iconColor: AppColors.primary,
+                        circleColor: AppColors.borderMuted,
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) =>
+                                  const ScrapsListScreen(moduleType: 'primary'),
+                            ),
+                          );
+                        },
+                      ),
                   ] else ...[
-                    _buildModuleCard(
-                      title: 'Sales (Secondary)',
-                      icon: Icons.shopping_bag_outlined,
-                      iconColor: AppColors.primary,
-                      circleColor: AppColors.primarySoft,
-                      onTap: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => const SecondaryOrdersListScreen(),
-                          ),
-                        );
-                      },
-                    ),
-                    _buildModuleCard(
-                      title: 'Routes',
-                      icon: Icons.alt_route,
-                      iconColor: AppColors.primary,
-                      circleColor: AppColors.primaryTint,
-                      onTap: () => onModuleSelected(AppShellIndex.routes),
-                    ),
-                    _buildModuleCard(
-                      title: 'Outlets',
-                      icon: Icons.location_on_outlined,
-                      iconColor: AppColors.primary,
-                      circleColor: AppColors.primarySoft,
-                      onTap: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => const OutletsListScreen(),
-                          ),
-                        );
-                      },
-                    ),
-                    _buildModuleCard(
-                      title: 'Van Operations',
-                      icon: Icons.local_shipping_outlined,
-                      iconColor: AppColors.primary,
-                      circleColor: AppColors.borderMuted,
-                      onTap: () => onModuleSelected(AppShellIndex.vanLoading),
-                    ),
+                    if (auth.canView(AppScreen.secondaryOrdersList))
+                      _buildModuleCard(
+                        title: 'Sales (Secondary)',
+                        icon: Icons.shopping_bag_outlined,
+                        iconColor: AppColors.primary,
+                        circleColor: AppColors.primarySoft,
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => const SecondaryOrdersListScreen(),
+                            ),
+                          );
+                        },
+                      ),
+                    if (auth.canView(AppScreen.routesList))
+                      _buildModuleCard(
+                        title: 'Routes',
+                        icon: Icons.alt_route,
+                        iconColor: AppColors.primary,
+                        circleColor: AppColors.primaryTint,
+                        onTap: () => onModuleSelected(AppShellIndex.routes),
+                      ),
+                    if (auth.canView(AppScreen.outletsList))
+                      _buildModuleCard(
+                        title: 'Outlets',
+                        icon: Icons.location_on_outlined,
+                        iconColor: AppColors.primary,
+                        circleColor: AppColors.primarySoft,
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => const OutletsListScreen(),
+                            ),
+                          );
+                        },
+                      ),
+                    if (auth.canView(AppScreen.vanOperationsList))
+                      _buildModuleCard(
+                        title: 'Van Operations',
+                        icon: Icons.local_shipping_outlined,
+                        iconColor: AppColors.primary,
+                        circleColor: AppColors.borderMuted,
+                        onTap: () => onModuleSelected(AppShellIndex.vanLoading),
+                      ),
                     _buildModuleCard(
                       title: 'Delivery (Secondary)',
                       icon: Icons.inventory_2_outlined,
@@ -218,7 +231,9 @@ class DashboardTab extends StatelessWidget {
                         Navigator.push(
                           context,
                           MaterialPageRoute(
-                            builder: (_) => const DeliveriesListScreen(moduleType: 'secondary'),
+                            builder: (_) => const DeliveriesListScreen(
+                              moduleType: 'secondary',
+                            ),
                           ),
                         );
                       },
@@ -232,25 +247,27 @@ class DashboardTab extends StatelessWidget {
                         Navigator.push(
                           context,
                           MaterialPageRoute(
-                            builder: (_) => const ScrapsListScreen(moduleType: 'secondary'),
+                            builder: (_) =>
+                                const ScrapsListScreen(moduleType: 'secondary'),
                           ),
                         );
                       },
                     ),
-                    _buildModuleCard(
-                      title: 'Visit History',
-                      icon: Icons.history_edu,
-                      iconColor: AppColors.primary,
-                      circleColor: AppColors.primaryTint,
-                      onTap: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => const VisitsListScreen(),
-                          ),
-                        );
-                      },
-                    ),
+                    if (auth.canView(AppScreen.visitsList))
+                      _buildModuleCard(
+                        title: 'Visit History',
+                        icon: Icons.history_edu,
+                        iconColor: AppColors.primary,
+                        circleColor: AppColors.primaryTint,
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => const VisitsListScreen(),
+                            ),
+                          );
+                        },
+                      ),
                   ],
                 ],
               ),

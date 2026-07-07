@@ -5,6 +5,8 @@ import 'package:provider/provider.dart';
 
 import 'package:secondary_sales/data/models/employees/sales_employee.dart';
 import 'package:secondary_sales/features/employees/employee_provider.dart';
+import 'package:secondary_sales/features/auth/auth_provider.dart';
+import 'package:secondary_sales/core/access/access_resources.dart';
 import 'package:secondary_sales/core/widgets/ss_ui.dart';
 import 'package:secondary_sales/features/employees/screens/create_sales_officer_screen.dart';
 import 'package:secondary_sales/features/employees/screens/sales_officer_detail_screen.dart';
@@ -148,27 +150,28 @@ class _SalesOfficerListScreenState extends State<SalesOfficerListScreen> {
                 onChanged: _onSearchChanged,
               ),
               const SizedBox(height: 24),
-              ElevatedButton.icon(
-                onPressed: _openCreateSO,
-                icon: const Icon(Icons.add, color: Colors.white, size: 22),
-                label: const Text(
-                  'New Sales Officer',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 16,
+              if (context.watch<AuthProvider>().canDo(AppAction.employeeCreate))
+                ElevatedButton.icon(
+                  onPressed: _openCreateSO,
+                  icon: const Icon(Icons.add, color: Colors.white, size: 22),
+                  label: const Text(
+                    'New Sales Officer',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                    ),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                    elevation: 0,
+                    shadowColor: Colors.transparent,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
                   ),
                 ),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.primary,
-                  elevation: 0,
-                  shadowColor: Colors.transparent,
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-              ),
               const SizedBox(height: 32),
               if (provider.error != null) ErrorPanel(provider.error!),
               if (provider.isLoading && provider.employees.isEmpty)

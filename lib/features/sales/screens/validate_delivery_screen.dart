@@ -7,6 +7,8 @@ import 'package:secondary_sales/data/models/sales/delivery_prepare.dart';
 import 'package:secondary_sales/data/models/sales/sale_order_detail.dart';
 import 'package:secondary_sales/data/models/inventory/warehouse.dart';
 import 'package:secondary_sales/features/sales/primary_sale_provider.dart';
+import 'package:secondary_sales/core/access/permission_gate.dart';
+import 'package:secondary_sales/core/access/access_resources.dart';
 import 'package:secondary_sales/core/widgets/ss_ui.dart';
 
 class ValidateDeliveryScreen extends StatefulWidget {
@@ -436,6 +438,19 @@ class _ValidateDeliveryScreenState extends State<ValidateDeliveryScreen> {
     });
   }
 
+  void _setLineQty(DeliveryLineInput input, double val) {
+    setState(() {
+      final maxAllowed = input.move.orderedQty < input.move.quantityDone
+          ? input.move.orderedQty
+          : input.move.quantityDone;
+      input.quantityDone = val.clamp(0, maxAllowed).toDouble();
+
+      if (input.move.requiresLots && input.lots.isNotEmpty) {
+        _trimLotsToQty(input);
+      }
+    });
+  }
+
   void _trimLotsToQty(DeliveryLineInput input) {
     final target = input.quantityDone;
     if (target <= 0) {
@@ -535,7 +550,8 @@ class _ValidateDeliveryScreenState extends State<ValidateDeliveryScreen> {
                           ),
                         ),
                       ),
-                    if (prepare.picking.sourceLocationName != null || prepare.picking.destinationLocationName != null)
+                    if (prepare.picking.sourceLocationName != null ||
+                        prepare.picking.destinationLocationName != null)
                       Padding(
                         padding: const EdgeInsets.only(bottom: 16),
                         child: Container(
@@ -546,48 +562,75 @@ class _ValidateDeliveryScreenState extends State<ValidateDeliveryScreen> {
                               if (prepare.picking.sourceLocationName != null)
                                 Row(
                                   children: [
-                                    const Icon(Icons.outbox, color: AppColors.textSecondary, size: 20),
+                                    const Icon(
+                                      Icons.outbox,
+                                      color: AppColors.textSecondary,
+                                      size: 20,
+                                    ),
                                     const SizedBox(width: 12),
                                     Expanded(
                                       child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
                                         children: [
                                           const Text(
                                             'Source Location',
-                                            style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                                            style: TextStyle(
+                                              fontSize: 12,
+                                              color: AppColors.textSecondary,
+                                            ),
                                           ),
                                           const SizedBox(height: 2),
                                           Text(
                                             prepare.picking.sourceLocationName!,
-                                            style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+                                            style: const TextStyle(
+                                              fontWeight: FontWeight.w600,
+                                              fontSize: 14,
+                                            ),
                                           ),
                                         ],
                                       ),
                                     ),
                                   ],
                                 ),
-                              if (prepare.picking.sourceLocationName != null && prepare.picking.destinationLocationName != null)
+                              if (prepare.picking.sourceLocationName != null &&
+                                  prepare.picking.destinationLocationName !=
+                                      null)
                                 const Padding(
                                   padding: EdgeInsets.symmetric(vertical: 8),
                                   child: Divider(color: AppColors.borderMuted),
                                 ),
-                              if (prepare.picking.destinationLocationName != null)
+                              if (prepare.picking.destinationLocationName !=
+                                  null)
                                 Row(
                                   children: [
-                                    const Icon(Icons.move_to_inbox, color: AppColors.textSecondary, size: 20),
+                                    const Icon(
+                                      Icons.move_to_inbox,
+                                      color: AppColors.textSecondary,
+                                      size: 20,
+                                    ),
                                     const SizedBox(width: 12),
                                     Expanded(
                                       child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
                                         children: [
                                           const Text(
                                             'Destination Location',
-                                            style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                                            style: TextStyle(
+                                              fontSize: 12,
+                                              color: AppColors.textSecondary,
+                                            ),
                                           ),
                                           const SizedBox(height: 2),
                                           Text(
-                                            prepare.picking.destinationLocationName!,
-                                            style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+                                            prepare
+                                                .picking
+                                                .destinationLocationName!,
+                                            style: const TextStyle(
+                                              fontWeight: FontWeight.w600,
+                                              fontSize: 14,
+                                            ),
                                           ),
                                         ],
                                       ),
@@ -615,6 +658,13 @@ class _ValidateDeliveryScreenState extends State<ValidateDeliveryScreen> {
                           },
                           onMinus: () => _changeLineQty(input, -1),
                           onPlus: () => _changeLineQty(input, 1),
+                          onQuantityInput: (newVal) =>
+                              _setLineQty(input, newVal),
+                          onLotQtyInput: (lotInput, newVal) {
+                            setState(() {
+                              lotInput.quantity = newVal;
+                            });
+                          },
                           onAddLot: () => _addLot(input),
                           onRemoveLot: (lot) {
                             setState(() => input.lots.remove(lot));
@@ -666,29 +716,32 @@ class _ValidateDeliveryScreenState extends State<ValidateDeliveryScreen> {
                 child: SizedBox(
                   width: double.infinity,
                   height: 50,
-                  child: FilledButton(
-                    onPressed: provider.isLoading || _prepare == null
-                        ? null
-                        : _confirmDelivery,
-                    style: FilledButton.styleFrom(
-                      backgroundColor: const Color(0xFF16C083),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(9),
+                  child: PermissionGate(
+                    resourceKey: AppAction.deliveryValidate,
+                    child: FilledButton(
+                      onPressed: provider.isLoading || _prepare == null
+                          ? null
+                          : _confirmDelivery,
+                      style: FilledButton.styleFrom(
+                        backgroundColor: const Color(0xFF16C083),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(9),
+                        ),
                       ),
-                    ),
-                    child: provider.isLoading && _prepare != null
-                        ? const SizedBox(
-                            width: 22,
-                            height: 22,
-                            child: CircularProgressIndicator(
-                              color: Colors.white,
-                              strokeWidth: 2,
+                      child: provider.isLoading && _prepare != null
+                          ? const SizedBox(
+                              width: 22,
+                              height: 22,
+                              child: CircularProgressIndicator(
+                                color: Colors.white,
+                                strokeWidth: 2,
+                              ),
+                            )
+                          : const Text(
+                              'Confirm Delivery',
+                              style: TextStyle(fontWeight: FontWeight.w800),
                             ),
-                          )
-                        : const Text(
-                            'Confirm Delivery',
-                            style: TextStyle(fontWeight: FontWeight.w800),
-                          ),
+                    ),
                   ),
                 ),
               ),
@@ -954,6 +1007,8 @@ class _DeliveryLinePanel extends StatelessWidget {
     required this.onLotChanged,
     required this.onLotMinus,
     required this.onLotPlus,
+    this.onQuantityInput,
+    this.onLotQtyInput,
   });
 
   final DeliveryLineInput input;
@@ -972,6 +1027,9 @@ class _DeliveryLinePanel extends StatelessWidget {
   onLotChanged;
   final ValueChanged<DeliveryLotInput> onLotMinus;
   final ValueChanged<DeliveryLotInput> onLotPlus;
+  final ValueChanged<double>? onQuantityInput;
+  final void Function(DeliveryLotInput lotInput, double quantity)?
+  onLotQtyInput;
 
   @override
   Widget build(BuildContext context) {
@@ -1041,6 +1099,12 @@ class _DeliveryLinePanel extends StatelessWidget {
                   value: formatQty(input.quantityDone),
                   onMinus: onMinus,
                   onPlus: onPlus,
+                  onValueInput: (val) {
+                    final parsed = double.tryParse(val);
+                    if (parsed != null && onQuantityInput != null) {
+                      onQuantityInput!(parsed);
+                    }
+                  },
                 ),
             ],
           ),
@@ -1109,6 +1173,14 @@ class _DeliveryLinePanel extends StatelessWidget {
                   onRemove: () => onRemoveLot(lotInput),
                   onMinus: () => onLotMinus(lotInput),
                   onPlus: () => onLotPlus(lotInput),
+                  onQuantityInput: (newVal) {
+                    final otherAllocated = input.lots
+                        .where((l) => l != lotInput)
+                        .fold<double>(0.0, (s, l) => s + l.quantity);
+                    final maxForLot = (input.quantityDone - otherAllocated)
+                        .clamp(0.0, input.quantityDone);
+                    onLotQtyInput?.call(lotInput, newVal.clamp(0, maxForLot));
+                  },
                 ),
               ),
             ),
@@ -1140,6 +1212,8 @@ class _LotAllocationRow extends StatelessWidget {
     required this.onRemove,
     required this.onMinus,
     required this.onPlus,
+    this.onQuantityChanged,
+    this.onQuantityInput,
   });
 
   final DeliveryLotInput lotInput;
@@ -1149,6 +1223,8 @@ class _LotAllocationRow extends StatelessWidget {
   final VoidCallback onRemove;
   final VoidCallback onMinus;
   final VoidCallback onPlus;
+  final ValueChanged<double>? onQuantityChanged;
+  final ValueChanged<double>? onQuantityInput;
 
   @override
   Widget build(BuildContext context) {
@@ -1248,6 +1324,16 @@ class _LotAllocationRow extends StatelessWidget {
                 value: formatQty(lotInput.quantity),
                 onMinus: onMinus,
                 onPlus: onPlus,
+                onValueInput: (val) {
+                  final parsed = double.tryParse(val);
+                  if (parsed != null) {
+                    if (onQuantityInput != null) {
+                      onQuantityInput!(parsed);
+                    } else if (onQuantityChanged != null) {
+                      onQuantityChanged!(parsed);
+                    }
+                  }
+                },
               ),
             ],
           ),

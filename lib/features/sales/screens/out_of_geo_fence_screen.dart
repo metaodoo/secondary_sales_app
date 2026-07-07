@@ -94,7 +94,7 @@ class _OutOfGeoFenceScreenState extends State<OutOfGeoFenceScreen> {
               Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: Colors.red.withOpacity(0.1),
+                  color: Colors.red.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: const Icon(Icons.error_outline, color: Colors.red, size: 24),
@@ -143,7 +143,7 @@ class _OutOfGeoFenceScreenState extends State<OutOfGeoFenceScreen> {
                             ? const Center(child: Text('No order mediums configured.'))
                             : ListView.separated(
                                 itemCount: _mediums.length,
-                                separatorBuilder: (_, __) => const SizedBox(height: 12),
+                                separatorBuilder: (_, _) => const SizedBox(height: 12),
                                 itemBuilder: (context, index) {
                                   final medium = _mediums[index];
                                   final isSelected = _selectedMediumId == medium['id'];

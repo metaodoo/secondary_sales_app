@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:secondary_sales/features/auth/auth_provider.dart';
 import 'package:secondary_sales/core/theme/app_theme.dart';
+import 'package:geolocator/geolocator.dart';
 
 class ProfileAvatar extends StatelessWidget {
   const ProfileAvatar({super.key, required this.onTap, this.borderColor});
@@ -227,22 +228,143 @@ class SectionHeader extends StatelessWidget {
   }
 }
 
-class SmallStepper extends StatelessWidget {
+Future<void> ssShowQtyInputDialog({
+  required BuildContext context,
+  required String title,
+  required String initialValue,
+  required ValueChanged<String> onConfirm,
+  bool isDecimal = false,
+}) async {
+  final controller = TextEditingController(text: initialValue);
+  controller.selection = TextSelection(
+    baseOffset: 0,
+    extentOffset: controller.text.length,
+  );
+
+  return showDialog<void>(
+    context: context,
+    builder: (BuildContext context) {
+      return AlertDialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16.0),
+        ),
+        title: Text(
+          title,
+          style: const TextStyle(
+            fontWeight: FontWeight.bold,
+            color: AppColors.textPrimary,
+          ),
+        ),
+        content: TextField(
+          controller: controller,
+          keyboardType: TextInputType.numberWithOptions(decimal: isDecimal),
+          autofocus: true,
+          decoration: InputDecoration(
+            hintText: 'Enter quantity',
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+          ),
+        ),
+        actions: <Widget>[
+          TextButton(
+            child: const Text('Cancel', style: TextStyle(color: AppColors.textSecondary)),
+            onPressed: () {
+              Navigator.of(context).pop();
+            },
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primaryStrong,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+            child: const Text('Confirm'),
+            onPressed: () {
+              final val = controller.text.trim();
+              if (val.isNotEmpty) {
+                onConfirm(val);
+              }
+              Navigator.of(context).pop();
+            },
+          ),
+        ],
+      );
+    },
+  );
+}
+
+class SmallStepper extends StatefulWidget {
   const SmallStepper({
     super.key,
     required this.value,
     required this.onMinus,
     required this.onPlus,
+    this.onValueInput,
   });
 
   final String value;
   final VoidCallback onMinus;
   final VoidCallback onPlus;
+  final ValueChanged<String>? onValueInput;
+
+  @override
+  State<SmallStepper> createState() => _SmallStepperState();
+}
+
+class _SmallStepperState extends State<SmallStepper> {
+  bool _isEditing = false;
+  late TextEditingController _controller;
+  late FocusNode _focusNode;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TextEditingController();
+    _focusNode = FocusNode();
+    _focusNode.addListener(() {
+      if (!_focusNode.hasFocus && _isEditing) {
+        _commitValue();
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    _focusNode.dispose();
+    super.dispose();
+  }
+
+  void _startEditing() {
+    if (widget.onValueInput == null) return;
+    setState(() {
+      _isEditing = true;
+      _controller.text = widget.value;
+      _controller.selection = TextSelection(
+        baseOffset: 0,
+        extentOffset: widget.value.length,
+      );
+    });
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _focusNode.requestFocus();
+    });
+  }
+
+  void _commitValue() {
+    final val = _controller.text.trim();
+    setState(() => _isEditing = false);
+    if (val.isNotEmpty && val != widget.value) {
+      widget.onValueInput?.call(val);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      height: 34,
+      height: 38,
       decoration: BoxDecoration(
         color: const Color(0xFFE8EEF7),
         borderRadius: BorderRadius.circular(8),
@@ -251,20 +373,56 @@ class SmallStepper extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           IconButton(
-            onPressed: onMinus,
+            onPressed: widget.onMinus,
             icon: const Icon(Icons.remove, size: 18),
             visualDensity: VisualDensity.compact,
           ),
-          SizedBox(
-            width: 36,
-            child: Text(
-              value,
-              textAlign: TextAlign.center,
-              style: const TextStyle(fontWeight: FontWeight.w800),
+          GestureDetector(
+            onTap: _isEditing ? null : _startEditing,
+            child: SizedBox(
+              width: 52,
+              child: _isEditing
+                  ? TextField(
+                      controller: _controller,
+                      focusNode: _focusNode,
+                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w800,
+                        fontSize: 14,
+                      ),
+                      decoration: const InputDecoration(
+                        isDense: true,
+                        contentPadding: EdgeInsets.symmetric(horizontal: 4, vertical: 6),
+                        border: OutlineInputBorder(
+                          borderSide: BorderSide(color: Color(0xFF2563EB)),
+                          borderRadius: BorderRadius.all(Radius.circular(6)),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderSide: BorderSide(color: Color(0xFF2563EB)),
+                          borderRadius: BorderRadius.all(Radius.circular(6)),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderSide: BorderSide(color: Color(0xFF2563EB), width: 2),
+                          borderRadius: BorderRadius.all(Radius.circular(6)),
+                        ),
+                        filled: true,
+                        fillColor: Colors.white,
+                      ),
+                      onSubmitted: (_) => _commitValue(),
+                    )
+                  : Container(
+                      alignment: Alignment.center,
+                      child: Text(
+                        widget.value,
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(fontWeight: FontWeight.w800),
+                      ),
+                    ),
             ),
           ),
           IconButton(
-            onPressed: onPlus,
+            onPressed: widget.onPlus,
             icon: const Icon(Icons.add, size: 18),
             visualDensity: VisualDensity.compact,
           ),
@@ -312,4 +470,137 @@ BoxDecoration ssPanelDecoration() {
 
 String ssFormatDate(DateTime date) {
   return '${date.month.toString().padLeft(2, '0')}/${date.day.toString().padLeft(2, '0')}/${date.year}';
+}
+
+void ssShowLocationErrorDialog(BuildContext context, String message) {
+  final bool isGpsDisabled = message.toLowerCase().contains('disabled') || 
+                             message.toLowerCase().contains('enable gps');
+  
+  showDialog(
+    context: context,
+    builder: (BuildContext context) {
+      return Dialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20.0),
+        ),
+        elevation: 8,
+        child: Padding(
+          padding: const EdgeInsets.all(24.0),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Icon Header
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFEF2F2),
+                  shape: BoxShape.circle,
+                  border: Border.all(color: const Color(0xFFFEE2E2), width: 2),
+                ),
+                child: const Icon(
+                  Icons.location_off,
+                  color: Color(0xFFEF4444),
+                  size: 40,
+                ),
+              ),
+              const SizedBox(height: 20),
+              
+              // Title
+              const Text(
+                'Location Mismatch',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.textPrimary,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 12),
+              
+              // Message
+              Text(
+                message,
+                style: const TextStyle(
+                  fontSize: 14,
+                  color: AppColors.textSecondary,
+                  height: 1.5,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 24),
+              
+              // Action Buttons
+              Row(
+                children: [
+                  if (isGpsDisabled) ...[
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: () => Navigator.pop(context),
+                        style: OutlinedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                        ),
+                        child: const Text(
+                          'Cancel',
+                          style: TextStyle(
+                            color: AppColors.textSecondary,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: () async {
+                          Navigator.pop(context);
+                          try {
+                            await Geolocator.openLocationSettings();
+                          } catch (_) {}
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.primaryStrong,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          elevation: 0,
+                        ),
+                        child: const Text(
+                          'Open Settings',
+                          style: TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                    ),
+                  ] else ...[
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: () => Navigator.pop(context),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.primaryStrong,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          elevation: 0,
+                        ),
+                        child: const Text(
+                          'Got It',
+                          style: TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ],
+          ),
+        ),
+      );
+    },
+  );
 }

@@ -489,6 +489,13 @@ class _TransferLineCard extends StatelessWidget {
                     onChanged();
                   }
                 },
+                onValueInput: (val) {
+                  final parsed = double.tryParse(val);
+                  if (parsed != null) {
+                    line.quantity = parsed.clamp(1, line.product.availableQty);
+                    onChanged();
+                  }
+                },
               ),
               const Spacer(),
               Text(
@@ -531,6 +538,11 @@ class _TransferLineCard extends StatelessWidget {
                     onRemove: () => onRemoveLot(lotInput),
                     onMinus: () => onLotMinus(lotInput),
                     onPlus: () => onLotPlus(lotInput),
+                    onQuantityChanged: (newVal) {
+                      final maxQty = lotInput.lot?.availableQty ?? line.quantity;
+                      lotInput.quantity = newVal.clamp(0, maxQty);
+                      onChanged();
+                    },
                   ),
                 ),
               ),
@@ -562,6 +574,7 @@ class _TransferLotAllocationRow extends StatelessWidget {
     required this.onRemove,
     required this.onMinus,
     required this.onPlus,
+    this.onQuantityChanged,
   });
 
   final TransferLotInput lotInput;
@@ -570,6 +583,7 @@ class _TransferLotAllocationRow extends StatelessWidget {
   final VoidCallback onRemove;
   final VoidCallback onMinus;
   final VoidCallback onPlus;
+  final ValueChanged<double>? onQuantityChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -634,6 +648,12 @@ class _TransferLotAllocationRow extends StatelessWidget {
                 value: lotInput.quantity.toStringAsFixed(0),
                 onMinus: onMinus,
                 onPlus: onPlus,
+                onValueInput: (val) {
+                  final parsed = double.tryParse(val);
+                  if (parsed != null && onQuantityChanged != null) {
+                    onQuantityChanged!(parsed);
+                  }
+                },
               ),
             ],
           ),
