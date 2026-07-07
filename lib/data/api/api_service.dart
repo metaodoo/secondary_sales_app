@@ -35,6 +35,7 @@ part 'endpoints/leave_api.dart';
 part 'endpoints/expense_api.dart';
 part 'endpoints/access_api.dart';
 part 'endpoints/my_team_api.dart';
+part 'endpoints/location_api.dart';
 
 class ApiService {
   ApiService._internal();

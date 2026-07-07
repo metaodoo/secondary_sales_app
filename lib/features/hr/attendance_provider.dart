@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:secondary_sales/data/api/api_service.dart';
@@ -14,6 +15,8 @@ class AttendanceProvider extends ChangeNotifier {
   bool _isCheckedIn = false;
   String? _activeCheckInTime;
   String? _activeCheckInAddress;
+  int _locationTrackingInterval = 1800; // Default 30 mins
+  Timer? _locationTrackingTimer;
 
   List<Map<String, dynamic>> _historyLogs = [];
   String? _errorMessage;
@@ -35,6 +38,12 @@ class AttendanceProvider extends ChangeNotifier {
     _loadHistory();
   }
 
+  @override
+  void dispose() {
+    _stopLocationTracking();
+    super.dispose();
+  }
+
   Future<void> refresh() async {
     await _loadStatus();
     await _loadHistory();
@@ -45,6 +54,63 @@ class AttendanceProvider extends ChangeNotifier {
   void clearError() {
     _errorMessage = null;
     notifyListeners();
+  }
+
+  void _startLocationTracking() {
+    _locationTrackingTimer?.cancel();
+    if (!_isCheckedIn) return;
+
+    debugPrint("Starting periodic location tracking timer. Interval: $_locationTrackingInterval seconds");
+    _locationTrackingTimer = Timer.periodic(
+      Duration(seconds: _locationTrackingInterval),
+      (timer) => _trackAndSyncLocation(),
+    );
+  }
+
+  void _stopLocationTracking() {
+    if (_locationTrackingTimer != null) {
+      debugPrint("Stopping periodic location tracking timer.");
+      _locationTrackingTimer!.cancel();
+      _locationTrackingTimer = null;
+    }
+  }
+
+  Future<void> _trackAndSyncLocation() async {
+    if (!_isCheckedIn || _employeeId == 0) {
+      _stopLocationTracking();
+      return;
+    }
+
+    try {
+      debugPrint("Periodic task: Fetching GPS location for sync...");
+      final position = await _getCurrentLocation();
+      if (position == null) return;
+
+      // Format current timestamp to Odoo's expected format: "YYYY-MM-DD HH:MM:SS"
+      final nowUtc = DateTime.now().toUtc();
+      final formattedTime = 
+          "${nowUtc.year.toString().padLeft(4, '0')}-"
+          "${nowUtc.month.toString().padLeft(2, '0')}-"
+          "${nowUtc.day.toString().padLeft(2, '0')} "
+          "${nowUtc.hour.toString().padLeft(2, '0')}:"
+          "${nowUtc.minute.toString().padLeft(2, '0')}:"
+          "${nowUtc.second.toString().padLeft(2, '0')}";
+
+      final response = await _apiService.syncEmployeeLocations(
+        locations: [
+          {
+            "latitude": position.latitude,
+            "longitude": position.longitude,
+            "recorded_at": formattedTime,
+            "is_mock": position.isMocked,
+          }
+        ],
+      );
+      
+      debugPrint("Location sync response: $response");
+    } catch (e) {
+      debugPrint("Error in periodic location tracking/sync: $e");
+    }
   }
 
   Future<void> _loadStatus() async {
@@ -59,6 +125,13 @@ class AttendanceProvider extends ChangeNotifier {
         _isCheckedIn = data['is_checked_in'] ?? false;
         _activeCheckInTime = data['active_check_in'];
         _activeCheckInAddress = data['check_in_address'];
+        _locationTrackingInterval = data['location_tracking_interval'] ?? 1800;
+
+        if (_isCheckedIn) {
+          _startLocationTracking();
+        } else {
+          _stopLocationTracking();
+        }
       }
     } catch (e) {
       debugPrint('Failed to load attendance status: $e');
