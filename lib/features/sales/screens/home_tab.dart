@@ -123,7 +123,7 @@ class HomeTab extends StatelessWidget {
               TextField(
                 controller: orderSearchController,
                 decoration: InputDecoration(
-                  hintText: 'Search orders...',
+                  hintText: 'Search orders by name or distributor code...',
                   hintStyle: const TextStyle(
                     color: AppColors.textSecondary,
                     fontSize: 15,

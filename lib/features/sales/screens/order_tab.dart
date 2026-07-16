@@ -48,7 +48,7 @@ class OrderTab extends StatelessWidget {
                   TextField(
                     controller: searchController,
                     decoration: ssInputDecoration(
-                      'Search customer...',
+                      'Search customer name or code...',
                       Icons.search,
                     ),
                     onChanged: onSearchChanged,

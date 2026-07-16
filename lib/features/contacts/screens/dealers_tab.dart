@@ -87,7 +87,7 @@ class _DealersTabState extends State<DealersTab> {
                     TextField(
                       controller: _searchController,
                       decoration: ssInputDecoration(
-                        'Search distributor...',
+                        'Search distributor name or code...',
                         Icons.search,
                       ),
                       onChanged: _onSearchChanged,
