@@ -3,11 +3,12 @@ import 'package:provider/provider.dart';
 import 'package:secondary_sales/features/auth/auth_provider.dart';
 import 'package:secondary_sales/core/theme/app_theme.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:secondary_sales/features/settings/screens/settings_tab.dart';
 
 class ProfileAvatar extends StatelessWidget {
-  const ProfileAvatar({super.key, required this.onTap, this.borderColor});
+  const ProfileAvatar({super.key, this.onTap, this.borderColor});
 
-  final VoidCallback onTap;
+  final VoidCallback? onTap;
   final Color? borderColor;
 
   @override
@@ -27,7 +28,17 @@ class ProfileAvatar extends StatelessWidget {
     }
 
     return GestureDetector(
-      onTap: onTap,
+      onTap: onTap ??
+          () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => SettingsTab(
+                  onBack: () => Navigator.pop(context),
+                ),
+              ),
+            );
+          },
       child: Container(
         width: 38,
         height: 38,

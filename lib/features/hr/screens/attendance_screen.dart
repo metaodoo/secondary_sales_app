@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import 'package:secondary_sales/core/theme/app_theme.dart';
 import 'package:secondary_sales/features/auth/auth_provider.dart';
 import 'package:secondary_sales/features/hr/attendance_provider.dart';
+import 'package:secondary_sales/core/widgets/ss_ui.dart';
 
 class AttendanceScreen extends StatelessWidget {
   const AttendanceScreen({super.key});
@@ -135,7 +136,32 @@ class _AttendanceScreenContentState extends State<_AttendanceScreenContent>
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Attendance', style: TextStyle(fontWeight: FontWeight.bold)),
+        backgroundColor: Colors.white,
+        elevation: 0,
+        scrolledUnderElevation: 0,
+        leading: IconButton(
+          icon: const Icon(
+            Icons.arrow_back,
+            color: AppColors.textPrimary,
+            size: 28,
+          ),
+          onPressed: () => Navigator.pop(context),
+        ),
+        title: const Text(
+          'Attendance',
+          style: TextStyle(
+            color: AppColors.primaryStrong,
+            fontWeight: FontWeight.bold,
+            fontSize: 22,
+          ),
+        ),
+        centerTitle: true,
+        actions: [
+          Padding(
+            padding: const EdgeInsets.only(right: 16),
+            child: const ProfileAvatar(),
+          ),
+        ],
         bottom: TabBar(
           controller: _tabController,
           indicatorColor: AppColors.primary,

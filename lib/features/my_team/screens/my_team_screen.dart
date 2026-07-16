@@ -79,19 +79,32 @@ class _MyTeamScreenState extends State<MyTeamScreen> {
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
+        backgroundColor: Colors.white,
+        elevation: 0,
+        scrolledUnderElevation: 0,
+        leading: IconButton(
+          icon: const Icon(
+            Icons.arrow_back,
+            color: AppColors.textPrimary,
+            size: 28,
+          ),
+          onPressed: () => Navigator.pop(context),
+        ),
         title: const Text(
           'My Team',
           style: TextStyle(
             color: AppColors.primaryStrong,
             fontWeight: FontWeight.bold,
+            fontSize: 22,
           ),
         ),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: AppColors.primaryStrong),
-          onPressed: () => Navigator.of(context).pop(),
-        ),
-        backgroundColor: Colors.white,
-        elevation: 0,
+        centerTitle: true,
+        actions: [
+          Padding(
+            padding: const EdgeInsets.only(right: 16),
+            child: const ProfileAvatar(),
+          ),
+        ],
       ),
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,

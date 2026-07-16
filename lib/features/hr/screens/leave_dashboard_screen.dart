@@ -7,6 +7,7 @@ import 'package:secondary_sales/features/hr/screens/leave_request_sheet.dart';
 import 'package:secondary_sales/features/hr/screens/leave_details_sheet.dart';
 import 'package:secondary_sales/core/access/permission_gate.dart';
 import 'package:secondary_sales/core/access/access_resources.dart';
+import 'package:secondary_sales/core/widgets/ss_ui.dart';
 
 class LeaveDashboardScreen extends StatelessWidget {
   const LeaveDashboardScreen({super.key});
@@ -128,8 +129,32 @@ class _LeaveDashboardContentState extends State<_LeaveDashboardContent> with Sin
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Leave Requests'),
+        backgroundColor: Colors.white,
+        elevation: 0,
+        scrolledUnderElevation: 0,
+        leading: IconButton(
+          icon: const Icon(
+            Icons.arrow_back,
+            color: AppColors.textPrimary,
+            size: 28,
+          ),
+          onPressed: () => Navigator.pop(context),
+        ),
+        title: const Text(
+          'Leave Requests',
+          style: TextStyle(
+            color: AppColors.primaryStrong,
+            fontWeight: FontWeight.bold,
+            fontSize: 22,
+          ),
+        ),
         centerTitle: true,
+        actions: [
+          Padding(
+            padding: const EdgeInsets.only(right: 16),
+            child: const ProfileAvatar(),
+          ),
+        ],
         bottom: TabBar(
           controller: _tabController,
           isScrollable: false,

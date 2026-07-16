@@ -7,6 +7,7 @@ import 'package:secondary_sales/features/hr/screens/expense_create_sheet.dart';
 import 'package:secondary_sales/features/hr/screens/expense_details_sheet.dart';
 import 'package:secondary_sales/core/access/permission_gate.dart';
 import 'package:secondary_sales/core/access/access_resources.dart';
+import 'package:secondary_sales/core/widgets/ss_ui.dart';
 
 class ExpenseDashboardScreen extends StatelessWidget {
   const ExpenseDashboardScreen({super.key});
@@ -171,7 +172,26 @@ class _ExpenseDashboardContentState extends State<_ExpenseDashboardContent> with
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
-        title: const Text('Expenses', style: TextStyle(fontWeight: FontWeight.bold)),
+        backgroundColor: Colors.white,
+        elevation: 0,
+        scrolledUnderElevation: 0,
+        leading: IconButton(
+          icon: const Icon(
+            Icons.arrow_back,
+            color: AppColors.textPrimary,
+            size: 28,
+          ),
+          onPressed: () => Navigator.pop(context),
+        ),
+        title: const Text(
+          'Expenses',
+          style: TextStyle(
+            color: AppColors.primaryStrong,
+            fontWeight: FontWeight.bold,
+            fontSize: 22,
+          ),
+        ),
+        centerTitle: true,
         bottom: TabBar(
           controller: _tabController,
           indicatorColor: AppColors.primary,
@@ -181,15 +201,10 @@ class _ExpenseDashboardContentState extends State<_ExpenseDashboardContent> with
           tabs: _tabs.map((tab) => Tab(text: tab)).toList(),
         ),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.date_range),
-            onPressed: () => _selectDateRange(context, provider),
+          Padding(
+            padding: const EdgeInsets.only(right: 16),
+            child: const ProfileAvatar(),
           ),
-          if (provider.dateFrom != null || provider.dateTo != null)
-            IconButton(
-              icon: const Icon(Icons.clear, color: Colors.red),
-              onPressed: () => provider.setDateRange(null, null),
-            ),
         ],
       ),
       floatingActionButton: provider.activeTab == 'own'
@@ -294,58 +309,95 @@ class _ExpenseDashboardContentState extends State<_ExpenseDashboardContent> with
                 ),
               ),
 
-            // Date Range indicator if active
-            if (provider.dateFrom != null && provider.dateTo != null)
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-                child: Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: Colors.amber.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Row(
+            // Search & Filter Row (same as leave request)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16.0, 8.0, 16.0, 8.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
                     children: [
-                      const Icon(Icons.date_range, size: 16, color: Colors.amber),
-                      const SizedBox(width: 8),
+                      // Unified Search Field
                       Expanded(
-                        child: Text(
-                          'Filtered Date: ${provider.dateFrom} to ${provider.dateTo}',
-                          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.amber),
+                        child: Container(
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: AppColors.borderSoft),
+                          ),
+                          child: TextField(
+                            controller: _searchController,
+                            decoration: InputDecoration(
+                              hintText: 'Search expenses...',
+                              hintStyle: const TextStyle(color: Colors.grey, fontSize: 14),
+                              prefixIcon: const Icon(Icons.search, color: Colors.grey, size: 20),
+                              suffixIcon: _searchController.text.isNotEmpty
+                                  ? IconButton(
+                                      icon: const Icon(Icons.clear, size: 18, color: Colors.grey),
+                                      onPressed: () {
+                                        _searchController.clear();
+                                        provider.setSearchQuery(null);
+                                      },
+                                    )
+                                  : null,
+                              border: InputBorder.none,
+                              contentPadding: const EdgeInsets.symmetric(vertical: 12),
+                            ),
+                            style: const TextStyle(fontSize: 14),
+                            onChanged: (val) {
+                              provider.setSearchQuery(val.trim().isEmpty ? null : val.trim());
+                            },
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      // Beautiful Filter Trigger Button
+                      Container(
+                        decoration: BoxDecoration(
+                          color: (provider.dateFrom != null)
+                              ? AppColors.primary.withOpacity(0.1)
+                              : Colors.white,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: (provider.dateFrom != null)
+                                ? AppColors.primary
+                                : AppColors.borderSoft,
+                          ),
+                        ),
+                        child: IconButton(
+                          icon: Icon(
+                            Icons.filter_alt_outlined,
+                            color: (provider.dateFrom != null)
+                                ? AppColors.primary
+                                : AppColors.textSecondary,
+                          ),
+                          tooltip: 'Filter by Date Range',
+                          onPressed: () => _selectDateRange(context, provider),
                         ),
                       ),
                     ],
                   ),
-                ),
-              ),
-
-            // Search bar
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-              child: TextField(
-                controller: _searchController,
-                decoration: InputDecoration(
-                  hintText: 'Search expenses...',
-                  prefixIcon: const Icon(Icons.search, color: AppColors.textSecondary),
-                  fillColor: Colors.white,
-                  filled: true,
-                  contentPadding: const EdgeInsets.symmetric(vertical: 0, horizontal: 16),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: const BorderSide(color: AppColors.borderSoft),
-                  ),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: const BorderSide(color: AppColors.borderSoft),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
-                  ),
-                ),
-                onChanged: (val) {
-                  provider.setSearchQuery(val.trim().isEmpty ? null : val.trim());
-                },
+                  // Active Filters Chips (e.g. Selected Date Range)
+                  if (provider.dateFrom != null && provider.dateTo != null) ...[
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 8,
+                      children: [
+                        Chip(
+                          backgroundColor: AppColors.primary.withOpacity(0.08),
+                          labelStyle: const TextStyle(color: AppColors.primary, fontSize: 12, fontWeight: FontWeight.w500),
+                          side: BorderSide(color: AppColors.primary.withOpacity(0.2)),
+                          avatar: const Icon(Icons.calendar_month, size: 14, color: AppColors.primary),
+                          label: Text('${provider.dateFrom} to ${provider.dateTo}'),
+                          deleteIcon: const Icon(Icons.close, size: 14, color: AppColors.primary),
+                          onDeleted: () {
+                            provider.setDateRange(null, null);
+                          },
+                        ),
+                      ],
+                    ),
+                  ],
+                ],
               ),
             ),
 

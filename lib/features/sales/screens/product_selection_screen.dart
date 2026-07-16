@@ -332,7 +332,7 @@ class ProductSelectionCard extends StatelessWidget {
                   ),
                   const SizedBox(height: 6),
                   Text(
-                    'Stock: ${product.stock?.toInt() ?? 0}',
+                    'Van Stock: ${product.stock?.toInt() ?? 0}   |   DB Stock: ${product.distributorStock?.toInt() ?? 0}',
                     style: const TextStyle(
                       color: AppColors.textSecondary,
                       fontSize: 13,

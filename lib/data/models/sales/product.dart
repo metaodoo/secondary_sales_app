@@ -6,6 +6,7 @@ class Product {
   final double price;
   final String? uom;
   final double? stock;
+  final double? distributorStock;
 
   Product({
     required this.id,
@@ -14,6 +15,7 @@ class Product {
     required this.price,
     this.uom,
     this.stock,
+    this.distributorStock,
   });
 
   factory Product.fromMap(Map<String, dynamic> map) {
@@ -24,6 +26,7 @@ class Product {
       price: asDouble(map['list_price']),
       uom: map['uom_name'] ?? map['uom']?['name'] ?? 'Unit',
       stock: _nullableDouble(map['qty_available'] ?? map['stock']),
+      distributorStock: _nullableDouble(map['distributor_qty_available']),
     );
   }
 

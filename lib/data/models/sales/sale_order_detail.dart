@@ -184,6 +184,7 @@ class OrderProduct {
     this.defaultCode,
     this.tracking = 'none',
     this.qtyAvailable,
+    this.distributorQtyAvailable,
   });
 
   final int id;
@@ -191,6 +192,7 @@ class OrderProduct {
   final String? defaultCode;
   final String tracking;
   final double? qtyAvailable;
+  final double? distributorQtyAvailable;
 
   factory OrderProduct.fromMap(Map<String, dynamic> map) {
     return OrderProduct(
@@ -199,6 +201,7 @@ class OrderProduct {
       defaultCode: asNullableString(map['default_code']),
       tracking: (map['tracking'] ?? 'none').toString(),
       qtyAvailable: map['qty_available'] != null ? asDouble(map['qty_available']) : null,
+      distributorQtyAvailable: map['distributor_qty_available'] != null ? asDouble(map['distributor_qty_available']) : null,
     );
   }
 }

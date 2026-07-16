@@ -100,7 +100,7 @@ class _SalesOfficerListScreenState extends State<SalesOfficerListScreen> {
         actions: [
           Padding(
             padding: const EdgeInsets.only(right: 16),
-            child: ProfileAvatar(onTap: () {}),
+            child: const ProfileAvatar(),
           ),
         ],
         bottom: PreferredSize(
