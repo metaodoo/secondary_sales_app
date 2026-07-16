@@ -162,6 +162,10 @@ class _OutletsListScreenState extends State<OutletsListScreen> {
               ),
               const SizedBox(height: 16),
               if (_error != null) ErrorPanel(_error!),
+              if (_isLoading && _outlets.isNotEmpty) ...[
+                const LinearProgressIndicator(),
+                const SizedBox(height: 16),
+              ],
               if (_isLoading && _outlets.isEmpty)
                 const LoadingState()
               else if (_outlets.isEmpty)

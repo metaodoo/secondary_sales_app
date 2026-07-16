@@ -163,4 +163,24 @@ class ScrapProvider with ChangeNotifier {
       notifyListeners();
     }
   }
+
+  Future<Map<String, dynamic>?> executeScrapAction(
+    int scrapId,
+    String action,
+  ) async {
+    _loadingCount++;
+    _error = null;
+    notifyListeners();
+
+    try {
+      return await _apiService.scrapAction(scrapId, action);
+    } catch (e) {
+      _error = e.toString();
+      return null;
+    } finally {
+      if (_loadingCount > 0) _loadingCount--;
+      notifyListeners();
+    }
+  }
 }
+

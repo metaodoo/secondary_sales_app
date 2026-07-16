@@ -94,6 +94,10 @@ class _DealersTabState extends State<DealersTab> {
                     ),
                     const SizedBox(height: 16),
                     if (provider.error != null) ErrorPanel(provider.error!),
+                    if (provider.isLoading && provider.hubs.isNotEmpty) ...[
+                      const LinearProgressIndicator(),
+                      const SizedBox(height: 16),
+                    ],
                     if (provider.isLoading && provider.hubs.isEmpty)
                       const LoadingState()
                     else if (provider.hubs.isEmpty)

@@ -177,4 +177,24 @@ class ReturnProvider with ChangeNotifier {
       notifyListeners();
     }
   }
+
+  Future<Map<String, dynamic>?> executeReturnAction(
+    int returnId,
+    String action,
+  ) async {
+    _loadingCount++;
+    _error = null;
+    notifyListeners();
+
+    try {
+      return await _apiService.returnAction(returnId, action);
+    } catch (e) {
+      _error = e.toString();
+      return null;
+    } finally {
+      if (_loadingCount > 0) _loadingCount--;
+      notifyListeners();
+    }
+  }
 }
+

@@ -55,6 +55,10 @@ class OrderTab extends StatelessWidget {
                   ),
                   const SizedBox(height: 16),
                   if (provider.error != null) ErrorPanel(provider.error!),
+                  if (provider.isLoading && hubs.isNotEmpty) ...[
+                    const LinearProgressIndicator(),
+                    const SizedBox(height: 16),
+                  ],
                   if (provider.isLoading && hubs.isEmpty)
                     const Padding(
                       padding: EdgeInsets.all(32),

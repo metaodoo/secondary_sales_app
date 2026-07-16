@@ -127,6 +127,7 @@ class VirtualTransfer {
   final String name;
   final String state;
   final String? vanOperationType;
+  final String? ssTransferCategory;
   final String? scheduledDate;
   final Map<String, dynamic>? distributor;
   final Map<String, dynamic>? sourceLocation;
@@ -138,6 +139,7 @@ class VirtualTransfer {
     required this.name,
     required this.state,
     this.vanOperationType,
+    this.ssTransferCategory,
     this.scheduledDate,
     this.distributor,
     this.sourceLocation,
@@ -152,6 +154,7 @@ class VirtualTransfer {
       name: map['name'] ?? '',
       state: map['state'] ?? '',
       vanOperationType: map['van_operation_type'],
+      ssTransferCategory: map['ss_transfer_category'],
       scheduledDate: map['scheduled_date'],
       distributor: asMapOrNull(map['distributor']),
       sourceLocation: asMapOrNull(map['source_location']),

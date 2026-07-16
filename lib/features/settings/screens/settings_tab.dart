@@ -7,6 +7,7 @@ import 'package:secondary_sales/core/access/access_resources.dart';
 import 'package:secondary_sales/features/employees/screens/sales_officer_list_screen.dart';
 import 'package:secondary_sales/features/hr/screens/attendance_screen.dart';
 import 'package:secondary_sales/features/hr/screens/leave_request_screen.dart';
+import 'package:secondary_sales/features/hr/screens/location_buffer_screen.dart';
 
 class SettingsTab extends StatelessWidget {
   const SettingsTab({super.key, this.onBack});
@@ -158,6 +159,19 @@ class SettingsTab extends StatelessWidget {
                     ),
                     const Divider(height: 1, color: AppColors.borderMuted),
                   ],
+                  _buildSettingItem(
+                    icon: Icons.storage_outlined,
+                    title: 'Location Buffer',
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const LocationBufferScreen(),
+                        ),
+                      );
+                    },
+                  ),
+                  const Divider(height: 1, color: AppColors.borderMuted),
                   if (auth.canView(AppScreen.moduleLeave)) ...[
                     _buildSettingItem(
                       icon: Icons.event_busy_outlined,

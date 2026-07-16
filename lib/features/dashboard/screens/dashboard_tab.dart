@@ -222,37 +222,40 @@ class DashboardTab extends StatelessWidget {
                         circleColor: AppColors.borderMuted,
                         onTap: () => onModuleSelected(AppShellIndex.vanLoading),
                       ),
-                    _buildModuleCard(
-                      title: 'Delivery (Secondary)',
-                      icon: Icons.inventory_2_outlined,
-                      iconColor: AppColors.primary,
-                      circleColor: AppColors.primarySoft,
-                      onTap: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => const DeliveriesListScreen(
-                              moduleType: 'secondary',
+                    if (auth.canView(AppScreen.secondaryDeliveriesList))
+                      _buildModuleCard(
+                        title: 'Delivery (Secondary)',
+                        icon: Icons.inventory_2_outlined,
+                        iconColor: AppColors.primary,
+                        circleColor: AppColors.primarySoft,
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => const DeliveriesListScreen(
+                                moduleType: 'secondary',
+                              ),
                             ),
-                          ),
-                        );
-                      },
-                    ),
-                    _buildModuleCard(
-                      title: 'Scrap Operation',
-                      icon: Icons.recycling_outlined,
-                      iconColor: AppColors.primary,
-                      circleColor: AppColors.borderMuted,
-                      onTap: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) =>
-                                const ScrapsListScreen(moduleType: 'secondary'),
-                          ),
-                        );
-                      },
-                    ),
+                          );
+                        },
+                      ),
+                    if (auth.canView(AppScreen.secondaryScrapsList))
+                      _buildModuleCard(
+                        title: 'Scrap Operation',
+                        icon: Icons.recycling_outlined,
+                        iconColor: AppColors.primary,
+                        circleColor: AppColors.borderMuted,
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => const ScrapsListScreen(
+                                moduleType: 'secondary',
+                              ),
+                            ),
+                          );
+                        },
+                      ),
                     if (auth.canView(AppScreen.visitsList))
                       _buildModuleCard(
                         title: 'Visit History',

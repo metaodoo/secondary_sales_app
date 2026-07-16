@@ -47,6 +47,8 @@ class _ValidateDeliveryScreenState extends State<ValidateDeliveryScreen> {
       widget.pickingState.toLowerCase() == 'done' ||
       widget.pickingState.toLowerCase() == 'cancel';
 
+  bool get _isSecondary => widget.saleType == 'secondary';
+
   @override
   void dispose() {
     for (final timer in _reassignTimers.values) {
@@ -65,6 +67,7 @@ class _ValidateDeliveryScreenState extends State<ValidateDeliveryScreen> {
     final prepare = await context.read<PrimarySaleProvider>().prepareDelivery(
       widget.orderId,
       pickingId: widget.pickingId,
+      saleType: widget.saleType,
     );
     if (!mounted || prepare == null) return;
 
@@ -75,19 +78,21 @@ class _ValidateDeliveryScreenState extends State<ValidateDeliveryScreen> {
             quantityDone: isReadOnly
                 ? line.quantityDone
                 : line.defaultDeliveryQty,
-            lots: (line.lotLines ?? [])
-                .map(
-                  (l) => DeliveryLotInput(
-                    lot: AvailableLot(
-                      lotId: l.lotId ?? 0,
-                      lotName: l.lotName ?? '',
-                      productId: line.product?.id ?? 0,
-                      availableQty: l.quantity,
-                    ),
-                    quantity: l.quantity,
-                  ),
-                )
-                .toList(),
+            lots: _isSecondary
+                ? []
+                : (line.lotLines ?? [])
+                    .map(
+                      (l) => DeliveryLotInput(
+                        lot: AvailableLot(
+                          lotId: l.lotId ?? 0,
+                          lotName: l.lotName ?? '',
+                          productId: line.product?.id ?? 0,
+                          availableQty: l.quantity,
+                        ),
+                        quantity: l.quantity,
+                      ),
+                    )
+                    .toList(),
           ),
         )
         .toList();
@@ -112,7 +117,7 @@ class _ValidateDeliveryScreenState extends State<ValidateDeliveryScreen> {
     });
 
     // Fetch complete lot lists in the background so the dropdown has all options initially
-    if (!isReadOnly && _locationId != null) {
+    if (!isReadOnly && _locationId != null && !_isSecondary) {
       for (final input in inputs) {
         if (input.move.requiresLots) {
           final productId = input.move.product?.id;
@@ -318,6 +323,28 @@ class _ValidateDeliveryScreenState extends State<ValidateDeliveryScreen> {
       return;
     }
 
+    if (widget.saleType == 'primary') {
+      final order = await context.read<PrimarySaleProvider>().validateDelivery(
+        orderId: widget.orderId,
+        pickingId: prepare.picking.id,
+        locationId: _locationId,
+        lines: _inputs,
+        saleType: widget.saleType,
+        action: 'save',
+      );
+      if (!mounted) return;
+
+      if (order == null) {
+        final error = context.read<PrimarySaleProvider>().error;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(error ?? 'Could not save delivery details.')),
+        );
+        return;
+      }
+      Navigator.of(context).pop(order);
+      return;
+    }
+
     bool hasLessQty = _inputs.any(
       (input) => input.quantityDone < input.move.orderedQty,
     );
@@ -403,10 +430,10 @@ class _ValidateDeliveryScreenState extends State<ValidateDeliveryScreen> {
       if (input.quantityDone > input.move.orderedQty) {
         return 'Delivery quantity cannot exceed ordered quantity.';
       }
-      if (input.quantityDone > input.move.quantityDone) {
+      if (input.quantityDone > input.move.availableQty) {
         return 'Delivery quantity cannot exceed available stock.';
       }
-      if (!input.move.requiresLots || input.quantityDone <= 0) continue;
+      if (_isSecondary || !input.move.requiresLots || input.quantityDone <= 0) continue;
 
       final allocated = _allocatedQty(input);
       if ((allocated - input.quantityDone).abs() > 0.0001) {
@@ -423,9 +450,9 @@ class _ValidateDeliveryScreenState extends State<ValidateDeliveryScreen> {
   void _changeLineQty(DeliveryLineInput input, double delta) {
     setState(() {
       final next = input.quantityDone + delta;
-      final maxAllowed = input.move.orderedQty < input.move.quantityDone
+      final maxAllowed = input.move.orderedQty < input.move.availableQty
           ? input.move.orderedQty
-          : input.move.quantityDone;
+          : input.move.availableQty;
       input.quantityDone = next.clamp(0, maxAllowed).toDouble();
 
       if (input.move.requiresLots && input.lots.isNotEmpty && delta < 0) {
@@ -440,9 +467,9 @@ class _ValidateDeliveryScreenState extends State<ValidateDeliveryScreen> {
 
   void _setLineQty(DeliveryLineInput input, double val) {
     setState(() {
-      final maxAllowed = input.move.orderedQty < input.move.quantityDone
+      final maxAllowed = input.move.orderedQty < input.move.availableQty
           ? input.move.orderedQty
-          : input.move.quantityDone;
+          : input.move.availableQty;
       input.quantityDone = val.clamp(0, maxAllowed).toDouble();
 
       if (input.move.requiresLots && input.lots.isNotEmpty) {
@@ -653,6 +680,7 @@ class _ValidateDeliveryScreenState extends State<ValidateDeliveryScreen> {
                           isReassigning: _isReassigning[productId] ?? false,
                           reassignError: _reassignErrors[productId],
                           allocatedQty: _allocatedQty(input),
+                          isSecondary: _isSecondary,
                           onRemove: () {
                             setState(() => _inputs.remove(input));
                           },
@@ -717,7 +745,7 @@ class _ValidateDeliveryScreenState extends State<ValidateDeliveryScreen> {
                   width: double.infinity,
                   height: 50,
                   child: PermissionGate(
-                    resourceKey: AppAction.deliveryValidate,
+                    resourceKey: AppAction.deliveryValidateFor(widget.saleType),
                     child: FilledButton(
                       onPressed: provider.isLoading || _prepare == null
                           ? null
@@ -737,9 +765,11 @@ class _ValidateDeliveryScreenState extends State<ValidateDeliveryScreen> {
                                 strokeWidth: 2,
                               ),
                             )
-                          : const Text(
-                              'Confirm Delivery',
-                              style: TextStyle(fontWeight: FontWeight.w800),
+                          : Text(
+                              widget.saleType == 'primary'
+                                  ? 'Save Delivery'
+                                  : 'Confirm Delivery',
+                              style: const TextStyle(fontWeight: FontWeight.w800),
                             ),
                     ),
                   ),
@@ -1009,6 +1039,7 @@ class _DeliveryLinePanel extends StatelessWidget {
     required this.onLotPlus,
     this.onQuantityInput,
     this.onLotQtyInput,
+    this.isSecondary = false,
   });
 
   final DeliveryLineInput input;
@@ -1030,6 +1061,7 @@ class _DeliveryLinePanel extends StatelessWidget {
   final ValueChanged<double>? onQuantityInput;
   final void Function(DeliveryLotInput lotInput, double quantity)?
   onLotQtyInput;
+  final bool isSecondary;
 
   @override
   Widget build(BuildContext context) {
@@ -1074,7 +1106,7 @@ class _DeliveryLinePanel extends StatelessWidget {
           ),
           const SizedBox(height: 2),
           Text(
-            'Available: ${formatQty(move.quantityDone)} $uomName',
+            'Available: ${formatQty(move.availableQty)} $uomName',
             style: const TextStyle(color: AppColors.textSecondary),
           ),
           const SizedBox(height: 16),
@@ -1108,94 +1140,96 @@ class _DeliveryLinePanel extends StatelessWidget {
                 ),
             ],
           ),
-          const Divider(height: 28),
-          Row(
-            children: [
-              const Expanded(
+          if (!isSecondary) ...[
+            const Divider(height: 28),
+            Row(
+              children: [
+                const Expanded(
+                  child: Text(
+                    'Location Lots',
+                    style: TextStyle(fontWeight: FontWeight.w800),
+                  ),
+                ),
+                if (move.requiresLots && !isReadOnly)
+                  TextButton.icon(
+                    onPressed: isLoadingLots || isReassigning ? null : onAddLot,
+                    icon: const Icon(Icons.add, size: 18),
+                    label: Text(isLoadingLots ? 'Loading' : 'Add Lot'),
+                  ),
+              ],
+            ),
+            if (!move.requiresLots)
+              const Text(
+                'No lot allocation required',
+                style: TextStyle(color: AppColors.textSecondary),
+              )
+            else if (isReassigning)
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 20),
+                child: Center(
+                  child: SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  ),
+                ),
+              )
+            else if (reassignError != null)
+              Padding(
+                padding: const EdgeInsets.only(top: 8),
                 child: Text(
-                  'Location Lots',
-                  style: TextStyle(fontWeight: FontWeight.w800),
+                  reassignError!,
+                  style: const TextStyle(
+                    color: Colors.red,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              )
+            else if (input.lots.isEmpty)
+              Text(
+                isReadOnly
+                    ? 'No lots allocated'
+                    : 'Click "Add Lot" to allocate from source location',
+                style: const TextStyle(color: AppColors.textSecondary),
+              )
+            else ...[
+              const SizedBox(height: 8),
+              ...input.lots.map(
+                (lotInput) => Padding(
+                  padding: const EdgeInsets.only(bottom: 10),
+                  child: _LotAllocationRow(
+                    lotInput: lotInput,
+                    lots: lots,
+                    isReadOnly: isReadOnly,
+                    onChanged: (lot) => onLotChanged(lotInput, lot),
+                    onRemove: () => onRemoveLot(lotInput),
+                    onMinus: () => onLotMinus(lotInput),
+                    onPlus: () => onLotPlus(lotInput),
+                    onQuantityInput: (newVal) {
+                      final otherAllocated = input.lots
+                          .where((l) => l != lotInput)
+                          .fold<double>(0.0, (s, l) => s + l.quantity);
+                      final maxForLot = (input.quantityDone - otherAllocated)
+                          .clamp(0.0, input.quantityDone);
+                      onLotQtyInput?.call(lotInput, newVal.clamp(0, maxForLot));
+                    },
+                  ),
                 ),
               ),
-              if (move.requiresLots && !isReadOnly)
-                TextButton.icon(
-                  onPressed: isLoadingLots || isReassigning ? null : onAddLot,
-                  icon: const Icon(Icons.add, size: 18),
-                  label: Text(isLoadingLots ? 'Loading' : 'Add Lot'),
+              if (!isReadOnly)
+                Text(
+                  'Total Allocated: ${formatQty(allocatedQty)} / '
+                  '${formatQty(input.quantityDone)} $uomName'
+                  '${allocationMatches ? '' : ' (Must match delivery quantity)'}',
+                  style: TextStyle(
+                    color: allocationMatches
+                        ? const Color(0xFF16A34A)
+                        : const Color(0xFFEF4444),
+                    fontWeight: FontWeight.w800,
+                  ),
                 ),
             ],
-          ),
-          if (!move.requiresLots)
-            const Text(
-              'No lot allocation required',
-              style: TextStyle(color: AppColors.textSecondary),
-            )
-          else if (isReassigning)
-            const Padding(
-              padding: EdgeInsets.symmetric(vertical: 20),
-              child: Center(
-                child: SizedBox(
-                  width: 20,
-                  height: 20,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                ),
-              ),
-            )
-          else if (reassignError != null)
-            Padding(
-              padding: const EdgeInsets.only(top: 8),
-              child: Text(
-                reassignError!,
-                style: const TextStyle(
-                  color: Colors.red,
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            )
-          else if (input.lots.isEmpty)
-            Text(
-              isReadOnly
-                  ? 'No lots allocated'
-                  : 'Click "Add Lot" to allocate from source location',
-              style: const TextStyle(color: AppColors.textSecondary),
-            )
-          else ...[
-            const SizedBox(height: 8),
-            ...input.lots.map(
-              (lotInput) => Padding(
-                padding: const EdgeInsets.only(bottom: 10),
-                child: _LotAllocationRow(
-                  lotInput: lotInput,
-                  lots: lots,
-                  isReadOnly: isReadOnly,
-                  onChanged: (lot) => onLotChanged(lotInput, lot),
-                  onRemove: () => onRemoveLot(lotInput),
-                  onMinus: () => onLotMinus(lotInput),
-                  onPlus: () => onLotPlus(lotInput),
-                  onQuantityInput: (newVal) {
-                    final otherAllocated = input.lots
-                        .where((l) => l != lotInput)
-                        .fold<double>(0.0, (s, l) => s + l.quantity);
-                    final maxForLot = (input.quantityDone - otherAllocated)
-                        .clamp(0.0, input.quantityDone);
-                    onLotQtyInput?.call(lotInput, newVal.clamp(0, maxForLot));
-                  },
-                ),
-              ),
-            ),
-            if (!isReadOnly)
-              Text(
-                'Total Allocated: ${formatQty(allocatedQty)} / '
-                '${formatQty(input.quantityDone)} $uomName'
-                '${allocationMatches ? '' : ' (Must match delivery quantity)'}',
-                style: TextStyle(
-                  color: allocationMatches
-                      ? const Color(0xFF16A34A)
-                      : const Color(0xFFEF4444),
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
           ],
         ],
       ),

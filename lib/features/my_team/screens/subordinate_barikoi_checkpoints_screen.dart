@@ -1,16 +1,28 @@
 import 'dart:convert';
+import 'dart:math';
 import 'package:http/http.dart' as http;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:secondary_sales/core/theme/app_theme.dart';
 import 'package:secondary_sales/core/widgets/ss_ui.dart';
 import 'package:secondary_sales/features/my_team/my_team_provider.dart';
-import 'package:flutter_map/flutter_map.dart';
-import 'package:latlong2/latlong.dart';
+import 'package:maplibre_gl/maplibre_gl.dart';
 import 'package:intl/intl.dart';
 
-class SubordinateCheckpointsScreen extends StatefulWidget {
-  const SubordinateCheckpointsScreen({
+class ProcessedCheckpoint {
+  final Checkpoint original;
+  final bool isStop;
+  final int duration;
+
+  ProcessedCheckpoint({
+    required this.original,
+    this.isStop = false,
+    this.duration = 0,
+  });
+}
+
+class SubordinateBarikoiCheckpointsScreen extends StatefulWidget {
+  const SubordinateBarikoiCheckpointsScreen({
     super.key,
     required this.employeeId,
     required this.employeeName,
@@ -22,17 +34,19 @@ class SubordinateCheckpointsScreen extends StatefulWidget {
   final String initialDateStr;
 
   @override
-  State<SubordinateCheckpointsScreen> createState() =>
-      _SubordinateCheckpointsScreenState();
+  State<SubordinateBarikoiCheckpointsScreen> createState() =>
+      _SubordinateBarikoiCheckpointsScreenState();
 }
 
-class _SubordinateCheckpointsScreenState
-    extends State<SubordinateCheckpointsScreen> {
+class _SubordinateBarikoiCheckpointsScreenState
+    extends State<SubordinateBarikoiCheckpointsScreen> {
   late DateTime _selectedDate;
-  final MapController _mapController = MapController();
-  Checkpoint? _selectedCheckpoint;
+  MapLibreMapController? _mapController;
+  ProcessedCheckpoint? _selectedCheckpoint;
   String? _resolvedAddress;
   int? _resolvingCheckpointId;
+  List<ProcessedCheckpoint> _processedCheckpoints = [];
+  bool _styleLoaded = false;
   int? _selectedShiftIndex;
 
   @override
@@ -49,13 +63,232 @@ class _SubordinateCheckpointsScreenState
     context.read<MyTeamProvider>().fetchEmployeeCheckpoints(
           employeeId: widget.employeeId,
           date: formattedDate,
-        );
+        ).then((_) {
+          if (mounted) {
+            _processLocationPoints();
+            if (_styleLoaded) {
+              _drawRoute();
+            }
+          }
+        });
     setState(() {
       _selectedCheckpoint = null;
       _resolvedAddress = null;
       _resolvingCheckpointId = null;
       _selectedShiftIndex = null;
     });
+  }
+
+  // Calculate distance in meters using Haversine formula
+  double _getDistance(double lat1, double lon1, double lat2, double lon2) {
+    const r = 6371000.0; // Earth radius in meters
+    final phi1 = lat1 * pi / 180.0;
+    final phi2 = lat2 * pi / 180.0;
+    final deltaPhi = (lat2 - lat1) * pi / 180.0;
+    final deltaLambda = (lon2 - lon1) * pi / 180.0;
+    final a = sin(deltaPhi / 2.0) * sin(deltaPhi / 2.0) +
+        cos(phi1) * cos(phi2) * sin(deltaLambda / 2.0) * sin(deltaLambda / 2.0);
+    final c = 2.0 * atan2(sqrt(a), sqrt(1.0 - a));
+    return r * c;
+  }
+
+  // Calculate duration in minutes between two timestamps
+  int _getDuration(String? t1Str, String? t2Str) {
+    if (t1Str == null || t2Str == null) return 0;
+    final t1 = DateTime.tryParse(t1Str);
+    final t2 = DateTime.tryParse(t2Str);
+    if (t1 == null || t2 == null) return 0;
+    return t2.difference(t1).inMinutes;
+  }
+
+  // Process data-driven states of location coordinates
+  void _processLocationPoints() {
+    final shifts = context.read<MyTeamProvider>().checkpointsShifts;
+    final List<ProcessedCheckpoint> processed = [];
+
+    for (int sIdx = 0; sIdx < shifts.length; sIdx++) {
+      if (_selectedShiftIndex != null && _selectedShiftIndex != sIdx) {
+        continue;
+      }
+      final shift = shifts[sIdx];
+      final shiftPts = shift.checkpoints;
+      for (int i = 0; i < shiftPts.length; i++) {
+        final pt = shiftPts[i];
+        bool isStop = false;
+        int duration = 0;
+
+        if (i < shiftPts.length - 1) {
+          final nextPt = shiftPts[i + 1];
+          final dist = _getDistance(pt.latitude, pt.longitude, nextPt.latitude, nextPt.longitude);
+          final dur = _getDuration(pt.recordedAt, nextPt.recordedAt);
+
+          // Stationary for >= 5 minutes within 50 meters
+          if (dist < 50 && dur >= 5) {
+            isStop = true;
+            duration = dur;
+          }
+        }
+
+        processed.add(ProcessedCheckpoint(
+          original: pt,
+          isStop: isStop,
+          duration: duration,
+        ));
+      }
+    }
+
+    setState(() {
+      _processedCheckpoints = processed;
+    });
+  }
+
+  Future<void> _drawRoute() async {
+    final controller = _mapController;
+    if (controller == null) return;
+
+    // Clear previous shapes
+    await controller.clearLines();
+    await controller.clearCircles();
+
+    if (_processedCheckpoints.isEmpty) return;
+
+    // 1. Draw dynamic colored path segments
+    final shifts = context.read<MyTeamProvider>().checkpointsShifts;
+    for (int sIdx = 0; sIdx < shifts.length; sIdx++) {
+      if (_selectedShiftIndex != null && _selectedShiftIndex != sIdx) {
+        continue;
+      }
+      final shift = shifts[sIdx];
+      final shiftPts = shift.checkpoints;
+      if (shiftPts.length < 2) continue;
+
+      for (int i = 0; i < shiftPts.length - 1; i++) {
+        final ptOriginal = shiftPts[i];
+        final nextPtOriginal = shiftPts[i + 1];
+
+        final pt = _processedCheckpoints.firstWhere(
+          (element) => element.original.id == ptOriginal.id,
+          orElse: () => ProcessedCheckpoint(original: ptOriginal),
+        );
+
+        String lineColor = "#3b82f6"; // Blue for active movement
+        double lineWidth = 4.5;
+
+        if (pt.original.isMock) {
+          lineColor = "#ef4444"; // Red for mock warning
+          lineWidth = 5.0;
+        } else if (pt.isStop) {
+          if (pt.duration >= 15) {
+            lineColor = "#d97706"; // Amber for major stop
+            lineWidth = 6.0;
+          } else {
+            lineColor = "#f59e0b"; // Yellow for short stop
+            lineWidth = 5.0;
+          }
+        }
+
+        await controller.addLine(
+          LineOptions(
+            geometry: [
+              LatLng(pt.original.latitude, pt.original.longitude),
+              LatLng(nextPtOriginal.latitude, nextPtOriginal.longitude),
+            ],
+            lineColor: lineColor,
+            lineWidth: lineWidth,
+            lineOpacity: 0.8,
+          ),
+        );
+      }
+    }
+
+    // 2. Draw styled location pins/circles
+    for (int sIdx = 0; sIdx < shifts.length; sIdx++) {
+      if (_selectedShiftIndex != null && _selectedShiftIndex != sIdx) {
+        continue;
+      }
+      final shift = shifts[sIdx];
+      final shiftPts = shift.checkpoints;
+      for (int i = 0; i < shiftPts.length; i++) {
+        final ptOriginal = shiftPts[i];
+        final isStart = i == 0;
+        final isEnd = i == shiftPts.length - 1;
+
+        final pt = _processedCheckpoints.firstWhere(
+          (element) => element.original.id == ptOriginal.id,
+          orElse: () => ProcessedCheckpoint(original: ptOriginal),
+        );
+
+        String circleColor = "#3b82f6"; // Default Blue
+        double radius = 6.0;
+        double strokeWidth = 1.5;
+
+        if (pt.original.isMock) {
+          circleColor = "#ef4444"; // Red for mock
+          radius = 8.0;
+          strokeWidth = 2.0;
+        } else if (isStart) {
+          circleColor = "#16a34a"; // Green for start
+          radius = 10.0;
+          strokeWidth = 2.5;
+        } else if (isEnd) {
+          circleColor = "#1f2937"; // Dark Gray for end
+          radius = 10.0;
+          strokeWidth = 2.5;
+        } else if (pt.isStop) {
+          if (pt.duration >= 15) {
+            circleColor = "#d97706"; // Major Stop (Amber)
+            radius = 10.0;
+            strokeWidth = 2.0;
+          } else {
+            circleColor = "#f59e0b"; // Short Stop (Yellow)
+            radius = 8.0;
+            strokeWidth = 1.5;
+          }
+        }
+
+        await controller.addCircle(
+          CircleOptions(
+            geometry: LatLng(pt.original.latitude, pt.original.longitude),
+            circleColor: circleColor,
+            circleRadius: radius,
+            circleStrokeColor: "#ffffff",
+            circleStrokeWidth: strokeWidth,
+          ),
+        );
+      }
+    }
+
+    // 3. Auto-fit camera boundaries
+    double? minLat, maxLat, minLng, maxLng;
+    for (final pt in _processedCheckpoints) {
+      final lat = pt.original.latitude;
+      final lng = pt.original.longitude;
+      if (minLat == null || lat < minLat) minLat = lat;
+      if (maxLat == null || lat > maxLat) maxLat = lat;
+      if (minLng == null || lng < minLng) minLng = lng;
+      if (maxLng == null || lng > maxLng) maxLng = lng;
+    }
+
+    if (minLat != null && maxLat != null && minLng != null && maxLng != null) {
+      if (_processedCheckpoints.length == 1) {
+        controller.animateCamera(
+          CameraUpdate.newLatLngZoom(LatLng(minLat, minLng), 16.0),
+        );
+      } else {
+        controller.animateCamera(
+          CameraUpdate.newLatLngBounds(
+            LatLngBounds(
+              southwest: LatLng(minLat, minLng),
+              northeast: LatLng(maxLat, maxLng),
+            ),
+            left: 50,
+            top: 150, // Added padding to clear floating widgets
+            right: 50,
+            bottom: 50,
+          ),
+        );
+      }
+    }
   }
 
   Future<void> _fetchAddressForCheckpoint(Checkpoint pt) async {
@@ -122,115 +355,53 @@ class _SubordinateCheckpointsScreenState
     if (picked != null && picked != _selectedDate) {
       setState(() {
         _selectedDate = picked;
+        _styleLoaded = false;
       });
       _fetchCheckpoints();
     }
   }
 
-  void _centerMapOnPoint(Checkpoint point) {
+  void _centerMapOnPoint(ProcessedCheckpoint point) {
     setState(() {
       _selectedCheckpoint = point;
     });
-    _mapController.move(LatLng(point.latitude, point.longitude), 16.0);
-    _fetchAddressForCheckpoint(point);
+    _mapController?.animateCamera(
+      CameraUpdate.newLatLngZoom(
+        LatLng(point.original.latitude, point.original.longitude),
+        16.5,
+      ),
+    );
+    _fetchAddressForCheckpoint(point.original);
+  }
+
+  void _onCircleTapped(Circle circle) {
+    final tappedLatLng = circle.options.geometry;
+    if (tappedLatLng == null) return;
+
+    final match = _processedCheckpoints.firstWhere(
+      (pt) => (pt.original.latitude - tappedLatLng.latitude).abs() < 0.0001 &&
+              (pt.original.longitude - tappedLatLng.longitude).abs() < 0.0001,
+      orElse: () => _processedCheckpoints.first,
+    );
+
+    _centerMapOnPoint(match);
   }
 
   @override
   Widget build(BuildContext context) {
     final myTeamProvider = context.watch<MyTeamProvider>();
     final shifts = myTeamProvider.checkpointsShifts;
+    final barikoiKey = myTeamProvider.barikoiApiKey ?? '';
 
-    // Collect all checkpoints across all shifts
-    final allCheckpoints = <Checkpoint>[];
-    for (int sIdx = 0; sIdx < shifts.length; sIdx++) {
-      if (_selectedShiftIndex != null && _selectedShiftIndex != sIdx) {
-        continue;
-      }
-      allCheckpoints.addAll(shifts[sIdx].checkpoints);
-    }
+    // Style URL with the API key retrieved dynamically from Odoo backend
+    final mapUrl = 'https://map.barikoi.com/styles/osm-liberty/style.json?key=$barikoiKey';
 
-    // Determine initial center
-    LatLng initialCenter = const LatLng(23.8103, 90.4125); // Default Dhaka coordinates
-    if (allCheckpoints.isNotEmpty) {
+    LatLng initialCenter = const LatLng(23.8103, 90.4125); // Default Dhaka center
+    if (_processedCheckpoints.isNotEmpty) {
       initialCenter = LatLng(
-        allCheckpoints.first.latitude,
-        allCheckpoints.first.longitude,
+        _processedCheckpoints.first.original.latitude,
+        _processedCheckpoints.first.original.longitude,
       );
-    }
-
-    // Generate markers
-    final markers = <Marker>[];
-    for (int sIdx = 0; sIdx < shifts.length; sIdx++) {
-      if (_selectedShiftIndex != null && _selectedShiftIndex != sIdx) {
-        continue;
-      }
-      final shift = shifts[sIdx];
-      final shiftPts = shift.checkpoints;
-      for (int i = 0; i < shiftPts.length; i++) {
-        final pt = shiftPts[i];
-        final isStart = i == 0;
-        final isEnd = i == shiftPts.length - 1;
-
-        Color markerColor = AppColors.primary;
-        IconData markerIcon = Icons.location_on;
-        double size = 30.0;
-
-        if (pt.isMock) {
-          markerColor = const Color(0xFFEF4444); // Red warning for mock GPS
-          markerIcon = Icons.warning_amber_rounded;
-          size = 36.0;
-        } else if (isStart) {
-          markerColor = const Color(0xFF16A34A); // Green start
-          markerIcon = Icons.play_arrow_rounded;
-        } else if (isEnd) {
-          markerColor = const Color(0xFFDC2626); // Red end
-          markerIcon = Icons.stop_rounded;
-        }
-
-        markers.add(
-          Marker(
-            point: LatLng(pt.latitude, pt.longitude),
-            width: size,
-            height: size,
-            child: GestureDetector(
-              onTap: () => _centerMapOnPoint(pt),
-              child: Container(
-                decoration: BoxDecoration(
-                  color: _selectedCheckpoint?.id == pt.id
-                      ? Colors.yellow.shade100
-                      : Colors.transparent,
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(
-                  markerIcon,
-                  color: markerColor,
-                  size: size,
-                ),
-              ),
-            ),
-          ),
-        );
-      }
-    }
-
-    // Build polyline points per shift
-    final polylines = <Polyline>[];
-    for (int sIdx = 0; sIdx < shifts.length; sIdx++) {
-      if (_selectedShiftIndex != null && _selectedShiftIndex != sIdx) {
-        continue;
-      }
-      final shift = shifts[sIdx];
-      if (shift.checkpoints.isNotEmpty) {
-        polylines.add(
-          Polyline(
-            points: shift.checkpoints
-                .map((pt) => LatLng(pt.latitude, pt.longitude))
-                .toList(),
-            color: AppColors.primary.withValues(alpha: 0.7),
-            strokeWidth: 4.5,
-          ),
-        );
-      }
     }
 
     return Scaffold(
@@ -272,7 +443,7 @@ class _SubordinateCheckpointsScreenState
                   ),
                 ),
                 Text(
-                  'Checkpoints: ${allCheckpoints.length}',
+                  'Checkpoints: ${_processedCheckpoints.length}',
                   style: const TextStyle(
                     fontWeight: FontWeight.w600,
                     color: AppColors.textSecondary,
@@ -309,6 +480,10 @@ class _SubordinateCheckpointsScreenState
                     onTap: () {
                       setState(() {
                         _selectedShiftIndex = isAll ? null : index - 1;
+                        _processLocationPoints();
+                        if (_styleLoaded) {
+                          _drawRoute();
+                        }
                       });
                     },
                     child: Container(
@@ -342,28 +517,102 @@ class _SubordinateCheckpointsScreenState
             flex: 4,
             child: Stack(
               children: [
-                FlutterMap(
-                  mapController: _mapController,
-                  options: MapOptions(
-                    initialCenter: initialCenter,
-                    initialZoom: 15.0,
-                  ),
-                  children: [
-                    TileLayer(
-                      urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                      userAgentPackageName: 'com.abrar.secondary_sales',
-                    ),
-                    if (polylines.isNotEmpty)
-                      PolylineLayer(
-                        polylines: polylines,
+                if (barikoiKey.isEmpty && myTeamProvider.isLoading)
+                  const Center(
+                    child: LoadingState(message: 'Initializing map parameters...'),
+                  )
+                else if (barikoiKey.isEmpty)
+                  const Center(
+                    child: Padding(
+                      padding: EdgeInsets.all(24.0),
+                      child: Text(
+                        'Barikoi API Key missing or map not configured.',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold),
                       ),
-                    MarkerLayer(markers: markers),
-                    const SimpleAttributionWidget(
-                      source: Text('© OpenStreetMap contributors'),
                     ),
-                  ],
+                  )
+                else
+                MapLibreMap(
+                    initialCameraPosition: CameraPosition(
+                      target: initialCenter,
+                      zoom: 15.0,
+                    ),
+                    styleString: mapUrl,
+                    onMapCreated: (MapLibreMapController mapController) {
+                      _mapController = mapController;
+                      _mapController?.onCircleTapped.add(_onCircleTapped);
+                    },
+                    onStyleLoadedCallback: () {
+                      _styleLoaded = true;
+                      _drawRoute();
+                    },
+                  ),
+
+                // Map Legend Overlays
+                Positioned(
+                  bottom: 12,
+                  right: 12,
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.95),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: AppColors.borderSoft),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.1),
+                          blurRadius: 4,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    padding: const EdgeInsets.symmetric(horizontal: 10.0, vertical: 8.0),
+                    child: const Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          'Route Legend',
+                          style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+                        ),
+                        SizedBox(height: 6),
+                        Row(
+                          children: [
+                            CircleAvatar(radius: 4, backgroundColor: Color(0xFF3B82F6)),
+                            SizedBox(width: 6),
+                            Text('Active Movement', style: TextStyle(fontSize: 10, color: AppColors.textSecondary)),
+                          ],
+                        ),
+                        SizedBox(height: 4),
+                        Row(
+                          children: [
+                            CircleAvatar(radius: 4, backgroundColor: Color(0xFFF59E0B)),
+                            SizedBox(width: 6),
+                            Text('Short Stop (<15m)', style: TextStyle(fontSize: 10, color: AppColors.textSecondary)),
+                          ],
+                        ),
+                        SizedBox(height: 4),
+                        Row(
+                          children: [
+                            CircleAvatar(radius: 4, backgroundColor: Color(0xFFD97706)),
+                            SizedBox(width: 6),
+                            Text('Major Stop (>=15m)', style: TextStyle(fontSize: 10, color: AppColors.textSecondary)),
+                          ],
+                        ),
+                        SizedBox(height: 4),
+                        Row(
+                          children: [
+                            CircleAvatar(radius: 4, backgroundColor: Color(0xFFEF4444)),
+                            SizedBox(width: 6),
+                            Text('Mock Location', style: TextStyle(fontSize: 10, color: AppColors.textSecondary)),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
-                // Floating active point inspector tooltip
+
+                // Floating active checkpoint inspector tooltip
                 if (_selectedCheckpoint != null)
                   Positioned(
                     top: 12,
@@ -375,10 +624,10 @@ class _SubordinateCheckpointsScreenState
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
                         side: BorderSide(
-                          color: _selectedCheckpoint!.isMock
+                          color: _selectedCheckpoint!.original.isMock
                               ? const Color(0xFFEF4444)
                               : AppColors.borderSoft,
-                          width: _selectedCheckpoint!.isMock ? 2 : 1,
+                          width: _selectedCheckpoint!.original.isMock ? 2 : 1,
                         ),
                       ),
                       child: Padding(
@@ -393,24 +642,32 @@ class _SubordinateCheckpointsScreenState
                                 Row(
                                   children: [
                                     Icon(
-                                      _selectedCheckpoint!.isMock
+                                      _selectedCheckpoint!.original.isMock
                                           ? Icons.warning_amber_rounded
-                                          : Icons.info_outline,
-                                      color: _selectedCheckpoint!.isMock
+                                          : _selectedCheckpoint!.isStop
+                                              ? Icons.pause_circle_outline
+                                              : Icons.info_outline,
+                                      color: _selectedCheckpoint!.original.isMock
                                           ? const Color(0xFFEF4444)
-                                          : AppColors.primaryStrong,
+                                          : _selectedCheckpoint!.isStop
+                                              ? const Color(0xFFD97706)
+                                              : AppColors.primaryStrong,
                                       size: 18,
                                     ),
                                     const SizedBox(width: 6),
                                     Text(
-                                      _selectedCheckpoint!.isMock
+                                      _selectedCheckpoint!.original.isMock
                                           ? 'SPOOF DETECTED'
-                                          : 'Checkpoint Info',
+                                          : _selectedCheckpoint!.isStop
+                                              ? 'Stop Duration: ${_selectedCheckpoint!.duration} mins'
+                                              : 'Checkpoint Info',
                                       style: TextStyle(
                                         fontWeight: FontWeight.bold,
-                                        color: _selectedCheckpoint!.isMock
+                                        color: _selectedCheckpoint!.original.isMock
                                             ? const Color(0xFFEF4444)
-                                            : AppColors.textPrimary,
+                                            : _selectedCheckpoint!.isStop
+                                                ? const Color(0xFFD97706)
+                                                : AppColors.textPrimary,
                                       ),
                                     ),
                                   ],
@@ -433,7 +690,7 @@ class _SubordinateCheckpointsScreenState
                             Row(
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
-                                Text('Time: ${_selectedCheckpoint!.recordedAt ?? "N/A"}'),
+                                Text('Time: ${_selectedCheckpoint!.original.recordedAt ?? "N/A"}'),
                               ],
                             ),
                             const SizedBox(height: 6),
@@ -445,7 +702,7 @@ class _SubordinateCheckpointsScreenState
                                 fontWeight: FontWeight.w500,
                               ),
                             ),
-                            if (_selectedCheckpoint!.isMock) ...[
+                            if (_selectedCheckpoint!.original.isMock) ...[
                               const SizedBox(height: 8),
                               Container(
                                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -575,10 +832,25 @@ class _SubordinateCheckpointsScreenState
             itemCount: shift.checkpoints.length,
             itemBuilder: (context, ptIndex) {
               final pt = shift.checkpoints[ptIndex];
-              final isSelected = _selectedCheckpoint?.id == pt.id;
+              // Map back original checkpoint to processed checkpoint to keep UI selection consistent
+              final procPtIndex = _processedCheckpoints.indexWhere((element) => element.original.id == pt.id);
+              final procPt = procPtIndex != -1 ? _processedCheckpoints[procPtIndex] : ProcessedCheckpoint(original: pt);
+              final isSelected = _selectedCheckpoint?.original.id == pt.id;
+
+              Color indicatorColor = AppColors.primaryTint;
+              Color borderColor = AppColors.primary;
+              if (pt.isMock) {
+                indicatorColor = const Color(0xFFEF4444);
+                borderColor = const Color(0xFFFCA5A5);
+              } else if (procPt.isStop) {
+                indicatorColor = procPt.duration >= 15 ? const Color(0xFFD97706) : const Color(0xFFF59E0B);
+                borderColor = procPt.duration >= 15 ? const Color(0xFFFBBF24) : const Color(0xFFFDE68A);
+              } else if (isSelected) {
+                indicatorColor = AppColors.primaryStrong;
+              }
 
               return InkWell(
-                onTap: () => _centerMapOnPoint(pt),
+                onTap: () => _centerMapOnPoint(procPt),
                 child: Container(
                   padding: const EdgeInsets.symmetric(vertical: 8),
                   decoration: BoxDecoration(
@@ -596,16 +868,10 @@ class _SubordinateCheckpointsScreenState
                             width: 12,
                             height: 12,
                             decoration: BoxDecoration(
-                              color: pt.isMock
-                                  ? const Color(0xFFEF4444)
-                                  : isSelected
-                                      ? AppColors.primaryStrong
-                                      : AppColors.primaryTint,
+                              color: indicatorColor,
                               shape: BoxShape.circle,
                               border: Border.all(
-                                color: pt.isMock
-                                    ? const Color(0xFFFCA5A5)
-                                    : AppColors.primary,
+                                color: borderColor,
                                 width: 2,
                               ),
                             ),
@@ -636,6 +902,28 @@ class _SubordinateCheckpointsScreenState
                           ),
                         ),
                       ),
+                      // Stop badge
+                      if (procPt.isStop)
+                        Container(
+                          margin: const EdgeInsets.only(right: 6),
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: procPt.duration >= 15 ? const Color(0xFFFEF3C7) : const Color(0xFFFFFBEB),
+                            borderRadius: BorderRadius.circular(4),
+                            border: Border.all(
+                              color: procPt.duration >= 15 ? const Color(0xFFF59E0B) : const Color(0xFFFDE68A),
+                              width: 0.5,
+                            ),
+                          ),
+                          child: Text(
+                            'STOP ${procPt.duration}m',
+                            style: TextStyle(
+                              color: procPt.duration >= 15 ? const Color(0xFFB45309) : const Color(0xFFD97706),
+                              fontSize: 9,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
                       // Spoof / Mock indicator
                       if (pt.isMock)
                         Container(

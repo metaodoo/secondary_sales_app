@@ -60,16 +60,17 @@ class _ReturnsListScreenState extends State<ReturnsListScreen> {
   Future<void> _openCreateReturn() async {
     await Navigator.push(
       context,
-      MaterialPageRoute(builder: (_) => CreateReturnScreen(moduleType: widget.moduleType)),
+      MaterialPageRoute(
+        builder: (_) => CreateReturnScreen(moduleType: widget.moduleType),
+      ),
     );
     if (mounted) {
       _fetchReturns();
     }
   }
 
-  int get _activeCount => _returns
-      .where((r) => r.state != 'done' && r.state != 'cancel')
-      .length;
+  int get _activeCount =>
+      _returns.where((r) => r.state != 'done' && r.state != 'cancel').length;
   int get _pendingCount => _returns
       .where((r) => r.state == 'assigned' || r.state == 'waiting')
       .length;
@@ -317,7 +318,7 @@ class _ReturnsListScreenState extends State<ReturnsListScreen> {
               const SizedBox(height: 24),
 
               // Create Return Button
-              if (auth.canDo(AppAction.returnCreate)) ...[
+              if (auth.canDo(AppAction.returnCreateFor(widget.moduleType))) ...[
                 ElevatedButton.icon(
                   onPressed: _openCreateReturn,
                   icon: const Icon(Icons.add, color: Colors.white, size: 22),

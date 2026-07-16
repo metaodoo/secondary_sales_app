@@ -3,6 +3,7 @@ import 'package:secondary_sales/core/theme/app_theme.dart';
 import 'package:provider/provider.dart';
 
 import 'package:secondary_sales/data/models/inventory/virtual_transfer.dart';
+import 'package:secondary_sales/features/auth/auth_provider.dart';
 import 'package:secondary_sales/features/scraps/scrap_provider.dart';
 import 'package:secondary_sales/features/scraps/screens/scrap_product_selection_screen.dart';
 import 'package:secondary_sales/core/widgets/ss_ui.dart';
@@ -11,7 +12,11 @@ class CreateScrapScreen extends StatefulWidget {
   final int? scrapId;
   final String moduleType;
 
-  const CreateScrapScreen({super.key, this.scrapId, this.moduleType = 'primary'});
+  const CreateScrapScreen({
+    super.key,
+    this.scrapId,
+    this.moduleType = 'primary',
+  });
 
   @override
   State<CreateScrapScreen> createState() => _CreateScrapScreenState();
@@ -62,6 +67,8 @@ class _CreateScrapScreenState extends State<CreateScrapScreen> {
             final entry = VirtualTransferLineEntry(
               product: product,
               quantity: qty,
+              soQty: (ld['so_qty'] as num?)?.toDouble(),
+              qcQty: (ld['qc_qty'] as num?)?.toDouble(),
             );
 
             final lotLinesData = ld['lot_lines'] as List<dynamic>? ?? [];
@@ -71,17 +78,32 @@ class _CreateScrapScreenState extends State<CreateScrapScreen> {
                 final lotId = lotData['id'] as int;
                 final lotName = lotData['name'] as String;
                 final lotQty = (ll['quantity'] as num?)?.toDouble() ?? 0.0;
+                final soQty = (ll['so_qty'] as num?)?.toDouble();
+                final qcQty = (ll['qc_qty'] as num?)?.toDouble();
+                final lotAvail =
+                    (lotData['available_qty'] as num?)?.toDouble() ?? lotQty;
+
+                final maxCurrent = [
+                  lotQty,
+                  soQty ?? 0.0,
+                  qcQty ?? 0.0,
+                ].reduce((a, b) => a > b ? a : b);
+                final finalAvail = lotAvail > maxCurrent
+                    ? lotAvail
+                    : maxCurrent;
 
                 final tLot = TransferLot(
                   lotId: lotId,
                   lotName: lotName,
-                  availableQty: lotQty,
+                  availableQty: finalAvail,
                 );
 
                 entry.lotLines.add(
                   TransferLotInput()
                     ..lot = tLot
-                    ..quantity = lotQty,
+                    ..quantity = lotQty
+                    ..soQty = soQty
+                    ..qcQty = qcQty,
                 );
               }
             }
@@ -175,14 +197,39 @@ class _CreateScrapScreenState extends State<CreateScrapScreen> {
   }
 
   void _changeLotQty(TransferLotInput lotInput, double maxQty, double delta) {
+    final auth = context.read<AuthProvider>();
     setState(() {
-      final next = lotInput.quantity + delta;
-      lotInput.quantity = next.clamp(0, maxQty).toDouble();
+      if (auth.canEditSoQty) {
+        final current = lotInput.soQty ?? lotInput.quantity;
+        final next = current + delta;
+        lotInput.soQty = next.clamp(0, maxQty).toDouble();
+      } else if (auth.canEditQcQty) {
+        final current = lotInput.qcQty ?? lotInput.quantity;
+        final next = current + delta;
+        lotInput.qcQty = next.clamp(0, maxQty).toDouble();
+      } else {
+        final next = lotInput.quantity + delta;
+        lotInput.quantity = next.clamp(0, maxQty).toDouble();
+      }
     });
   }
 
   double _allocatedQty(VirtualTransferLineEntry line) {
     return line.lotLines.fold<double>(0, (sum, lot) => sum + lot.quantity);
+  }
+
+  double _allocatedSoQty(VirtualTransferLineEntry line) {
+    return line.lotLines.fold<double>(
+      0,
+      (sum, lot) => sum + (lot.soQty ?? lot.quantity),
+    );
+  }
+
+  double _allocatedQcQty(VirtualTransferLineEntry line) {
+    return line.lotLines.fold<double>(
+      0,
+      (sum, lot) => sum + (lot.qcQty ?? lot.quantity),
+    );
   }
 
   Future<void> _createScrap() async {
@@ -196,42 +243,18 @@ class _CreateScrapScreenState extends State<CreateScrapScreen> {
       return;
     }
 
-    for (final line in _lines) {
-      if (line.product.requiresLots) {
-        if (line.lotLines.isEmpty) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(
-                'Please select lots for ${line.product.name} (Auto-allocate is disabled for scraps)',
-              ),
-              backgroundColor: Colors.red,
-            ),
-          );
-          return;
-        }
-        final allocated = _allocatedQty(line);
-        if ((allocated - line.quantity).abs() > 0.0001) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(
-                'Lot allocation for ${line.product.name} must match return quantity.',
-              ),
-              backgroundColor: Colors.red,
-            ),
-          );
-          return;
-        }
-      }
-    }
-
     final linesData = _lines.map((line) {
+      final qty = line.quantity;
+      final soQty = line.soQty;
+      final qcQty = line.qcQty;
+
       return {
         'product_id': line.product.id,
-        'quantity': line.quantity,
-        'lot_lines': line.lotLines
-            .where((l) => l.lot != null)
-            .map((l) => {'lot_id': l.lot!.lotId, 'quantity': l.quantity})
-            .toList(),
+        'product_uom_qty': 0.0,
+        'quantity': qty,
+        if (soQty != null && soQty > 0) 'so_qty': soQty,
+        if (qcQty != null && qcQty > 0) 'qc_qty': qcQty,
+        'lot_lines': const [],
       };
     }).toList();
 
@@ -271,6 +294,72 @@ class _CreateScrapScreenState extends State<CreateScrapScreen> {
     Navigator.pop(context);
   }
 
+  Future<void> _runAction(String action) async {
+    if (widget.scrapId == null) return;
+
+    setState(() => _isPreparing = true);
+
+    try {
+      if (action == 'validate') {
+        // Save first!
+        final linesData = _lines.map((line) {
+          final qty = line.quantity;
+          final soQty = line.soQty;
+          final qcQty = line.qcQty;
+
+          return {
+            'product_id': line.product.id,
+            'product_uom_qty': 0.0,
+            'quantity': qty,
+            if (soQty != null && soQty > 0) 'so_qty': soQty,
+            if (qcQty != null && qcQty > 0) 'qc_qty': qcQty,
+            'lot_lines': const [],
+          };
+        }).toList();
+
+        final saveRes = await context.read<ScrapProvider>().updateScrapDelivery(
+          widget.scrapId!,
+          lines: linesData,
+          type: widget.moduleType,
+        );
+        if (saveRes == null) {
+          final err =
+              context.read<ScrapProvider>().error ??
+              'Save failed before validation';
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(err), backgroundColor: Colors.red),
+          );
+          return;
+        }
+      }
+
+      final res = await context.read<ScrapProvider>().executeScrapAction(
+        widget.scrapId!,
+        action,
+      );
+      if (!mounted) return;
+
+      if (res == null) {
+        final err = context.read<ScrapProvider>().error ?? 'Action failed';
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(err), backgroundColor: Colors.red),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Scrap ${action == 'validate' ? 'validated' : 'cancelled'} successfully',
+            ),
+            backgroundColor: Colors.green,
+          ),
+        );
+        Navigator.pop(context);
+      }
+    } finally {
+      if (mounted) setState(() => _isPreparing = false);
+    }
+  }
+
   String _nameOf(dynamic value) {
     if (value is Map<String, dynamic>) {
       return value['name']?.toString() ?? '-';
@@ -281,6 +370,10 @@ class _CreateScrapScreenState extends State<CreateScrapScreen> {
   @override
   Widget build(BuildContext context) {
     final provider = context.watch<ScrapProvider>();
+    final auth = context.watch<AuthProvider>();
+    final canEditSoQty = auth.canEditSoQty;
+    final canEditQcQty = auth.canEditQcQty;
+    final canEditEffectiveQty = auth.canEditEffectiveQty;
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -330,10 +423,14 @@ class _CreateScrapScreenState extends State<CreateScrapScreen> {
                               const SizedBox(height: 6),
                               if (!_isReadOnly &&
                                   _prepareData?['distributors'] is List &&
-                                  (_prepareData?['distributors'] as List).length > 1)
+                                  (_prepareData?['distributors'] as List)
+                                          .length >
+                                      1)
                                 DropdownButtonFormField<int>(
                                   isExpanded: true,
-                                  value: _prepareData?['distributor']?['id'] as int?,
+                                  value:
+                                      _prepareData?['distributor']?['id']
+                                          as int?,
                                   decoration: InputDecoration(
                                     contentPadding: const EdgeInsets.symmetric(
                                       horizontal: 16,
@@ -343,26 +440,32 @@ class _CreateScrapScreenState extends State<CreateScrapScreen> {
                                     filled: true,
                                     border: OutlineInputBorder(
                                       borderRadius: BorderRadius.circular(8),
-                                      borderSide: const BorderSide(color: Color(0xFFDDE6F2)),
+                                      borderSide: const BorderSide(
+                                        color: Color(0xFFDDE6F2),
+                                      ),
                                     ),
                                     enabledBorder: OutlineInputBorder(
                                       borderRadius: BorderRadius.circular(8),
-                                      borderSide: const BorderSide(color: Color(0xFFDDE6F2)),
+                                      borderSide: const BorderSide(
+                                        color: Color(0xFFDDE6F2),
+                                      ),
                                     ),
                                   ),
-                                  items: (_prepareData?['distributors'] as List).map((d) {
-                                    final map = d as Map<dynamic, dynamic>;
-                                    return DropdownMenuItem<int>(
-                                      value: map['id'] as int?,
-                                      child: Text(
-                                        map['name']?.toString() ?? '',
-                                        style: const TextStyle(
-                                          color: Colors.black87,
-                                          fontSize: 16,
-                                        ),
-                                      ),
-                                    );
-                                  }).toList(),
+                                  items: (_prepareData?['distributors'] as List)
+                                      .map((d) {
+                                        final map = d as Map<dynamic, dynamic>;
+                                        return DropdownMenuItem<int>(
+                                          value: map['id'] as int?,
+                                          child: Text(
+                                            map['name']?.toString() ?? '',
+                                            style: const TextStyle(
+                                              color: Colors.black87,
+                                              fontSize: 16,
+                                            ),
+                                          ),
+                                        );
+                                      })
+                                      .toList(),
                                   onChanged: (val) {
                                     if (val != null) {
                                       _lines.clear();
@@ -521,37 +624,81 @@ class _CreateScrapScreenState extends State<CreateScrapScreen> {
                               onLotChanged: (lotInput, selectedLot) {
                                 setState(() {
                                   lotInput.lot = selectedLot;
-                                  if (lotInput.quantity <= 0 &&
-                                      selectedLot != null) {
-                                    lotInput.quantity = 1
+                                  if (selectedLot != null) {
+                                    final initVal = 1
                                         .clamp(0, selectedLot.availableQty)
                                         .toDouble();
+                                    if (canEditSoQty) {
+                                      if (lotInput.soQty == null ||
+                                          lotInput.soQty! <= 0) {
+                                        lotInput.soQty = initVal;
+                                      }
+                                      lotInput.quantity = 0;
+                                    } else if (canEditQcQty) {
+                                      if (lotInput.qcQty == null ||
+                                          lotInput.qcQty! <= 0) {
+                                        lotInput.qcQty = initVal;
+                                      }
+                                      lotInput.quantity = 0;
+                                    } else {
+                                      if (lotInput.quantity <= 0) {
+                                        lotInput.quantity = initVal;
+                                      }
+                                    }
                                   }
                                 });
                               },
                               onLotMinus: (lotInput) => _changeLotQty(
                                 lotInput,
-                                lotInput.lot?.availableQty ?? line.quantity,
+                                lotInput.lot?.availableQty ??
+                                    line.product.availableQty,
                                 -1,
                               ),
                               onLotPlus: (lotInput) => _changeLotQty(
                                 lotInput,
-                                lotInput.lot?.availableQty ?? line.quantity,
+                                lotInput.lot?.availableQty ??
+                                    line.product.availableQty,
                                 1,
                               ),
                               allocatedQty: _allocatedQty(line),
                               isReadOnly: _isReadOnly,
+                              canEditSoQty: canEditSoQty,
+                              canEditQcQty: canEditQcQty,
+                              canEditEffectiveQty: canEditEffectiveQty,
+                              onSoQtyChanged: (newQty) {
+                                setState(() {
+                                  line.soQty = newQty;
+                                });
+                              },
+                              onQcQtyChanged: (newQty) {
+                                setState(() {
+                                  line.qcQty = newQty;
+                                });
+                              },
                               onQuantityChanged: (newQty) {
                                 setState(() {
-                                  line.quantity = newQty.clamp(1, line.product.availableQty);
+                                  final maxQty = line.product.availableQty;
+                                  final safeMax = maxQty > 1 ? maxQty : 1.0;
+                                  line.quantity = newQty.clamp(1, safeMax);
                                   // trigger rebuild
                                   _allocatedQty(line);
                                 });
                               },
                               onLotQtyInput: (lotInput, newLotQty) {
                                 setState(() {
-                                  final maxQty = lotInput.lot?.availableQty ?? line.quantity;
-                                  lotInput.quantity = newLotQty.clamp(0, maxQty);
+                                  final maxQty =
+                                      lotInput.lot?.availableQty ??
+                                      line.product.availableQty;
+                                  final clampedVal = newLotQty
+                                      .clamp(0, maxQty)
+                                      .toDouble();
+                                  if (canEditSoQty) {
+                                    lotInput.soQty = clampedVal;
+                                  } else if (canEditQcQty) {
+                                    lotInput.qcQty = clampedVal;
+                                  } else {
+                                    lotInput.quantity = clampedVal;
+                                  }
                                 });
                               },
                             ),
@@ -567,22 +714,104 @@ class _CreateScrapScreenState extends State<CreateScrapScreen> {
                   color: Colors.white,
                   border: Border(top: BorderSide(color: Color(0xFFDDE6F2))),
                 ),
-                child: SizedBox(
-                  width: double.infinity,
-                  height: 50,
-                  child: ElevatedButton.icon(
-                    onPressed: provider.isLoading ? null : _createScrap,
-                    icon: const Icon(Icons.inventory),
-                    label: const Text('Process Scrap'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.primary,
-                      foregroundColor: Colors.white,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
+                child: widget.scrapId == null
+                    ? SizedBox(
+                        width: double.infinity,
+                        height: 50,
+                        child: ElevatedButton.icon(
+                          onPressed: provider.isLoading ? null : _createScrap,
+                          icon: const Icon(Icons.inventory),
+                          label: const Text('Process Scrap'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.primary,
+                            foregroundColor: Colors.white,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                          ),
+                        ),
+                      )
+                    : Row(
+                        children: [
+                          if (auth.canCancelScrapFor(widget.moduleType)) ...[
+                            Expanded(
+                              flex: 1,
+                              child: OutlinedButton(
+                                onPressed: provider.isLoading
+                                    ? null
+                                    : () => _runAction('cancel'),
+                                style: OutlinedButton.styleFrom(
+                                  foregroundColor: Colors.red,
+                                  side: const BorderSide(color: Colors.red),
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 14,
+                                  ),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                ),
+                                child: const Text(
+                                  'Cancel',
+                                  style: TextStyle(fontWeight: FontWeight.bold),
+                                ),
+                              ),
+                            ),
+                          ],
+                          if (auth.canSaveScrapFor(widget.moduleType)) ...[
+                            if (auth.canCancelScrapFor(widget.moduleType))
+                              const SizedBox(width: 8),
+                            Expanded(
+                              flex: 2,
+                              child: ElevatedButton(
+                                onPressed: provider.isLoading
+                                    ? null
+                                    : _createScrap,
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: AppColors.primary,
+                                  foregroundColor: Colors.white,
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 14,
+                                  ),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                ),
+                                child: const Text(
+                                  'Save',
+                                  style: TextStyle(fontWeight: FontWeight.bold),
+                                ),
+                              ),
+                            ),
+                          ],
+                          if (auth.canValidateScrapFor(widget.moduleType)) ...[
+                            if (auth.canCancelScrapFor(widget.moduleType) ||
+                                auth.canSaveScrapFor(widget.moduleType))
+                              const SizedBox(width: 8),
+                            Expanded(
+                              flex: 2,
+                              child: ElevatedButton(
+                                onPressed: provider.isLoading
+                                    ? null
+                                    : () => _runAction('validate'),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.green,
+                                  foregroundColor: Colors.white,
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 14,
+                                  ),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                ),
+                                child: const Text(
+                                  'Validate',
+                                  style: TextStyle(fontWeight: FontWeight.bold),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ],
                       ),
-                    ),
-                  ),
-                ),
               ),
           ],
         ),
@@ -604,7 +833,12 @@ class _ScrapLineCard extends StatelessWidget {
     required this.onLotPlus,
     required this.allocatedQty,
     this.isReadOnly = false,
+    this.canEditSoQty = false,
+    this.canEditQcQty = false,
+    this.canEditEffectiveQty = false,
     this.onQuantityChanged,
+    this.onSoQtyChanged,
+    this.onQcQtyChanged,
     this.onLotQtyInput,
   });
 
@@ -620,8 +854,14 @@ class _ScrapLineCard extends StatelessWidget {
   final ValueChanged<TransferLotInput> onLotPlus;
   final double allocatedQty;
   final bool isReadOnly;
+  final bool canEditSoQty;
+  final bool canEditQcQty;
+  final bool canEditEffectiveQty;
   final ValueChanged<double>? onQuantityChanged;
-  final void Function(TransferLotInput lotInput, double quantity)? onLotQtyInput;
+  final ValueChanged<double>? onSoQtyChanged;
+  final ValueChanged<double>? onQcQtyChanged;
+  final void Function(TransferLotInput lotInput, double quantity)?
+  onLotQtyInput;
 
   @override
   Widget build(BuildContext context) {
@@ -688,7 +928,7 @@ class _ScrapLineCard extends StatelessWidget {
             ),
           ),
 
-          if (line.product.requiresLots) ...[
+          if (false) ...[
             Container(
               color: Colors.white,
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -730,6 +970,9 @@ class _ScrapLineCard extends StatelessWidget {
                         onQuantityChanged: onLotQtyInput != null
                             ? (newVal) => onLotQtyInput!(lotInput, newVal)
                             : null,
+                        canEditSoQty: canEditSoQty,
+                        canEditQcQty: canEditQcQty,
+                        canEditEffectiveQty: canEditEffectiveQty,
                       ),
                     ),
                   ),
@@ -775,45 +1018,84 @@ class _ScrapLineCard extends StatelessWidget {
             Container(
               color: Colors.white,
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              child: Row(
+              child: Column(
                 children: [
-                  const Text(
-                    'Scrap Qty',
-                    style: TextStyle(color: Colors.black54, fontSize: 12),
+                  _buildQtyRow(
+                    title: 'SO Qty',
+                    value: line.soQty ?? 0,
+                    isReadOnly: isReadOnly || !canEditSoQty,
+                    min: 0,
+                    max: 999999,
+                    onChanged: onSoQtyChanged,
                   ),
-                  const Spacer(),
-                  if (isReadOnly)
-                    Text(
-                      line.quantity.toStringAsFixed(0),
-                      style: const TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 16,
-                      ),
-                    )
-                  else
-                    SmallStepper(
-                      value: line.quantity.toStringAsFixed(0),
-                      onMinus: () {
-                        if (line.quantity > 1) {
-                          onQuantityChanged?.call(line.quantity - 1);
-                        }
-                      },
-                      onPlus: () {
-                        if (line.quantity < line.product.availableQty) {
-                          onQuantityChanged?.call(line.quantity + 1);
-                        }
-                      },
-                      onValueInput: (val) {
-                        final parsed = double.tryParse(val);
-                        if (parsed != null) {
-                          onQuantityChanged?.call(parsed);
-                        }
-                      },
-                    ),
+                  _buildQtyRow(
+                    title: 'QC Qty',
+                    value: line.qcQty ?? 0,
+                    isReadOnly: isReadOnly || !canEditQcQty,
+                    min: 0,
+                    max: 999999,
+                    onChanged: onQcQtyChanged,
+                  ),
+                  _buildQtyRow(
+                    title: 'Scrap Qty',
+                    value: line.quantity,
+                    isReadOnly: isReadOnly || !canEditEffectiveQty,
+                    min: 1,
+                    max: line.product.availableQty,
+                    onChanged: onQuantityChanged,
+                  ),
                 ],
               ),
             ),
           ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildQtyRow({
+    required String title,
+    required double value,
+    required bool isReadOnly,
+    required double min,
+    required double max,
+    required ValueChanged<double>? onChanged,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8.0),
+      child: Row(
+        children: [
+          Text(
+            title,
+            style: const TextStyle(color: Colors.black54, fontSize: 12),
+          ),
+          const Spacer(),
+          if (isReadOnly)
+            Text(
+              value.toStringAsFixed(0),
+              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+            )
+          else
+            SmallStepper(
+              value: value.toStringAsFixed(0),
+              onMinus: () {
+                if (value > min) {
+                  onChanged?.call(value - 1);
+                }
+              },
+              onPlus: () {
+                if (value < max) {
+                  onChanged?.call(value + 1);
+                }
+              },
+              onValueInput: (val) {
+                final parsed = double.tryParse(val);
+                if (parsed != null) {
+                  final safeMax = max > min ? max : min;
+                  onChanged?.call(parsed.clamp(min, safeMax));
+                }
+              },
+            ),
         ],
       ),
     );
@@ -830,6 +1112,9 @@ class _ScrapLotRow extends StatelessWidget {
     required this.onPlus,
     this.isReadOnly = false,
     this.onQuantityChanged,
+    required this.canEditSoQty,
+    required this.canEditQcQty,
+    required this.canEditEffectiveQty,
   });
 
   final TransferLotInput lotInput;
@@ -840,9 +1125,31 @@ class _ScrapLotRow extends StatelessWidget {
   final VoidCallback onPlus;
   final bool isReadOnly;
   final ValueChanged<double>? onQuantityChanged;
+  final bool canEditSoQty;
+  final bool canEditQcQty;
+  final bool canEditEffectiveQty;
 
   @override
   Widget build(BuildContext context) {
+    double activeQty = lotInput.quantity;
+    String label = 'Scrap Qty';
+    if (canEditSoQty) {
+      activeQty = lotInput.soQty ?? lotInput.quantity;
+      label = 'SO Qty';
+    } else if (canEditQcQty) {
+      activeQty = lotInput.qcQty ?? lotInput.quantity;
+      label = 'QC Qty';
+    } else {
+      activeQty = lotInput.quantity;
+      label = 'Scrap Qty';
+    }
+
+    final displayLots = List<TransferLot>.from(lots);
+    if (lotInput.lot != null &&
+        !displayLots.any((l) => l.lotId == lotInput.lot!.lotId)) {
+      displayLots.add(lotInput.lot!);
+    }
+
     return Row(
       crossAxisAlignment: CrossAxisAlignment.end,
       children: [
@@ -855,6 +1162,34 @@ class _ScrapLotRow extends StatelessWidget {
                 'Lot Reference',
                 style: TextStyle(color: Colors.black54, fontSize: 12),
               ),
+              if ((lotInput.soQty != null && lotInput.soQty! > 0) ||
+                  (lotInput.qcQty != null && lotInput.qcQty! > 0)) ...[
+                const SizedBox(height: 2),
+                Wrap(
+                  spacing: 6,
+                  runSpacing: 2,
+                  children: [
+                    if (lotInput.soQty != null && lotInput.soQty! > 0)
+                      Text(
+                        'SO Qty: ${lotInput.soQty!.toStringAsFixed(0)}',
+                        style: const TextStyle(
+                          color: Color(0xFF2563EB),
+                          fontWeight: FontWeight.bold,
+                          fontSize: 10,
+                        ),
+                      ),
+                    if (lotInput.qcQty != null && lotInput.qcQty! > 0)
+                      Text(
+                        'QC Qty: ${lotInput.qcQty!.toStringAsFixed(0)}',
+                        style: const TextStyle(
+                          color: Color(0xFF16A34A),
+                          fontWeight: FontWeight.bold,
+                          fontSize: 10,
+                        ),
+                      ),
+                  ],
+                ),
+              ],
               const SizedBox(height: 4),
               DropdownButtonFormField<int>(
                 isExpanded: true,
@@ -871,7 +1206,7 @@ class _ScrapLotRow extends StatelessWidget {
                     borderSide: BorderSide(color: Color(0xFFDDE6F2)),
                   ),
                 ),
-                items: lots
+                items: displayLots
                     .map(
                       (lot) => DropdownMenuItem(
                         value: lot.lotId,
@@ -886,7 +1221,7 @@ class _ScrapLotRow extends StatelessWidget {
                     ? null
                     : (val) {
                         TransferLot? selected;
-                        for (final lot in lots) {
+                        for (final lot in displayLots) {
                           if (lot.lotId == val) {
                             selected = lot;
                             break;
@@ -904,9 +1239,9 @@ class _ScrapLotRow extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
-                'Scrap Qty',
-                style: TextStyle(color: Colors.black54, fontSize: 12),
+              Text(
+                label,
+                style: const TextStyle(color: Colors.black54, fontSize: 12),
               ),
               const SizedBox(height: 4),
               Container(
@@ -923,17 +1258,25 @@ class _ScrapLotRow extends StatelessWidget {
                       width: 52,
                       height: 32,
                       child: TextField(
-                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                        keyboardType: const TextInputType.numberWithOptions(
+                          decimal: true,
+                        ),
                         textAlign: TextAlign.center,
                         enabled: !isReadOnly && onQuantityChanged != null,
                         style: const TextStyle(fontSize: 14),
                         decoration: const InputDecoration(
                           isDense: true,
-                          contentPadding: EdgeInsets.symmetric(horizontal: 4, vertical: 6),
+                          contentPadding: EdgeInsets.symmetric(
+                            horizontal: 4,
+                            vertical: 6,
+                          ),
                           border: InputBorder.none,
                           enabledBorder: InputBorder.none,
                           focusedBorder: UnderlineInputBorder(
-                            borderSide: BorderSide(color: AppColors.primary, width: 2),
+                            borderSide: BorderSide(
+                              color: AppColors.primary,
+                              width: 2,
+                            ),
                           ),
                         ),
                         onChanged: (val) {
@@ -942,9 +1285,13 @@ class _ScrapLotRow extends StatelessWidget {
                             onQuantityChanged!(parsed);
                           }
                         },
-                        controller: TextEditingController(
-                          text: lotInput.quantity.toStringAsFixed(0),
-                        )..selection = TextSelection.collapsed(offset: lotInput.quantity.toStringAsFixed(0).length),
+                        controller:
+                            TextEditingController(
+                                text: activeQty.toStringAsFixed(0),
+                              )
+                              ..selection = TextSelection.collapsed(
+                                offset: activeQty.toStringAsFixed(0).length,
+                              ),
                       ),
                     ),
                     if (!isReadOnly)

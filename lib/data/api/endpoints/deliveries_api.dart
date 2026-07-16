@@ -6,11 +6,13 @@ extension DeliveriesApi on ApiService {
   Future<DeliveryPrepare> preparePrimarySaleDelivery(
     int orderId, {
     int? pickingId,
+    String? saleType,
   }) async {
     final result = await _post('${AppConstants.deliveriesEndpoint}/prepare', {
       'employee_id': _activeEmployeeId,
       'sale_order_id': orderId,
       if (pickingId != null) 'picking_id': pickingId,
+      if (saleType != null) 'sale_type': saleType,
     });
     if (result['success'] == true) {
       return DeliveryPrepare.fromMap(result['data'] ?? <String, dynamic>{});
@@ -25,16 +27,19 @@ extension DeliveriesApi on ApiService {
     int? locationId,
     required List<DeliveryLineInput> lines,
     bool createBackorder = true,
+    String? saleType,
+    String action = 'validate',
   }) async {
     final result =
         await _post('${AppConstants.deliveriesEndpoint}/$pickingId/action', {
           'employee_id': _activeEmployeeId,
           'sale_order_id': orderId,
-          'action': 'validate',
+          'action': action,
           if (warehouseId != null) 'warehouse_id': warehouseId,
           if (locationId != null) 'location_id': locationId,
           'create_backorder': createBackorder,
           'lines': lines.map((line) => line.toPayload()).toList(),
+          if (saleType != null) 'sale_type': saleType,
         });
     if (result['success'] == true) {
       final data = result['data'];

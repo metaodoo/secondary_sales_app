@@ -136,6 +136,7 @@ class SaleOrderDetailLine {
     required this.orderedQty,
     required this.deliveredQty,
     required this.balanceQty,
+    required this.damagedQty,
     this.uomName,
     required this.priceUnit,
     required this.discount,
@@ -148,6 +149,7 @@ class SaleOrderDetailLine {
   final double orderedQty;
   final double deliveredQty;
   final double balanceQty;
+  final double damagedQty;
   final String? uomName;
   final double priceUnit;
   final double discount;
@@ -165,6 +167,7 @@ class SaleOrderDetailLine {
       orderedQty: asDouble(map['product_uom_qty']),
       deliveredQty: asDouble(map['qty_delivered']),
       balanceQty: asDouble(map['balance_qty']),
+      damagedQty: asDouble(map['damaged_qty'] ?? 0.0),
       uomName: uom is Map ? asNullableString(uom['name']) : null,
       priceUnit: asDouble(map['price_unit']),
       discount: asDouble(map['discount']),
@@ -180,12 +183,14 @@ class OrderProduct {
     required this.name,
     this.defaultCode,
     this.tracking = 'none',
+    this.qtyAvailable,
   });
 
   final int id;
   final String name;
   final String? defaultCode;
   final String tracking;
+  final double? qtyAvailable;
 
   factory OrderProduct.fromMap(Map<String, dynamic> map) {
     return OrderProduct(
@@ -193,6 +198,7 @@ class OrderProduct {
       name: (map['name'] ?? '').toString(),
       defaultCode: asNullableString(map['default_code']),
       tracking: (map['tracking'] ?? 'none').toString(),
+      qtyAvailable: map['qty_available'] != null ? asDouble(map['qty_available']) : null,
     );
   }
 }

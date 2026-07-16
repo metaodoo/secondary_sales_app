@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:secondary_sales/core/services/location_tracking_service.dart';
 import 'package:secondary_sales/data/api/api_service.dart';
 import 'package:secondary_sales/features/auth/auth_provider.dart';
 
@@ -15,8 +16,10 @@ class AttendanceProvider extends ChangeNotifier {
   bool _isCheckedIn = false;
   String? _activeCheckInTime;
   String? _activeCheckInAddress;
-  int _locationTrackingInterval = 1800; // Default 30 mins
-  Timer? _locationTrackingTimer;
+  int _locationTrackingInterval = 1800; // GPS sampling cadence (seconds)
+  int _locationTrackingDistance = 30; // Min move to buffer a point (meters)
+  int _locationSyncInterval = 3600; // Buffer flush cadence (seconds)
+  String _locationTrackingType = 'both'; // time | distance | both
 
   List<Map<String, dynamic>> _historyLogs = [];
   String? _errorMessage;
@@ -40,7 +43,9 @@ class AttendanceProvider extends ChangeNotifier {
 
   @override
   void dispose() {
-    _stopLocationTracking();
+    // Location tracking is a background service bound to attendance state, not
+    // to this provider's lifecycle — it must keep running after the screen is
+    // disposed. Do not stop it here.
     super.dispose();
   }
 
@@ -56,63 +61,6 @@ class AttendanceProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  void _startLocationTracking() {
-    _locationTrackingTimer?.cancel();
-    if (!_isCheckedIn) return;
-
-    debugPrint("Starting periodic location tracking timer. Interval: $_locationTrackingInterval seconds");
-    _locationTrackingTimer = Timer.periodic(
-      Duration(seconds: _locationTrackingInterval),
-      (timer) => _trackAndSyncLocation(),
-    );
-  }
-
-  void _stopLocationTracking() {
-    if (_locationTrackingTimer != null) {
-      debugPrint("Stopping periodic location tracking timer.");
-      _locationTrackingTimer!.cancel();
-      _locationTrackingTimer = null;
-    }
-  }
-
-  Future<void> _trackAndSyncLocation() async {
-    if (!_isCheckedIn || _employeeId == 0) {
-      _stopLocationTracking();
-      return;
-    }
-
-    try {
-      debugPrint("Periodic task: Fetching GPS location for sync...");
-      final position = await _getCurrentLocation();
-      if (position == null) return;
-
-      // Format current timestamp to Odoo's expected format: "YYYY-MM-DD HH:MM:SS"
-      final nowUtc = DateTime.now().toUtc();
-      final formattedTime = 
-          "${nowUtc.year.toString().padLeft(4, '0')}-"
-          "${nowUtc.month.toString().padLeft(2, '0')}-"
-          "${nowUtc.day.toString().padLeft(2, '0')} "
-          "${nowUtc.hour.toString().padLeft(2, '0')}:"
-          "${nowUtc.minute.toString().padLeft(2, '0')}:"
-          "${nowUtc.second.toString().padLeft(2, '0')}";
-
-      final response = await _apiService.syncEmployeeLocations(
-        locations: [
-          {
-            "latitude": position.latitude,
-            "longitude": position.longitude,
-            "recorded_at": formattedTime,
-            "is_mock": position.isMocked,
-          }
-        ],
-      );
-      
-      debugPrint("Location sync response: $response");
-    } catch (e) {
-      debugPrint("Error in periodic location tracking/sync: $e");
-    }
-  }
-
   Future<void> _loadStatus() async {
     if (_employeeId == 0) return;
     _isLoadingStatus = true;
@@ -126,11 +74,19 @@ class AttendanceProvider extends ChangeNotifier {
         _activeCheckInTime = data['active_check_in'];
         _activeCheckInAddress = data['check_in_address'];
         _locationTrackingInterval = data['location_tracking_interval'] ?? 1800;
+        _locationTrackingDistance = data['location_tracking_distance'] ?? 30;
+        _locationSyncInterval = data['location_tracking_sync_interval'] ?? 3600;
+        _locationTrackingType = data['location_tracking_type'] ?? 'both';
 
         if (_isCheckedIn) {
-          _startLocationTracking();
+          await LocationTrackingService.start(
+            intervalSeconds: _locationTrackingInterval,
+            distanceMeters: _locationTrackingDistance,
+            syncIntervalSeconds: _locationSyncInterval,
+            trackingType: _locationTrackingType,
+          );
         } else {
-          _stopLocationTracking();
+          await LocationTrackingService.stop();
         }
       }
     } catch (e) {
@@ -230,7 +186,14 @@ class AttendanceProvider extends ChangeNotifier {
       );
 
       if (response['success'] == true) {
-        // Reload everything on success
+        // On check-in, secure the permissions the background tracking service
+        // needs ("Allow all the time" location, notifications) and prompt for a
+        // battery-optimization exemption so it survives the app being closed.
+        if (action == 'check_in') {
+          await LocationTrackingService.ensurePermissions();
+          await LocationTrackingService.requestBatteryExemption();
+        }
+        // Reload everything on success ( _loadStatus starts/stops tracking).
         await _loadStatus();
         await _loadHistory();
         return true;

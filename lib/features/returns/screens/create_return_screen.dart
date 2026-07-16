@@ -12,7 +12,11 @@ class CreateReturnScreen extends StatefulWidget {
   final int? returnId;
   final String moduleType;
 
-  const CreateReturnScreen({super.key, this.returnId, this.moduleType = 'primary'});
+  const CreateReturnScreen({
+    super.key,
+    this.returnId,
+    this.moduleType = 'primary',
+  });
 
   @override
   State<CreateReturnScreen> createState() => _CreateReturnScreenState();
@@ -25,10 +29,11 @@ class _CreateReturnScreenState extends State<CreateReturnScreen> {
   Map<String, dynamic>? _prepareData;
   bool _isPreparing = true;
   bool _isReadOnly = false;
-  
-  final TextEditingController _challanNumberController = TextEditingController();
+
+  final TextEditingController _challanNumberController =
+      TextEditingController();
   String? _selectedDamageType;
-  
+
   @override
   void dispose() {
     _challanNumberController.dispose();
@@ -74,6 +79,8 @@ class _CreateReturnScreenState extends State<CreateReturnScreen> {
             final entry = VirtualTransferLineEntry(
               product: product,
               quantity: qty,
+              soQty: (ld['so_qty'] as num?)?.toDouble(),
+              qcQty: (ld['qc_qty'] as num?)?.toDouble(),
             );
 
             final lotLinesData = ld['lot_lines'] as List<dynamic>? ?? [];
@@ -83,17 +90,32 @@ class _CreateReturnScreenState extends State<CreateReturnScreen> {
                 final lotId = lotData['id'] as int;
                 final lotName = lotData['name'] as String;
                 final lotQty = (ll['quantity'] as num?)?.toDouble() ?? 0.0;
+                final soQty = (ll['so_qty'] as num?)?.toDouble();
+                final qcQty = (ll['qc_qty'] as num?)?.toDouble();
+                final lotAvail =
+                    (lotData['available_qty'] as num?)?.toDouble() ?? lotQty;
+
+                final maxCurrent = [
+                  lotQty,
+                  soQty ?? 0.0,
+                  qcQty ?? 0.0,
+                ].reduce((a, b) => a > b ? a : b);
+                final finalAvail = lotAvail > maxCurrent
+                    ? lotAvail
+                    : maxCurrent;
 
                 final tLot = TransferLot(
                   lotId: lotId,
                   lotName: lotName,
-                  availableQty: lotQty,
+                  availableQty: finalAvail,
                 );
 
                 entry.lotLines.add(
                   TransferLotInput()
                     ..lot = tLot
-                    ..quantity = lotQty,
+                    ..quantity = lotQty
+                    ..soQty = soQty
+                    ..qcQty = qcQty,
                 );
               }
             }
@@ -152,9 +174,10 @@ class _CreateReturnScreenState extends State<CreateReturnScreen> {
 
     if (!_lotsByProduct.containsKey(productId)) {
       setState(() => _isLoadingLots = true);
-      final res = await context
-          .read<ReturnProvider>()
-          .fetchReturnProductLots(productId, distributorId: distributorId);
+      final res = await context.read<ReturnProvider>().fetchReturnProductLots(
+        productId,
+        distributorId: distributorId,
+      );
       if (!mounted) return;
 
       final lotsData =
@@ -186,14 +209,39 @@ class _CreateReturnScreenState extends State<CreateReturnScreen> {
   }
 
   void _changeLotQty(TransferLotInput lotInput, double maxQty, double delta) {
+    final auth = context.read<AuthProvider>();
     setState(() {
-      final next = lotInput.quantity + delta;
-      lotInput.quantity = next.clamp(0, maxQty).toDouble();
+      if (auth.canEditSoQty) {
+        final current = lotInput.soQty ?? lotInput.quantity;
+        final next = current + delta;
+        lotInput.soQty = next.clamp(0, maxQty).toDouble();
+      } else if (auth.canEditQcQty) {
+        final current = lotInput.qcQty ?? lotInput.quantity;
+        final next = current + delta;
+        lotInput.qcQty = next.clamp(0, maxQty).toDouble();
+      } else {
+        final next = lotInput.quantity + delta;
+        lotInput.quantity = next.clamp(0, maxQty).toDouble();
+      }
     });
   }
 
   double _allocatedQty(VirtualTransferLineEntry line) {
     return line.lotLines.fold<double>(0, (sum, lot) => sum + lot.quantity);
+  }
+
+  double _allocatedSoQty(VirtualTransferLineEntry line) {
+    return line.lotLines.fold<double>(
+      0,
+      (sum, lot) => sum + (lot.soQty ?? lot.quantity),
+    );
+  }
+
+  double _allocatedQcQty(VirtualTransferLineEntry line) {
+    return line.lotLines.fold<double>(
+      0,
+      (sum, lot) => sum + (lot.qcQty ?? lot.quantity),
+    );
   }
 
   Future<void> _createReturn() async {
@@ -208,7 +256,7 @@ class _CreateReturnScreenState extends State<CreateReturnScreen> {
     }
 
     for (final line in _lines) {
-      if (line.product.requiresLots) {
+      if (line.product.requiresLots && line.quantity > 0) {
         if (line.lotLines.isEmpty) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
@@ -236,19 +284,33 @@ class _CreateReturnScreenState extends State<CreateReturnScreen> {
     }
 
     final linesData = _lines.map((line) {
+      final qty = line.product.tracking != 'none'
+          ? _allocatedQty(line)
+          : line.quantity;
+      final soQty = line.product.tracking != 'none'
+          ? _allocatedSoQty(line)
+          : line.soQty;
+      final qcQty = line.product.tracking != 'none'
+          ? _allocatedQcQty(line)
+          : line.qcQty;
+
       return {
         'product_id': line.product.id,
-        'quantity': line.quantity,
-        if (line.soQty != null && line.soQty! > 0) 'so_qty': line.soQty,
-        if (line.qcQty != null && line.qcQty! > 0) 'qc_qty': line.qcQty,
+        'product_uom_qty': 0.0,
+        'quantity': qty,
+        if (soQty != null && soQty > 0) 'so_qty': soQty,
+        if (qcQty != null && qcQty > 0) 'qc_qty': qcQty,
         'lot_lines': line.lotLines
             .where((l) => l.lot != null)
-            .map((l) => {
-                  'lot_id': l.lot!.lotId,
-                  'quantity': l.quantity,
-                  if (l.soQty != null && l.soQty! > 0) 'so_qty': l.soQty,
-                  if (l.qcQty != null && l.qcQty! > 0) 'qc_qty': l.qcQty,
-                })
+            .map(
+              (l) => {
+                'lot_id': l.lot!.lotId,
+                'product_uom_qty': 0.0,
+                'quantity': l.quantity,
+                if (l.soQty != null && l.soQty! > 0) 'so_qty': l.soQty,
+                if (l.qcQty != null && l.qcQty! > 0) 'qc_qty': l.qcQty,
+              },
+            )
             .toList(),
       };
     }).toList();
@@ -291,6 +353,93 @@ class _CreateReturnScreenState extends State<CreateReturnScreen> {
       ),
     );
     Navigator.pop(context);
+  }
+
+  Future<void> _runAction(String action) async {
+    if (widget.returnId == null) return;
+
+    setState(() => _isPreparing = true);
+
+    try {
+      if (action == 'validate') {
+        // Save first!
+        final linesData = _lines.map((line) {
+          final qty = line.product.tracking != 'none'
+              ? _allocatedQty(line)
+              : line.quantity;
+          final soQty = line.product.tracking != 'none'
+              ? _allocatedSoQty(line)
+              : line.soQty;
+          final qcQty = line.product.tracking != 'none'
+              ? _allocatedQcQty(line)
+              : line.qcQty;
+
+          return {
+            'product_id': line.product.id,
+            'product_uom_qty': 0.0,
+            'quantity': qty,
+            if (soQty != null && soQty > 0) 'so_qty': soQty,
+            if (qcQty != null && qcQty > 0) 'qc_qty': qcQty,
+            'lot_lines': line.lotLines
+                .where((l) => l.lot != null)
+                .map(
+                  (l) => {
+                    'lot_id': l.lot!.lotId,
+                    'product_uom_qty': 0.0,
+                    'quantity': l.quantity,
+                    if (l.soQty != null && l.soQty! > 0) 'so_qty': l.soQty,
+                    if (l.qcQty != null && l.qcQty! > 0) 'qc_qty': l.qcQty,
+                  },
+                )
+                .toList(),
+          };
+        }).toList();
+
+        final saveRes = await context
+            .read<ReturnProvider>()
+            .updateReturnDelivery(
+              widget.returnId!,
+              lines: linesData,
+              type: widget.moduleType,
+              challanNumber: _challanNumberController.text,
+              damageType: _selectedDamageType,
+            );
+        if (saveRes == null) {
+          final err =
+              context.read<ReturnProvider>().error ??
+              'Save failed before validation';
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(err), backgroundColor: Colors.red),
+          );
+          return;
+        }
+      }
+
+      final res = await context.read<ReturnProvider>().executeReturnAction(
+        widget.returnId!,
+        action,
+      );
+      if (!mounted) return;
+
+      if (res == null) {
+        final err = context.read<ReturnProvider>().error ?? 'Action failed';
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(err), backgroundColor: Colors.red),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Return ${action == 'validate' ? 'validated' : 'cancelled'} successfully',
+            ),
+            backgroundColor: Colors.green,
+          ),
+        );
+        Navigator.pop(context);
+      }
+    } finally {
+      if (mounted) setState(() => _isPreparing = false);
+    }
   }
 
   String _nameOf(dynamic value) {
@@ -356,10 +505,14 @@ class _CreateReturnScreenState extends State<CreateReturnScreen> {
                               const SizedBox(height: 6),
                               if (!_isReadOnly &&
                                   _prepareData?['distributors'] is List &&
-                                  (_prepareData?['distributors'] as List).length > 1)
+                                  (_prepareData?['distributors'] as List)
+                                          .length >
+                                      1)
                                 DropdownButtonFormField<int>(
                                   isExpanded: true,
-                                  value: _prepareData?['distributor']?['id'] as int?,
+                                  value:
+                                      _prepareData?['distributor']?['id']
+                                          as int?,
                                   decoration: InputDecoration(
                                     contentPadding: const EdgeInsets.symmetric(
                                       horizontal: 16,
@@ -369,26 +522,32 @@ class _CreateReturnScreenState extends State<CreateReturnScreen> {
                                     filled: true,
                                     border: OutlineInputBorder(
                                       borderRadius: BorderRadius.circular(8),
-                                      borderSide: const BorderSide(color: Color(0xFFDDE6F2)),
+                                      borderSide: const BorderSide(
+                                        color: Color(0xFFDDE6F2),
+                                      ),
                                     ),
                                     enabledBorder: OutlineInputBorder(
                                       borderRadius: BorderRadius.circular(8),
-                                      borderSide: const BorderSide(color: Color(0xFFDDE6F2)),
+                                      borderSide: const BorderSide(
+                                        color: Color(0xFFDDE6F2),
+                                      ),
                                     ),
                                   ),
-                                  items: (_prepareData?['distributors'] as List).map((d) {
-                                    final map = d as Map<dynamic, dynamic>;
-                                    return DropdownMenuItem<int>(
-                                      value: map['id'] as int?,
-                                      child: Text(
-                                        map['name']?.toString() ?? '',
-                                        style: const TextStyle(
-                                          color: Colors.black87,
-                                          fontSize: 16,
-                                        ),
-                                      ),
-                                    );
-                                  }).toList(),
+                                  items: (_prepareData?['distributors'] as List)
+                                      .map((d) {
+                                        final map = d as Map<dynamic, dynamic>;
+                                        return DropdownMenuItem<int>(
+                                          value: map['id'] as int?,
+                                          child: Text(
+                                            map['name']?.toString() ?? '',
+                                            style: const TextStyle(
+                                              color: Colors.black87,
+                                              fontSize: 16,
+                                            ),
+                                          ),
+                                        );
+                                      })
+                                      .toList(),
                                   onChanged: (val) {
                                     if (val != null) {
                                       _lines.clear();
@@ -513,14 +672,21 @@ class _CreateReturnScreenState extends State<CreateReturnScreen> {
                             hintText: 'Enter challan number',
                             filled: true,
                             fillColor: Colors.white,
-                            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 12,
+                            ),
                             border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(8),
-                              borderSide: const BorderSide(color: Color(0xFFDDE6F2)),
+                              borderSide: const BorderSide(
+                                color: Color(0xFFDDE6F2),
+                              ),
                             ),
                             enabledBorder: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(8),
-                              borderSide: const BorderSide(color: Color(0xFFDDE6F2)),
+                              borderSide: const BorderSide(
+                                color: Color(0xFFDDE6F2),
+                              ),
                             ),
                           ),
                           enabled: !_isReadOnly,
@@ -539,22 +705,41 @@ class _CreateReturnScreenState extends State<CreateReturnScreen> {
                         DropdownButtonFormField<String>(
                           value: _selectedDamageType,
                           items: const [
-                            DropdownMenuItem(value: 'non_salable', child: Text('Non Salable')),
-                            DropdownMenuItem(value: 'quality', child: Text('Quality')),
-                            DropdownMenuItem(value: 'saleable', child: Text('Saleable')),
+                            DropdownMenuItem(
+                              value: 'non_salable',
+                              child: Text('Non Salable'),
+                            ),
+                            DropdownMenuItem(
+                              value: 'quality',
+                              child: Text('Quality'),
+                            ),
+                            DropdownMenuItem(
+                              value: 'saleable',
+                              child: Text('Saleable'),
+                            ),
                           ],
-                          onChanged: _isReadOnly ? null : (val) => setState(() => _selectedDamageType = val),
+                          onChanged: _isReadOnly
+                              ? null
+                              : (val) =>
+                                    setState(() => _selectedDamageType = val),
                           decoration: InputDecoration(
                             filled: true,
                             fillColor: Colors.white,
-                            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 12,
+                            ),
                             border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(8),
-                              borderSide: const BorderSide(color: Color(0xFFDDE6F2)),
+                              borderSide: const BorderSide(
+                                color: Color(0xFFDDE6F2),
+                              ),
                             ),
                             enabledBorder: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(8),
-                              borderSide: const BorderSide(color: Color(0xFFDDE6F2)),
+                              borderSide: const BorderSide(
+                                color: Color(0xFFDDE6F2),
+                              ),
                             ),
                           ),
                           hint: const Text('Select Damage Type'),
@@ -610,22 +795,40 @@ class _CreateReturnScreenState extends State<CreateReturnScreen> {
                               onLotChanged: (lotInput, selectedLot) {
                                 setState(() {
                                   lotInput.lot = selectedLot;
-                                  if (lotInput.quantity <= 0 &&
-                                      selectedLot != null) {
-                                    lotInput.quantity = 1
+                                  if (selectedLot != null) {
+                                    final initVal = 1
                                         .clamp(0, selectedLot.availableQty)
                                         .toDouble();
+                                    if (canEditSoQty) {
+                                      if (lotInput.soQty == null ||
+                                          lotInput.soQty! <= 0) {
+                                        lotInput.soQty = initVal;
+                                      }
+                                      lotInput.quantity = 0;
+                                    } else if (canEditQcQty) {
+                                      if (lotInput.qcQty == null ||
+                                          lotInput.qcQty! <= 0) {
+                                        lotInput.qcQty = initVal;
+                                      }
+                                      lotInput.quantity = 0;
+                                    } else {
+                                      if (lotInput.quantity <= 0) {
+                                        lotInput.quantity = initVal;
+                                      }
+                                    }
                                   }
                                 });
                               },
                               onLotMinus: (lotInput) => _changeLotQty(
                                 lotInput,
-                                lotInput.lot?.availableQty ?? line.quantity,
+                                lotInput.lot?.availableQty ??
+                                    line.product.availableQty,
                                 -1,
                               ),
                               onLotPlus: (lotInput) => _changeLotQty(
                                 lotInput,
-                                lotInput.lot?.availableQty ?? line.quantity,
+                                lotInput.lot?.availableQty ??
+                                    line.product.availableQty,
                                 1,
                               ),
                               allocatedQty: _allocatedQty(line),
@@ -635,7 +838,9 @@ class _CreateReturnScreenState extends State<CreateReturnScreen> {
                               canEditEffectiveQty: canEditEffectiveQty,
                               onQuantityChanged: (newQty) {
                                 setState(() {
-                                  line.quantity = newQty.clamp(1, line.product.availableQty);
+                                  final maxQty = line.product.availableQty;
+                                  final safeMax = maxQty > 1 ? maxQty : 1.0;
+                                  line.quantity = newQty.clamp(1, safeMax);
                                   // trigger rebuild
                                   _allocatedQty(line);
                                 });
@@ -652,8 +857,19 @@ class _CreateReturnScreenState extends State<CreateReturnScreen> {
                               },
                               onLotQtyInput: (lotInput, newLotQty) {
                                 setState(() {
-                                  final maxQty = lotInput.lot?.availableQty ?? line.quantity;
-                                  lotInput.quantity = newLotQty.clamp(0, maxQty);
+                                  final maxQty =
+                                      lotInput.lot?.availableQty ??
+                                      line.product.availableQty;
+                                  final clampedVal = newLotQty
+                                      .clamp(0, maxQty)
+                                      .toDouble();
+                                  if (canEditSoQty) {
+                                    lotInput.soQty = clampedVal;
+                                  } else if (canEditQcQty) {
+                                    lotInput.qcQty = clampedVal;
+                                  } else {
+                                    lotInput.quantity = clampedVal;
+                                  }
                                 });
                               },
                             ),
@@ -669,22 +885,104 @@ class _CreateReturnScreenState extends State<CreateReturnScreen> {
                   color: Colors.white,
                   border: Border(top: BorderSide(color: Color(0xFFDDE6F2))),
                 ),
-                child: SizedBox(
-                  width: double.infinity,
-                  height: 50,
-                  child: ElevatedButton.icon(
-                    onPressed: provider.isLoading ? null : _createReturn,
-                    icon: const Icon(Icons.inventory),
-                    label: const Text('Process Return'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.primary,
-                      foregroundColor: Colors.white,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
+                child: widget.returnId == null
+                    ? SizedBox(
+                        width: double.infinity,
+                        height: 50,
+                        child: ElevatedButton.icon(
+                          onPressed: provider.isLoading ? null : _createReturn,
+                          icon: const Icon(Icons.inventory),
+                          label: const Text('Process Return'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.primary,
+                            foregroundColor: Colors.white,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                          ),
+                        ),
+                      )
+                    : Row(
+                        children: [
+                          if (auth.canCancelReturnFor(widget.moduleType)) ...[
+                            Expanded(
+                              flex: 1,
+                              child: OutlinedButton(
+                                onPressed: provider.isLoading
+                                    ? null
+                                    : () => _runAction('cancel'),
+                                style: OutlinedButton.styleFrom(
+                                  foregroundColor: Colors.red,
+                                  side: const BorderSide(color: Colors.red),
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 14,
+                                  ),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                ),
+                                child: const Text(
+                                  'Cancel',
+                                  style: TextStyle(fontWeight: FontWeight.bold),
+                                ),
+                              ),
+                            ),
+                          ],
+                          if (auth.canSaveReturnFor(widget.moduleType)) ...[
+                            if (auth.canCancelReturnFor(widget.moduleType))
+                              const SizedBox(width: 8),
+                            Expanded(
+                              flex: 2,
+                              child: ElevatedButton(
+                                onPressed: provider.isLoading
+                                    ? null
+                                    : _createReturn,
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: AppColors.primary,
+                                  foregroundColor: Colors.white,
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 14,
+                                  ),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                ),
+                                child: const Text(
+                                  'Save',
+                                  style: TextStyle(fontWeight: FontWeight.bold),
+                                ),
+                              ),
+                            ),
+                          ],
+                          if (auth.canValidateReturnFor(widget.moduleType)) ...[
+                            if (auth.canCancelReturnFor(widget.moduleType) ||
+                                auth.canSaveReturnFor(widget.moduleType))
+                              const SizedBox(width: 8),
+                            Expanded(
+                              flex: 2,
+                              child: ElevatedButton(
+                                onPressed: provider.isLoading
+                                    ? null
+                                    : () => _runAction('validate'),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.green,
+                                  foregroundColor: Colors.white,
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 14,
+                                  ),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                ),
+                                child: const Text(
+                                  'Validate',
+                                  style: TextStyle(fontWeight: FontWeight.bold),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ],
                       ),
-                    ),
-                  ),
-                ),
               ),
           ],
         ),
@@ -733,7 +1031,8 @@ class _ReturnLineCard extends StatelessWidget {
   final ValueChanged<double>? onQuantityChanged;
   final ValueChanged<double>? onSoQtyChanged;
   final ValueChanged<double>? onQcQtyChanged;
-  final void Function(TransferLotInput lotInput, double quantity)? onLotQtyInput;
+  final void Function(TransferLotInput lotInput, double quantity)?
+  onLotQtyInput;
 
   @override
   Widget build(BuildContext context) {
@@ -842,6 +1141,9 @@ class _ReturnLineCard extends StatelessWidget {
                         onQuantityChanged: onLotQtyInput != null
                             ? (newVal) => onLotQtyInput!(lotInput, newVal)
                             : null,
+                        canEditSoQty: canEditSoQty,
+                        canEditQcQty: canEditQcQty,
+                        canEditEffectiveQty: canEditEffectiveQty,
                       ),
                     ),
                   ),
@@ -942,10 +1244,7 @@ class _ReturnLineCard extends StatelessWidget {
           if (isReadOnly)
             Text(
               value.toStringAsFixed(0),
-              style: const TextStyle(
-                fontWeight: FontWeight.bold,
-                fontSize: 16,
-              ),
+              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
             )
           else
             SmallStepper(
@@ -963,7 +1262,8 @@ class _ReturnLineCard extends StatelessWidget {
               onValueInput: (val) {
                 final parsed = double.tryParse(val);
                 if (parsed != null) {
-                  onChanged?.call(parsed.clamp(min, max));
+                  final safeMax = max > min ? max : min;
+                  onChanged?.call(parsed.clamp(min, safeMax));
                 }
               },
             ),
@@ -983,6 +1283,9 @@ class _ReturnLotRow extends StatelessWidget {
     required this.onPlus,
     this.isReadOnly = false,
     this.onQuantityChanged,
+    required this.canEditSoQty,
+    required this.canEditQcQty,
+    required this.canEditEffectiveQty,
   });
 
   final TransferLotInput lotInput;
@@ -993,9 +1296,31 @@ class _ReturnLotRow extends StatelessWidget {
   final VoidCallback onPlus;
   final bool isReadOnly;
   final ValueChanged<double>? onQuantityChanged;
+  final bool canEditSoQty;
+  final bool canEditQcQty;
+  final bool canEditEffectiveQty;
 
   @override
   Widget build(BuildContext context) {
+    double activeQty = lotInput.quantity;
+    String label = 'Return Qty';
+    if (canEditSoQty) {
+      activeQty = lotInput.soQty ?? lotInput.quantity;
+      label = 'SO Qty';
+    } else if (canEditQcQty) {
+      activeQty = lotInput.qcQty ?? lotInput.quantity;
+      label = 'QC Qty';
+    } else {
+      activeQty = lotInput.quantity;
+      label = 'Return Qty';
+    }
+
+    final displayLots = List<TransferLot>.from(lots);
+    if (lotInput.lot != null &&
+        !displayLots.any((l) => l.lotId == lotInput.lot!.lotId)) {
+      displayLots.add(lotInput.lot!);
+    }
+
     return Row(
       crossAxisAlignment: CrossAxisAlignment.end,
       children: [
@@ -1008,6 +1333,34 @@ class _ReturnLotRow extends StatelessWidget {
                 'Lot Reference',
                 style: TextStyle(color: Colors.black54, fontSize: 12),
               ),
+              if ((lotInput.soQty != null && lotInput.soQty! > 0) ||
+                  (lotInput.qcQty != null && lotInput.qcQty! > 0)) ...[
+                const SizedBox(height: 2),
+                Wrap(
+                  spacing: 6,
+                  runSpacing: 2,
+                  children: [
+                    if (lotInput.soQty != null && lotInput.soQty! > 0)
+                      Text(
+                        'SO Qty: ${lotInput.soQty!.toStringAsFixed(0)}',
+                        style: const TextStyle(
+                          color: Color(0xFF2563EB),
+                          fontWeight: FontWeight.bold,
+                          fontSize: 10,
+                        ),
+                      ),
+                    if (lotInput.qcQty != null && lotInput.qcQty! > 0)
+                      Text(
+                        'QC Qty: ${lotInput.qcQty!.toStringAsFixed(0)}',
+                        style: const TextStyle(
+                          color: Color(0xFF16A34A),
+                          fontWeight: FontWeight.bold,
+                          fontSize: 10,
+                        ),
+                      ),
+                  ],
+                ),
+              ],
               const SizedBox(height: 4),
               DropdownButtonFormField<int>(
                 isExpanded: true,
@@ -1024,7 +1377,7 @@ class _ReturnLotRow extends StatelessWidget {
                     borderSide: BorderSide(color: Color(0xFFDDE6F2)),
                   ),
                 ),
-                items: lots
+                items: displayLots
                     .map(
                       (lot) => DropdownMenuItem(
                         value: lot.lotId,
@@ -1039,7 +1392,7 @@ class _ReturnLotRow extends StatelessWidget {
                     ? null
                     : (val) {
                         TransferLot? selected;
-                        for (final lot in lots) {
+                        for (final lot in displayLots) {
                           if (lot.lotId == val) {
                             selected = lot;
                             break;
@@ -1057,9 +1410,9 @@ class _ReturnLotRow extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
-                'Return Qty',
-                style: TextStyle(color: Colors.black54, fontSize: 12),
+              Text(
+                label,
+                style: const TextStyle(color: Colors.black54, fontSize: 12),
               ),
               const SizedBox(height: 4),
               Container(
@@ -1076,17 +1429,25 @@ class _ReturnLotRow extends StatelessWidget {
                       width: 52,
                       height: 32,
                       child: TextField(
-                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                        keyboardType: const TextInputType.numberWithOptions(
+                          decimal: true,
+                        ),
                         textAlign: TextAlign.center,
                         enabled: !isReadOnly && onQuantityChanged != null,
                         style: const TextStyle(fontSize: 14),
                         decoration: const InputDecoration(
                           isDense: true,
-                          contentPadding: EdgeInsets.symmetric(horizontal: 4, vertical: 6),
+                          contentPadding: EdgeInsets.symmetric(
+                            horizontal: 4,
+                            vertical: 6,
+                          ),
                           border: InputBorder.none,
                           enabledBorder: InputBorder.none,
                           focusedBorder: UnderlineInputBorder(
-                            borderSide: BorderSide(color: AppColors.primary, width: 2),
+                            borderSide: BorderSide(
+                              color: AppColors.primary,
+                              width: 2,
+                            ),
                           ),
                         ),
                         onChanged: (val) {
@@ -1095,9 +1456,13 @@ class _ReturnLotRow extends StatelessWidget {
                             onQuantityChanged!(parsed);
                           }
                         },
-                        controller: TextEditingController(
-                          text: lotInput.quantity.toStringAsFixed(0),
-                        )..selection = TextSelection.collapsed(offset: lotInput.quantity.toStringAsFixed(0).length),
+                        controller:
+                            TextEditingController(
+                                text: activeQty.toStringAsFixed(0),
+                              )
+                              ..selection = TextSelection.collapsed(
+                                offset: activeQty.toStringAsFixed(0).length,
+                              ),
                       ),
                     ),
                     if (!isReadOnly)

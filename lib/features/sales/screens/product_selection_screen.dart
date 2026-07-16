@@ -11,7 +11,8 @@ import 'package:secondary_sales/core/widgets/ss_ui.dart';
 
 class ProductSelectionScreen extends StatefulWidget {
   final String saleType;
-  const ProductSelectionScreen({super.key, this.saleType = 'primary'});
+  final int? partnerId;
+  const ProductSelectionScreen({super.key, this.saleType = 'primary', this.partnerId});
 
   @override
   State<ProductSelectionScreen> createState() => _ProductSelectionScreenState();
@@ -26,7 +27,7 @@ class _ProductSelectionScreenState extends State<ProductSelectionScreen> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<PrimarySaleProvider>().searchProducts('', saleType: widget.saleType);
+      context.read<PrimarySaleProvider>().searchProducts('', saleType: widget.saleType, partnerId: widget.partnerId);
     });
   }
 
@@ -40,7 +41,7 @@ class _ProductSelectionScreenState extends State<ProductSelectionScreen> {
   void _onSearchChanged(String query) {
     _searchDebounce?.cancel();
     _searchDebounce = Timer(const Duration(milliseconds: 350), () {
-      context.read<PrimarySaleProvider>().searchProducts(query, saleType: widget.saleType);
+      context.read<PrimarySaleProvider>().searchProducts(query, saleType: widget.saleType, partnerId: widget.partnerId);
     });
   }
 
@@ -175,7 +176,7 @@ class _ProductSelectionScreenState extends State<ProductSelectionScreen> {
             Expanded(
               child: RefreshIndicator(
                 onRefresh: () async {
-                  await provider.searchProducts(_searchController.text, saleType: widget.saleType);
+                  await provider.searchProducts(_searchController.text, saleType: widget.saleType, partnerId: widget.partnerId);
                 },
                 child: provider.isLoading && provider.products.isEmpty
                     ? const Center(child: CircularProgressIndicator())

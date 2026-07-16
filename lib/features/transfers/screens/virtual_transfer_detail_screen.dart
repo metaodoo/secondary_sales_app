@@ -136,30 +136,34 @@ class _VirtualTransferDetailScreenState
       body: SafeArea(
         child: Column(
           children: [
-            BlueHeader(
-              title: widget.initialTransfer.name,
-              subtitle: 'Virtual transfer',
-              leading: IconButton(
-                onPressed: () => Navigator.pop(context),
-                icon: const Icon(Icons.arrow_back, color: Colors.white),
-              ),
-              trailing: FutureBuilder<VirtualTransfer>(
-                future: _transferFuture,
-                builder: (context, snapshot) {
-                  final transfer = snapshot.data;
-                  if (transfer != null &&
-                      ![
-                        'done',
-                        'cancel',
-                      ].contains(transfer.state.toLowerCase())) {
-                    return IconButton(
-                      icon: const Icon(Icons.edit, color: Colors.white),
-                      onPressed: () => _editTransfer(transfer),
-                    );
-                  }
-                  return const SizedBox.shrink();
-                },
-              ),
+            FutureBuilder<VirtualTransfer>(
+              future: _transferFuture,
+              builder: (context, snapshot) {
+                final transfer = snapshot.data ?? widget.initialTransfer;
+                final bool isLoad = transfer.vanOperationType?.toLowerCase() == 'load';
+                final bool isScrap = transfer.ssTransferCategory?.toLowerCase() == 'scrap';
+                final String subtitle = isLoad
+                    ? 'Van Load'
+                    : (isScrap ? 'Van Scrap Unload' : 'Van Unload');
+
+                return BlueHeader(
+                  title: transfer.name,
+                  subtitle: subtitle,
+                  leading: IconButton(
+                    onPressed: () => Navigator.pop(context),
+                    icon: const Icon(Icons.arrow_back, color: Colors.white),
+                  ),
+                  trailing: ![
+                    'done',
+                    'cancel',
+                  ].contains(transfer.state.toLowerCase())
+                      ? IconButton(
+                          icon: const Icon(Icons.edit, color: Colors.white),
+                          onPressed: () => _editTransfer(transfer),
+                        )
+                      : const SizedBox.shrink(),
+                );
+              },
             ),
             Expanded(
               child: FutureBuilder<VirtualTransfer>(

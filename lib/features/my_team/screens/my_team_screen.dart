@@ -4,7 +4,7 @@ import 'package:secondary_sales/core/theme/app_theme.dart';
 import 'package:secondary_sales/core/widgets/ss_ui.dart';
 import 'package:secondary_sales/features/my_team/my_team_provider.dart';
 import 'package:secondary_sales/features/auth/auth_provider.dart';
-import 'package:secondary_sales/features/my_team/screens/subordinate_checkpoints_screen.dart';
+import 'package:secondary_sales/features/my_team/screens/subordinate_barikoi_checkpoints_screen.dart';
 import 'package:intl/intl.dart';
 
 class MyTeamScreen extends StatefulWidget {
@@ -182,54 +182,64 @@ class _MyTeamScreenState extends State<MyTeamScreen> {
 
           // Main Subordinate list
           Expanded(
-            child: myTeamProvider.isLoading
+            child: myTeamProvider.isLoading && myTeamProvider.teamMembers.isEmpty
                 ? const Center(
                     child: LoadingState(message: 'Retrieving team directory...'),
                   )
-                : myTeamProvider.error != null
+                : myTeamProvider.error != null && myTeamProvider.teamMembers.isEmpty
                     ? SingleChildScrollView(
                         padding: const EdgeInsets.all(16.0),
                         child: ErrorPanel(myTeamProvider.error!),
                       )
-                    : filteredMembers.isEmpty
-                        ? Center(
-                            child: Padding(
-                              padding: const EdgeInsets.all(32.0),
-                              child: Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Icon(
-                                    Icons.group_off_outlined,
-                                    size: 64,
-                                    color: AppColors.textSecondary.withValues(alpha: 0.5),
-                                  ),
-                                  const SizedBox(height: 16),
-                                  Text(
-                                    _searchQuery.isNotEmpty
-                                        ? 'No subordinates found matching "$_searchQuery".'
-                                        : 'No subordinates assigned or active today.',
-                                    textAlign: TextAlign.center,
-                                    style: const TextStyle(
-                                      fontSize: 16,
-                                      color: AppColors.textSecondary,
+                    : RefreshIndicator(
+                        onRefresh: () async => _fetchTeam(),
+                        child: ListView(
+                          physics: const AlwaysScrollableScrollPhysics(),
+                          padding: const EdgeInsets.all(16.0),
+                          children: [
+                            if (myTeamProvider.error != null) ...[
+                              ErrorPanel(myTeamProvider.error!),
+                              const SizedBox(height: 12),
+                            ],
+                            if (myTeamProvider.isLoading) ...[
+                              const LinearProgressIndicator(),
+                              const SizedBox(height: 12),
+                            ],
+                            if (filteredMembers.isEmpty)
+                              Padding(
+                                padding: const EdgeInsets.all(32.0),
+                                child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Icon(
+                                      Icons.group_off_outlined,
+                                      size: 64,
+                                      color: AppColors.textSecondary.withValues(alpha: 0.5),
                                     ),
-                                  ),
-                                ],
+                                    const SizedBox(height: 16),
+                                    Text(
+                                      _searchQuery.isNotEmpty
+                                          ? 'No subordinates found matching "$_searchQuery".'
+                                          : 'No subordinates assigned or active today.',
+                                      textAlign: TextAlign.center,
+                                      style: const TextStyle(
+                                        fontSize: 16,
+                                        color: AppColors.textSecondary,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              )
+                            else
+                              ...filteredMembers.map(
+                                (member) => Padding(
+                                  padding: const EdgeInsets.only(bottom: 12),
+                                  child: _buildSubordinateCard(context, member, formattedDate),
+                                ),
                               ),
-                            ),
-                          )
-                        : RefreshIndicator(
-                            onRefresh: () async => _fetchTeam(),
-                            child: ListView.separated(
-                              padding: const EdgeInsets.all(16.0),
-                              itemCount: filteredMembers.length,
-                              separatorBuilder: (context, index) => const SizedBox(height: 12),
-                              itemBuilder: (context, index) {
-                                final member = filteredMembers[index];
-                                return _buildSubordinateCard(context, member, formattedDate);
-                              },
-                            ),
-                          ),
+                          ],
+                        ),
+                      ),
           ),
         ],
       ),
@@ -259,7 +269,7 @@ class _MyTeamScreenState extends State<MyTeamScreen> {
         Navigator.push(
           context,
           MaterialPageRoute(
-            builder: (_) => SubordinateCheckpointsScreen(
+            builder: (_) => SubordinateBarikoiCheckpointsScreen(
               employeeId: member.id,
               employeeName: member.name,
               initialDateStr: dateStr,

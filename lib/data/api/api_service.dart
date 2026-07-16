@@ -15,6 +15,7 @@ import 'package:secondary_sales/data/models/sales/delivery_prepare.dart';
 import 'package:secondary_sales/data/models/delivery_item.dart';
 import 'package:secondary_sales/data/models/inventory/warehouse.dart';
 import 'package:secondary_sales/data/models/inventory/virtual_transfer.dart';
+import 'package:secondary_sales/data/models/dashboard/dashboard_summary.dart';
 import 'package:secondary_sales/core/access/access_control.dart';
 import 'package:secondary_sales/core/access/access_resources.dart';
 import 'package:secondary_sales/core/util/parse.dart';
@@ -36,6 +37,7 @@ part 'endpoints/expense_api.dart';
 part 'endpoints/access_api.dart';
 part 'endpoints/my_team_api.dart';
 part 'endpoints/location_api.dart';
+part 'endpoints/dashboard_api.dart';
 
 class ApiService {
   ApiService._internal();

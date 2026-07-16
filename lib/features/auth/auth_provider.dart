@@ -36,6 +36,7 @@ class AuthProvider with ChangeNotifier {
   String? get sessionId => _session?.sessionId ?? _odooSessionId;
   String get baseUrl => AppConstants.baseUrl;
   String get dbName => AppConstants.dbName;
+
   /// Legacy "is manager/TSM (not a Sales Officer)" rule. Used as the fallback
   /// for module gates until the matching screen key is enforced server-side.
   bool get _legacyManagerAccess {
@@ -95,6 +96,34 @@ class AuthProvider with ChangeNotifier {
     AppAction.attendanceSkipGeo,
     user?.permissions?.skipAttendanceGeolocation ?? false,
   );
+
+  bool canSaveReturnFor(String moduleType) => _enforcedOr(
+    AppAction.returnSaveFor(moduleType),
+    canEditSoQty || canEditQcQty || canEditEffectiveQty,
+  );
+  bool canCancelReturnFor(String moduleType) => _enforcedOr(
+    AppAction.returnCancelFor(moduleType),
+    canEditSoQty || canEditQcQty,
+  );
+  bool canValidateReturnFor(String moduleType) =>
+      _enforcedOr(AppAction.returnValidateFor(moduleType), canEditQcQty);
+  bool canSaveScrapFor(String moduleType) => _enforcedOr(
+    AppAction.scrapSaveFor(moduleType),
+    canEditSoQty || canEditQcQty || canEditEffectiveQty,
+  );
+  bool canCancelScrapFor(String moduleType) => _enforcedOr(
+    AppAction.scrapCancelFor(moduleType),
+    canEditSoQty || canEditQcQty,
+  );
+  bool canValidateScrapFor(String moduleType) =>
+      _enforcedOr(AppAction.scrapValidateFor(moduleType), canEditQcQty);
+
+  bool get canSaveReturn => canSaveReturnFor('primary');
+  bool get canCancelReturn => canCancelReturnFor('primary');
+  bool get canValidateReturn => canValidateReturnFor('primary');
+  bool get canSaveScrap => canSaveScrapFor('primary');
+  bool get canCancelScrap => canCancelScrapFor('primary');
+  bool get canValidateScrap => canValidateScrapFor('primary');
 
   Future<List<String>> fetchDatabases(String baseUrl) {
     return _authService.fetchDatabaseList(baseUrl);

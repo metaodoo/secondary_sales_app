@@ -20,6 +20,22 @@ subprojects {
     project.layout.buildDirectory.value(newSubprojectBuildDir)
 }
 subprojects {
+    // Force plugin subprojects (file_picker, package_info_plus, etc.) to
+    // compile against SDK 36. Flutter 3.44's flutter.compileSdkVersion is 34,
+    // but some transitive plugins now require 36 or later. Registered before
+    // evaluationDependsOn(":app") below, which eagerly evaluates projects.
+    val forceCompileSdk: Project.() -> Unit = {
+        extensions.findByType(com.android.build.api.dsl.CommonExtension::class.java)?.let { ext ->
+            if ((ext.compileSdk ?: 0) < 36) {
+                ext.compileSdk = 36
+            }
+            if (ext.namespace == null) {
+                ext.namespace = project.group.toString()
+            }
+        }
+    }
+    if (state.executed) forceCompileSdk() else afterEvaluate { forceCompileSdk() }
+
     project.evaluationDependsOn(":app")
 }
 

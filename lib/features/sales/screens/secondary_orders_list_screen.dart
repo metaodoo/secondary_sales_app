@@ -7,6 +7,7 @@ import 'package:secondary_sales/core/widgets/ss_ui.dart';
 import 'package:secondary_sales/data/models/sales/primary_order.dart';
 import 'package:secondary_sales/features/sales/primary_sale_provider.dart';
 import 'package:secondary_sales/features/sales/screens/order_detail_screen.dart';
+import 'package:secondary_sales/features/sales/screens/order_creation_screen.dart';
 import 'package:secondary_sales/features/routes/screens/officer_route_selection_screen.dart';
 import 'package:secondary_sales/features/auth/auth_provider.dart';
 import 'package:secondary_sales/core/access/access_resources.dart';
@@ -449,6 +450,10 @@ class _SecondaryOrdersListScreenState extends State<SecondaryOrdersListScreen> {
 
               // List of Orders
               if (_error != null) ErrorPanel(_error!),
+              if (_isLoading && _orders.isNotEmpty) ...[
+                const LinearProgressIndicator(),
+                const SizedBox(height: 16),
+              ],
               if (_isLoading && _orders.isEmpty)
                 const LoadingState()
               else if (_orders.isEmpty)
@@ -469,6 +474,18 @@ class _SecondaryOrdersListScreenState extends State<SecondaryOrdersListScreen> {
                               orderId: order.id,
                               fallbackName: order.name,
                               saleType: 'secondary',
+                            ),
+                          ),
+                        );
+                        _fetchOrders();
+                      },
+                      onEditTap: () async {
+                        await Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) => OrderCreationScreen(
+                              outletId: order.hubId,
+                              customerName: order.hubName,
+                              editOrderId: order.id,
                             ),
                           ),
                         );

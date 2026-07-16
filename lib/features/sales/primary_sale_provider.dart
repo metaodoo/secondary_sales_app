@@ -212,12 +212,12 @@ class PrimarySaleProvider with ChangeNotifier {
     }
   }
 
-  Future<void> searchProducts(String query, {String? saleType}) async {
+  Future<void> searchProducts(String query, {String? saleType, int? partnerId}) async {
     _error = null;
     notifyListeners();
 
     try {
-      _products = await _apiService.getProducts(search: query, saleType: saleType);
+      _products = await _apiService.getProducts(search: query, saleType: saleType, partnerId: partnerId);
     } catch (e) {
       _error = e.toString();
     } finally {
@@ -298,6 +298,7 @@ class PrimarySaleProvider with ChangeNotifier {
   Future<DeliveryPrepare?> prepareDelivery(
     int orderId, {
     int? pickingId,
+    String? saleType,
   }) async {
     _loadingCount++;
     _error = null;
@@ -307,6 +308,7 @@ class PrimarySaleProvider with ChangeNotifier {
       _deliveryPrepare = await _apiService.preparePrimarySaleDelivery(
         orderId,
         pickingId: pickingId,
+        saleType: saleType,
       );
       _warehouses = _deliveryPrepare!.warehouses;
       return _deliveryPrepare;
@@ -375,6 +377,7 @@ class PrimarySaleProvider with ChangeNotifier {
     required List<DeliveryLineInput> lines,
     bool createBackorder = true,
     String saleType = 'primary',
+    String action = 'validate',
   }) async {
     _loadingCount++;
     _error = null;
@@ -388,6 +391,8 @@ class PrimarySaleProvider with ChangeNotifier {
         locationId: locationId,
         lines: lines,
         createBackorder: createBackorder,
+        saleType: saleType,
+        action: action,
       );
       _deliveryPrepare = null;
       await fetchRecentOrders(saleType: saleType);
@@ -451,6 +456,39 @@ class PrimarySaleProvider with ChangeNotifier {
         warehouseId: warehouseId,
       );
       await fetchRecentOrders();
+      return true;
+    } catch (e) {
+      _error = e.toString();
+      return false;
+    } finally {
+      if (_loadingCount > 0) _loadingCount--;
+      notifyListeners();
+    }
+  }
+
+  Future<bool> editSecondaryOrder({
+    required int orderId,
+    required int outletId,
+    required List<Map<String, dynamic>> items,
+    int? mediumId,
+    int? routeId,
+    int? visitId,
+    bool confirm = true,
+  }) async {
+    _loadingCount++;
+    notifyListeners();
+
+    try {
+      await _apiService.updateSecondarySaleOrder(
+        orderId: orderId,
+        outletId: outletId,
+        items: items,
+        mediumId: mediumId,
+        routeId: routeId,
+        visitId: visitId,
+        confirm: confirm,
+      );
+      await fetchRecentOrders(saleType: 'secondary');
       return true;
     } catch (e) {
       _error = e.toString();

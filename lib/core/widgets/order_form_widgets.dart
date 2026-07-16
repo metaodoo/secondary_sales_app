@@ -95,7 +95,7 @@ class OrderLineCard extends StatelessWidget {
             ],
           ),
           Text(
-            'Stock: ${line.product.stock?.toInt() ?? 0}   Forecast: ${(line.product.stock != null ? (line.product.stock! * 0.85).toInt() : 0)}',
+            'Stock: ${line.product.stock?.toInt() ?? 0}',
             style: const TextStyle(
               color: AppColors.textSecondary,
               fontSize: 13,

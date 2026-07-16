@@ -76,23 +76,8 @@ class _ScrapProductSelectionScreenState
       } else {
         _selectedLines[product.id] = VirtualTransferLineEntry(
           product: product,
-          quantity: 1,
+          quantity: 0,
         );
-      }
-    });
-  }
-
-  void _changeQuantity(TransferProduct product, double delta) {
-    final line = _selectedLines[product.id];
-    if (line == null) return;
-    setState(() {
-      final next = line.quantity + delta;
-      if (next < 1) {
-        line.quantity = 1;
-      } else if (next > product.availableQty) {
-        line.quantity = product.availableQty;
-      } else {
-        line.quantity = next;
       }
     });
   }
@@ -177,12 +162,8 @@ class _ScrapProductSelectionScreenState
                       final line = _selectedLines[product.id];
                       return _ScrapProductCard(
                         product: product,
-                        quantity: line?.quantity ?? 1,
                         isSelected: line != null,
                         onTap: () => _toggleProduct(product),
-                        onDecrease: () => _changeQuantity(product, -1),
-                        onIncrease: () => _changeQuantity(product, 1),
-                        onQuantityInput: (newVal) => _changeQuantity(product, newVal - (line?.quantity ?? 1)),
                       );
                     }),
                 ],
@@ -198,21 +179,13 @@ class _ScrapProductSelectionScreenState
 class _ScrapProductCard extends StatelessWidget {
   const _ScrapProductCard({
     required this.product,
-    required this.quantity,
     required this.isSelected,
     required this.onTap,
-    required this.onDecrease,
-    required this.onIncrease,
-    this.onQuantityInput,
   });
 
   final TransferProduct product;
-  final double quantity;
   final bool isSelected;
   final VoidCallback onTap;
-  final VoidCallback onDecrease;
-  final VoidCallback onIncrease;
-  final ValueChanged<double>? onQuantityInput;
 
   @override
   Widget build(BuildContext context) {
@@ -256,20 +229,6 @@ class _ScrapProductCard extends StatelessWidget {
               'Available: ${product.availableQty.toStringAsFixed(0)} ${product.uomName}',
               style: const TextStyle(color: Color(0xFF16A34A)),
             ),
-            if (isSelected) ...[
-              const SizedBox(height: 12),
-              SmallStepper(
-                value: quantity.toStringAsFixed(0),
-                onMinus: onDecrease,
-                onPlus: onIncrease,
-                onValueInput: (val) {
-                  final parsed = double.tryParse(val);
-                  if (parsed != null && onQuantityInput != null) {
-                    onQuantityInput!(parsed);
-                  }
-                },
-              ),
-            ],
           ],
         ),
       ),

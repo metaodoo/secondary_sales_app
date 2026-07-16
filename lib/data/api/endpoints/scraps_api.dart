@@ -143,4 +143,21 @@ extension ScrapsApi on ApiService {
     }
     throw Exception(result['message'] ?? 'Failed to update scrap delivery');
   }
+
+  Future<Map<String, dynamic>> scrapAction(int scrapId, String action) async {
+    final params = <String, dynamic>{
+      'employee_id': _activeEmployeeId,
+      'action': action,
+    };
+    final result = await _post(
+      '${AppConstants.scrapsEndpoint}/$scrapId/action',
+      params,
+    );
+    if (result['success'] == true) {
+      return Map<String, dynamic>.from(result['data']);
+    }
+    throw Exception(result['message'] ?? 'Failed to execute scrap action');
+  }
 }
+
+

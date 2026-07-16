@@ -91,12 +91,14 @@ class MyTeamProvider with ChangeNotifier {
   List<MyTeamMember> _teamMembers = [];
   List<AttendanceShift> _checkpointsShifts = [];
   String? _selectedEmployeeName;
+  String? _barikoiApiKey;
   bool _isLoading = false;
   String? _error;
 
   List<MyTeamMember> get teamMembers => _teamMembers;
   List<AttendanceShift> get checkpointsShifts => _checkpointsShifts;
   String? get selectedEmployeeName => _selectedEmployeeName;
+  String? get barikoiApiKey => _barikoiApiKey;
   bool get isLoading => _isLoading;
   String? get error => _error;
 
@@ -145,6 +147,7 @@ class MyTeamProvider with ChangeNotifier {
       if (res['success'] == true) {
         final data = res['data'] as Map<String, dynamic>? ?? {};
         _selectedEmployeeName = data['employee']?['name'] as String?;
+        _barikoiApiKey = data['barikoi_api_key'] as String?;
         final list = data['attendances'] as List? ?? [];
         _checkpointsShifts = list.map((item) => AttendanceShift.fromMap(item as Map<String, dynamic>)).toList();
       } else {

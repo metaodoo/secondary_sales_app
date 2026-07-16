@@ -174,6 +174,11 @@ class _SalesOfficerListScreenState extends State<SalesOfficerListScreen> {
                 ),
               const SizedBox(height: 32),
               if (provider.error != null) ErrorPanel(provider.error!),
+              if (provider.isLoading && provider.employees.isNotEmpty)
+                const Padding(
+                  padding: EdgeInsets.only(bottom: 12),
+                  child: LinearProgressIndicator(),
+                ),
               if (provider.isLoading && provider.employees.isEmpty)
                 const Padding(
                   padding: EdgeInsets.all(32),

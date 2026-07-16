@@ -463,9 +463,20 @@ class _VanOperationsListScreenState extends State<VanOperationsListScreen> {
 
   Widget _buildOperationCard(VirtualTransfer transfer) {
     final bool isLoad = transfer.vanOperationType?.toLowerCase() == 'load';
+    final bool isScrap = transfer.ssTransferCategory?.toLowerCase() == 'scrap';
     final stateLabel = _stateLabel(transfer.state);
     final stateColor = _stateColor(transfer.state);
     final stateIcon = _stateIcon(transfer.state);
+
+    final badgeBgColor = isLoad
+        ? const Color(0xFFE0F2E9)
+        : (isScrap ? const Color(0xFFFCE8E6) : const Color(0xFFFDECDA));
+    final badgeTextColor = isLoad
+        ? const Color(0xFF10B981)
+        : (isScrap ? const Color(0xFFEA4335) : const Color(0xFFF59E0B));
+    final badgeText = isLoad
+        ? 'Load'
+        : (isScrap ? 'Scrap Unload' : 'Unload');
 
     return Card(
       margin: const EdgeInsets.only(bottom: 16),
@@ -496,13 +507,13 @@ class _VanOperationsListScreenState extends State<VanOperationsListScreen> {
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                     decoration: BoxDecoration(
-                      color: isLoad ? const Color(0xFFE0F2E9) : const Color(0xFFFDECDA),
+                      color: badgeBgColor,
                       borderRadius: BorderRadius.circular(20),
                     ),
                     child: Text(
-                      isLoad ? 'Load' : 'Unload',
+                      badgeText,
                       style: TextStyle(
-                        color: isLoad ? const Color(0xFF10B981) : const Color(0xFFF59E0B),
+                        color: badgeTextColor,
                         fontWeight: FontWeight.w600,
                         fontSize: 12,
                       ),

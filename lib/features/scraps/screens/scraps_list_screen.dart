@@ -60,16 +60,17 @@ class _ScrapsListScreenState extends State<ScrapsListScreen> {
   Future<void> _openCreateScrap() async {
     await Navigator.push(
       context,
-      MaterialPageRoute(builder: (_) => CreateScrapScreen(moduleType: widget.moduleType)),
+      MaterialPageRoute(
+        builder: (_) => CreateScrapScreen(moduleType: widget.moduleType),
+      ),
     );
     if (mounted) {
       _fetchScraps();
     }
   }
 
-  int get _activeCount => _scraps
-      .where((r) => r.state != 'done' && r.state != 'cancel')
-      .length;
+  int get _activeCount =>
+      _scraps.where((r) => r.state != 'done' && r.state != 'cancel').length;
   int get _pendingCount => _scraps
       .where((r) => r.state == 'assigned' || r.state == 'waiting')
       .length;
@@ -317,8 +318,7 @@ class _ScrapsListScreenState extends State<ScrapsListScreen> {
               const SizedBox(height: 24),
 
               // Create Scrap Button
-              if (widget.moduleType == 'primary' &&
-                  auth.canDo(AppAction.scrapCreate)) ...[
+              if (auth.canDo(AppAction.scrapCreateFor(widget.moduleType))) ...[
                 ElevatedButton.icon(
                   onPressed: _openCreateScrap,
                   icon: const Icon(Icons.add, color: Colors.white, size: 22),

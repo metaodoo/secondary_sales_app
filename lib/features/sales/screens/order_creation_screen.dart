@@ -37,6 +37,7 @@ class OrderCreationScreen extends StatefulWidget {
   final int? mediumId;
   final int? routeId;
   final int? visitId;
+  final int? editOrderId;
 
   const OrderCreationScreen({
     super.key,
@@ -45,6 +46,7 @@ class OrderCreationScreen extends StatefulWidget {
     this.mediumId,
     this.routeId,
     this.visitId,
+    this.editOrderId,
   });
 
   @override
@@ -54,6 +56,49 @@ class OrderCreationScreen extends StatefulWidget {
 class _OrderCreationScreenState extends State<OrderCreationScreen> {
   List<OrderLineModel> lines = [];
   bool _isSubmitting = false;
+  bool _isInitLoaded = false;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.editOrderId != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _loadOrderDetails();
+      });
+    }
+  }
+
+  Future<void> _loadOrderDetails() async {
+    final provider = context.read<PrimarySaleProvider>();
+    await provider.fetchOrderDetail(widget.editOrderId!, saleType: 'secondary');
+    final detail = provider.selectedOrder;
+    if (detail != null && mounted) {
+      setState(() {
+        lines.clear();
+        for (final line in detail.lines) {
+          if (line.product != null) {
+            lines.add(
+              OrderLineModel(
+                productId: line.product!.id,
+                productName: line.product!.name,
+                unitPrice: line.priceUnit,
+                dbStock: 0,
+                vanStock: (line.product!.qtyAvailable ?? (line.orderedQty + line.balanceQty)).toInt(),
+                orderQty: line.orderedQty.toInt(),
+                damagedQty: line.damagedQty.toInt(),
+              ),
+            );
+          }
+        }
+        _isInitLoaded = true;
+      });
+    }
+  }
+
+  String get _currencySymbol {
+    final detail = context.read<PrimarySaleProvider>().selectedOrder;
+    return detail?.amounts.currencySymbol ?? '৳';
+  }
 
   double get subtotal => lines.fold(0, (sum, line) => sum + line.lineTotal);
   double get netTotal => subtotal; // Apply discounts/taxes here if needed
@@ -65,14 +110,17 @@ class _OrderCreationScreenState extends State<OrderCreationScreen> {
   Future<void> _showProductSelection() async {
     final provider = context.read<PrimarySaleProvider>();
     if (provider.products.isEmpty) {
-      await provider.searchProducts('', saleType: 'secondary');
+      await provider.searchProducts('', saleType: 'secondary', partnerId: widget.outletId);
     }
     if (!mounted) return;
 
     final selected = await Navigator.push<List<OrderLineEntry>>(
       context,
       MaterialPageRoute(
-        builder: (_) => const ProductSelectionScreen(saleType: 'secondary'),
+        builder: (_) => ProductSelectionScreen(
+          saleType: 'secondary',
+          partnerId: widget.outletId,
+        ),
       ),
     );
     if (selected == null || selected.isEmpty) return;
@@ -121,34 +169,50 @@ class _OrderCreationScreenState extends State<OrderCreationScreen> {
         'price_unit': l.unitPrice,
       }).toList();
 
-      final result = await apiService.createSecondarySaleOrder(
-        outletId: widget.outletId,
-        items: items,
-        mediumId: widget.mediumId,
-        routeId: widget.routeId,
-        visitId: widget.visitId,
-        confirm: true,
-      );
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Order submitted successfully!')),
+      if (widget.editOrderId != null) {
+        await apiService.updateSecondarySaleOrder(
+          orderId: widget.editOrderId!,
+          outletId: widget.outletId,
+          items: items,
+          mediumId: widget.mediumId,
+          routeId: widget.routeId,
+          visitId: widget.visitId,
+          confirm: true,
         );
-        
-        final orderId = result['id'] as int?;
-        if (orderId != null) {
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(
-              builder: (_) => OrderDetailScreen(
-                orderId: orderId,
-                fallbackName: result['name']?.toString() ?? 'Order',
-                saleType: 'secondary',
-              ),
-            ),
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Order updated successfully!')),
           );
-        } else {
-          Navigator.popUntil(context, (route) => route.isFirst);
+          Navigator.pop(context);
+        }
+      } else {
+        final result = await apiService.createSecondarySaleOrder(
+          outletId: widget.outletId,
+          items: items,
+          mediumId: widget.mediumId,
+          routeId: widget.routeId,
+          visitId: widget.visitId,
+          confirm: true,
+        );
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Order submitted successfully!')),
+          );
+          final orderId = result['id'] as int?;
+          if (orderId != null) {
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(
+                builder: (_) => OrderDetailScreen(
+                  orderId: orderId,
+                  fallbackName: result['name']?.toString() ?? 'Order',
+                  saleType: 'secondary',
+                ),
+              ),
+            );
+          } else {
+            Navigator.popUntil(context, (route) => route.isFirst);
+          }
         }
       }
     } catch (e) {
@@ -168,10 +232,12 @@ class _OrderCreationScreenState extends State<OrderCreationScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isLoadingDetails = widget.editOrderId != null && !_isInitLoaded;
+
     return Scaffold(
       backgroundColor: const Color(0xFFF8F9FB),
       appBar: AppBar(
-        title: const Text('FieldForce Manager'),
+        title: Text(widget.editOrderId != null ? 'Edit Secondary Sales' : 'Secondary Sales'),
         centerTitle: true,
         actions: [
           IconButton(
@@ -181,220 +247,224 @@ class _OrderCreationScreenState extends State<OrderCreationScreen> {
         ],
       ),
       body: SafeArea(
-        child: Column(
-          children: [
-            Expanded(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.all(20.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Customer Header Card
-                    const Text(
-                      'Ordering For',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: AppColors.textSecondary,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Container(
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFEDF0FF),
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: const Color(0xFFD6DDFB)),
-                      ),
-                      child: Row(
+        child: isLoadingDetails
+            ? const Center(
+                child: CircularProgressIndicator(color: AppColors.primary),
+              )
+            : Column(
+                children: [
+                  Expanded(
+                    child: SingleChildScrollView(
+                      padding: const EdgeInsets.all(20.0),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Container(
-                            padding: const EdgeInsets.all(12),
-                            decoration: const BoxDecoration(
-                              color: AppColors.primaryStrong,
-                              shape: BoxShape.circle,
+                          // Customer Header Card
+                          const Text(
+                            'Ordering For',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: AppColors.textSecondary,
                             ),
-                            child: const Icon(Icons.storefront, color: Colors.white, size: 24),
                           ),
-                          const SizedBox(width: 16),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
+                          const SizedBox(height: 8),
+                          Container(
+                            padding: const EdgeInsets.all(16),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFEDF0FF),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: const Color(0xFFD6DDFB)),
+                            ),
+                            child: Row(
                               children: [
-                                Text(
-                                  widget.customerName,
-                                  style: const TextStyle(
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.bold,
-                                    color: AppColors.textPrimary,
+                                Container(
+                                  padding: const EdgeInsets.all(12),
+                                  decoration: const BoxDecoration(
+                                    color: AppColors.primaryStrong,
+                                    shape: BoxShape.circle,
                                   ),
+                                  child: const Icon(Icons.storefront, color: Colors.white, size: 24),
                                 ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  'Client ID: #${widget.outletId} • Selected Outlet',
-                                  style: const TextStyle(
-                                    fontSize: 12,
-                                    color: AppColors.textSecondary,
+                                const SizedBox(width: 16),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        widget.customerName,
+                                        style: const TextStyle(
+                                          fontSize: 18,
+                                          fontWeight: FontWeight.bold,
+                                          color: AppColors.textPrimary,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        'Client ID: #${widget.outletId} • Selected Outlet',
+                                        style: const TextStyle(
+                                          fontSize: 12,
+                                          color: AppColors.textSecondary,
+                                        ),
+                                      ),
+                                    ],
                                   ),
                                 ),
                               ],
                             ),
                           ),
+                          const SizedBox(height: 24),
+
+                          // Added Products Header
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              const Text(
+                                'Added Products',
+                                style: TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                  color: AppColors.textPrimary,
+                                ),
+                              ),
+                              TextButton.icon(
+                                onPressed: _addDummyProduct, // TODO: Open Product Selection Screen
+                                icon: const Icon(Icons.add_circle_outline, size: 18),
+                                label: const Text('Add Items'),
+                                style: TextButton.styleFrom(
+                                  foregroundColor: AppColors.primaryStrong,
+                                  padding: EdgeInsets.zero,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 12),
+
+                          // Product Lines
+                          if (lines.isEmpty)
+                            const Padding(
+                              padding: EdgeInsets.all(20.0),
+                              child: Center(
+                                child: Text(
+                                  'No products added yet.\nClick "Add Items" to begin.',
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(color: AppColors.textSecondary),
+                                ),
+                              ),
+                            )
+                          else
+                            ...lines.map((line) => _buildProductCard(line)),
+
+                          const SizedBox(height: 12),
+
+                          // Total Summary Card
+                          if (lines.isNotEmpty)
+                            Container(
+                              padding: const EdgeInsets.all(20),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFEDF0FF),
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(color: const Color(0xFFD6DDFB)),
+                              ),
+                              child: Column(
+                                children: [
+                                  Row(
+                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      const Text(
+                                        'Subtotal',
+                                        style: TextStyle(
+                                          fontSize: 14,
+                                          color: AppColors.textSecondary,
+                                        ),
+                                      ),
+                                      Text(
+                                        '$_currencySymbol${subtotal.toStringAsFixed(2)}',
+                                        style: const TextStyle(
+                                          fontSize: 14,
+                                          color: AppColors.textSecondary,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  const Padding(
+                                    padding: EdgeInsets.symmetric(vertical: 12),
+                                    child: Divider(color: Color(0xFFD6DDFB), height: 1),
+                                  ),
+                                  Row(
+                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      const Text(
+                                        'Net Total',
+                                        style: TextStyle(
+                                          fontSize: 18,
+                                          fontWeight: FontWeight.w500,
+                                          color: AppColors.textPrimary,
+                                        ),
+                                      ),
+                                      Text(
+                                        '$_currencySymbol${netTotal.toStringAsFixed(2)}',
+                                        style: const TextStyle(
+                                          fontSize: 18,
+                                          fontWeight: FontWeight.bold,
+                                          color: AppColors.primaryStrong,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                            ),
                         ],
                       ),
                     ),
-                    const SizedBox(height: 24),
-
-                    // Added Products Header
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        const Text(
-                          'Added Products',
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                            color: AppColors.textPrimary,
-                          ),
-                        ),
-                        TextButton.icon(
-                          onPressed: _addDummyProduct, // TODO: Open Product Selection Screen
-                          icon: const Icon(Icons.add_circle_outline, size: 18),
-                          label: const Text('Add Items'),
-                          style: TextButton.styleFrom(
-                            foregroundColor: AppColors.primaryStrong,
-                            padding: EdgeInsets.zero,
-                          ),
+                  ),
+                  
+                  // Bottom Confirm Button
+                  Container(
+                    padding: const EdgeInsets.all(20),
+                    decoration: const BoxDecoration(
+                      color: Colors.white,
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black12,
+                          blurRadius: 10,
+                          offset: Offset(0, -2),
                         ),
                       ],
                     ),
-                    const SizedBox(height: 12),
-
-                    // Product Lines
-                    if (lines.isEmpty)
-                      const Padding(
-                        padding: EdgeInsets.all(20.0),
-                        child: Center(
-                          child: Text(
-                            'No products added yet.\nClick "Add Items" to begin.',
-                            textAlign: TextAlign.center,
-                            style: TextStyle(color: AppColors.textSecondary),
-                          ),
-                        ),
-                      )
-                    else
-                      ...lines.map((line) => _buildProductCard(line)),
-
-                    const SizedBox(height: 12),
-
-                    // Total Summary Card
-                    if (lines.isNotEmpty)
-                      Container(
-                        padding: const EdgeInsets.all(20),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFEDF0FF),
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: const Color(0xFFD6DDFB)),
-                        ),
-                        child: Column(
-                          children: [
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                const Text(
-                                  'Subtotal',
-                                  style: TextStyle(
-                                    fontSize: 14,
-                                    color: AppColors.textSecondary,
-                                  ),
-                                ),
-                                Text(
-                                  '\$${subtotal.toStringAsFixed(2)}',
-                                  style: const TextStyle(
-                                    fontSize: 14,
-                                    color: AppColors.textSecondary,
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const Padding(
-                              padding: EdgeInsets.symmetric(vertical: 12),
-                              child: Divider(color: Color(0xFFD6DDFB), height: 1),
-                            ),
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                const Text(
-                                  'Net Total',
-                                  style: TextStyle(
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.w500,
-                                    color: AppColors.textPrimary,
-                                  ),
-                                ),
-                                Text(
-                                  '\$${netTotal.toStringAsFixed(2)}',
-                                  style: const TextStyle(
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.bold,
-                                    color: AppColors.primaryStrong,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ],
+                    child: ElevatedButton(
+                      onPressed: (lines.isNotEmpty && !_isSubmitting)
+                          ? _submitOrder
+                          : null,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primaryStrong,
+                        disabledBackgroundColor: AppColors.borderSoft,
+                        minimumSize: const Size(double.infinity, 54),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
                         ),
                       ),
-                  ],
-                ),
-              ),
-            ),
-            
-            // Bottom Confirm Button
-            Container(
-              padding: const EdgeInsets.all(20),
-              decoration: const BoxDecoration(
-                color: Colors.white,
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black12,
-                    blurRadius: 10,
-                    offset: Offset(0, -2),
+                      child: _isSubmitting
+                          ? const SizedBox(
+                              height: 24,
+                              width: 24,
+                              child: CircularProgressIndicator(
+                                color: Colors.white,
+                                strokeWidth: 2,
+                              ),
+                            )
+                          : Text(
+                              widget.editOrderId != null ? 'Save' : 'Confirm',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                    ),
                   ),
                 ],
               ),
-              child: ElevatedButton(
-                onPressed: (lines.isNotEmpty && !_isSubmitting)
-                    ? _submitOrder
-                    : null,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.primaryStrong,
-                  disabledBackgroundColor: AppColors.borderSoft,
-                  minimumSize: const Size(double.infinity, 54),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                ),
-                child: _isSubmitting
-                    ? const SizedBox(
-                        height: 24,
-                        width: 24,
-                        child: CircularProgressIndicator(
-                          color: Colors.white,
-                          strokeWidth: 2,
-                        ),
-                      )
-                    : const Text(
-                        'Confirm',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-              ),
-            ),
-          ],
-        ),
       ),
     );
   }
@@ -428,7 +498,7 @@ class _OrderCreationScreenState extends State<OrderCreationScreen> {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      'Unit Price: \$${line.unitPrice.toStringAsFixed(2)}',
+                      'Unit Price: $_currencySymbol${line.unitPrice.toStringAsFixed(2)}',
                       style: const TextStyle(
                         fontSize: 12,
                         color: AppColors.textSecondary,
@@ -509,7 +579,7 @@ class _OrderCreationScreenState extends State<OrderCreationScreen> {
               ),
               const SizedBox(height: 4),
               Text(
-                '\$${line.lineTotal.toStringAsFixed(2)}',
+                '$_currencySymbol${line.lineTotal.toStringAsFixed(2)}',
                 style: const TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.bold,

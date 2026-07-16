@@ -102,6 +102,7 @@ class DeliveryMoveLine {
     required this.defaultDeliveryQty,
     this.uomName,
     this.lotLines,
+    this.availableQty = 0.0,
   });
 
   final int moveId;
@@ -113,6 +114,7 @@ class DeliveryMoveLine {
   final double defaultDeliveryQty;
   final String? uomName;
   final List<DeliveryLotLine>? lotLines;
+  final double availableQty;
 
   String get tracking => product?.tracking ?? 'none';
   bool get requiresLots => tracking != 'none';
@@ -135,6 +137,7 @@ class DeliveryMoveLine {
           .whereType<Map>()
           .map((item) => DeliveryLotLine.fromMap(item.cast<String, dynamic>()))
           .toList(),
+      availableQty: asDouble(map['available_qty']),
     );
   }
 }

@@ -200,4 +200,41 @@ extension SalesApi on ApiService {
     }
     throw Exception(result['message'] ?? 'Failed to update sale order');
   }
+
+  Future<Map<String, dynamic>> updateSecondarySaleOrder({
+    required int orderId,
+    required int outletId,
+    required List<Map<String, dynamic>> items,
+    int? mediumId,
+    int? routeId,
+    int? visitId,
+    bool confirm = true,
+  }) async {
+    final params = {
+      'employee_id': _activeEmployeeId,
+      'sale_type': 'secondary',
+      'outlet_id': outletId,
+      'confirm': confirm,
+      'order_lines': items.map((item) {
+        return {
+          'product_id': item['product_id'],
+          'product_uom_qty': item['order_qty'],
+          'damaged_qty': item['damaged_qty'],
+          'price_unit': item['price_unit'],
+        };
+      }).toList(),
+    };
+    if (mediumId != null) params['medium_id'] = mediumId;
+    if (routeId != null) params['route_id'] = routeId;
+    if (visitId != null) params['visit_id'] = visitId;
+
+    final result = await _post(
+      '${AppConstants.apiPrefix}/sale-orders/$orderId/update',
+      params,
+    );
+    if (result['success'] == true) {
+      return result['data'] ?? <String, dynamic>{};
+    }
+    throw Exception(result['message'] ?? 'Failed to update secondary sale order');
+  }
 }

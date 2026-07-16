@@ -163,6 +163,12 @@ class _RoutesTabState extends State<RoutesTab> {
               ),
             ),
 
+            if (provider.isLoading && provider.routes.isNotEmpty)
+              const Padding(
+                padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                child: LinearProgressIndicator(),
+              ),
+
             // Route List
             Expanded(
               child: RefreshIndicator(

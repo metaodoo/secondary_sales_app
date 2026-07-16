@@ -140,15 +140,14 @@ class _DeliveriesListScreenState extends State<DeliveriesListScreen> {
           child: Container(color: AppColors.borderMuted, height: 1),
         ),
       ),
-      body: _isLoading
+      body: _isLoading && _deliveries.isEmpty
           ? const Center(child: CircularProgressIndicator())
-          : _error != null
-          ? Center(child: Text('Error: $_error'))
           : _buildContent(),
     );
   }
 
   Widget _buildContent() {
+    final displayed = _filteredDeliveries;
     return RefreshIndicator(
       onRefresh: () => _fetchDeliveries(),
       child: CustomScrollView(
@@ -159,6 +158,14 @@ class _DeliveriesListScreenState extends State<DeliveriesListScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  if (_error != null) ...[
+                    ErrorPanel(_error!),
+                    const SizedBox(height: 16),
+                  ],
+                  if (_isLoading) ...[
+                    const LinearProgressIndicator(),
+                    const SizedBox(height: 16),
+                  ],
                   _buildSearchBar(),
                   const SizedBox(height: 16),
                   _buildStatsCards(),
@@ -176,14 +183,19 @@ class _DeliveriesListScreenState extends State<DeliveriesListScreen> {
               ),
             ),
           ),
-          SliverPadding(
-            padding: const EdgeInsets.symmetric(horizontal: 16.0),
-            sliver: SliverList(
-              delegate: SliverChildBuilderDelegate((context, index) {
-                return _buildDeliveryCard(_filteredDeliveries[index]);
-              }, childCount: _filteredDeliveries.length),
+          if (displayed.isEmpty)
+            const SliverFillRemaining(
+              child: EmptyPanel(message: 'No deliveries found'),
+            )
+          else
+            SliverPadding(
+              padding: const EdgeInsets.symmetric(horizontal: 16.0),
+              sliver: SliverList(
+                delegate: SliverChildBuilderDelegate((context, index) {
+                  return _buildDeliveryCard(displayed[index]);
+                }, childCount: displayed.length),
+              ),
             ),
-          ),
           const SliverPadding(padding: EdgeInsets.only(bottom: 80)),
         ],
       ),

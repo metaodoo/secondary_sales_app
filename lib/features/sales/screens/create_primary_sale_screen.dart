@@ -69,7 +69,7 @@ class _CreatePrimarySaleScreenState extends State<CreatePrimarySaleScreen> {
                   code: line.product!.defaultCode,
                   price: line.priceUnit,
                   uom: line.uomName,
-                  stock: line.orderedQty + line.balanceQty,
+                  stock: line.product!.qtyAvailable ?? (line.orderedQty + line.balanceQty),
                 ),
                 quantity: line.orderedQty.toInt(),
                 discountPercent: line.discount,
@@ -95,13 +95,17 @@ class _CreatePrimarySaleScreenState extends State<CreatePrimarySaleScreen> {
   Future<void> _openProductPicker() async {
     final provider = context.read<PrimarySaleProvider>();
     if (provider.products.isEmpty) {
-      await provider.searchProducts('');
+      await provider.searchProducts('', partnerId: _hub.id);
     }
     if (!mounted) return;
 
     final selected = await Navigator.push<List<OrderLineEntry>>(
       context,
-      MaterialPageRoute(builder: (_) => const ProductSelectionScreen()),
+      MaterialPageRoute(
+        builder: (_) => ProductSelectionScreen(
+          partnerId: _hub.id,
+        ),
+      ),
     );
     if (selected == null || selected.isEmpty) return;
 

@@ -153,5 +153,19 @@ extension ReturnsApi on ApiService {
     throw Exception(result['message'] ?? 'Failed to update return delivery');
   }
 
-  // --- SCRAP TRANSFERS ---
+  Future<Map<String, dynamic>> returnAction(int returnId, String action) async {
+    final params = <String, dynamic>{
+      'employee_id': _activeEmployeeId,
+      'action': action,
+    };
+    final result = await _post(
+      '${AppConstants.returnsEndpoint}/$returnId/action',
+      params,
+    );
+    if (result['success'] == true) {
+      return Map<String, dynamic>.from(result['data']);
+    }
+    throw Exception(result['message'] ?? 'Failed to execute return action');
+  }
 }
+

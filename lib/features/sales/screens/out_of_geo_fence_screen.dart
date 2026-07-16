@@ -75,7 +75,7 @@ class _OutOfGeoFenceScreenState extends State<OutOfGeoFenceScreen> {
     return Scaffold(
       backgroundColor: const Color(0xFFF8F9FA),
       appBar: AppBar(
-        title: const Text('FieldForce Manager'),
+        title: const Text('Secondary Sales'),
         centerTitle: true,
         actions: [
           IconButton(

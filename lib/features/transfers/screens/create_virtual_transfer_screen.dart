@@ -611,7 +611,7 @@ class _TransferLotAllocationRow extends StatelessWidget {
                         (lot) => DropdownMenuItem<int>(
                           value: lot.lotId,
                           child: Text(
-                            '${lot.lotName} (${lot.availableQty.toStringAsFixed(0)})',
+                            lot.lotName,
                             overflow: TextOverflow.ellipsis,
                           ),
                         ),

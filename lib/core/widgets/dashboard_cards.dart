@@ -196,7 +196,7 @@ class SalesOrderCard extends StatelessWidget {
                       ),
                     ),
                     Text(
-                      '৳${order.amount.toStringAsFixed(2)}',
+                      '${order.currencySymbol}${order.amount.toStringAsFixed(2)}',
                       style: const TextStyle(
                         color: AppColors.primaryStrong,
                         fontWeight: FontWeight.bold,

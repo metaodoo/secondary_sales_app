@@ -51,7 +51,7 @@ class AppConstants {
     var url = value.trim();
     if (url.isEmpty) return url;
     if (!url.startsWith('http://') && !url.startsWith('https://')) {
-      url = 'http://$url';
+      url = 'https://$url';
     }
     while (url.endsWith('/')) {
       url = url.substring(0, url.length - 1);
@@ -92,6 +92,7 @@ class AppConstants {
   static const String accessPermissionsEndpoint = '$apiPrefix/access/permissions';
   static const String accessCatalogSyncEndpoint =
       '$apiPrefix/access/catalog/sync';
+  static const String dashboardSummaryEndpoint = '$apiPrefix/dashboard/summary';
   // Storage Keys
   static const String accessTokenKey = 'mobile_access_token';
   static const String refreshTokenKey = 'mobile_refresh_token';
