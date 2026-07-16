@@ -59,7 +59,10 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
 
     try {
       final bytes = base64Decode(fileContent);
-      await Printing.sharePdf(bytes: bytes, filename: filename);
+      await Printing.layoutPdf(
+        onLayout: (format) async => bytes,
+        name: filename,
+      );
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(

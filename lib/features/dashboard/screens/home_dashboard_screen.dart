@@ -116,7 +116,9 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
                 const SizedBox(height: 20),
               ],
 
-              if (summary?.target != null) ...[
+              // Only show the target card when a real target is configured;
+              // an unset target (target_qty == 0) would render a bare "0 / 0".
+              if ((summary?.target?.targetQty ?? 0) > 0) ...[
                 _TargetCard(target: summary!.target!, isTeam: isManager),
                 const SizedBox(height: 20),
               ],
