@@ -117,9 +117,35 @@ class _CreateScrapScreenState extends State<CreateScrapScreen> {
         _isPreparing = true;
       });
       final data = await provider.prepareScrap(distributorId: distributorId);
-      if (mounted) {
+      if (mounted && data != null) {
         setState(() {
           _prepareData = data;
+        });
+
+        final resolvedDistributorId = data['distributor']?['id'] as int?;
+        if (resolvedDistributorId != null) {
+          final products = await provider.getScrapProducts(
+            distributorId: resolvedDistributorId,
+          );
+          if (mounted && products != null) {
+            setState(() {
+              _lines.clear();
+              for (final p in products) {
+                final product = TransferProduct.fromMap(p);
+                if (product.availableQty > 0) {
+                  _lines.add(
+                    VirtualTransferLineEntry(
+                      product: product,
+                      quantity: 0.0,
+                    ),
+                  );
+                }
+              }
+            });
+          }
+        }
+
+        setState(() {
           _isPreparing = false;
         });
       }
@@ -1021,11 +1047,19 @@ class _ScrapLineCard extends StatelessWidget {
               child: Column(
                 children: [
                   _buildQtyRow(
+                    title: 'Available Qty',
+                    value: line.product.availableQty,
+                    isReadOnly: true,
+                    min: 0,
+                    max: line.product.availableQty,
+                    onChanged: null,
+                  ),
+                  _buildQtyRow(
                     title: 'SO Qty',
                     value: line.soQty ?? 0,
                     isReadOnly: isReadOnly || !canEditSoQty,
                     min: 0,
-                    max: 999999,
+                    max: line.product.availableQty,
                     onChanged: onSoQtyChanged,
                   ),
                   _buildQtyRow(
@@ -1033,14 +1067,14 @@ class _ScrapLineCard extends StatelessWidget {
                     value: line.qcQty ?? 0,
                     isReadOnly: isReadOnly || !canEditQcQty,
                     min: 0,
-                    max: 999999,
+                    max: line.product.availableQty,
                     onChanged: onQcQtyChanged,
                   ),
                   _buildQtyRow(
                     title: 'Scrap Qty',
                     value: line.quantity,
                     isReadOnly: isReadOnly || !canEditEffectiveQty,
-                    min: 1,
+                    min: 0,
                     max: line.product.availableQty,
                     onChanged: onQuantityChanged,
                   ),

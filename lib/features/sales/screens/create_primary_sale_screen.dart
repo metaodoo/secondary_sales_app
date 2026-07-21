@@ -9,6 +9,7 @@ import 'package:secondary_sales/features/auth/auth_provider.dart';
 import 'package:secondary_sales/features/sales/primary_sale_provider.dart';
 import 'package:secondary_sales/features/sales/screens/product_selection_screen.dart';
 import 'package:secondary_sales/core/widgets/order_form_widgets.dart';
+import 'package:secondary_sales/core/widgets/ss_ui.dart';
 
 class CreatePrimarySaleScreen extends StatefulWidget {
   const CreatePrimarySaleScreen({
@@ -190,20 +191,6 @@ class _CreatePrimarySaleScreenState extends State<CreatePrimarySaleScreen> {
   @override
   Widget build(BuildContext context) {
     final provider = context.watch<PrimarySaleProvider>();
-    final auth = context.watch<AuthProvider>();
-    final user = auth.user;
-    final userName = user?.employeeName ?? user?.name ?? 'Sales User';
-
-    // Generate initials for profile icon
-    String initials = 'U';
-    if (userName.isNotEmpty) {
-      final parts = userName.trim().split(' ');
-      if (parts.length > 1) {
-        initials = '${parts[0][0]}${parts[1][0]}'.toUpperCase();
-      } else if (parts[0].isNotEmpty) {
-        initials = parts[0][0].toUpperCase();
-      }
-    }
 
     final isLoadingDetails = widget.editOrderId != null && !_isInitLoaded;
 
@@ -231,25 +218,9 @@ class _CreatePrimarySaleScreenState extends State<CreatePrimarySaleScreen> {
         ),
         centerTitle: true,
         actions: [
-          Container(
-            margin: const EdgeInsets.only(right: 16),
-            width: 38,
-            height: 38,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: AppColors.primaryTint,
-              border: Border.all(color: AppColors.primaryTint, width: 1.5),
-            ),
-            child: Center(
-              child: Text(
-                initials,
-                style: const TextStyle(
-                  color: AppColors.primary,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 14,
-                ),
-              ),
-            ),
+          const Padding(
+            padding: EdgeInsets.only(right: 16),
+            child: ProfileAvatar(),
           ),
         ],
         bottom: PreferredSize(

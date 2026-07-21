@@ -1,6 +1,4 @@
-import 'dart:convert';
 import 'dart:math';
-import 'package:http/http.dart' as http;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:secondary_sales/core/theme/app_theme.dart';
@@ -48,6 +46,12 @@ class _SubordinateBarikoiCheckpointsScreenState
   List<ProcessedCheckpoint> _processedCheckpoints = [];
   bool _styleLoaded = false;
   int? _selectedShiftIndex;
+  String _drawStatus = 'draw not called yet';
+
+  static const String _lineSourceId = 'route-line-src';
+  static const String _lineLayerId = 'route-line-layer';
+  static const String _pointSourceId = 'route-points-src';
+  static const String _pointLayerId = 'route-points-layer';
 
   @override
   void initState() {
@@ -66,9 +70,10 @@ class _SubordinateBarikoiCheckpointsScreenState
         ).then((_) {
           if (mounted) {
             _processLocationPoints();
-            if (_styleLoaded) {
-              _drawRoute();
-            }
+            // Always redraw — _drawRoute() self-guards on _styleLoaded, and it
+            // is what clears the previous date's layers. Gating the call here
+            // would leave a stale route on screen for dates with no data.
+            _drawRoute();
           }
         });
     setState(() {
@@ -142,72 +147,74 @@ class _SubordinateBarikoiCheckpointsScreenState
     });
   }
 
-  Future<void> _drawRoute() async {
+  void _setStatus(String s) {
+    if (!mounted) {
+      _drawStatus = s;
+      return;
+    }
+    setState(() => _drawStatus = s);
+  }
+
+  /// Serializes route draws. Concurrent calls (the style-loaded callback racing
+  /// the 2s creation fallback, or a shift tap landing while a fetch resolves)
+  /// interleave their awaits: one removes the sources the other just added, and
+  /// the add then fails with "source already exists" — leaving the map blank.
+  Future<void> _drawInFlight = Future<void>.value();
+
+  Future<void> _drawRoute() {
+    _drawInFlight =
+        _drawInFlight.then((_) => _drawRouteImpl()).catchError((_) {});
+    return _drawInFlight;
+  }
+
+  Future<void> _drawRouteImpl() async {
+    // Queued draws can run after the screen is gone; context is unusable then.
+    if (!mounted) return;
     final controller = _mapController;
-    if (controller == null) return;
-
-    // Clear previous shapes
-    await controller.clearLines();
-    await controller.clearCircles();
-
-    if (_processedCheckpoints.isEmpty) return;
-
-    // 1. Draw dynamic colored path segments
-    final shifts = context.read<MyTeamProvider>().checkpointsShifts;
-    for (int sIdx = 0; sIdx < shifts.length; sIdx++) {
-      if (_selectedShiftIndex != null && _selectedShiftIndex != sIdx) {
-        continue;
-      }
-      final shift = shifts[sIdx];
-      final shiftPts = shift.checkpoints;
-      if (shiftPts.length < 2) continue;
-
-      for (int i = 0; i < shiftPts.length - 1; i++) {
-        final ptOriginal = shiftPts[i];
-        final nextPtOriginal = shiftPts[i + 1];
-
-        final pt = _processedCheckpoints.firstWhere(
-          (element) => element.original.id == ptOriginal.id,
-          orElse: () => ProcessedCheckpoint(original: ptOriginal),
-        );
-
-        String lineColor = "#3b82f6"; // Blue for active movement
-        double lineWidth = 4.5;
-
-        if (pt.original.isMock) {
-          lineColor = "#ef4444"; // Red for mock warning
-          lineWidth = 5.0;
-        } else if (pt.isStop) {
-          if (pt.duration >= 15) {
-            lineColor = "#d97706"; // Amber for major stop
-            lineWidth = 6.0;
-          } else {
-            lineColor = "#f59e0b"; // Yellow for short stop
-            lineWidth = 5.0;
-          }
-        }
-
-        await controller.addLine(
-          LineOptions(
-            geometry: [
-              LatLng(pt.original.latitude, pt.original.longitude),
-              LatLng(nextPtOriginal.latitude, nextPtOriginal.longitude),
-            ],
-            lineColor: lineColor,
-            lineWidth: lineWidth,
-            lineOpacity: 0.8,
-          ),
-        );
-      }
+    if (controller == null) {
+      _setStatus('no map controller');
+      return;
+    }
+    if (!_styleLoaded) {
+      _setStatus('style not loaded yet');
+      return;
     }
 
-    // 2. Draw styled location pins/circles
+    // Read shift data synchronously, before any await, so BuildContext is not
+    // used across an async gap.
+    final shifts = context.read<MyTeamProvider>().checkpointsShifts;
+
+    // Remove any previously drawn route layers/sources. Wrapped because the ids
+    // may not exist yet (first draw) or after a style reload.
+    for (final id in const [_pointLayerId, _lineLayerId]) {
+      try {
+        await controller.removeLayer(id);
+      } catch (_) {}
+    }
+    for (final id in const [_pointSourceId, _lineSourceId]) {
+      try {
+        await controller.removeSource(id);
+      } catch (_) {}
+    }
+
+    if (_processedCheckpoints.isEmpty) {
+      _setStatus('0 processed checkpoints');
+      return;
+    }
+
+    // Render the whole route as two GeoJSON layers (one line, one circle)
+    // instead of thousands of per-point annotations. A single source + a
+    // data-driven layer is what MapLibre is built for and renders reliably at
+    // these counts (~2900 points), where per-annotation calls did not show up.
+    final lineFeatures = <Map<String, dynamic>>[];
+    final pointFeatures = <Map<String, dynamic>>[];
+
     for (int sIdx = 0; sIdx < shifts.length; sIdx++) {
       if (_selectedShiftIndex != null && _selectedShiftIndex != sIdx) {
         continue;
       }
-      final shift = shifts[sIdx];
-      final shiftPts = shift.checkpoints;
+      final shiftPts = shifts[sIdx].checkpoints;
+
       for (int i = 0; i < shiftPts.length; i++) {
         final ptOriginal = shiftPts[i];
         final isStart = i == 0;
@@ -218,44 +225,116 @@ class _SubordinateBarikoiCheckpointsScreenState
           orElse: () => ProcessedCheckpoint(original: ptOriginal),
         );
 
+        // Point styling
         String circleColor = "#3b82f6"; // Default Blue
         double radius = 6.0;
         double strokeWidth = 1.5;
-
         if (pt.original.isMock) {
-          circleColor = "#ef4444"; // Red for mock
+          circleColor = "#ef4444";
           radius = 8.0;
           strokeWidth = 2.0;
         } else if (isStart) {
-          circleColor = "#16a34a"; // Green for start
+          circleColor = "#16a34a";
           radius = 10.0;
           strokeWidth = 2.5;
         } else if (isEnd) {
-          circleColor = "#1f2937"; // Dark Gray for end
+          circleColor = "#1f2937";
           radius = 10.0;
           strokeWidth = 2.5;
         } else if (pt.isStop) {
           if (pt.duration >= 15) {
-            circleColor = "#d97706"; // Major Stop (Amber)
+            circleColor = "#d97706";
             radius = 10.0;
             strokeWidth = 2.0;
           } else {
-            circleColor = "#f59e0b"; // Short Stop (Yellow)
+            circleColor = "#f59e0b";
             radius = 8.0;
             strokeWidth = 1.5;
           }
         }
 
-        await controller.addCircle(
-          CircleOptions(
-            geometry: LatLng(pt.original.latitude, pt.original.longitude),
-            circleColor: circleColor,
-            circleRadius: radius,
-            circleStrokeColor: "#ffffff",
-            circleStrokeWidth: strokeWidth,
-          ),
-        );
+        pointFeatures.add({
+          "type": "Feature",
+          "geometry": {
+            "type": "Point",
+            "coordinates": [ptOriginal.longitude, ptOriginal.latitude],
+          },
+          "properties": {
+            "color": circleColor,
+            "radius": radius,
+            "stroke": strokeWidth,
+            "cid": ptOriginal.id,
+          },
+        });
+
+        // Line segment to the next point
+        if (i < shiftPts.length - 1) {
+          final nextPtOriginal = shiftPts[i + 1];
+          String lineColor = "#3b82f6";
+          double lineWidth = 4.5;
+          if (pt.original.isMock) {
+            lineColor = "#ef4444";
+            lineWidth = 5.0;
+          } else if (pt.isStop) {
+            if (pt.duration >= 15) {
+              lineColor = "#d97706";
+              lineWidth = 6.0;
+            } else {
+              lineColor = "#f59e0b";
+              lineWidth = 5.0;
+            }
+          }
+          lineFeatures.add({
+            "type": "Feature",
+            "geometry": {
+              "type": "LineString",
+              "coordinates": [
+                [ptOriginal.longitude, ptOriginal.latitude],
+                [nextPtOriginal.longitude, nextPtOriginal.latitude],
+              ],
+            },
+            "properties": {"color": lineColor, "width": lineWidth},
+          });
+        }
       }
+    }
+
+    _setStatus('built L=${lineFeatures.length} P=${pointFeatures.length}, adding…');
+    try {
+      await controller.addGeoJsonSource(_lineSourceId, {
+        "type": "FeatureCollection",
+        "features": lineFeatures,
+      });
+      await controller.addLineLayer(
+        _lineSourceId,
+        _lineLayerId,
+        LineLayerProperties(
+          lineColor: ["get", "color"],
+          lineWidth: ["get", "width"],
+          lineOpacity: 0.85,
+          lineJoin: "round",
+          lineCap: "round",
+        ),
+      );
+      await controller.addGeoJsonSource(
+        _pointSourceId,
+        {"type": "FeatureCollection", "features": pointFeatures},
+        promoteId: "cid",
+      );
+      await controller.addCircleLayer(
+        _pointSourceId,
+        _pointLayerId,
+        CircleLayerProperties(
+          circleColor: ["get", "color"],
+          circleRadius: ["get", "radius"],
+          circleStrokeColor: "#ffffff",
+          circleStrokeWidth: ["get", "stroke"],
+        ),
+      );
+      _setStatus('added OK · L=${lineFeatures.length} '
+          'P=${pointFeatures.length} shifts=${shifts.length}');
+    } catch (e) {
+      _setStatus('ADD ERROR: $e');
     }
 
     // 3. Auto-fit camera boundaries
@@ -298,38 +377,16 @@ class _SubordinateBarikoiCheckpointsScreenState
       _resolvingCheckpointId = pt.id;
     });
 
-    try {
-      final response = await http.get(
-        Uri.parse(
-          'https://nominatim.openstreetmap.org/reverse?format=json&lat=${pt.latitude}&lon=${pt.longitude}&zoom=18',
-        ),
-        headers: {
-          'User-Agent': 'Secondary-Sales-Mobile-App/1.0 (info@metamorphosis.com.bd)',
-          'Accept-Language': 'en',
-        },
-      ).timeout(const Duration(seconds: 5));
+    final address = await context.read<MyTeamProvider>().reverseGeocode(
+          latitude: pt.latitude,
+          longitude: pt.longitude,
+        );
 
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        final displayName = data['display_name'] as String?;
-        if (mounted && _resolvingCheckpointId == pt.id) {
-          setState(() {
-            _resolvedAddress = displayName ?? 'Address not found';
-          });
-        }
-      } else {
-        if (mounted && _resolvingCheckpointId == pt.id) {
-          setState(() {
-            _resolvedAddress = 'Failed to fetch address';
-          });
-        }
-      }
-    } catch (e) {
-      if (mounted && _resolvingCheckpointId == pt.id) {
-        setState(() {
-          _resolvedAddress = 'Address unavailable';
-        });
-      }
+    // Ignore a response for a checkpoint the user has already tapped away from.
+    if (mounted && _resolvingCheckpointId == pt.id) {
+      setState(() {
+        _resolvedAddress = address ?? 'Address unavailable';
+      });
     }
   }
 
@@ -355,7 +412,6 @@ class _SubordinateBarikoiCheckpointsScreenState
     if (picked != null && picked != _selectedDate) {
       setState(() {
         _selectedDate = picked;
-        _styleLoaded = false;
       });
       _fetchCheckpoints();
     }
@@ -374,13 +430,18 @@ class _SubordinateBarikoiCheckpointsScreenState
     _fetchAddressForCheckpoint(point.original);
   }
 
-  void _onCircleTapped(Circle circle) {
-    final tappedLatLng = circle.options.geometry;
-    if (tappedLatLng == null) return;
+  void _onFeatureTapped(
+    Point<double> point,
+    LatLng coordinates,
+    String id,
+    String layerId,
+    Annotation? annotation,
+  ) {
+    if (layerId != _pointLayerId || _processedCheckpoints.isEmpty) return;
 
+    final cid = int.tryParse(id);
     final match = _processedCheckpoints.firstWhere(
-      (pt) => (pt.original.latitude - tappedLatLng.latitude).abs() < 0.0001 &&
-              (pt.original.longitude - tappedLatLng.longitude).abs() < 0.0001,
+      (pt) => pt.original.id == cid,
       orElse: () => _processedCheckpoints.first,
     );
 
@@ -480,11 +541,9 @@ class _SubordinateBarikoiCheckpointsScreenState
                     onTap: () {
                       setState(() {
                         _selectedShiftIndex = isAll ? null : index - 1;
-                        _processLocationPoints();
-                        if (_styleLoaded) {
-                          _drawRoute();
-                        }
                       });
+                      _processLocationPoints();
+                      _drawRoute();
                     },
                     child: Container(
                       margin: const EdgeInsets.only(right: 8.0),
@@ -541,13 +600,45 @@ class _SubordinateBarikoiCheckpointsScreenState
                     styleString: mapUrl,
                     onMapCreated: (MapLibreMapController mapController) {
                       _mapController = mapController;
-                      _mapController?.onCircleTapped.add(_onCircleTapped);
+                      _mapController?.onFeatureTapped.add(_onFeatureTapped);
+                      // Fallback: on some devices/styles onStyleLoadedCallback
+                      // does not fire, leaving _styleLoaded false and the route
+                      // undrawn. Force a draw shortly after creation.
+                      Future.delayed(const Duration(seconds: 2), () {
+                        if (mounted && !_styleLoaded) {
+                          _styleLoaded = true;
+                          _drawRoute();
+                        }
+                      });
                     },
                     onStyleLoadedCallback: () {
                       _styleLoaded = true;
                       _drawRoute();
                     },
                   ),
+
+                // Diagnostic overlay — shows the map-draw state on the device
+                // itself (no console needed when side-loading an APK).
+                Positioned(
+                  top: 8,
+                  left: 8,
+                  right: 8,
+                  child: Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: Colors.black.withValues(alpha: 0.78),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      'MAP: $_drawStatus',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ),
 
                 // Map Legend Overlays
                 Positioned(

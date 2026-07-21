@@ -129,9 +129,38 @@ class _CreateReturnScreenState extends State<CreateReturnScreen> {
         _isPreparing = true;
       });
       final data = await provider.prepareReturn(distributorId: distributorId);
-      if (mounted) {
+      if (mounted && data != null) {
         setState(() {
           _prepareData = data;
+        });
+
+        final resolvedDistributorId = data['distributor']?['id'] as int?;
+        if (resolvedDistributorId != null) {
+          final products = await provider.fetchReturnProducts(
+            distributorId: resolvedDistributorId,
+          );
+          if (mounted && products != null) {
+            final auth = context.read<AuthProvider>();
+            setState(() {
+              _lines.clear();
+              for (final p in products) {
+                final product = TransferProduct.fromMap(p);
+                if (product.availableQty > 0) {
+                  _lines.add(
+                    VirtualTransferLineEntry(
+                      product: product,
+                      quantity: product.availableQty,
+                      soQty: auth.canEditSoQty ? product.availableQty : null,
+                      qcQty: auth.canEditQcQty ? product.availableQty : null,
+                    ),
+                  );
+                }
+              }
+            });
+          }
+        }
+
+        setState(() {
           _isPreparing = false;
         });
       }
@@ -255,8 +284,13 @@ class _CreateReturnScreenState extends State<CreateReturnScreen> {
       return;
     }
 
+    final auth = context.read<AuthProvider>();
     for (final line in _lines) {
-      if (line.product.requiresLots && line.quantity > 0) {
+      final targetQty = auth.canEditSoQty
+          ? (line.soQty ?? 0.0)
+          : (auth.canEditQcQty ? (line.qcQty ?? 0.0) : line.quantity);
+
+      if (line.product.requiresLots && targetQty > 0) {
         if (line.lotLines.isEmpty) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
@@ -268,8 +302,11 @@ class _CreateReturnScreenState extends State<CreateReturnScreen> {
           );
           return;
         }
-        final allocated = _allocatedQty(line);
-        if ((allocated - line.quantity).abs() > 0.0001) {
+        final allocated = auth.canEditSoQty
+            ? _allocatedSoQty(line)
+            : (auth.canEditQcQty ? _allocatedQcQty(line) : _allocatedQty(line));
+
+        if ((allocated - targetQty).abs() > 0.0001) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text(
@@ -831,7 +868,11 @@ class _CreateReturnScreenState extends State<CreateReturnScreen> {
                                     line.product.availableQty,
                                 1,
                               ),
-                              allocatedQty: _allocatedQty(line),
+                              allocatedQty: canEditSoQty
+                                  ? _allocatedSoQty(line)
+                                  : (canEditQcQty
+                                      ? _allocatedQcQty(line)
+                                      : _allocatedQty(line)),
                               isReadOnly: _isReadOnly,
                               canEditSoQty: canEditSoQty,
                               canEditQcQty: canEditQcQty,
@@ -1192,11 +1233,19 @@ class _ReturnLineCard extends StatelessWidget {
               child: Column(
                 children: [
                   _buildQtyRow(
+                    title: 'Available Qty',
+                    value: line.product.availableQty,
+                    isReadOnly: true,
+                    min: 0,
+                    max: line.product.availableQty,
+                    onChanged: null,
+                  ),
+                  _buildQtyRow(
                     title: 'SO Qty',
                     value: line.soQty ?? 0,
                     isReadOnly: isReadOnly || !canEditSoQty,
                     min: 0,
-                    max: 999999,
+                    max: line.product.availableQty,
                     onChanged: onSoQtyChanged,
                   ),
                   _buildQtyRow(
@@ -1204,14 +1253,14 @@ class _ReturnLineCard extends StatelessWidget {
                     value: line.qcQty ?? 0,
                     isReadOnly: isReadOnly || !canEditQcQty,
                     min: 0,
-                    max: 999999,
+                    max: line.product.availableQty,
                     onChanged: onQcQtyChanged,
                   ),
                   _buildQtyRow(
                     title: 'Return Qty',
                     value: line.quantity,
                     isReadOnly: isReadOnly || !canEditEffectiveQty,
-                    min: 1,
+                    min: 0,
                     max: line.product.availableQty,
                     onChanged: onQuantityChanged,
                   ),
@@ -1329,9 +1378,23 @@ class _ReturnLotRow extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
-                'Lot Reference',
-                style: TextStyle(color: Colors.black54, fontSize: 12),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text(
+                    'Lot Reference',
+                    style: TextStyle(color: Colors.black54, fontSize: 12),
+                  ),
+                  if (lotInput.lot != null)
+                    Text(
+                      'Avail: ${lotInput.lot!.availableQty.toStringAsFixed(0)}',
+                      style: const TextStyle(
+                        color: Colors.black54,
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                ],
               ),
               if ((lotInput.soQty != null && lotInput.soQty! > 0) ||
                   (lotInput.qcQty != null && lotInput.qcQty! > 0)) ...[
@@ -1382,7 +1445,7 @@ class _ReturnLotRow extends StatelessWidget {
                       (lot) => DropdownMenuItem(
                         value: lot.lotId,
                         child: Text(
-                          lot.lotName,
+                          "${lot.lotName} (Avail: ${lot.availableQty.toStringAsFixed(0)})",
                           style: const TextStyle(fontSize: 14),
                         ),
                       ),

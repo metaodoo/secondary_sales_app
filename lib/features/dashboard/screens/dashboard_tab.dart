@@ -23,6 +23,7 @@ class DashboardTab extends StatelessWidget {
     this.showSecondarySalesModule = true,
     required this.moduleType,
     required this.onBackToModules,
+    this.onOpenMenu,
   });
 
   final ValueChanged<int> onModuleSelected;
@@ -31,6 +32,10 @@ class DashboardTab extends StatelessWidget {
   final bool showSecondarySalesModule;
   final String moduleType;
   final VoidCallback onBackToModules;
+
+  /// Opens the global navigation drawer. When provided, the app-bar leading
+  /// becomes a hamburger; otherwise it falls back to the back-to-modules arrow.
+  final VoidCallback? onOpenMenu;
 
   @override
   Widget build(BuildContext context) {
@@ -45,15 +50,25 @@ class DashboardTab extends StatelessWidget {
         backgroundColor: AppColors.surface,
         elevation: 0,
         scrolledUnderElevation: 0,
-        leading: IconButton(
-          tooltip: 'Back to modules',
-          icon: const Icon(
-            Icons.arrow_back,
-            color: AppColors.textPrimary,
-            size: 28,
-          ),
-          onPressed: onBackToModules,
-        ),
+        leading: onOpenMenu != null
+            ? IconButton(
+                tooltip: 'Menu',
+                icon: const Icon(
+                  Icons.menu,
+                  color: AppColors.textPrimary,
+                  size: 28,
+                ),
+                onPressed: onOpenMenu,
+              )
+            : IconButton(
+                tooltip: 'Back to modules',
+                icon: const Icon(
+                  Icons.arrow_back,
+                  color: AppColors.textPrimary,
+                  size: 28,
+                ),
+                onPressed: onBackToModules,
+              ),
         title: const Text(
           'Dashboard',
           style: TextStyle(

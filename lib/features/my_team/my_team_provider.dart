@@ -95,6 +95,11 @@ class MyTeamProvider with ChangeNotifier {
   bool _isLoading = false;
   String? _error;
 
+  /// Guards against out-of-order checkpoint responses. Switching dates quickly
+  /// leaves two requests in flight; without this the slower (older) one lands
+  /// last and paints the wrong day's route.
+  int _checkpointsRequestId = 0;
+
   List<MyTeamMember> get teamMembers => _teamMembers;
   List<AttendanceShift> get checkpointsShifts => _checkpointsShifts;
   String? get selectedEmployeeName => _selectedEmployeeName;
@@ -130,10 +135,34 @@ class MyTeamProvider with ChangeNotifier {
     }
   }
 
+  /// Resolves an address via Barikoi (server-side). Returns null on any
+  /// failure so callers can fall back to their own placeholder text.
+  Future<String?> reverseGeocode({
+    required double latitude,
+    required double longitude,
+  }) async {
+    try {
+      final res = await _apiService.reverseGeocode(
+        latitude: latitude,
+        longitude: longitude,
+      );
+      if (res['success'] == true) {
+        final data = res['data'] as Map<String, dynamic>? ?? {};
+        final address = data['address'] as String?;
+        if (address != null && address.isNotEmpty) return address;
+      }
+    } catch (_) {
+      // Address resolution is best-effort; never surface as a screen error.
+    }
+    return null;
+  }
+
   Future<void> fetchEmployeeCheckpoints({
     required int employeeId,
     required String date,
   }) async {
+    final requestId = ++_checkpointsRequestId;
+
     _isLoading = true;
     _error = null;
     _checkpointsShifts = [];
@@ -144,6 +173,7 @@ class MyTeamProvider with ChangeNotifier {
         employeeId: employeeId,
         date: date,
       );
+      if (requestId != _checkpointsRequestId) return; // superseded
       if (res['success'] == true) {
         final data = res['data'] as Map<String, dynamic>? ?? {};
         _selectedEmployeeName = data['employee']?['name'] as String?;
@@ -154,10 +184,13 @@ class MyTeamProvider with ChangeNotifier {
         _error = res['message'] ?? 'Failed to retrieve employee checkpoints.';
       }
     } catch (e) {
+      if (requestId != _checkpointsRequestId) return; // superseded
       _error = e.toString();
     } finally {
-      _isLoading = false;
-      notifyListeners();
+      if (requestId == _checkpointsRequestId) {
+        _isLoading = false;
+        notifyListeners();
+      }
     }
   }
 }

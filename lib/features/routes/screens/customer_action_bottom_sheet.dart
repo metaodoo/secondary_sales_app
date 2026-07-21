@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:secondary_sales/core/theme/app_theme.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import 'package:secondary_sales/features/routes/route_provider.dart';
 import 'package:secondary_sales/features/routes/screens/outlet_visit_history_screen.dart';
@@ -13,10 +14,14 @@ import 'package:secondary_sales/features/sales/screens/secondary_orders_list_scr
 class CustomerActionBottomSheet extends StatefulWidget {
   final String customerName;
   final int outletId;
+  final String? phone;
+  final String? mobile;
   const CustomerActionBottomSheet({
     super.key,
     required this.customerName,
     required this.outletId,
+    this.phone,
+    this.mobile,
   });
 
   @override
@@ -58,6 +63,41 @@ class _CustomerActionBottomSheetState extends State<CustomerActionBottomSheet> {
         _timer?.cancel();
       }
     });
+  }
+
+  Future<void> _makeCall() async {
+    final phoneNumber = (widget.mobile != null && widget.mobile!.trim().isNotEmpty)
+        ? widget.mobile!.trim()
+        : (widget.phone != null && widget.phone!.trim().isNotEmpty)
+            ? widget.phone!.trim()
+            : '';
+    final Uri launchUri = Uri(
+      scheme: 'tel',
+      path: phoneNumber,
+    );
+    try {
+      if (await canLaunchUrl(launchUri)) {
+        await launchUrl(launchUri);
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                phoneNumber.isNotEmpty
+                    ? 'Could not launch dialer for $phoneNumber'
+                    : 'No phone number available for ${widget.customerName}',
+              ),
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error launching dialer: $e')),
+        );
+      }
+    }
   }
 
   String _formatDuration(Duration duration) {
@@ -141,7 +181,13 @@ class _CustomerActionBottomSheetState extends State<CustomerActionBottomSheet> {
                 ),
               ),
               const SizedBox(width: 12),
-              Expanded(child: _buildActionBtn(Icons.phone_outlined, 'Call')),
+              Expanded(
+                child: _buildActionBtn(
+                  Icons.phone_outlined,
+                  'Call',
+                  onTap: _makeCall,
+                ),
+              ),
               const SizedBox(width: 12),
               Expanded(
                 child: _buildActionBtn(

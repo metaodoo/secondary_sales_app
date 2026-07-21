@@ -198,11 +198,14 @@ class _ScrapsListScreenState extends State<ScrapsListScreen> {
           child: Container(color: AppColors.borderMuted, height: 1),
         ),
       ),
+      floatingActionButton: auth.canDo(AppAction.scrapCreateFor(widget.moduleType))
+          ? SsCreateFab(label: 'New Scrap', onPressed: _openCreateScrap)
+          : null,
       body: SafeArea(
         child: RefreshIndicator(
           onRefresh: _fetchScraps,
           child: ListView(
-            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+            padding: const EdgeInsets.fromLTRB(24, 24, 24, kSsFabScrollPadding),
             children: [
               // Search Field
               TextField(
@@ -316,32 +319,6 @@ class _ScrapsListScreenState extends State<ScrapsListScreen> {
                 ],
               ),
               const SizedBox(height: 24),
-
-              // Create Scrap Button
-              if (auth.canDo(AppAction.scrapCreateFor(widget.moduleType))) ...[
-                ElevatedButton.icon(
-                  onPressed: _openCreateScrap,
-                  icon: const Icon(Icons.add, color: Colors.white, size: 22),
-                  label: const Text(
-                    'New Scrap',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 16,
-                    ),
-                  ),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.primary,
-                    elevation: 0,
-                    shadowColor: Colors.transparent,
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 32),
-              ],
 
               if (provider.isLoading && _scraps.isEmpty)
                 const Padding(

@@ -108,13 +108,17 @@ class _SalesOfficerListScreenState extends State<SalesOfficerListScreen> {
           child: Container(color: AppColors.borderMuted, height: 1),
         ),
       ),
+      floatingActionButton:
+          context.watch<AuthProvider>().canDo(AppAction.employeeCreate)
+              ? SsCreateFab(label: 'New Sales Officer', onPressed: _openCreateSO)
+              : null,
       body: SafeArea(
         child: RefreshIndicator(
           onRefresh: () => context.read<EmployeeProvider>().fetchEmployees(
             search: _searchController.text,
           ),
           child: ListView(
-            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+            padding: const EdgeInsets.fromLTRB(24, 24, 24, kSsFabScrollPadding),
             children: [
               TextField(
                 controller: _searchController,
@@ -150,29 +154,6 @@ class _SalesOfficerListScreenState extends State<SalesOfficerListScreen> {
                 onChanged: _onSearchChanged,
               ),
               const SizedBox(height: 24),
-              if (context.watch<AuthProvider>().canDo(AppAction.employeeCreate))
-                ElevatedButton.icon(
-                  onPressed: _openCreateSO,
-                  icon: const Icon(Icons.add, color: Colors.white, size: 22),
-                  label: const Text(
-                    'New Sales Officer',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 16,
-                    ),
-                  ),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.primary,
-                    elevation: 0,
-                    shadowColor: Colors.transparent,
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                ),
-              const SizedBox(height: 32),
               if (provider.error != null) ErrorPanel(provider.error!),
               if (provider.isLoading && provider.employees.isNotEmpty)
                 const Padding(

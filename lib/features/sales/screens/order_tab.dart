@@ -12,11 +12,13 @@ class OrderTab extends StatelessWidget {
     required this.searchController,
     required this.onSearchChanged,
     this.onBack,
+    this.onOpenMenu,
   });
 
   final TextEditingController searchController;
   final ValueChanged<String> onSearchChanged;
   final VoidCallback? onBack;
+  final VoidCallback? onOpenMenu;
 
   @override
   Widget build(BuildContext context) {
@@ -29,7 +31,12 @@ class OrderTab extends StatelessWidget {
           BlueHeader(
             title: 'New Order',
             subtitle: 'Create sales order',
-            leading: onBack != null
+            leading: onOpenMenu != null
+                ? IconButton(
+                    onPressed: onOpenMenu,
+                    icon: const Icon(Icons.menu, color: Colors.white),
+                  )
+                : onBack != null
                 ? IconButton(
                     onPressed: onBack,
                     icon: const Icon(Icons.arrow_back, color: Colors.white),

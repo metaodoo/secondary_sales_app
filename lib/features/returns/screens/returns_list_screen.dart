@@ -198,11 +198,14 @@ class _ReturnsListScreenState extends State<ReturnsListScreen> {
           child: Container(color: AppColors.borderMuted, height: 1),
         ),
       ),
+      floatingActionButton: auth.canDo(AppAction.returnCreateFor(widget.moduleType))
+          ? SsCreateFab(label: 'New Return', onPressed: _openCreateReturn)
+          : null,
       body: SafeArea(
         child: RefreshIndicator(
           onRefresh: _fetchReturns,
           child: ListView(
-            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+            padding: const EdgeInsets.fromLTRB(24, 24, 24, kSsFabScrollPadding),
             children: [
               // Search Field
               TextField(
@@ -316,32 +319,6 @@ class _ReturnsListScreenState extends State<ReturnsListScreen> {
                 ],
               ),
               const SizedBox(height: 24),
-
-              // Create Return Button
-              if (auth.canDo(AppAction.returnCreateFor(widget.moduleType))) ...[
-                ElevatedButton.icon(
-                  onPressed: _openCreateReturn,
-                  icon: const Icon(Icons.add, color: Colors.white, size: 22),
-                  label: const Text(
-                    'New Return',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 16,
-                    ),
-                  ),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.primary,
-                    elevation: 0,
-                    shadowColor: Colors.transparent,
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 32),
-              ],
 
               if (provider.isLoading && _returns.isEmpty)
                 const Padding(

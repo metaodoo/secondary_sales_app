@@ -6,13 +6,14 @@ import 'package:secondary_sales/features/auth/auth_provider.dart';
 import 'package:secondary_sales/core/access/access_resources.dart';
 import 'package:secondary_sales/features/employees/screens/sales_officer_list_screen.dart';
 import 'package:secondary_sales/features/hr/screens/attendance_screen.dart';
-import 'package:secondary_sales/features/hr/screens/leave_request_screen.dart';
+import 'package:secondary_sales/features/hr/screens/leave_dashboard_screen.dart';
 import 'package:secondary_sales/features/hr/screens/location_buffer_screen.dart';
 
 class SettingsTab extends StatelessWidget {
-  const SettingsTab({super.key, this.onBack});
+  const SettingsTab({super.key, this.onBack, this.onOpenMenu});
 
   final VoidCallback? onBack;
+  final VoidCallback? onOpenMenu;
 
   @override
   Widget build(BuildContext context) {
@@ -39,7 +40,12 @@ class SettingsTab extends StatelessWidget {
         backgroundColor: Colors.white,
         elevation: 0,
         scrolledUnderElevation: 0,
-        leading: onBack != null
+        leading: onOpenMenu != null
+            ? IconButton(
+                icon: const Icon(Icons.menu, color: AppColors.textPrimary),
+                onPressed: onOpenMenu,
+              )
+            : onBack != null
             ? IconButton(
                 icon: const Icon(
                   Icons.arrow_back,
@@ -180,7 +186,7 @@ class SettingsTab extends StatelessWidget {
                         Navigator.push(
                           context,
                           MaterialPageRoute(
-                            builder: (_) => const LeaveRequestScreen(),
+                            builder: (_) => const LeaveDashboardScreen(),
                           ),
                         );
                       },

@@ -163,6 +163,55 @@ class EmptyPanel extends StatelessWidget {
   }
 }
 
+/// The single "create a new record" action used across every list screen.
+///
+/// Matches the expense dashboard's `FloatingActionButton.extended`, which is
+/// the reference for this control. Screens previously hand-rolled inline
+/// `ElevatedButton.icon`s that drifted in radius, weight, and in one case used
+/// a hard-coded green instead of the brand colour.
+///
+/// Pass to `Scaffold.floatingActionButton`. Screens with a scrolling list need
+/// [kSsFabScrollPadding] at the bottom of that list so the final row is not
+/// covered by the floating button.
+class SsCreateFab extends StatelessWidget {
+  const SsCreateFab({
+    super.key,
+    required this.label,
+    required this.onPressed,
+    this.icon = Icons.add,
+    this.heroTag,
+  });
+
+  final String label;
+
+  /// Null disables the action (e.g. while a list is still loading).
+  final VoidCallback? onPressed;
+  final IconData icon;
+
+  /// Required when a screen shows more than one FAB — Flutter throws on
+  /// duplicate default hero tags within a single route.
+  final Object? heroTag;
+
+  @override
+  Widget build(BuildContext context) {
+    return FloatingActionButton.extended(
+      onPressed: onPressed,
+      heroTag: heroTag,
+      backgroundColor:
+          onPressed == null ? AppColors.primary.withValues(alpha: 0.45) : AppColors.primary,
+      icon: Icon(icon, color: Colors.white),
+      label: Text(
+        label,
+        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+      ),
+    );
+  }
+}
+
+/// Bottom padding for a scrolling list on a screen that shows an [SsCreateFab],
+/// so the last row clears the floating button.
+const double kSsFabScrollPadding = 88;
+
 class ErrorPanel extends StatelessWidget {
   const ErrorPanel(this.message, {super.key});
 

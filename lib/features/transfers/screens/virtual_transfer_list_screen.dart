@@ -108,6 +108,13 @@ class _VirtualTransferListScreenState extends State<VirtualTransferListScreen> {
 
     return Scaffold(
       backgroundColor: AppColors.background,
+      floatingActionButton: PermissionGate(
+        resourceKey: AppAction.transferCreate,
+        child: SsCreateFab(
+          label: 'New Virtual Transfer',
+          onPressed: provider.isLoading ? null : _openCreateTransfer,
+        ),
+      ),
       body: SafeArea(
         child: Column(
           children: [
@@ -130,7 +137,7 @@ class _VirtualTransferListScreenState extends State<VirtualTransferListScreen> {
               child: RefreshIndicator(
                 onRefresh: _fetchTransfers,
                 child: ListView(
-                  padding: const EdgeInsets.all(16),
+                  padding: const EdgeInsets.fromLTRB(16, 16, 16, kSsFabScrollPadding),
                   children: [
                     TextField(
                       controller: _searchController,
@@ -197,26 +204,6 @@ class _VirtualTransferListScreenState extends State<VirtualTransferListScreen> {
                       ),
                     ],
                   ],
-                ),
-              ),
-            ),
-            Container(
-              padding: const EdgeInsets.all(16),
-              color: Colors.white,
-              child: SizedBox(
-                width: double.infinity,
-                height: 50,
-                child: ElevatedButton.icon(
-                  onPressed: provider.isLoading ? null : _openCreateTransfer,
-                  icon: const Icon(Icons.add),
-                  label: const Text('New Virtual Transfer'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF10B981),
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                  ),
                 ),
               ),
             ),

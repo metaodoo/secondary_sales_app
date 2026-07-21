@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import 'package:secondary_sales/app/navigation/app_shell_config.dart';
+import 'package:secondary_sales/app/navigation/app_drawer.dart';
 import 'package:secondary_sales/features/auth/auth_provider.dart';
 import 'package:secondary_sales/features/sales/primary_sale_provider.dart';
 import 'package:secondary_sales/features/dashboard/screens/dashboard_tab.dart';
@@ -25,11 +26,11 @@ class AppShell extends StatefulWidget {
 }
 
 class _AppShellState extends State<AppShell> {
+  final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   final TextEditingController _orderSearchController = TextEditingController();
   final TextEditingController _distributorSearchController =
       TextEditingController();
   int _currentIndex = AppShellIndex.dashboard;
-  final List<int> _history = [AppShellIndex.dashboard];
   // Tabs are built lazily: a tab (and its initState network calls) is only
   // created the first time it is opened, then kept alive afterwards.
   final Set<int> _activatedTabs = {AppShellIndex.dashboard};
@@ -62,22 +63,19 @@ class _AppShellState extends State<AppShell> {
     super.dispose();
   }
 
-  void _setIndex(int index, {bool isBack = false}) {
+  void _setIndex(int index) {
     if (index == AppShellIndex.dealers &&
         !context.read<AuthProvider>().canAccessDealers) {
       index = AppShellIndex.dashboard;
     }
     if (_currentIndex == index) {
-      if (index == AppShellIndex.dealers && !isBack) {
+      if (index == AppShellIndex.dealers) {
         _refreshDealers();
       }
       return;
     }
 
     setState(() {
-      if (!isBack) {
-        _history.add(index);
-      }
       _currentIndex = index;
       _activatedTabs.add(index);
     });
@@ -90,12 +88,15 @@ class _AppShellState extends State<AppShell> {
     }
   }
 
+  /// Flat back model (Material "fixed start destination"): a lateral switch
+  /// never stacks, so back from any destination returns to the Dashboard in a
+  /// single press, and back from the Dashboard exits the module. Detail screens
+  /// pushed above the shell pop normally on their own.
   void _goBack() {
-    if (_history.length > 1) {
-      _history.removeLast();
-      _setIndex(_history.last, isBack: true);
+    if (_currentIndex != AppShellIndex.dashboard) {
+      _setIndex(AppShellIndex.dashboard);
     } else {
-      _setIndex(0, isBack: true);
+      _exitModule();
     }
   }
 
@@ -182,14 +183,20 @@ class _AppShellState extends State<AppShell> {
         showSecondarySalesModule: canAccessSecondary,
         moduleType: widget.moduleType,
         onBackToModules: _exitModule,
+        onOpenMenu: () => _scaffoldKey.currentState?.openDrawer(),
         onModuleSelected: (index) {
           _setIndex(index);
         },
       ),
-      () => DealersTab(onProfileTap: () => _setIndex(5), onBack: _goBack),
+      () => DealersTab(
+        onProfileTap: () => _setIndex(5),
+        onBack: _goBack,
+        onOpenMenu: () => _scaffoldKey.currentState?.openDrawer(),
+      ),
       () => OfficerRouteSelectionScreen(
         onProfileTap: () => _setIndex(5),
         onBack: _goBack,
+        onOpenMenu: () => _scaffoldKey.currentState?.openDrawer(),
       ),
       () => HomeTab(
         orderSearchController: _orderSearchController,
@@ -205,6 +212,7 @@ class _AppShellState extends State<AppShell> {
         onNewOrderTap: () => _setIndex(4),
         onProfileTap: () => _setIndex(5),
         onBack: _goBack,
+        onOpenMenu: () => _scaffoldKey.currentState?.openDrawer(),
         onClearDate: () {
           setState(() {
             _dateFromFilter = null;
@@ -231,23 +239,37 @@ class _AppShellState extends State<AppShell> {
         searchController: _distributorSearchController,
         onSearchChanged: _onDistributorSearchChanged,
         onBack: _goBack,
+        onOpenMenu: () => _scaffoldKey.currentState?.openDrawer(),
       ),
-      () => SettingsTab(onBack: _goBack),
+      () => SettingsTab(
+        onBack: _goBack,
+        onOpenMenu: () => _scaffoldKey.currentState?.openDrawer(),
+      ),
       () => VanOperationsListScreen(
         onProfileTap: () => _setIndex(5),
         onBack: _goBack,
+        onOpenMenu: () => _scaffoldKey.currentState?.openDrawer(),
       ),
     ];
 
     return PopScope(
-      canPop: _history.length <= 1,
+      // Only the Dashboard lets the system back exit the module; every other
+      // destination intercepts back and returns to the Dashboard in one step.
+      canPop: _currentIndex == AppShellIndex.dashboard,
       onPopInvokedWithResult: (didPop, result) {
         if (!didPop) {
-          _goBack();
+          _setIndex(AppShellIndex.dashboard);
         }
       },
       child: Scaffold(
+        key: _scaffoldKey,
         backgroundColor: AppColors.background,
+        drawer: AppDrawer(
+          moduleType: widget.moduleType,
+          currentShellIndex: currentIndex,
+          onSelectTab: _setIndex,
+          onExitModule: _exitModule,
+        ),
         body: IndexedStack(
           index: currentIndex,
           children: List<Widget>.generate(

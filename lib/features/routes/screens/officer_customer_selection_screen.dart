@@ -37,7 +37,12 @@ class _OfficerCustomerSelectionScreenState
     ).fetchRouteDetail(widget.routeId);
   }
 
-  void _openActionModalFor(int outletId, String outletName) {
+  void _openActionModalFor(
+    int outletId,
+    String outletName, {
+    String? phone,
+    String? mobile,
+  }) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -45,6 +50,8 @@ class _OfficerCustomerSelectionScreenState
       builder: (context) => CustomerActionBottomSheet(
         customerName: outletName,
         outletId: outletId,
+        phone: phone,
+        mobile: mobile,
       ),
     );
   }
@@ -187,7 +194,12 @@ class _OfficerCustomerSelectionScreenState
 
                           return GestureDetector(
                             onTap: () {
-                              _openActionModalFor(outlet.id, outlet.name);
+                              _openActionModalFor(
+                                outlet.id,
+                                outlet.name,
+                                phone: outlet.phone,
+                                mobile: outlet.mobile,
+                              );
                             },
                             child: Container(
                               margin: const EdgeInsets.only(bottom: 12),

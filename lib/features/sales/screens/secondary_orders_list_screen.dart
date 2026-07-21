@@ -189,13 +189,30 @@ class _SecondaryOrdersListScreenState extends State<SecondaryOrdersListScreen> {
           child: Container(color: AppColors.borderMuted, height: 1),
         ),
       ),
+      floatingActionButton:
+          context.watch<AuthProvider>().canView(AppScreen.orderCreate)
+              ? SsCreateFab(
+                  label: 'New Sales Order',
+                  onPressed: () {
+                    Navigator.of(context)
+                        .push(
+                          MaterialPageRoute(
+                            builder: (_) => const OfficerRouteSelectionScreen(),
+                          ),
+                        )
+                        .then((_) => _fetchOrders());
+                  },
+                )
+              : null,
       body: SafeArea(
         child: RefreshIndicator(
           onRefresh: _fetchOrders,
           child: ListView(
-            padding: const EdgeInsets.symmetric(
-              horizontal: AppSpacing.screen,
-              vertical: AppSpacing.screen,
+            padding: const EdgeInsets.fromLTRB(
+              AppSpacing.screen,
+              AppSpacing.screen,
+              AppSpacing.screen,
+              kSsFabScrollPadding,
             ),
             children: [
               // Search Field
@@ -380,39 +397,6 @@ class _SecondaryOrdersListScreenState extends State<SecondaryOrdersListScreen> {
                 ),
               ],
               const SizedBox(height: 24),
-
-              // Create Order Button
-              if (context.watch<AuthProvider>().canView(AppScreen.orderCreate))
-                ElevatedButton.icon(
-                  onPressed: () {
-                    Navigator.of(context)
-                        .push(
-                          MaterialPageRoute(
-                            builder: (_) => const OfficerRouteSelectionScreen(),
-                          ),
-                        )
-                        .then((_) => _fetchOrders());
-                  },
-                  icon: const Icon(Icons.add, color: Colors.white, size: 22),
-                  label: const Text(
-                    'New Sales Order',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 16,
-                    ),
-                  ),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.primary,
-                    elevation: 0,
-                    shadowColor: Colors.transparent,
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                ),
-              const SizedBox(height: 32),
 
               // List Header
               Row(

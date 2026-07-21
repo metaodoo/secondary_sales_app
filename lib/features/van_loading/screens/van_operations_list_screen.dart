@@ -10,10 +10,16 @@ import 'package:secondary_sales/core/widgets/ss_ui.dart';
 import 'package:secondary_sales/core/theme/app_theme.dart';
 
 class VanOperationsListScreen extends StatefulWidget {
-  const VanOperationsListScreen({super.key, this.onProfileTap, this.onBack});
+  const VanOperationsListScreen({
+    super.key,
+    this.onProfileTap,
+    this.onBack,
+    this.onOpenMenu,
+  });
 
   final VoidCallback? onProfileTap;
   final VoidCallback? onBack;
+  final VoidCallback? onOpenMenu;
 
   @override
   State<VanOperationsListScreen> createState() =>
@@ -145,11 +151,42 @@ class _VanOperationsListScreenState extends State<VanOperationsListScreen> {
 
     return Scaffold(
       backgroundColor: AppColors.background,
+      // Two actions, so they stack rather than sit side by side. Distinct hero
+      // tags are required: two FABs on one route with the default tag throw.
+      floatingActionButton: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: [
+          SsCreateFab(
+            heroTag: 'vanNewUnload',
+            label: 'New Unload',
+            onPressed:
+                provider.isLoading ? null : () => _openCreateTransfer('unload'),
+          ),
+          const SizedBox(height: 12),
+          SsCreateFab(
+            heroTag: 'vanNewLoad',
+            label: 'New Load',
+            onPressed:
+                provider.isLoading ? null : () => _openCreateTransfer('load'),
+          ),
+        ],
+      ),
       appBar: AppBar(
         backgroundColor: AppColors.surface,
         elevation: 0,
         scrolledUnderElevation: 0,
-        leading: widget.onBack != null
+        leading: widget.onOpenMenu != null
+            ? IconButton(
+                tooltip: 'Menu',
+                icon: const Icon(
+                  Icons.menu,
+                  color: AppColors.textPrimary,
+                  size: 28,
+                ),
+                onPressed: widget.onOpenMenu,
+              )
+            : widget.onBack != null
             ? IconButton(
                 tooltip: 'Back',
                 icon: const Icon(
@@ -191,7 +228,8 @@ class _VanOperationsListScreenState extends State<VanOperationsListScreen> {
               child: RefreshIndicator(
                 onRefresh: _fetchOperations,
                 child: ListView(
-                  padding: const EdgeInsets.all(16),
+                  // Extra room: this screen stacks two FABs.
+                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 152),
                   children: [
                     // Search Field
                     TextField(
@@ -359,28 +397,6 @@ class _VanOperationsListScreenState extends State<VanOperationsListScreen> {
                     ),
                     const SizedBox(height: 24),
 
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        const Text(
-                          'RECENT OPERATIONS',
-                          style: TextStyle(
-                            color: AppColors.textSecondary,
-                            fontWeight: FontWeight.bold,
-                            letterSpacing: 1.1,
-                          ),
-                        ),
-                        Text(
-                          'Show: Today',
-                          style: TextStyle(
-                            color: AppColors.textSecondary,
-                            fontSize: 14,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 16),
-
                     if (provider.error != null) ErrorPanel(provider.error!),
                     if (provider.isLoading && transfers.isEmpty)
                       const Padding(
@@ -401,58 +417,6 @@ class _VanOperationsListScreenState extends State<VanOperationsListScreen> {
                     ],
                   ],
                 ),
-              ),
-            ),
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: AppColors.surface,
-                border: Border(
-                  top: BorderSide(color: AppColors.borderSoft),
-                ),
-              ),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: ElevatedButton.icon(
-                      onPressed: provider.isLoading
-                          ? null
-                          : () => _openCreateTransfer('load'),
-                      icon: const Icon(Icons.add, color: Colors.white),
-                      label: const Text(
-                        'New Load',
-                        style: TextStyle(color: Colors.white),
-                      ),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.primary,
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: ElevatedButton.icon(
-                      onPressed: provider.isLoading
-                          ? null
-                          : () => _openCreateTransfer('unload'),
-                      icon: const Icon(Icons.add, color: Colors.white),
-                      label: const Text(
-                        'New Unload',
-                        style: TextStyle(color: Colors.white),
-                      ),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.primary,
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
               ),
             ),
           ],

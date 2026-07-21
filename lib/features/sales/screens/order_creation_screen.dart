@@ -240,10 +240,10 @@ class _OrderCreationScreenState extends State<OrderCreationScreen> {
         title: Text(widget.editOrderId != null ? 'Edit Secondary Sales' : 'Secondary Sales'),
         centerTitle: true,
         actions: [
-          IconButton(
-            icon: const Icon(Icons.account_circle_outlined, color: AppColors.primaryStrong),
-            onPressed: () {},
-          )
+          const Padding(
+            padding: EdgeInsets.only(right: 16),
+            child: ProfileAvatar(),
+          ),
         ],
       ),
       body: SafeArea(

@@ -128,6 +128,13 @@ class _LeaveDashboardContentState extends State<_LeaveDashboardContent> with Sin
     }
 
     return Scaffold(
+      floatingActionButton: PermissionGate(
+        resourceKey: AppAction.leaveCreate,
+        child: SsCreateFab(
+          label: 'Request Leave',
+          onPressed: () => _showLeaveRequestForm(context),
+        ),
+      ),
       appBar: AppBar(
         backgroundColor: Colors.white,
         elevation: 0,
@@ -260,26 +267,6 @@ class _LeaveDashboardContentState extends State<_LeaveDashboardContent> with Sin
             ),
           ),
           
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-            child: PermissionGate(
-              resourceKey: AppAction.leaveCreate,
-              child: SizedBox(
-                width: double.infinity,
-                height: 48,
-                child: ElevatedButton.icon(
-                  icon: const Icon(Icons.add),
-                  label: const Text('Request Leave'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.primary,
-                    foregroundColor: Colors.white,
-                  ),
-                  onPressed: () => _showLeaveRequestForm(context),
-                ),
-              ),
-            ),
-          ),
-          
           Expanded(
             child: RefreshIndicator(
               onRefresh: () async {
@@ -297,7 +284,8 @@ class _LeaveDashboardContentState extends State<_LeaveDashboardContent> with Sin
                         )
                       : ListView.separated(
                           physics: const AlwaysScrollableScrollPhysics(),
-                          padding: const EdgeInsets.all(16),
+                          padding: const EdgeInsets.fromLTRB(
+                              16, 16, 16, kSsFabScrollPadding),
                           itemCount: provider.leaveList.length,
                           separatorBuilder: (context, index) => const SizedBox(height: 12),
                           itemBuilder: (context, index) {

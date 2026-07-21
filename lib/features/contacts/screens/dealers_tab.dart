@@ -10,10 +10,16 @@ import 'package:secondary_sales/core/widgets/ss_ui.dart';
 import 'package:secondary_sales/core/theme/app_theme.dart';
 
 class DealersTab extends StatefulWidget {
-  const DealersTab({super.key, this.onProfileTap, this.onBack});
+  const DealersTab({
+    super.key,
+    this.onProfileTap,
+    this.onBack,
+    this.onOpenMenu,
+  });
 
   final VoidCallback? onProfileTap;
   final VoidCallback? onBack;
+  final VoidCallback? onOpenMenu;
 
   @override
   State<DealersTab> createState() => _DealersTabState();
@@ -62,7 +68,13 @@ class _DealersTabState extends State<DealersTab> {
             BlueHeader(
               title: 'Dealers',
               subtitle: 'Distributor management',
-              leading: widget.onBack != null
+              leading: widget.onOpenMenu != null
+                  ? IconButton(
+                      tooltip: 'Menu',
+                      onPressed: widget.onOpenMenu,
+                      icon: const Icon(Icons.menu, color: Colors.white),
+                    )
+                  : widget.onBack != null
                   ? IconButton(
                       tooltip: 'Back',
                       onPressed: widget.onBack,

@@ -11,10 +11,12 @@ class OfficerRouteSelectionScreen extends StatelessWidget {
     super.key,
     this.onProfileTap,
     this.onBack,
+    this.onOpenMenu,
   });
 
   final VoidCallback? onProfileTap;
   final VoidCallback? onBack;
+  final VoidCallback? onOpenMenu;
 
   @override
   Widget build(BuildContext context) {
@@ -29,20 +31,29 @@ class OfficerRouteSelectionScreen extends StatelessWidget {
         backgroundColor: Colors.white,
         elevation: 0,
         scrolledUnderElevation: 0,
-        leading: IconButton(
-          icon: const Icon(
-            Icons.arrow_back,
-            color: AppColors.textPrimary,
-            size: 28,
-          ),
-          onPressed:
-              onBack ??
-              () {
-                if (Navigator.canPop(context)) {
-                  Navigator.pop(context);
-                }
-              },
-        ),
+        leading: onOpenMenu != null
+            ? IconButton(
+                icon: const Icon(
+                  Icons.menu,
+                  color: AppColors.textPrimary,
+                  size: 28,
+                ),
+                onPressed: onOpenMenu,
+              )
+            : IconButton(
+                icon: const Icon(
+                  Icons.arrow_back,
+                  color: AppColors.textPrimary,
+                  size: 28,
+                ),
+                onPressed:
+                    onBack ??
+                    () {
+                      if (Navigator.canPop(context)) {
+                        Navigator.pop(context);
+                      }
+                    },
+              ),
         title: const Text(
           'Routes',
           style: TextStyle(

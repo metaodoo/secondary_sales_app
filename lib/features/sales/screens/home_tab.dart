@@ -24,6 +24,7 @@ class HomeTab extends StatelessWidget {
     required this.onNewOrderTap,
     required this.onProfileTap,
     required this.onBack,
+    this.onOpenMenu,
     required this.onClearDate,
     required this.onClearStatus,
     required this.onClearAllFilters,
@@ -39,6 +40,7 @@ class HomeTab extends StatelessWidget {
   final VoidCallback onNewOrderTap;
   final VoidCallback onProfileTap;
   final VoidCallback onBack;
+  final VoidCallback? onOpenMenu;
   final VoidCallback onClearDate;
   final VoidCallback onClearStatus;
   final VoidCallback onClearAllFilters;
@@ -71,19 +73,36 @@ class HomeTab extends StatelessWidget {
 
     return Scaffold(
       backgroundColor: AppColors.background,
+      floatingActionButton:
+          context.watch<AuthProvider>().canView(AppScreen.createPrimarySale)
+              ? SsCreateFab(
+                  label: 'New Sales Order',
+                  onPressed: onNewOrderTap,
+                )
+              : null,
       appBar: AppBar(
         backgroundColor: AppColors.surface,
         elevation: 0,
         scrolledUnderElevation: 0,
-        leading: IconButton(
-          tooltip: 'Back',
-          icon: const Icon(
-            Icons.arrow_back,
-            color: AppColors.textPrimary,
-            size: 28,
-          ),
-          onPressed: onBack,
-        ),
+        leading: onOpenMenu != null
+            ? IconButton(
+                tooltip: 'Menu',
+                icon: const Icon(
+                  Icons.menu,
+                  color: AppColors.textPrimary,
+                  size: 28,
+                ),
+                onPressed: onOpenMenu,
+              )
+            : IconButton(
+                tooltip: 'Back',
+                icon: const Icon(
+                  Icons.arrow_back,
+                  color: AppColors.textPrimary,
+                  size: 28,
+                ),
+                onPressed: onBack,
+              ),
         title: const Text(
           'Sales Orders',
           style: TextStyle(
@@ -114,9 +133,11 @@ class HomeTab extends StatelessWidget {
                 dateTo: dateToFilter,
               ),
           child: ListView(
-            padding: const EdgeInsets.symmetric(
-              horizontal: AppSpacing.screen,
-              vertical: AppSpacing.screen,
+            padding: const EdgeInsets.fromLTRB(
+              AppSpacing.screen,
+              AppSpacing.screen,
+              AppSpacing.screen,
+              kSsFabScrollPadding,
             ),
             children: [
               // Search Field
@@ -298,33 +319,6 @@ class HomeTab extends StatelessWidget {
                 ),
               ],
               const SizedBox(height: 24),
-
-              // Create Order Button
-              if (context.watch<AuthProvider>().canView(
-                AppScreen.createPrimarySale,
-              ))
-                ElevatedButton.icon(
-                  onPressed: onNewOrderTap,
-                  icon: const Icon(Icons.add, color: Colors.white, size: 22),
-                  label: const Text(
-                    'New Sales Order',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 16,
-                    ),
-                  ),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.primary,
-                    elevation: 0,
-                    shadowColor: Colors.transparent,
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                ),
-              const SizedBox(height: 32),
 
               // Today's Sales Orders Header
               Row(

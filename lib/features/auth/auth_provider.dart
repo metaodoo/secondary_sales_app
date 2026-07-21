@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -274,7 +275,21 @@ class AuthProvider with ChangeNotifier {
       return true;
     } catch (e) {
       _error = e.toString();
-      await logout(callServer: false);
+      final errStr = e.toString().toLowerCase();
+      final isNetworkError = e is SocketException ||
+          e is TimeoutException ||
+          errStr.contains('socketexception') ||
+          errStr.contains('timeoutexception') ||
+          errStr.contains('connection') ||
+          errStr.contains('timeout') ||
+          errStr.contains('unreachable') ||
+          errStr.contains('network') ||
+          errStr.contains('handshake') ||
+          errStr.contains('http 5'); // server errors (502, 503, 504) are temporary
+      
+      if (!isNetworkError) {
+        await logout(callServer: false);
+      }
       return false;
     }
   }

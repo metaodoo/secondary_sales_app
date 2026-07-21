@@ -17,4 +17,14 @@ extension MyTeamApi on ApiService {
       'date': date,
     });
   }
+
+  Future<Map<String, dynamic>> reverseGeocode({
+    required double latitude,
+    required double longitude,
+  }) async {
+    return _post('/api/v1/location/reverse_geocode', {
+      'latitude': latitude,
+      'longitude': longitude,
+    });
+  }
 }

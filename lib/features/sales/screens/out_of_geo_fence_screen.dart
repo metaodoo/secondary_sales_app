@@ -4,6 +4,7 @@ import 'package:secondary_sales/core/theme/app_theme.dart';
 import 'package:secondary_sales/data/api/api_service.dart';
 import 'package:secondary_sales/features/auth/auth_provider.dart';
 import 'package:secondary_sales/features/sales/screens/order_creation_screen.dart';
+import 'package:secondary_sales/core/widgets/ss_ui.dart';
 
 class OutOfGeoFenceScreen extends StatefulWidget {
   final int outletId;
@@ -78,10 +79,10 @@ class _OutOfGeoFenceScreenState extends State<OutOfGeoFenceScreen> {
         title: const Text('Secondary Sales'),
         centerTitle: true,
         actions: [
-          IconButton(
-            icon: const Icon(Icons.account_circle_outlined, color: AppColors.primaryStrong),
-            onPressed: () {},
-          )
+          const Padding(
+            padding: EdgeInsets.only(right: 16),
+            child: ProfileAvatar(),
+          ),
         ],
       ),
       body: SafeArea(
