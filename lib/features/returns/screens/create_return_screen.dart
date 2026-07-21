@@ -32,7 +32,7 @@ class _CreateReturnScreenState extends State<CreateReturnScreen> {
 
   final TextEditingController _challanNumberController =
       TextEditingController();
-  String? _selectedDamageType;
+  String? _selectedDamageType = 'saleable';
 
   @override
   void dispose() {
@@ -61,7 +61,7 @@ class _CreateReturnScreenState extends State<CreateReturnScreen> {
           _isReadOnly =
               details['state'] == 'done' || details['state'] == 'cancel';
           _challanNumberController.text = details['challan_number'] ?? '';
-          _selectedDamageType = details['damage_type'];
+          _selectedDamageType = details['damage_type'] ?? 'saleable';
           _prepareData = {
             'distributor': details['distributor'],
             'source_location': details['source_location'],
@@ -743,25 +743,14 @@ class _CreateReturnScreenState extends State<CreateReturnScreen> {
                           value: _selectedDamageType,
                           items: const [
                             DropdownMenuItem(
-                              value: 'non_salable',
-                              child: Text('Non Salable'),
-                            ),
-                            DropdownMenuItem(
-                              value: 'quality',
-                              child: Text('Quality'),
-                            ),
-                            DropdownMenuItem(
                               value: 'saleable',
                               child: Text('Saleable'),
                             ),
                           ],
-                          onChanged: _isReadOnly
-                              ? null
-                              : (val) =>
-                                    setState(() => _selectedDamageType = val),
+                          onChanged: null,
                           decoration: InputDecoration(
                             filled: true,
-                            fillColor: Colors.white,
+                            fillColor: AppColors.primarySoft,
                             contentPadding: const EdgeInsets.symmetric(
                               horizontal: 16,
                               vertical: 12,
@@ -778,8 +767,13 @@ class _CreateReturnScreenState extends State<CreateReturnScreen> {
                                 color: Color(0xFFDDE6F2),
                               ),
                             ),
+                            disabledBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(8),
+                              borderSide: const BorderSide(
+                                color: Color(0xFFDDE6F2),
+                              ),
+                            ),
                           ),
-                          hint: const Text('Select Damage Type'),
                         ),
                         const SizedBox(height: 24),
 

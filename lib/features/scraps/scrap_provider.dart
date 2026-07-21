@@ -105,6 +105,7 @@ class ScrapProvider with ChangeNotifier {
     required List<Map<String, dynamic>> lines,
     int? distributorId,
     String? type,
+    String? damageType,
   }) async {
     _loadingCount++;
     _error = null;
@@ -115,6 +116,7 @@ class ScrapProvider with ChangeNotifier {
         lines: lines,
         distributorId: distributorId,
         type: type,
+        damageType: damageType,
       );
     } catch (e) {
       _error = e.toString();
@@ -148,13 +150,19 @@ class ScrapProvider with ChangeNotifier {
     int scrapId, {
     required List<Map<String, dynamic>> lines,
     String? type,
+    String? damageType,
   }) async {
     _loadingCount++;
     _error = null;
     notifyListeners();
 
     try {
-      return await _apiService.updateScrap(scrapId, lines: lines, type: type);
+      return await _apiService.updateScrap(
+        scrapId,
+        lines: lines,
+        type: type,
+        damageType: damageType,
+      );
     } catch (e) {
       _error = e.toString();
       return null;

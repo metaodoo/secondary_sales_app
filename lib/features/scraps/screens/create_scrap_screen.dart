@@ -29,6 +29,7 @@ class _CreateScrapScreenState extends State<CreateScrapScreen> {
   Map<String, dynamic>? _prepareData;
   bool _isPreparing = true;
   bool _isReadOnly = false;
+  String? _selectedDamageType;
 
   @override
   void initState() {
@@ -50,6 +51,7 @@ class _CreateScrapScreenState extends State<CreateScrapScreen> {
         setState(() {
           _isReadOnly =
               details['state'] == 'done' || details['state'] == 'cancel';
+          _selectedDamageType = details['damage_type'];
           _prepareData = {
             'distributor': details['distributor'],
             'source_location': details['source_location'],
@@ -290,12 +292,14 @@ class _CreateScrapScreenState extends State<CreateScrapScreen> {
         widget.scrapId!,
         lines: linesData,
         type: widget.moduleType,
+        damageType: _selectedDamageType,
       );
     } else {
       result = await context.read<ScrapProvider>().createScrapDelivery(
         lines: linesData,
         distributorId: distributorId,
         type: widget.moduleType,
+        damageType: _selectedDamageType,
       );
     }
 
@@ -347,6 +351,7 @@ class _CreateScrapScreenState extends State<CreateScrapScreen> {
           widget.scrapId!,
           lines: linesData,
           type: widget.moduleType,
+          damageType: _selectedDamageType,
         );
         if (saveRes == null) {
           final err =
@@ -598,6 +603,57 @@ class _CreateScrapScreenState extends State<CreateScrapScreen> {
                               ),
                             ],
                           ),
+                        ),
+                        const SizedBox(height: 16),
+                        // Damage Type
+                        const Text(
+                          'Damage Type',
+                          style: TextStyle(
+                            color: Colors.black54,
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        DropdownButtonFormField<String>(
+                          value: _selectedDamageType,
+                          items: const [
+                            DropdownMenuItem(
+                              value: 'non_salable',
+                              child: Text('Non Salable'),
+                            ),
+                            DropdownMenuItem(
+                              value: 'quality',
+                              child: Text('Quality'),
+                            ),
+                          ],
+                          onChanged: _isReadOnly
+                              ? null
+                              : (val) =>
+                                    setState(() => _selectedDamageType = val),
+                          decoration: InputDecoration(
+                            filled: true,
+                            fillColor: _isReadOnly
+                                ? AppColors.primarySoft
+                                : Colors.white,
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 12,
+                            ),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(8),
+                              borderSide: const BorderSide(
+                                color: Color(0xFFDDE6F2),
+                              ),
+                            ),
+                            enabledBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(8),
+                              borderSide: const BorderSide(
+                                color: Color(0xFFDDE6F2),
+                              ),
+                            ),
+                          ),
+                          hint: const Text('Select Damage Type'),
                         ),
                         const SizedBox(height: 24),
 

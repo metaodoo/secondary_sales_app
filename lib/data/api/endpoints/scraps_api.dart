@@ -91,6 +91,7 @@ extension ScrapsApi on ApiService {
     required List<Map<String, dynamic>> lines,
     int? distributorId,
     String? type,
+    String? damageType,
   }) async {
     final params = <String, dynamic>{
       'employee_id': _activeEmployeeId,
@@ -101,6 +102,9 @@ extension ScrapsApi on ApiService {
     }
     if (type != null && type.isNotEmpty) {
       params['type'] = type;
+    }
+    if (damageType != null && damageType.isNotEmpty) {
+      params['damage_type'] = damageType;
     }
 
     final result = await _post('${AppConstants.scrapsEndpoint}/create', params);
@@ -127,12 +131,16 @@ extension ScrapsApi on ApiService {
     int scrapId, {
     required List<Map<String, dynamic>> lines,
     String? type,
+    String? damageType,
   }) async {
     final params = <String, dynamic>{
       'employee_id': _activeEmployeeId,
       'lines': lines,
     };
     if (type != null && type.isNotEmpty) params['type'] = type;
+    if (damageType != null && damageType.isNotEmpty) {
+      params['damage_type'] = damageType;
+    }
 
     final result = await _post(
       '${AppConstants.scrapsEndpoint}/$scrapId/update',
