@@ -10,9 +10,22 @@ extension DashboardApi on ApiService {
   /// Throws when the endpoint is unavailable (e.g. the backend has not shipped
   /// `/dashboard/summary` yet, or the device is offline). Callers treat that as
   /// a graceful "summary unavailable" state rather than an error to surface.
-  Future<DashboardSummary> getDashboardSummary() async {
+  Future<DashboardSummary> getDashboardSummary({
+    String preset = 'today',
+    DateTime? dateFrom,
+    DateTime? dateTo,
+    int? scopeEmployeeId,
+  }) async {
     final result = await _post(AppConstants.dashboardSummaryEndpoint, {
       'employee_id': _activeEmployeeId,
+      'preset': preset,
+      if (dateFrom != null)
+        'date_from':
+            '${dateFrom.year.toString().padLeft(4, '0')}-${dateFrom.month.toString().padLeft(2, '0')}-${dateFrom.day.toString().padLeft(2, '0')}',
+      if (dateTo != null)
+        'date_to':
+            '${dateTo.year.toString().padLeft(4, '0')}-${dateTo.month.toString().padLeft(2, '0')}-${dateTo.day.toString().padLeft(2, '0')}',
+      'scope_employee_id': ?scopeEmployeeId,
     });
     if (result['success'] == true) {
       return DashboardSummary.fromMap(asMap(result['data']));

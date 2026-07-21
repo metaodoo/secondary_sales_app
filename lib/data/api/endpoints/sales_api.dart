@@ -10,6 +10,7 @@ extension SalesApi on ApiService {
     DateTime? dateTo,
     String saleType = 'primary',
     int? outletId,
+    int? visitId,
   }) async {
     final params = <String, dynamic>{
       'employee_id': _activeEmployeeId,
@@ -18,6 +19,9 @@ extension SalesApi on ApiService {
     };
     if (outletId != null) {
       params['outlet_id'] = outletId;
+    }
+    if (visitId != null) {
+      params['visit_id'] = visitId;
     }
     final query = search?.trim();
     if (query != null && query.isNotEmpty) {

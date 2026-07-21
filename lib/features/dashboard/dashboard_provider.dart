@@ -14,6 +14,7 @@ class DashboardProvider with ChangeNotifier {
   DashboardSummary? _summary;
   bool _isLoading = false;
   bool _summaryUnavailable = false;
+  String? _summaryError;
 
   DashboardSummary? get summary => _summary;
   bool get isLoading => _isLoading;
@@ -21,6 +22,7 @@ class DashboardProvider with ChangeNotifier {
   /// True when the last fetch could not produce a summary (endpoint missing or
   /// unreachable). Used to hide KPI sections rather than show an error.
   bool get summaryUnavailable => _summaryUnavailable;
+  String? get summaryError => _summaryError;
 
   void updateAuth({String? accessToken, String? sessionId, int? employeeId}) {
     _apiService.updateAccessToken(accessToken);
@@ -28,17 +30,29 @@ class DashboardProvider with ChangeNotifier {
     _apiService.updateEmployeeId(employeeId);
   }
 
-  Future<void> fetch() async {
+  Future<void> fetch({
+    String preset = 'today',
+    DateTime? dateFrom,
+    DateTime? dateTo,
+    int? scopeEmployeeId,
+  }) async {
     _isLoading = true;
     notifyListeners();
 
     try {
-      _summary = await _apiService.getDashboardSummary();
+      _summary = await _apiService.getDashboardSummary(
+        preset: preset,
+        dateFrom: dateFrom,
+        dateTo: dateTo,
+        scopeEmployeeId: scopeEmployeeId,
+      );
       _summaryUnavailable = false;
+      _summaryError = null;
     } catch (e) {
       // Non-fatal: the dashboard still works from attendance + modules alone.
       _summary = null;
       _summaryUnavailable = true;
+      _summaryError = e.toString();
       if (kDebugMode) {
         debugPrint('Dashboard summary unavailable: $e');
       }
@@ -52,6 +66,7 @@ class DashboardProvider with ChangeNotifier {
     _summary = null;
     _isLoading = false;
     _summaryUnavailable = false;
+    _summaryError = null;
     if (notify) notifyListeners();
   }
 }

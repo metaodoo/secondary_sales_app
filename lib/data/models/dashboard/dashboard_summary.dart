@@ -2,52 +2,276 @@ import 'package:secondary_sales/core/util/parse.dart';
 
 /// Role-aware landing-dashboard snapshot returned by `/dashboard/summary`.
 ///
-/// Every section is nullable so the UI can render progressively: until the
-/// backend endpoint ships (or when it is unreachable), the provider holds a
-/// null summary and the dashboard falls back to attendance + module navigation
-/// only — no section is required for the screen to function.
+/// The payload is in transition from the original compact dashboard contract to
+/// a richer date-range summary. This model parses both shapes so the app can
+/// move incrementally without hard-failing on either backend version.
 class DashboardSummary {
   const DashboardSummary({
     this.role = '',
+    this.hasTeam = false,
     this.isCheckedIn = false,
+    this.isScoped = false,
     this.checkInTime,
+    this.scopeEmployeeId,
+    this.scopeEmployeeName,
+    this.preset,
+    this.dateFrom,
+    this.dateTo,
+    this.attendance,
+    this.achievement,
+    this.orders,
+    this.visits,
+    this.currency,
     this.target,
     this.route,
     this.team,
     this.approvals,
   });
 
-  /// Server-declared role: 'so' | 'manager' | '' (unknown). The UI also infers
-  /// manager from the presence of a [team] block as a fallback.
   final String role;
+  final bool hasTeam;
   final bool isCheckedIn;
+  final bool isScoped;
   final String? checkInTime;
+  final int? scopeEmployeeId;
+  final String? scopeEmployeeName;
+  final String? preset;
+  final DateTime? dateFrom;
+  final DateTime? dateTo;
 
-  /// Σ delivered ÷ Σ target across the rep's (or team's) SKUs for the month.
+  final DashboardAttendanceSummary? attendance;
+  final DashboardAchievementSummary? achievement;
+  final DashboardOrdersSummary? orders;
+  final DashboardVisitsSummary? visits;
+
+  /// Reporting currency (company currency) for the money figures.
+  final DashboardCurrency? currency;
+
+  /// Legacy aliases kept while the UI migrates.
   final TargetProgress? target;
-
-  /// Today's route coverage (Sales Officer view).
   final RouteProgress? route;
-
-  /// Team roll-up + per-subordinate progress (Manager view).
   final TeamSummary? team;
-
-  /// Pending approval counts (Manager view).
   final ApprovalsSummary? approvals;
 
-  bool get isManager => role == 'manager' || team != null;
+  bool get isManager => role == 'manager' || hasTeam || team != null;
+  TargetProgress? get headlineTarget => achievement?.my ?? target;
+  List<TeamMemberProgress> get reportMembers {
+    final reports = achievement?.reports ?? const <TeamMemberProgress>[];
+    return reports.isNotEmpty
+        ? reports
+        : (team?.members ?? const <TeamMemberProgress>[]);
+  }
 
   factory DashboardSummary.fromMap(Map<String, dynamic> map) {
+    final attendance = DashboardAttendanceSummary.fromMapOrNull(
+      asMapOrNull(map['attendance']),
+    );
+    final achievement = DashboardAchievementSummary.fromMapOrNull(
+      asMapOrNull(map['achievement']),
+    );
+    final legacyTarget = TargetProgress.fromMapOrNull(
+      asMapOrNull(map['target']),
+    );
+    final derivedTeam = TeamSummary.fromBlocks(attendance, achievement);
+
     return DashboardSummary(
       role: (map['role'] ?? '').toString().trim().toLowerCase(),
+      hasTeam:
+          asBool(map['has_team']) ||
+          asMapOrNull(map['team']) != null ||
+          (achievement?.reports.isNotEmpty ?? false),
       isCheckedIn: asBool(map['is_checked_in']),
+      isScoped: asBool(map['is_scoped']),
       checkInTime: asNullableString(map['check_in_time']),
-      target: TargetProgress.fromMapOrNull(asMapOrNull(map['target'])),
+      scopeEmployeeId: asIntOrNull(map['scope_employee_id']),
+      scopeEmployeeName: asNullableString(map['scope_employee_name']),
+      preset: asNullableString(map['preset']),
+      dateFrom: asDateTime(map['date_from']),
+      dateTo: asDateTime(map['date_to']),
+      attendance: attendance,
+      achievement: achievement,
+      orders: DashboardOrdersSummary.fromMapOrNull(asMapOrNull(map['orders'])),
+      visits: DashboardVisitsSummary.fromMapOrNull(asMapOrNull(map['visits'])),
+      currency: DashboardCurrency.fromMapOrNull(asMapOrNull(map['currency'])),
+      target: legacyTarget ?? achievement?.my,
       route: RouteProgress.fromMapOrNull(
         asMapOrNull(map['today_route'] ?? map['route']),
       ),
-      team: TeamSummary.fromMapOrNull(asMapOrNull(map['team'])),
+      team: TeamSummary.fromMapOrNull(asMapOrNull(map['team'])) ?? derivedTeam,
       approvals: ApprovalsSummary.fromMapOrNull(asMapOrNull(map['approvals'])),
+    );
+  }
+}
+
+class DashboardAttendanceSummary {
+  const DashboardAttendanceSummary({required this.my, this.team});
+
+  final AttendanceWindow my;
+  final AttendanceWindow? team;
+
+  static DashboardAttendanceSummary? fromMapOrNull(Map<String, dynamic>? map) {
+    if (map == null) return null;
+    final my = AttendanceWindow.fromMapOrNull(asMapOrNull(map['my']));
+    if (my == null) return null;
+    return DashboardAttendanceSummary(
+      my: my,
+      team: AttendanceWindow.fromMapOrNull(asMapOrNull(map['team'])),
+    );
+  }
+}
+
+class AttendanceWindow {
+  const AttendanceWindow({required this.present, required this.absent});
+
+  final int present;
+  final int absent;
+
+  int get total => present + absent;
+
+  static AttendanceWindow? fromMapOrNull(Map<String, dynamic>? map) {
+    if (map == null) return null;
+    return AttendanceWindow(
+      present: asInt(map['present']),
+      absent: asInt(map['absent']),
+    );
+  }
+}
+
+class DashboardAchievementSummary {
+  const DashboardAchievementSummary({this.my, required this.reports});
+
+  final TargetProgress? my;
+  final List<TeamMemberProgress> reports;
+
+  static DashboardAchievementSummary? fromMapOrNull(Map<String, dynamic>? map) {
+    if (map == null) return null;
+    final rawReports = map['reports'];
+    final reports = rawReports is List
+        ? rawReports
+              .map((e) => TeamMemberProgress.fromMap(asMap(e)))
+              .toList(growable: false)
+        : const <TeamMemberProgress>[];
+    return DashboardAchievementSummary(
+      my: TargetProgress.fromMapOrNull(asMapOrNull(map['my'])),
+      reports: reports,
+    );
+  }
+}
+
+class DashboardOrdersSummary {
+  const DashboardOrdersSummary({
+    required this.primary,
+    required this.secondary,
+  });
+
+  final DashboardOrderScope primary;
+  final DashboardOrderScope secondary;
+
+  static DashboardOrdersSummary? fromMapOrNull(Map<String, dynamic>? map) {
+    if (map == null) return null;
+    return DashboardOrdersSummary(
+      primary: DashboardOrderScope.fromMap(asMap(map['primary'])),
+      secondary: DashboardOrderScope.fromMap(asMap(map['secondary'])),
+    );
+  }
+}
+
+class DashboardOrderScope {
+  const DashboardOrderScope({this.my, this.team});
+
+  final DashboardOrderMetric? my;
+  final DashboardOrderMetric? team;
+
+  bool get hasData => my != null || team != null;
+
+  static DashboardOrderScope fromMap(Map<String, dynamic> map) {
+    return DashboardOrderScope(
+      my: DashboardOrderMetric.fromMapOrNull(asMapOrNull(map['my'])),
+      team: DashboardOrderMetric.fromMapOrNull(asMapOrNull(map['team'])),
+    );
+  }
+}
+
+class DashboardOrderMetric {
+  const DashboardOrderMetric({required this.count, required this.value});
+
+  final int count;
+  final double value;
+
+  static DashboardOrderMetric? fromMapOrNull(Map<String, dynamic>? map) {
+    if (map == null) return null;
+    return DashboardOrderMetric(
+      count: asInt(map['count']),
+      value: asDouble(map['value']),
+    );
+  }
+}
+
+class DashboardVisitsSummary {
+  const DashboardVisitsSummary({this.my, this.team});
+
+  final DashboardVisitMetric? my;
+  final DashboardVisitMetric? team;
+
+  static DashboardVisitsSummary? fromMapOrNull(Map<String, dynamic>? map) {
+    if (map == null) return null;
+    return DashboardVisitsSummary(
+      my: DashboardVisitMetric.fromMapOrNull(asMapOrNull(map['my'])),
+      team: DashboardVisitMetric.fromMapOrNull(asMapOrNull(map['team'])),
+    );
+  }
+}
+
+class DashboardVisitMetric {
+  const DashboardVisitMetric({
+    required this.total,
+    required this.withOrder,
+    required this.noOrder,
+  });
+
+  final int total;
+  final int withOrder;
+  final int noOrder;
+
+  double get productiveFraction => total <= 0 ? 0 : withOrder / total;
+  int get productivePercent => (productiveFraction * 100).round();
+
+  static DashboardVisitMetric? fromMapOrNull(Map<String, dynamic>? map) {
+    if (map == null) return null;
+    return DashboardVisitMetric(
+      total: asInt(map['total']),
+      withOrder: asInt(map['with_order']),
+      noOrder: asInt(map['no_order']),
+    );
+  }
+}
+
+/// Reporting currency from Odoo (`res.currency`): symbol, ISO code, and whether
+/// the symbol sits before or after the amount.
+class DashboardCurrency {
+  const DashboardCurrency({
+    required this.symbol,
+    required this.code,
+    required this.position,
+  });
+
+  final String symbol;
+  final String code;
+
+  /// 'before' | 'after' — where the symbol sits relative to the amount.
+  final String position;
+
+  bool get symbolBefore => position != 'after';
+
+  static DashboardCurrency? fromMapOrNull(Map<String, dynamic>? map) {
+    if (map == null) return null;
+    final symbol = asNullableString(map['symbol']) ?? '';
+    final code = asNullableString(map['code']) ?? '';
+    if (symbol.isEmpty && code.isEmpty) return null;
+    return DashboardCurrency(
+      symbol: symbol.isNotEmpty ? symbol : code,
+      code: code,
+      position: asNullableString(map['position']) ?? 'after',
     );
   }
 }
@@ -129,6 +353,20 @@ class TeamSummary {
       members: members,
     );
   }
+
+  static TeamSummary? fromBlocks(
+    DashboardAttendanceSummary? attendance,
+    DashboardAchievementSummary? achievement,
+  ) {
+    final teamAttendance = attendance?.team;
+    final reports = achievement?.reports ?? const <TeamMemberProgress>[];
+    if (teamAttendance == null && reports.isEmpty) return null;
+    return TeamSummary(
+      present: teamAttendance?.present ?? 0,
+      total: teamAttendance?.total ?? reports.length,
+      members: reports,
+    );
+  }
 }
 
 class TeamMemberProgress {
@@ -137,12 +375,18 @@ class TeamMemberProgress {
     required this.name,
     required this.percent,
     required this.isCheckedIn,
+    this.achievedQty = 0,
+    this.targetQty = 0,
+    this.subCount = 0,
   });
 
   final int id;
   final String name;
   final double percent;
   final bool isCheckedIn;
+  final double achievedQty;
+  final double targetQty;
+  final int subCount;
 
   double get fraction => (percent / 100).clamp(0.0, 1.0);
 
@@ -152,6 +396,9 @@ class TeamMemberProgress {
       name: (map['name'] ?? '').toString(),
       percent: asDouble(map['percent']),
       isCheckedIn: asBool(map['is_checked_in']),
+      achievedQty: asDouble(map['achieved_qty']),
+      targetQty: asDouble(map['target_qty']),
+      subCount: asInt(map['sub_count']),
     );
   }
 }

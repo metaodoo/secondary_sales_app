@@ -16,7 +16,32 @@ import 'package:secondary_sales/data/api/api_service.dart';
 class SecondaryOrdersListScreen extends StatefulWidget {
   final int? outletId;
   final String? outletName;
-  const SecondaryOrdersListScreen({super.key, this.outletId, this.outletName});
+
+  /// When set, shows only the orders placed on this outlet visit
+  /// (`sale.order.visit_id`) — used by the "order on the visit" link.
+  final int? visitId;
+
+  /// Optional starting date filter (e.g. carried from the dashboard range).
+  final DateTime? initialDateFrom;
+  final DateTime? initialDateTo;
+
+  /// 'secondary' (default) or 'primary'. Primary opens read-only — create and
+  /// edit are secondary-only flows and are hidden.
+  final String saleType;
+
+  /// Optional app-bar title override.
+  final String? titleOverride;
+
+  const SecondaryOrdersListScreen({
+    super.key,
+    this.outletId,
+    this.outletName,
+    this.visitId,
+    this.initialDateFrom,
+    this.initialDateTo,
+    this.saleType = 'secondary',
+    this.titleOverride,
+  });
 
   @override
   State<SecondaryOrdersListScreen> createState() =>
@@ -36,6 +61,8 @@ class _SecondaryOrdersListScreenState extends State<SecondaryOrdersListScreen> {
   @override
   void initState() {
     super.initState();
+    _dateFromFilter = widget.initialDateFrom;
+    _dateToFilter = widget.initialDateTo;
     _fetchOrders();
   }
 
@@ -60,8 +87,9 @@ class _SecondaryOrdersListScreenState extends State<SecondaryOrdersListScreen> {
         status: _statusFilter,
         dateFrom: _dateFromFilter,
         dateTo: _dateToFilter,
-        saleType: 'secondary',
+        saleType: widget.saleType,
         outletId: widget.outletId,
+        visitId: widget.visitId,
       );
       if (mounted) {
         setState(() {
@@ -168,9 +196,12 @@ class _SecondaryOrdersListScreenState extends State<SecondaryOrdersListScreen> {
           onPressed: () => Navigator.of(context).pop(),
         ),
         title: Text(
-          widget.outletName != null
-              ? '${widget.outletName} Orders'
-              : 'Secondary Sales Orders',
+          widget.titleOverride ??
+              (widget.outletName != null
+                  ? '${widget.outletName} Orders'
+                  : (widget.saleType == 'primary'
+                        ? 'Primary Sales Orders'
+                        : 'Secondary Sales Orders')),
           style: const TextStyle(
             color: AppColors.primaryStrong,
             fontWeight: FontWeight.bold,
@@ -190,7 +221,8 @@ class _SecondaryOrdersListScreenState extends State<SecondaryOrdersListScreen> {
         ),
       ),
       floatingActionButton:
-          context.watch<AuthProvider>().canView(AppScreen.orderCreate)
+          (widget.saleType == 'secondary' &&
+                  context.watch<AuthProvider>().canView(AppScreen.orderCreate))
               ? SsCreateFab(
                   label: 'New Sales Order',
                   onPressed: () {
@@ -457,24 +489,26 @@ class _SecondaryOrdersListScreenState extends State<SecondaryOrdersListScreen> {
                             builder: (_) => OrderDetailScreen(
                               orderId: order.id,
                               fallbackName: order.name,
-                              saleType: 'secondary',
+                              saleType: widget.saleType,
                             ),
                           ),
                         );
                         _fetchOrders();
                       },
-                      onEditTap: () async {
-                        await Navigator.of(context).push(
-                          MaterialPageRoute(
-                            builder: (_) => OrderCreationScreen(
-                              outletId: order.hubId,
-                              customerName: order.hubName,
-                              editOrderId: order.id,
-                            ),
-                          ),
-                        );
-                        _fetchOrders();
-                      },
+                      onEditTap: widget.saleType == 'secondary'
+                          ? () async {
+                              await Navigator.of(context).push(
+                                MaterialPageRoute(
+                                  builder: (_) => OrderCreationScreen(
+                                    outletId: order.hubId,
+                                    customerName: order.hubName,
+                                    editOrderId: order.id,
+                                  ),
+                                ),
+                              );
+                              _fetchOrders();
+                            }
+                          : null,
                     );
                   },
                 ),

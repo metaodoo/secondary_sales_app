@@ -33,12 +33,18 @@ class AttendanceProvider extends ChangeNotifier {
   List<Map<String, dynamic>> get historyLogs => _historyLogs;
   String? get errorMessage => _errorMessage;
 
-  AttendanceProvider(this._authProvider) {
+  /// [autoLoad] defaults to true (the Attendance screen wants status + history
+  /// immediately). The dashboard hero creates an action-only instance with
+  /// `autoLoad: false` so it can reuse [performAction] (GPS + geofence) for a
+  /// one-tap check-in without firing the initial status/history requests.
+  AttendanceProvider(this._authProvider, {bool autoLoad = true}) {
     _apiService.updateAccessToken(_authProvider.accessToken);
     _apiService.updateSessionId(_authProvider.sessionId);
     _apiService.updateEmployeeId(_authProvider.employeeId);
-    _loadStatus();
-    _loadHistory();
+    if (autoLoad) {
+      _loadStatus();
+      _loadHistory();
+    }
   }
 
   @override

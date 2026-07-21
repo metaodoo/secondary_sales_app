@@ -9,6 +9,8 @@ extension RoutesApi on ApiService {
     String? visitType,
     int? routeId,
     String? search,
+    DateTime? dateFrom,
+    DateTime? dateTo,
   }) async {
     final params = <String, dynamic>{
       'employee_id': _activeEmployeeId,
@@ -19,6 +21,14 @@ extension RoutesApi on ApiService {
     if (routeId != null) params['route_id'] = routeId;
     final q = search?.trim();
     if (q != null && q.isNotEmpty) params['search'] = q;
+    if (dateFrom != null) {
+      params['date_from'] =
+          '${dateFrom.year.toString().padLeft(4, '0')}-${dateFrom.month.toString().padLeft(2, '0')}-${dateFrom.day.toString().padLeft(2, '0')}';
+    }
+    if (dateTo != null) {
+      params['date_to'] =
+          '${dateTo.year.toString().padLeft(4, '0')}-${dateTo.month.toString().padLeft(2, '0')}-${dateTo.day.toString().padLeft(2, '0')}';
+    }
 
     final result = await _post('/api/v1/visits', params);
     if (result['success'] == true) {

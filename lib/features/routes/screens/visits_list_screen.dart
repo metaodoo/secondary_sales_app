@@ -3,12 +3,21 @@ import 'package:provider/provider.dart';
 import 'package:secondary_sales/core/theme/app_theme.dart';
 import 'package:secondary_sales/data/api/api_service.dart';
 import 'package:secondary_sales/core/widgets/ss_ui.dart';
+import 'package:secondary_sales/core/access/access_resources.dart';
 import 'package:secondary_sales/features/auth/auth_provider.dart';
+import 'package:secondary_sales/features/sales/screens/secondary_orders_list_screen.dart';
 
 class VisitsListScreen extends StatefulWidget {
   final int? routeId;
+  final DateTime? dateFrom;
+  final DateTime? dateTo;
 
-  const VisitsListScreen({super.key, this.routeId});
+  const VisitsListScreen({
+    super.key,
+    this.routeId,
+    this.dateFrom,
+    this.dateTo,
+  });
 
   @override
   State<VisitsListScreen> createState() => _VisitsListScreenState();
@@ -45,8 +54,18 @@ class _VisitsListScreenState extends State<VisitsListScreen> {
         ),
         body: TabBarView(
           children: [
-            _VisitListTab(visitType: 'standard', routeId: widget.routeId),
-            _VisitListTab(visitType: 'join', routeId: widget.routeId),
+            _VisitListTab(
+              visitType: 'standard',
+              routeId: widget.routeId,
+              dateFrom: widget.dateFrom,
+              dateTo: widget.dateTo,
+            ),
+            _VisitListTab(
+              visitType: 'join',
+              routeId: widget.routeId,
+              dateFrom: widget.dateFrom,
+              dateTo: widget.dateTo,
+            ),
           ],
         ),
       ),
@@ -57,8 +76,15 @@ class _VisitsListScreenState extends State<VisitsListScreen> {
 class _VisitListTab extends StatefulWidget {
   final String visitType;
   final int? routeId;
+  final DateTime? dateFrom;
+  final DateTime? dateTo;
 
-  const _VisitListTab({required this.visitType, this.routeId});
+  const _VisitListTab({
+    required this.visitType,
+    this.routeId,
+    this.dateFrom,
+    this.dateTo,
+  });
 
   @override
   State<_VisitListTab> createState() => _VisitListTabState();
@@ -91,6 +117,8 @@ class _VisitListTabState extends State<_VisitListTab> {
       final result = await _apiService.getVisits(
         visitType: widget.visitType,
         routeId: widget.routeId,
+        dateFrom: widget.dateFrom,
+        dateTo: widget.dateTo,
         page: 1,
         pageSize: 100, // fetching 100 for simplicity
       );
@@ -113,6 +141,10 @@ class _VisitListTabState extends State<_VisitListTab> {
 
   @override
   Widget build(BuildContext context) {
+    // The visit → "orders on this visit" link opens the secondary orders list,
+    // so gate it by that screen's access (the endpoint enforces it too).
+    final canOpenOrders =
+        context.read<AuthProvider>().canView(AppScreen.secondaryOrdersList);
     return RefreshIndicator(
       onRefresh: _fetchVisits,
       child: ListView(
@@ -179,6 +211,27 @@ class _VisitListTabState extends State<_VisitListTab> {
                     ],
                   ),
                   isThreeLine: true,
+                  trailing: canOpenOrders
+                      ? const Icon(
+                          Icons.chevron_right,
+                          color: AppColors.textSecondary,
+                        )
+                      : null,
+                  onTap: canOpenOrders
+                      ? () {
+                          final visitId = visit['id'];
+                          if (visitId is! int) return;
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => SecondaryOrdersListScreen(
+                                visitId: visitId,
+                                outletName: visit['outlet_name']?.toString(),
+                              ),
+                            ),
+                          );
+                        }
+                      : null,
                 ),
               );
             }),
