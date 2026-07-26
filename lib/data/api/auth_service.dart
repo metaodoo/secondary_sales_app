@@ -18,19 +18,23 @@ class AuthService {
   }
 
   Uri _buildUri(String path) {
+    // See ApiService._buildApiUri: blank means "server resolves it".
+    final dbName = AppConstants.dbName;
+    if (dbName.isEmpty) {
+      return Uri.parse('${AppConstants.baseUrl}$path');
+    }
     final separator = path.contains('?') ? '&' : '?';
-    return Uri.parse(
-      '${AppConstants.baseUrl}$path${separator}db=${AppConstants.dbName}',
-    );
+    return Uri.parse('${AppConstants.baseUrl}$path${separator}db=$dbName');
   }
 
   Map<String, String> _headers({String? accessToken}) {
+    final dbName = AppConstants.dbName;
     return {
       HttpHeaders.contentTypeHeader: 'application/json',
       HttpHeaders.acceptHeader: 'application/json',
-      'X-Odoo-Database': AppConstants.dbName,
-      'X-Odoo-Db': AppConstants.dbName,
-      'X-Openerp-Database': AppConstants.dbName,
+      if (dbName.isNotEmpty) 'X-Odoo-Database': dbName,
+      if (dbName.isNotEmpty) 'X-Odoo-Db': dbName,
+      if (dbName.isNotEmpty) 'X-Openerp-Database': dbName,
       if (_sessionId != null && _sessionId!.isNotEmpty)
         HttpHeaders.cookieHeader: 'session_id=$_sessionId',
       if (accessToken != null && accessToken.isNotEmpty)
@@ -96,9 +100,14 @@ class AuthService {
     required String dbName,
   }) async {
     final normalizedBaseUrl = AppConstants.normalizeBaseUrl(baseUrl);
-    final encodedDb = Uri.encodeQueryComponent(dbName);
+    final db = dbName.trim();
+    // Omit the db entirely when blank: the backend's _request_db falls through
+    // to request.session.db, which Odoo populates from the host for a
+    // single-database server. Sending an empty value would be equivalent, but
+    // omitting it keeps the request honest about what it is asking for.
+    final query = db.isEmpty ? '' : '?db=${Uri.encodeQueryComponent(db)}';
     final url = Uri.parse(
-      '$normalizedBaseUrl${AppConstants.authBootstrapSessionEndpoint}?db=$encodedDb',
+      '$normalizedBaseUrl${AppConstants.authBootstrapSessionEndpoint}$query',
     );
     final response = await _client
         .post(
@@ -107,7 +116,7 @@ class AuthService {
             HttpHeaders.contentTypeHeader: 'application/json',
             HttpHeaders.acceptHeader: 'application/json',
           },
-          body: jsonEncode({'db': dbName}),
+          body: jsonEncode(db.isEmpty ? <String, dynamic>{} : {'db': db}),
         )
         .timeout(const Duration(seconds: 20));
 

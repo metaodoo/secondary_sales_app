@@ -5,6 +5,9 @@
 		},
 		{
 			"path": "../../odoo/odoo_18/custom/test_user"
+		},
+		{
+			"path": "../../odoo/odoo_18/odoo"
 		}
 	],
 	"settings": {}

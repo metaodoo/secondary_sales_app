@@ -1,3 +1,5 @@
+import 'package:secondary_sales/core/util/parse.dart';
+
 class DeliveryItem {
   final int id;
   final String name;
@@ -27,20 +29,14 @@ class DeliveryItem {
 
   factory DeliveryItem.fromMap(Map<String, dynamic> map) {
     return DeliveryItem(
-      id: map['id'] ?? 0,
+      id: asInt(map['id']),
       name: map['name'] ?? '',
       state: map['state'] ?? 'draft',
       partnerId: map['partner']?['id'],
       partnerName: map['partner']?['name'],
-      createdDate: map['created_date'] != null
-          ? DateTime.tryParse(map['created_date'])
-          : null,
-      scheduledDate: map['scheduled_date'] != null
-          ? DateTime.tryParse(map['scheduled_date'])
-          : null,
-      dateDone: map['date_done'] != null
-          ? DateTime.tryParse(map['date_done'])
-          : null,
+      createdDate: asDateTime(map['created_date']),
+      scheduledDate: asDateTime(map['scheduled_date']),
+      dateDone: asDateTime(map['date_done']),
       origin: map['origin'],
       saleId: map['sale_id'],
       saleName: map['sale_name'],

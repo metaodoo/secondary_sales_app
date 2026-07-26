@@ -14,6 +14,7 @@ import 'package:secondary_sales/features/routes/route_provider.dart';
 import 'package:secondary_sales/features/my_team/my_team_provider.dart';
 import 'package:secondary_sales/features/auth/screens/auth_gate.dart';
 import 'package:secondary_sales/features/dashboard/dashboard_provider.dart';
+import 'package:secondary_sales/features/notifications/notification_provider.dart';
 import 'package:secondary_sales/features/dashboard/screens/home_dashboard_screen.dart';
 import 'package:secondary_sales/data/api/api_service.dart';
 import 'package:secondary_sales/core/services/push_notification_service.dart';
@@ -184,6 +185,21 @@ Future<void> main() async {
           create: (_) => DashboardProvider(),
           update: (_, auth, dashboard) {
             final provider = dashboard ?? DashboardProvider();
+            provider.updateAuth(
+              accessToken: auth.accessToken,
+              sessionId: auth.sessionId,
+              employeeId: auth.employeeId,
+            );
+            if (!auth.isAuthenticated) {
+              provider.clearData(notify: false);
+            }
+            return provider;
+          },
+        ),
+        ChangeNotifierProxyProvider<AuthProvider, NotificationProvider>(
+          create: (_) => NotificationProvider(),
+          update: (_, auth, notifications) {
+            final provider = notifications ?? NotificationProvider();
             provider.updateAuth(
               accessToken: auth.accessToken,
               sessionId: auth.sessionId,

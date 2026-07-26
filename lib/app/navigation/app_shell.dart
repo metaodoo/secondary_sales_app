@@ -7,6 +7,7 @@ import 'package:secondary_sales/app/navigation/app_shell_config.dart';
 import 'package:secondary_sales/app/navigation/app_drawer.dart';
 import 'package:secondary_sales/features/auth/auth_provider.dart';
 import 'package:secondary_sales/features/sales/primary_sale_provider.dart';
+import 'package:secondary_sales/features/dashboard/module_launcher.dart';
 import 'package:secondary_sales/features/dashboard/screens/dashboard_tab.dart';
 import 'package:secondary_sales/features/contacts/screens/dealers_tab.dart';
 import 'package:secondary_sales/features/van_loading/screens/van_operations_list_screen.dart';
@@ -39,6 +40,13 @@ class _AppShellState extends State<AppShell> {
   DateTime? _dateToFilter;
   Timer? _orderSearchDebounce;
   Timer? _distributorSearchDebounce;
+
+  // Tabs that render their own new/add FAB; the module launcher is hidden there
+  // so the two floating buttons don't collide.
+  static const Set<int> _tabsWithOwnFab = {
+    AppShellIndex.sales,
+    AppShellIndex.vanLoading,
+  };
 
   @override
   void initState() {
@@ -164,14 +172,6 @@ class _AppShellState extends State<AppShell> {
         : (!canAccessPrimary && _currentIndex == AppShellIndex.sales)
         ? 0
         : _currentIndex;
-    final navItems = visibleAppShellNavItems(
-      canAccessDealers,
-      canAccessPrimary,
-      canAccessSecondary,
-      widget.moduleType,
-      auth.canView,
-    );
-
     // Ensure the tab being shown is always built, even if it was reached
     // through an access-fallback remap rather than a direct selection.
     _activatedTabs.add(currentIndex);
@@ -264,6 +264,10 @@ class _AppShellState extends State<AppShell> {
       child: Scaffold(
         key: _scaffoldKey,
         backgroundColor: AppColors.background,
+        floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
+        floatingActionButton: _tabsWithOwnFab.contains(currentIndex)
+            ? null
+            : const ModuleLauncherFab(),
         drawer: AppDrawer(
           moduleType: widget.moduleType,
           currentShellIndex: currentIndex,
@@ -279,37 +283,6 @@ class _AppShellState extends State<AppShell> {
                 : const SizedBox.shrink(),
           ),
         ),
-        bottomNavigationBar: navItems.length < 2
-            ? null
-            : NavigationBar(
-                selectedIndex: bottomNavIndexForStackIndex(
-                  currentIndex,
-                  canAccessDealers,
-                  canAccessPrimary,
-                  canAccessSecondary,
-                  widget.moduleType,
-                  auth.canView,
-                ),
-                onDestinationSelected: (index) => _setIndex(
-                  stackIndexForBottomNavIndex(
-                    index,
-                    canAccessDealers,
-                    canAccessPrimary,
-                    canAccessSecondary,
-                    widget.moduleType,
-                    auth.canView,
-                  ),
-                ),
-                destinations: navItems
-                    .map(
-                      (item) => NavigationDestination(
-                        icon: Icon(item.icon),
-                        selectedIcon: Icon(item.selectedIcon),
-                        label: item.label,
-                      ),
-                    )
-                    .toList(growable: false),
-              ),
       ),
     );
   }

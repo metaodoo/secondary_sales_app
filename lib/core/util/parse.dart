@@ -55,10 +55,39 @@ String? asNullableString(Object? value) {
   return stringValue.isEmpty ? null : stringValue;
 }
 
-/// Parses an ISO date string, mapping `null`/`false`/unparseable to null.
+/// Parses an ISO date/time string from server, mapping `null`/`false`/unparseable to null.
+/// Server timestamps (UTC) are converted to the local time zone (e.g. GMT+6 for Asia/Dhaka)
+/// so that all timestamps shown across the app strictly reflect the configured local timezone.
 DateTime? asDateTime(Object? value) {
   if (value == null || value == false) return null;
-  return DateTime.tryParse(value.toString());
+  final raw = value.toString().trim();
+  if (raw.isEmpty) return null;
+
+  // Pure date format YYYY-MM-DD
+  if (RegExp(r'^\d{4}-\d{2}-\d{2}$').hasMatch(raw)) {
+    return DateTime.tryParse(raw);
+  }
+
+  final parsed = DateTime.tryParse(raw.replaceAll(' ', 'T'));
+  if (parsed == null) return null;
+
+  // If already parsed as UTC or has explicit offset:
+  if (parsed.isUtc || raw.endsWith('Z') || raw.contains('+')) {
+    return parsed.toLocal();
+  }
+
+  // Naive Odoo datetime string (treated as UTC and converted to local device/timezone):
+  final utc = DateTime.utc(
+    parsed.year,
+    parsed.month,
+    parsed.day,
+    parsed.hour,
+    parsed.minute,
+    parsed.second,
+    parsed.millisecond,
+    parsed.microsecond,
+  );
+  return utc.toLocal();
 }
 
 /// Coerces to a typed map, defaulting to an empty map.

@@ -19,6 +19,8 @@ class ReturnProvider with ChangeNotifier {
   }
 
   Future<List<ReturnScrapSummary>> fetchReturns({
+    int page = 1,
+    int pageSize = 20,
     String? search,
     String? state,
     int? distributorId,
@@ -30,6 +32,8 @@ class ReturnProvider with ChangeNotifier {
 
     try {
       final res = await _apiService.getReturns(
+        page: page,
+        pageSize: pageSize,
         search: search,
         state: state,
         distributorId: distributorId,

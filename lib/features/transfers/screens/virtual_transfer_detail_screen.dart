@@ -385,26 +385,12 @@ class _MoveLineCard extends StatelessWidget {
           Row(
             children: [
               const Text(
-                'Demand',
+                'Quantity',
                 style: TextStyle(color: AppColors.textSecondary),
               ),
               const Spacer(),
               Text(
-                '${line.demandQty.toStringAsFixed(0)} ${line.uomName}',
-                style: const TextStyle(fontWeight: FontWeight.w800),
-              ),
-            ],
-          ),
-          const SizedBox(height: 4),
-          Row(
-            children: [
-              const Text(
-                'Reserved',
-                style: TextStyle(color: AppColors.textSecondary),
-              ),
-              const Spacer(),
-              Text(
-                '${line.quantity.toStringAsFixed(0)} ${line.uomName}',
+                '${(line.quantity > 0 ? line.quantity : line.demandQty).toStringAsFixed(0)} ${line.uomName}',
                 style: const TextStyle(fontWeight: FontWeight.w800),
               ),
             ],

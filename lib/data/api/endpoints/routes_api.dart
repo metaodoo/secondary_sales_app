@@ -126,6 +126,7 @@ extension RoutesApi on ApiService {
     int? outletId,
     String? name,
     String? mobile,
+    String? phone,
     String? email,
     String? street,
     String? city,
@@ -133,6 +134,8 @@ extension RoutesApi on ApiService {
     double? expectedVisitTime,
     double? partnerLatitude,
     double? partnerLongitude,
+    String? outletOwnerName,
+    String? image1920,
   }) async {
     final params = <String, dynamic>{'employee_id': _activeEmployeeId};
     if (outletId != null) {
@@ -140,6 +143,7 @@ extension RoutesApi on ApiService {
     } else {
       if (name != null) params['name'] = name;
       if (mobile != null) params['mobile'] = mobile;
+      if (phone != null) params['phone'] = phone;
       if (email != null) params['email'] = email;
       if (street != null) params['street'] = street;
       if (city != null) params['city'] = city;
@@ -147,6 +151,8 @@ extension RoutesApi on ApiService {
       if (partnerLongitude != null) {
         params['partner_longitude'] = partnerLongitude;
       }
+      if (outletOwnerName != null) params['outlet_owner_name'] = outletOwnerName;
+      if (image1920 != null) params['image_1920'] = image1920;
     }
     if (sequence != null) params['sequence'] = sequence;
     if (expectedVisitTime != null) {

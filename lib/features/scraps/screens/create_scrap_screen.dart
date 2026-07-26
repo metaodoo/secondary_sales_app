@@ -7,6 +7,7 @@ import 'package:secondary_sales/features/auth/auth_provider.dart';
 import 'package:secondary_sales/features/scraps/scrap_provider.dart';
 import 'package:secondary_sales/features/scraps/screens/scrap_product_selection_screen.dart';
 import 'package:secondary_sales/core/widgets/ss_ui.dart';
+import 'package:secondary_sales/core/widgets/stock_excess_dialog.dart';
 
 class CreateScrapScreen extends StatefulWidget {
   final int? scrapId;
@@ -268,6 +269,22 @@ class _CreateScrapScreenState extends State<CreateScrapScreen> {
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(const SnackBar(content: Text('Add at least one product')));
+      return;
+    }
+
+    // Stock excess validation - block if any line exceeds available stock
+    final excessItems = <StockExcessItem>[];
+    for (final line in _lines) {
+      if (line.quantity > line.product.availableQty) {
+        excessItems.add(StockExcessItem(
+          productName: line.product.name,
+          enteredQty: line.quantity,
+          availableQty: line.product.availableQty,
+        ));
+      }
+    }
+    if (excessItems.isNotEmpty) {
+      await showStockExcessValidationDialog(context, excessItems: excessItems);
       return;
     }
 
@@ -759,9 +776,7 @@ class _CreateScrapScreenState extends State<CreateScrapScreen> {
                               },
                               onQuantityChanged: (newQty) {
                                 setState(() {
-                                  final maxQty = line.product.availableQty;
-                                  final safeMax = maxQty > 1 ? maxQty : 1.0;
-                                  line.quantity = newQty.clamp(1, safeMax);
+                                  line.quantity = newQty.clamp(1, double.infinity);
                                   // trigger rebuild
                                   _allocatedQty(line);
                                 });

@@ -3,7 +3,7 @@ part of '../api_service.dart';
 
 /// Catalog endpoints for the secondary sales API.
 extension CatalogApi on ApiService {
-  Future<List<Product>> getProducts({String? search, String? saleType, int? partnerId}) async {
+  Future<List<Product>> getProducts({String? search, String? saleType, int? partnerId, bool? inStockOnly}) async {
     final params = <String, dynamic>{'page_size': 100, 'active': true};
     final query = search?.trim();
     if (query != null && query.isNotEmpty) {
@@ -15,6 +15,9 @@ extension CatalogApi on ApiService {
     }
     if (partnerId != null) {
       params['partner_id'] = partnerId;
+    }
+    if (inStockOnly == true) {
+      params['in_stock_only'] = true;
     }
 
     final result = await _post(AppConstants.productsEndpoint, params);

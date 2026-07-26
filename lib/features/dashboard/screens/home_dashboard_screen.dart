@@ -14,8 +14,8 @@ import 'package:secondary_sales/features/hr/screens/attendance_screen.dart';
 import 'package:secondary_sales/features/hr/screens/expense_dashboard_screen.dart';
 import 'package:secondary_sales/features/hr/screens/leave_dashboard_screen.dart';
 import 'package:secondary_sales/features/my_team/screens/my_team_screen.dart';
-import 'package:secondary_sales/features/routes/screens/visits_list_screen.dart';
-import 'package:secondary_sales/features/sales/screens/secondary_orders_list_screen.dart';
+import 'package:secondary_sales/features/notifications/notification_provider.dart';
+import 'package:secondary_sales/features/notifications/widgets/notification_bell.dart';
 import 'package:secondary_sales/features/settings/screens/settings_tab.dart';
 
 /// Post-login landing dashboard.
@@ -31,10 +31,15 @@ class HomeDashboardScreen extends StatefulWidget {
 }
 
 class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
+  final ScrollController _scrollController = ScrollController();
+  final GlobalKey _modulesSectionKey = GlobalKey();
+
   String _preset = 'today';
   DateTime? _customDateFrom;
   DateTime? _customDateTo;
   bool _showTeam = true;
+  bool _showModuleShortcut = true;
+  bool _moduleVisibilityCheckScheduled = false;
 
   /// Action-only attendance provider: reused purely for the hero's one-tap
   /// check-in/out (GPS + geofence live in [AttendanceProvider.performAction]).
@@ -45,14 +50,24 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
   @override
   void initState() {
     super.initState();
-    _attendance = AttendanceProvider(context.read<AuthProvider>(), autoLoad: false);
+    _attendance = AttendanceProvider(
+      context.read<AuthProvider>(),
+      autoLoad: false,
+    );
+    _scrollController.addListener(_updateModuleShortcutVisibility);
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) _fetchDashboard();
+      if (!mounted) return;
+      _scheduleModuleVisibilityCheck();
+      _fetchDashboard();
+      context.read<NotificationProvider>().refreshUnreadCount();
     });
   }
 
   @override
   void dispose() {
+    _scrollController
+      ..removeListener(_updateModuleShortcutVisibility)
+      ..dispose();
     _attendance.dispose();
     super.dispose();
   }
@@ -70,24 +85,138 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(_attendance.errorMessage ?? 'Could not update attendance.'),
+          content: Text(
+            _attendance.errorMessage ?? 'Could not update attendance.',
+          ),
         ),
       );
     }
   }
 
   Future<void> _fetchDashboard() {
-    return context.read<DashboardProvider>().fetch(
-      preset: _preset,
-      dateFrom: _preset == 'custom' ? _customDateFrom : null,
-      dateTo: _preset == 'custom' ? _customDateTo : null,
-    );
+    return context
+        .read<DashboardProvider>()
+        .fetch(
+          preset: _preset,
+          dateFrom: _preset == 'custom' ? _customDateFrom : null,
+          dateTo: _preset == 'custom' ? _customDateTo : null,
+        )
+        .whenComplete(_scheduleModuleVisibilityCheck);
   }
 
   Future<void> _refresh() => _fetchDashboard();
 
   void _open(Widget screen) {
     Navigator.push(context, MaterialPageRoute(builder: (_) => screen));
+  }
+
+  void _scheduleModuleVisibilityCheck() {
+    if (_moduleVisibilityCheckScheduled) return;
+    _moduleVisibilityCheckScheduled = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _moduleVisibilityCheckScheduled = false;
+      _updateModuleShortcutVisibility();
+    });
+  }
+
+  void _updateModuleShortcutVisibility() {
+    if (!mounted) return;
+    final sectionContext = _modulesSectionKey.currentContext;
+    final renderObject = sectionContext?.findRenderObject();
+
+    var shouldShow = true;
+    if (renderObject is RenderBox && renderObject.hasSize) {
+      final sectionTop = renderObject.localToGlobal(Offset.zero).dy;
+      final screenHeight = MediaQuery.sizeOf(context).height;
+      shouldShow = sectionTop > screenHeight;
+    }
+
+    if (_showModuleShortcut != shouldShow) {
+      setState(() => _showModuleShortcut = shouldShow);
+    }
+  }
+
+  Future<void> _showModulePicker(List<_ModuleItem> items) {
+    return showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (sheetContext) {
+        final maxHeight = MediaQuery.sizeOf(sheetContext).height * 0.78;
+
+        return SafeArea(
+          top: false,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+            child: ConstrainedBox(
+              constraints: BoxConstraints(maxHeight: maxHeight),
+              child: Container(
+                padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
+                decoration: BoxDecoration(
+                  color: AppColors.surface,
+                  borderRadius: BorderRadius.circular(28),
+                  boxShadow: const [
+                    BoxShadow(
+                      color: Color(0x220F172A),
+                      blurRadius: 24,
+                      offset: Offset(0, 10),
+                    ),
+                  ],
+                ),
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Center(
+                        child: Container(
+                          width: 44,
+                          height: 5,
+                          decoration: BoxDecoration(
+                            color: AppColors.borderSoft,
+                            borderRadius: BorderRadius.circular(999),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      const Text(
+                        'Open module',
+                        style: TextStyle(
+                          color: AppColors.textPrimary,
+                          fontWeight: FontWeight.w800,
+                          fontSize: 18,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      const Text(
+                        'Jump straight into the part of the app you need.',
+                        style: TextStyle(
+                          color: AppColors.textSecondary,
+                          fontSize: 13,
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      for (var i = 0; i < items.length; i++) ...[
+                        _ModulePickerTile(
+                          item: items[i],
+                          onTap: () {
+                            Navigator.of(sheetContext).pop();
+                            WidgetsBinding.instance.addPostFrameCallback((_) {
+                              if (mounted) items[i].onTap();
+                            });
+                          },
+                        ),
+                        if (i != items.length - 1) const SizedBox(height: 10),
+                      ],
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+    );
   }
 
   Future<void> _selectPreset(String preset) async {
@@ -174,36 +303,80 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
     final canAccessExpense = auth.canView(AppScreen.moduleExpense);
     final canAccessMyTeam = auth.canView(AppScreen.moduleMyTeam);
 
-    // Dashboard deep-links are gated by the same list-view access the backend
-    // enforces (require_sale_type_access / SECONDARY_VISITS_LIST). A card still
-    // shows its figure, but only navigates when the user may open that list —
-    // otherwise the tap is disabled, avoiding a dead-end into a denied endpoint.
-    final canOpenPrimaryList = auth.canView(AppScreen.primarySalesList);
-    final canOpenSecondaryList = auth.canView(AppScreen.secondaryOrdersList);
-    final canOpenVisitsList = auth.canView(AppScreen.visitsList);
-
     final canShowTeam = summary?.hasTeam ?? false;
     final showTeam = canShowTeam && _showTeam;
     final attendance = summary?.attendance;
-    final headlineTarget = summary?.headlineTarget;
     final reportMembers =
         summary?.reportMembers ?? const <TeamMemberProgress>[];
-    // Option A: the My / My Team toggle governs only the Sales breakdown (the
-    // per-report roster below). Orders and visits always show their natural
-    // scope — a rep's own figures, a manager's team roll-up — never toggled.
+    final headlineTarget = summary?.headlineTarget;
     final primaryScope = summary?.orders?.primary;
-    final primaryOrders = primaryScope?.my ?? primaryScope?.team;
-    final primaryIsTeam = primaryScope?.my == null && primaryScope?.team != null;
+    final primaryOrders = _selectOrderMetric(primaryScope, showTeam);
+    final primaryIsTeam = _selectedOrderMetricIsTeam(primaryScope, showTeam);
     final secondaryScope = summary?.orders?.secondary;
-    final secondaryOrders = secondaryScope?.my ?? secondaryScope?.team;
-    final secondaryIsTeam =
-        secondaryScope?.my == null && secondaryScope?.team != null;
+    final secondaryOrders = _selectOrderMetric(secondaryScope, showTeam);
+    final secondaryIsTeam = _selectedOrderMetricIsTeam(
+      secondaryScope,
+      showTeam,
+    );
     final visitsScope = summary?.visits;
-    final visits = visitsScope?.my ?? visitsScope?.team;
-    final visitsIsTeam = visitsScope?.my == null && visitsScope?.team != null;
+    final visits = _selectVisitMetric(visitsScope, showTeam);
+    final visitsIsTeam = _selectedVisitMetricIsTeam(visitsScope, showTeam);
+    final moduleItems = <_ModuleItem>[
+      if (canAccessPrimary)
+        _ModuleItem(
+          title: 'Primary',
+          icon: Icons.factory_outlined,
+          color: AppColors.primaryStrong,
+          onTap: () => _open(const AppShell(moduleType: 'primary')),
+        ),
+      if (canAccessSecondary)
+        _ModuleItem(
+          title: 'Secondary',
+          icon: Icons.storefront_outlined,
+          color: const Color(0xFF10B981),
+          onTap: () => _open(const AppShell(moduleType: 'secondary')),
+        ),
+      if (canAccessAttendance)
+        _ModuleItem(
+          title: 'Attendance',
+          icon: Icons.access_time_filled_outlined,
+          color: const Color(0xFFF59E0B),
+          onTap: () => _open(const AttendanceScreen()),
+        ),
+      if (canAccessLeave)
+        _ModuleItem(
+          title: 'Leave Request',
+          icon: Icons.event_busy_outlined,
+          color: const Color(0xFFEF4444),
+          onTap: () => _open(const LeaveDashboardScreen()),
+        ),
+      if (canAccessExpense)
+        _ModuleItem(
+          title: 'Expense',
+          icon: Icons.receipt_long_outlined,
+          color: const Color(0xFF6366F1),
+          onTap: () => _open(const ExpenseDashboardScreen()),
+        ),
+      if (canAccessMyTeam)
+        _ModuleItem(
+          title: 'My Team',
+          icon: Icons.group_outlined,
+          color: const Color(0xFF8B5CF6),
+          onTap: () => _open(const MyTeamScreen()),
+        ),
+    ];
+
+    _scheduleModuleVisibilityCheck();
 
     return Scaffold(
       backgroundColor: AppColors.background,
+      floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
+      floatingActionButton: moduleItems.isEmpty
+          ? null
+          : _FloatingModuleLauncher(
+              visible: _showModuleShortcut,
+              onTap: () => _showModulePicker(moduleItems),
+            ),
       appBar: AppBar(
         automaticallyImplyLeading: false,
         leading: Navigator.of(context).canPop()
@@ -227,6 +400,7 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
         backgroundColor: AppColors.surface,
         elevation: 0,
         actions: [
+          const NotificationBell(),
           Padding(
             padding: const EdgeInsets.only(right: 16),
             child: ProfileAvatar(
@@ -240,8 +414,14 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
         child: RefreshIndicator(
           onRefresh: _refresh,
           child: ListView(
+            controller: _scrollController,
             physics: const AlwaysScrollableScrollPhysics(),
-            padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
+            padding: EdgeInsets.fromLTRB(
+              20,
+              20,
+              20,
+              moduleItems.isEmpty ? 32 : 112,
+            ),
             children: [
               Text(
                 'Welcome back,',
@@ -297,7 +477,10 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
               ],
 
               if (attendance != null) ...[
-                _AttendanceSummaryCard(attendance: attendance),
+                _AttendanceSummaryCard(
+                  attendance: attendance,
+                  showTeam: showTeam,
+                ),
                 const SizedBox(height: 16),
               ],
 
@@ -329,18 +512,8 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
                   metric: primaryOrders,
                   accentColor: AppColors.primaryStrong,
                   icon: Icons.factory_outlined,
-                  scopeLabel: primaryIsTeam ? 'team' : 'you',
+                  scopeLabel: primaryIsTeam ? 'team total' : 'you',
                   currency: summary?.currency,
-                  onTap: canOpenPrimaryList
-                      ? () => _open(
-                          SecondaryOrdersListScreen(
-                            saleType: 'primary',
-                            titleOverride: 'Primary Sales Orders',
-                            initialDateFrom: summary?.dateFrom,
-                            initialDateTo: summary?.dateTo,
-                          ),
-                        )
-                      : null,
                 ),
                 const SizedBox(height: 16),
               ],
@@ -351,16 +524,8 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
                   metric: secondaryOrders,
                   accentColor: const Color(0xFF0D9488),
                   icon: Icons.shopping_bag_outlined,
-                  scopeLabel: secondaryIsTeam ? 'team' : 'you',
+                  scopeLabel: secondaryIsTeam ? 'team total' : 'you',
                   currency: summary?.currency,
-                  onTap: canOpenSecondaryList
-                      ? () => _open(
-                          SecondaryOrdersListScreen(
-                            initialDateFrom: summary?.dateFrom,
-                            initialDateTo: summary?.dateTo,
-                          ),
-                        )
-                      : null,
                 ),
                 const SizedBox(height: 16),
               ],
@@ -368,15 +533,9 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
               if (visits != null) ...[
                 _VisitsCard(
                   metric: visits,
-                  title: visitsIsTeam ? 'Outlet visits · team' : 'Outlet visits',
-                  onTap: canOpenVisitsList
-                      ? () => _open(
-                          VisitsListScreen(
-                            dateFrom: summary?.dateFrom,
-                            dateTo: summary?.dateTo,
-                          ),
-                        )
-                      : null,
+                  title: visitsIsTeam
+                      ? 'Outlet visits · team total'
+                      : 'Outlet visits',
                 ),
                 const SizedBox(height: 16),
               ],
@@ -386,55 +545,14 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
                 const SizedBox(height: 16),
               ],
 
-              const SectionHeader(title: 'Modules'),
-              const SizedBox(height: 12),
-              _ModulesGrid(
-                items: [
-                  if (canAccessPrimary)
-                    _ModuleItem(
-                      title: 'Primary',
-                      icon: Icons.factory_outlined,
-                      color: AppColors.primaryStrong,
-                      onTap: () => _open(const AppShell(moduleType: 'primary')),
-                    ),
-                  if (canAccessSecondary)
-                    _ModuleItem(
-                      title: 'Secondary',
-                      icon: Icons.storefront_outlined,
-                      color: const Color(0xFF10B981),
-                      onTap: () =>
-                          _open(const AppShell(moduleType: 'secondary')),
-                    ),
-                  if (canAccessAttendance)
-                    _ModuleItem(
-                      title: 'Attendance',
-                      icon: Icons.access_time_filled_outlined,
-                      color: const Color(0xFFF59E0B),
-                      onTap: () => _open(const AttendanceScreen()),
-                    ),
-                  if (canAccessLeave)
-                    _ModuleItem(
-                      title: 'Leave Request',
-                      icon: Icons.event_busy_outlined,
-                      color: const Color(0xFFEF4444),
-                      onTap: () => _open(const LeaveDashboardScreen()),
-                    ),
-                  if (canAccessExpense)
-                    _ModuleItem(
-                      title: 'Expense',
-                      icon: Icons.receipt_long_outlined,
-                      color: const Color(0xFF6366F1),
-                      onTap: () => _open(const ExpenseDashboardScreen()),
-                    ),
-                  if (canAccessMyTeam)
-                    _ModuleItem(
-                      title: 'My Team',
-                      icon: Icons.group_outlined,
-                      color: const Color(0xFF8B5CF6),
-                      onTap: () => _open(const MyTeamScreen()),
-                    ),
-                ],
-              ),
+              if (moduleItems.isNotEmpty) ...[
+                Container(
+                  key: _modulesSectionKey,
+                  child: const SectionHeader(title: 'Modules'),
+                ),
+                const SizedBox(height: 12),
+                _ModulesGrid(items: moduleItems),
+              ],
             ],
           ),
         ),
@@ -539,6 +657,71 @@ class _AttendanceHero extends StatelessWidget {
       ),
     );
   }
+}
+
+AttendanceWindow _selectAttendanceWindow(
+  DashboardAttendanceSummary attendance,
+  bool showTeam,
+) {
+  if (!showTeam || attendance.team == null) return attendance.my;
+  return AttendanceWindow(
+    present: attendance.my.present + attendance.team!.present,
+    absent: attendance.my.absent + attendance.team!.absent,
+    late: attendance.my.late + attendance.team!.late,
+  );
+}
+
+DashboardOrderMetric? _selectOrderMetric(
+  DashboardOrderScope? scope,
+  bool showTeam,
+) {
+  if (scope == null) return null;
+  if (!showTeam) return scope.my;
+  return _sumOrderMetrics(scope.my, scope.team) ?? scope.team ?? scope.my;
+}
+
+bool _selectedOrderMetricIsTeam(DashboardOrderScope? scope, bool showTeam) {
+  if (scope == null) return false;
+  if (showTeam) return scope.team != null || scope.my != null;
+  return false;
+}
+
+DashboardOrderMetric? _sumOrderMetrics(
+  DashboardOrderMetric? my,
+  DashboardOrderMetric? team,
+) {
+  if (my == null && team == null) return null;
+  return DashboardOrderMetric(
+    count: (my?.count ?? 0) + (team?.count ?? 0),
+    value: (my?.value ?? 0) + (team?.value ?? 0),
+  );
+}
+
+DashboardVisitMetric? _selectVisitMetric(
+  DashboardVisitsSummary? scope,
+  bool showTeam,
+) {
+  if (scope == null) return null;
+  if (!showTeam) return scope.my;
+  return _sumVisitMetrics(scope.my, scope.team) ?? scope.team ?? scope.my;
+}
+
+bool _selectedVisitMetricIsTeam(DashboardVisitsSummary? scope, bool showTeam) {
+  if (scope == null) return false;
+  if (showTeam) return scope.team != null || scope.my != null;
+  return false;
+}
+
+DashboardVisitMetric? _sumVisitMetrics(
+  DashboardVisitMetric? my,
+  DashboardVisitMetric? team,
+) {
+  if (my == null && team == null) return null;
+  return DashboardVisitMetric(
+    total: (my?.total ?? 0) + (team?.total ?? 0),
+    withOrder: (my?.withOrder ?? 0) + (team?.withOrder ?? 0),
+    noOrder: (my?.noOrder ?? 0) + (team?.noOrder ?? 0),
+  );
 }
 
 /// The inline check-in / check-out button inside the attendance hero. Nested in
@@ -765,12 +948,21 @@ class _ScopeButton extends StatelessWidget {
 }
 
 class _AttendanceSummaryCard extends StatelessWidget {
-  const _AttendanceSummaryCard({required this.attendance});
+  const _AttendanceSummaryCard({
+    required this.attendance,
+    required this.showTeam,
+  });
 
   final DashboardAttendanceSummary attendance;
+  final bool showTeam;
 
   @override
   Widget build(BuildContext context) {
+    final selectedWindow = _selectAttendanceWindow(attendance, showTeam);
+    final selectedLabel = showTeam && attendance.team != null
+        ? 'Team total'
+        : 'You';
+
     return Container(
       padding: const EdgeInsets.all(18),
       decoration: ssPanelDecoration(),
@@ -786,11 +978,7 @@ class _AttendanceSummaryCard extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 14),
-          _AttendanceRow(label: 'You', window: attendance.my),
-          if (attendance.team != null) ...[
-            const SizedBox(height: 10),
-            _AttendanceRow(label: 'My Team', window: attendance.team!),
-          ],
+          _AttendanceRow(label: selectedLabel, window: selectedWindow),
         ],
       ),
     );
@@ -842,10 +1030,10 @@ class _AttendanceRow extends StatelessWidget {
               const SizedBox(width: 8),
               Expanded(
                 child: _AttendanceStat(
-                  label: 'Total',
-                  value: window.total.toString(),
-                  bg: AppColors.primarySoft,
-                  fg: AppColors.primaryStrong,
+                  label: 'Late',
+                  value: window.late.toString(),
+                  bg: const Color(0xFFFEF3C7),
+                  fg: const Color(0xFFB45309),
                 ),
               ),
             ],
@@ -1024,9 +1212,6 @@ class _TeamMemberRow extends StatelessWidget {
         : member.percent >= 70
         ? const Color(0xFFD97706)
         : const Color(0xFFDC2626);
-    final subtitle = member.subCount > 0
-        ? '${member.subCount} reports'
-        : 'individual contributor';
 
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8),
@@ -1041,7 +1226,7 @@ class _TeamMemberRow extends StatelessWidget {
           ),
           const SizedBox(width: 10),
           Expanded(
-            flex: 4,
+            flex: 5,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -1054,19 +1239,30 @@ class _TeamMemberRow extends StatelessWidget {
                     fontSize: 14,
                   ),
                 ),
-                const SizedBox(height: 2),
-                Text(
-                  subtitle,
-                  style: const TextStyle(
-                    color: AppColors.textSecondary,
-                    fontSize: 11,
-                  ),
+                const SizedBox(height: 6),
+                Wrap(
+                  spacing: 6,
+                  runSpacing: 6,
+                  children: [
+                    _TeamMetricChip(
+                      label: 'Achieved',
+                      value: _fmtQty(member.achievedQty),
+                      bg: AppColors.successSoft,
+                      fg: const Color(0xFF166534),
+                    ),
+                    _TeamMetricChip(
+                      label: 'Target',
+                      value: _fmtQty(member.targetQty),
+                      bg: AppColors.primarySoft,
+                      fg: AppColors.primaryStrong,
+                    ),
+                  ],
                 ),
               ],
             ),
           ),
           Expanded(
-            flex: 4,
+            flex: 3,
             child: _ProgressBar(fraction: member.fraction, color: color),
           ),
           const SizedBox(width: 10),
@@ -1088,6 +1284,35 @@ class _TeamMemberRow extends StatelessWidget {
   }
 }
 
+class _TeamMetricChip extends StatelessWidget {
+  const _TeamMetricChip({
+    required this.label,
+    required this.value,
+    required this.bg,
+    required this.fg,
+  });
+
+  final String label;
+  final String value;
+  final Color bg;
+  final Color fg;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Text(
+        '$label $value',
+        style: TextStyle(color: fg, fontWeight: FontWeight.w700, fontSize: 10),
+      ),
+    );
+  }
+}
+
 class _OrdersCard extends StatelessWidget {
   const _OrdersCard({
     required this.title,
@@ -1096,7 +1321,6 @@ class _OrdersCard extends StatelessWidget {
     required this.icon,
     required this.scopeLabel,
     this.currency,
-    this.onTap,
   });
 
   final String title;
@@ -1105,7 +1329,6 @@ class _OrdersCard extends StatelessWidget {
   final IconData icon;
   final String scopeLabel;
   final DashboardCurrency? currency;
-  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
@@ -1113,63 +1336,54 @@ class _OrdersCard extends StatelessWidget {
       decoration: ssPanelDecoration(),
       child: Material(
         color: Colors.transparent,
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(AppRadii.large),
-          child: Padding(
-            padding: const EdgeInsets.all(18),
-            child: Row(
-              children: [
-                Container(
-                  width: 42,
-                  height: 42,
-                  decoration: BoxDecoration(
-                    color: accentColor.withValues(alpha: 0.12),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Icon(icon, color: accentColor),
+        child: Padding(
+          padding: const EdgeInsets.all(18),
+          child: Row(
+            children: [
+              Container(
+                width: 42,
+                height: 42,
+                decoration: BoxDecoration(
+                  color: accentColor.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(12),
                 ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        title,
-                        style: const TextStyle(
-                          color: AppColors.textPrimary,
-                          fontWeight: FontWeight.w800,
-                          fontSize: 15,
-                        ),
+                child: Icon(icon, color: accentColor),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: const TextStyle(
+                        color: AppColors.textPrimary,
+                        fontWeight: FontWeight.w800,
+                        fontSize: 15,
                       ),
-                      const SizedBox(height: 4),
-                      Text(
-                        _fmtMoney(metric.value, currency),
-                        style: const TextStyle(
-                          color: AppColors.textPrimary,
-                          fontWeight: FontWeight.w800,
-                          fontSize: 20,
-                        ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      _fmtMoney(metric.value, currency),
+                      style: const TextStyle(
+                        color: AppColors.textPrimary,
+                        fontWeight: FontWeight.w800,
+                        fontSize: 20,
                       ),
-                      const SizedBox(height: 2),
-                      Text(
-                        '$scopeLabel · ${metric.count} orders',
-                        style: const TextStyle(
-                          color: AppColors.textSecondary,
-                          fontWeight: FontWeight.w600,
-                          fontSize: 12,
-                        ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      '$scopeLabel · ${metric.count} orders',
+                      style: const TextStyle(
+                        color: AppColors.textSecondary,
+                        fontWeight: FontWeight.w600,
+                        fontSize: 12,
                       ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
-                if (onTap != null)
-                  const Icon(
-                    Icons.chevron_right,
-                    color: AppColors.textSecondary,
-                  ),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
       ),
@@ -1178,11 +1392,10 @@ class _OrdersCard extends StatelessWidget {
 }
 
 class _VisitsCard extends StatelessWidget {
-  const _VisitsCard({required this.metric, required this.title, this.onTap});
+  const _VisitsCard({required this.metric, required this.title});
 
   final DashboardVisitMetric metric;
   final String title;
-  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
@@ -1190,86 +1403,77 @@ class _VisitsCard extends StatelessWidget {
       decoration: ssPanelDecoration(),
       child: Material(
         color: Colors.transparent,
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(AppRadii.large),
-          child: Padding(
-            padding: const EdgeInsets.all(18),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        title,
-                        style: const TextStyle(
-                          color: AppColors.textPrimary,
-                          fontWeight: FontWeight.w800,
-                          fontSize: 16,
-                        ),
+        child: Padding(
+          padding: const EdgeInsets.all(18),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      title,
+                      style: const TextStyle(
+                        color: AppColors.textPrimary,
+                        fontWeight: FontWeight.w800,
+                        fontSize: 16,
                       ),
                     ),
-                    if (onTap != null)
-                      const Icon(
-                        Icons.chevron_right,
-                        color: AppColors.textSecondary,
-                      ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-          Row(
-            children: [
-              Text(
-                metric.total.toString(),
-                style: const TextStyle(
-                  color: AppColors.textPrimary,
-                  fontWeight: FontWeight.w900,
-                  fontSize: 24,
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Text(
+                    metric.total.toString(),
+                    style: const TextStyle(
+                      color: AppColors.textPrimary,
+                      fontWeight: FontWeight.w900,
+                      fontSize: 24,
+                    ),
+                  ),
+                  const Spacer(),
+                  Text(
+                    '${metric.productivePercent}% productive',
+                    style: const TextStyle(
+                      color: Color(0xFF16A34A),
+                      fontWeight: FontWeight.w700,
+                      fontSize: 13,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(999),
+                child: LinearProgressIndicator(
+                  minHeight: 10,
+                  value: metric.productiveFraction,
+                  backgroundColor: AppColors.borderMuted,
+                  valueColor: const AlwaysStoppedAnimation<Color>(
+                    Color(0xFF16A34A),
+                  ),
                 ),
               ),
-              const Spacer(),
-              Text(
-                '${metric.productivePercent}% productive',
-                style: const TextStyle(
-                  color: Color(0xFF16A34A),
-                  fontWeight: FontWeight.w700,
-                  fontSize: 13,
-                ),
+              const SizedBox(height: 10),
+              Row(
+                children: [
+                  _LegendDot(
+                    color: const Color(0xFF16A34A),
+                    text: 'With order ${metric.withOrder}',
+                  ),
+                  const SizedBox(width: 16),
+                  _LegendDot(
+                    color: AppColors.textSecondary,
+                    text: 'No order ${metric.noOrder}',
+                  ),
+                ],
               ),
             ],
-          ),
-          const SizedBox(height: 10),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(999),
-            child: LinearProgressIndicator(
-              minHeight: 10,
-              value: metric.productiveFraction,
-              backgroundColor: AppColors.borderMuted,
-              valueColor: const AlwaysStoppedAnimation<Color>(
-                Color(0xFF16A34A),
-              ),
-            ),
-          ),
-          const SizedBox(height: 10),
-          Row(
-            children: [
-              _LegendDot(
-                color: const Color(0xFF16A34A),
-                text: 'With order ${metric.withOrder}',
-              ),
-              const SizedBox(width: 16),
-              _LegendDot(
-                color: AppColors.textSecondary,
-                text: 'No order ${metric.noOrder}',
-              ),
-            ],
-          ),
-        ],
-              ),
-            ),
           ),
         ),
+      ),
     );
   }
 }
@@ -1432,6 +1636,105 @@ class _ModulesGrid extends StatelessWidget {
             ),
           )
           .toList(growable: false),
+    );
+  }
+}
+
+class _FloatingModuleLauncher extends StatelessWidget {
+  const _FloatingModuleLauncher({required this.visible, required this.onTap});
+
+  final bool visible;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return IgnorePointer(
+      ignoring: !visible,
+      child: AnimatedSlide(
+        duration: const Duration(milliseconds: 180),
+        curve: Curves.easeOut,
+        offset: visible ? Offset.zero : const Offset(0, 1.2),
+        child: AnimatedOpacity(
+          duration: const Duration(milliseconds: 180),
+          opacity: visible ? 1 : 0,
+          child: Material(
+            color: AppColors.primaryStrong,
+            borderRadius: BorderRadius.circular(999),
+            elevation: 8,
+            child: InkWell(
+              onTap: onTap,
+              borderRadius: BorderRadius.circular(999),
+              child: const Padding(
+                padding: EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.apps_rounded, color: Colors.white, size: 20),
+                    SizedBox(width: 10),
+                    Text(
+                      'Open module',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w800,
+                        fontSize: 14,
+                      ),
+                    ),
+                    SizedBox(width: 6),
+                    Icon(Icons.keyboard_arrow_up_rounded, color: Colors.white),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ModulePickerTile extends StatelessWidget {
+  const _ModulePickerTile({required this.item, required this.onTap});
+
+  final _ModuleItem item;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: item.color.withValues(alpha: 0.08),
+      borderRadius: BorderRadius.circular(18),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(18),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          child: Row(
+            children: [
+              Container(
+                width: 42,
+                height: 42,
+                decoration: BoxDecoration(
+                  color: item.color.withValues(alpha: 0.14),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(item.icon, color: item.color),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  item.title,
+                  style: const TextStyle(
+                    color: AppColors.textPrimary,
+                    fontWeight: FontWeight.w800,
+                    fontSize: 15,
+                  ),
+                ),
+              ),
+              const Icon(Icons.chevron_right, color: AppColors.textSecondary),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

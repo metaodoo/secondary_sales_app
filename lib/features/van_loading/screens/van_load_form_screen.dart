@@ -8,6 +8,7 @@ import 'package:secondary_sales/data/models/inventory/virtual_transfer.dart';
 import 'package:secondary_sales/features/auth/auth_provider.dart';
 import 'package:secondary_sales/features/transfers/transfer_provider.dart';
 import 'package:secondary_sales/features/transfers/screens/virtual_transfer_detail_screen.dart';
+import 'package:secondary_sales/core/widgets/stock_excess_dialog.dart';
 
 class VanLoadFormScreen extends StatefulWidget {
   const VanLoadFormScreen({super.key, this.isLoad = true, this.existingTransfer});
@@ -220,6 +221,24 @@ class _VanLoadFormScreenState extends State<VanLoadFormScreen> {
         ),
       );
       return;
+    }
+
+    // Stock excess validation - block if any line exceeds available stock
+    if (widget.isLoad) {
+      final excessItems = <StockExcessItem>[];
+      for (final item in _items) {
+        if (item.demandQty > 0 && item.demandQty > item.availableStock) {
+          excessItems.add(StockExcessItem(
+            productName: item.productName,
+            enteredQty: item.demandQty,
+            availableQty: item.availableStock,
+          ));
+        }
+      }
+      if (excessItems.isNotEmpty) {
+        await showStockExcessValidationDialog(context, excessItems: excessItems);
+        return;
+      }
     }
 
     final VirtualTransfer? transfer;
@@ -570,12 +589,7 @@ class _VanLoadFormScreenState extends State<VanLoadFormScreen> {
                                                     onChanged: (val) {
                                                       final qty = double.tryParse(val) ?? 0;
                                                       setState(() {
-                                                        // Cap at available stock
-                                                        if (qty > item.availableStock) {
-                                                          item.demandQty = item.availableStock;
-                                                        } else {
-                                                          item.demandQty = qty;
-                                                        }
+                                                        item.demandQty = qty;
                                                       });
                                                     },
                                                     controller: TextEditingController(

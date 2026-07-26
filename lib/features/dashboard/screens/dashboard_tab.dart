@@ -69,9 +69,9 @@ class DashboardTab extends StatelessWidget {
                 ),
                 onPressed: onBackToModules,
               ),
-        title: const Text(
-          'Dashboard',
-          style: TextStyle(
+        title: Text(
+          moduleType == 'primary' ? 'Primary Sales' : 'Secondary Sales',
+          style: const TextStyle(
             color: AppColors.primaryStrong,
             fontWeight: FontWeight.bold,
             fontSize: 22,

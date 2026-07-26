@@ -8,6 +8,7 @@ import 'package:secondary_sales/features/transfers/transfer_provider.dart';
 import 'package:secondary_sales/features/transfers/screens/transfer_product_selection_screen.dart';
 import 'package:secondary_sales/features/transfers/screens/virtual_transfer_detail_screen.dart';
 import 'package:secondary_sales/core/widgets/ss_ui.dart';
+import 'package:secondary_sales/core/widgets/stock_excess_dialog.dart';
 
 class CreateVirtualTransferScreen extends StatefulWidget {
   const CreateVirtualTransferScreen({super.key});
@@ -132,6 +133,23 @@ class _CreateVirtualTransferScreenState
           return;
         }
       }
+    }
+
+    // Stock excess validation - block if any line exceeds available stock
+    final excessItems = <StockExcessItem>[];
+    for (final line in _lines) {
+      if (line.quantity > line.product.availableQty) {
+        excessItems.add(StockExcessItem(
+          productName: line.product.name,
+          enteredQty: line.quantity,
+          availableQty: line.product.availableQty,
+          uomName: line.product.uomName,
+        ));
+      }
+    }
+    if (excessItems.isNotEmpty) {
+      await showStockExcessValidationDialog(context, excessItems: excessItems);
+      return;
     }
 
     final transfer = await context
@@ -484,15 +502,13 @@ class _TransferLineCard extends StatelessWidget {
                   }
                 },
                 onPlus: () {
-                  if (line.quantity < line.product.availableQty) {
-                    line.quantity++;
-                    onChanged();
-                  }
+                  line.quantity++;
+                  onChanged();
                 },
                 onValueInput: (val) {
                   final parsed = double.tryParse(val);
                   if (parsed != null) {
-                    line.quantity = parsed.clamp(1, line.product.availableQty);
+                    line.quantity = parsed.clamp(1, double.infinity);
                     onChanged();
                   }
                 },

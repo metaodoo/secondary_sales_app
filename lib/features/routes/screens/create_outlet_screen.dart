@@ -1,8 +1,12 @@
+import 'dart:convert';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:secondary_sales/core/theme/app_theme.dart';
 import 'package:provider/provider.dart';
 import 'package:secondary_sales/features/routes/route_provider.dart';
 import 'package:secondary_sales/core/services/location_service.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:secondary_sales/features/my_team/my_team_provider.dart';
 
 class CreateOutletScreen extends StatefulWidget {
   final int routeId;
@@ -25,7 +29,12 @@ class _CreateOutletScreenState extends State<CreateOutletScreen> {
   final _nameController = TextEditingController();
   final _phoneController = TextEditingController();
   final _addressController = TextEditingController();
+  final _ownerNameController = TextEditingController();
 
+  File? _capturedPhoto;
+  double? _capturedLatitude;
+  double? _capturedLongitude;
+  bool _isResolvingAddress = false;
   bool _isSaving = false;
 
   @override
@@ -33,26 +42,86 @@ class _CreateOutletScreenState extends State<CreateOutletScreen> {
     _nameController.dispose();
     _phoneController.dispose();
     _addressController.dispose();
+    _ownerNameController.dispose();
     super.dispose();
+  }
+
+  Future<void> _captureOutletPhoto() async {
+    final ImagePicker picker = ImagePicker();
+    try {
+      final XFile? photo = await picker.pickImage(
+        source: ImageSource.camera,
+        imageQuality: 70,
+      );
+
+      if (photo == null) return;
+
+      setState(() {
+        _isResolvingAddress = true;
+        _capturedPhoto = File(photo.path);
+      });
+
+      // Get precise GPS coordinates at the moment of capture
+      final position = await LocationService.getCurrentPosition();
+      _capturedLatitude = position.latitude;
+      _capturedLongitude = position.longitude;
+
+      if (!mounted) return;
+
+      // Reverse geocode coordinate to physical address via Barikoi
+      final myTeamProvider = Provider.of<MyTeamProvider>(context, listen: false);
+      final resolvedAddress = await myTeamProvider.reverseGeocode(
+        latitude: position.latitude,
+        longitude: position.longitude,
+      );
+
+      setState(() {
+        _isResolvingAddress = false;
+        if (resolvedAddress != null && resolvedAddress.isNotEmpty) {
+          _addressController.text = resolvedAddress;
+        }
+      });
+    } catch (e) {
+      setState(() => _isResolvingAddress = false);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: ${e.toString()}')),
+        );
+      }
+    }
   }
 
   Future<void> _saveOutlet() async {
     if (!_formKey.currentState!.validate()) return;
+
+    if (_capturedPhoto == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('You must capture a live photo of the outlet using the camera.'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
 
     setState(() => _isSaving = true);
 
     final provider = Provider.of<RouteProvider>(context, listen: false);
 
     try {
-      final position = await LocationService.getCurrentPosition();
+      final bytes = await _capturedPhoto!.readAsBytes();
+      final base64Image = base64Encode(bytes);
 
       final newOutlet = await provider.addOutletToRoute(
         widget.routeId,
         name: _nameController.text.trim(),
         mobile: _phoneController.text.trim(),
+        phone: _phoneController.text.trim(),
         street: _addressController.text.trim(),
-        partnerLatitude: position.latitude,
-        partnerLongitude: position.longitude,
+        outletOwnerName: _ownerNameController.text.trim(),
+        partnerLatitude: _capturedLatitude,
+        partnerLongitude: _capturedLongitude,
+        image1920: base64Image,
       );
 
       setState(() => _isSaving = false);
@@ -140,6 +209,151 @@ class _CreateOutletScreenState extends State<CreateOutletScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     const Text(
+                      'OUTLET IMAGE & LOCATION',
+                      style: TextStyle(
+                        color: AppColors.primaryStrong,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 12,
+                        letterSpacing: 1,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    GestureDetector(
+                      onTap: _captureOutletPhoto,
+                      child: Container(
+                        width: double.infinity,
+                        height: 180,
+                        decoration: BoxDecoration(
+                          color: AppColors.borderMuted.withOpacity(0.3),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: _capturedPhoto == null 
+                                ? AppColors.borderSoft 
+                                : AppColors.primaryStrong.withOpacity(0.5),
+                            width: 1.5,
+                          ),
+                        ),
+                        child: _capturedPhoto == null
+                            ? Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  const Icon(
+                                    Icons.camera_alt_outlined,
+                                    size: 48,
+                                    color: AppColors.textSecondary,
+                                  ),
+                                  const SizedBox(height: 12),
+                                  const Text(
+                                    'Capture Live Outlet Photo *',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 15,
+                                      color: AppColors.textPrimary,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  const Text(
+                                    'Restricted to direct device camera',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: AppColors.textSecondary,
+                                    ),
+                                  ),
+                                ],
+                              )
+                            : ClipRRect(
+                                borderRadius: BorderRadius.circular(10),
+                                child: Stack(
+                                  children: [
+                                    Image.file(
+                                      _capturedPhoto!,
+                                      width: double.infinity,
+                                      height: double.infinity,
+                                      fit: BoxFit.cover,
+                                    ),
+                                    Container(
+                                      color: Colors.black.withOpacity(0.4),
+                                    ),
+                                    Positioned(
+                                      bottom: 12,
+                                      left: 12,
+                                      right: 12,
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Row(
+                                            children: [
+                                              const Icon(
+                                                Icons.location_on,
+                                                color: Colors.redAccent,
+                                                size: 16,
+                                              ),
+                                              const SizedBox(width: 4),
+                                              Text(
+                                                'Lat: ${_capturedLatitude?.toStringAsFixed(6)}, Lon: ${_capturedLongitude?.toStringAsFixed(6)}',
+                                                style: const TextStyle(
+                                                  color: Colors.white,
+                                                  fontWeight: FontWeight.bold,
+                                                  fontSize: 12,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                          if (_isResolvingAddress)
+                                            const Padding(
+                                              padding: EdgeInsets.only(top: 4.0),
+                                              child: Text(
+                                                'Resolving address details...',
+                                                style: TextStyle(
+                                                  color: Colors.white70,
+                                                  fontSize: 11,
+                                                  fontStyle: FontStyle.italic,
+                                                ),
+                                              ),
+                                            ),
+                                        ],
+                                      ),
+                                    ),
+                                    Positioned(
+                                      top: 12,
+                                      right: 12,
+                                      child: Container(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 10,
+                                          vertical: 6,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color: Colors.black.withOpacity(0.6),
+                                          borderRadius: BorderRadius.circular(20),
+                                        ),
+                                        child: const Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            Icon(
+                                              Icons.replay_outlined,
+                                              color: Colors.white,
+                                              size: 14,
+                                            ),
+                                            SizedBox(width: 4),
+                                            Text(
+                                              'Retake',
+                                              style: TextStyle(
+                                                color: Colors.white,
+                                                fontSize: 11,
+                                                fontWeight: FontWeight.bold,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                    const Text(
                       'OUTLET DETAILS',
                       style: TextStyle(
                         color: AppColors.primaryStrong,
@@ -163,6 +377,27 @@ class _CreateOutletScreenState extends State<CreateOutletScreen> {
                           ? 'Enter customer name'
                           : null,
                       decoration: InputDecoration(
+                        filled: true,
+                        fillColor: AppColors.borderMuted,
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide: BorderSide.none,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    const Text(
+                      'Outlet Owner Name',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w500,
+                        fontSize: 14,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    TextFormField(
+                      controller: _ownerNameController,
+                      decoration: InputDecoration(
+                        hintText: 'Enter owner name',
                         filled: true,
                         fillColor: AppColors.borderMuted,
                         border: OutlineInputBorder(
@@ -255,6 +490,9 @@ class _CreateOutletScreenState extends State<CreateOutletScreen> {
                     TextFormField(
                       controller: _phoneController,
                       keyboardType: TextInputType.phone,
+                      validator: (v) => v == null || v.trim().isEmpty
+                          ? 'Phone number is required'
+                          : null,
                       decoration: InputDecoration(
                         hintText: 'Enter mobile number',
                         prefixIcon: const Icon(

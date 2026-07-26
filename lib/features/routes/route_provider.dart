@@ -171,6 +171,7 @@ class RouteProvider with ChangeNotifier {
     int? outletId,
     String? name,
     String? mobile,
+    String? phone,
     String? email,
     String? street,
     String? city,
@@ -178,6 +179,8 @@ class RouteProvider with ChangeNotifier {
     double? expectedVisitTime,
     double? partnerLatitude,
     double? partnerLongitude,
+    String? outletOwnerName,
+    String? image1920,
   }) async {
     _loadingCount++;
     _error = null;
@@ -189,6 +192,7 @@ class RouteProvider with ChangeNotifier {
         outletId: outletId,
         name: name,
         mobile: mobile,
+        phone: phone,
         email: email,
         street: street,
         city: city,
@@ -196,6 +200,8 @@ class RouteProvider with ChangeNotifier {
         expectedVisitTime: expectedVisitTime,
         partnerLatitude: partnerLatitude,
         partnerLongitude: partnerLongitude,
+        outletOwnerName: outletOwnerName,
+        image1920: image1920,
       );
 
       final newOutlet = RouteOutlet.fromMap(result);
@@ -285,7 +291,15 @@ class RouteProvider with ChangeNotifier {
     _error = null;
     notifyListeners();
     try {
-      final position = await LocationService.getCurrentPosition();
+      // Geofenced action: require a fresh, reasonably accurate fix so a stale
+      // cached position from a previous location can't pass the outlet geofence.
+      // 50 m mirrors the default outlet radius (ss_attendance_radius); relax if
+      // field GPS proves too strict.
+      final position = await LocationService.getCurrentPosition(
+        requireFresh: true,
+        timeLimit: const Duration(seconds: 15),
+        maxAccuracyMeters: 50,
+      );
       final res = await _apiService.createVisit(
         employeeId,
         outletId,

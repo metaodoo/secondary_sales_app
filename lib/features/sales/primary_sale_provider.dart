@@ -212,12 +212,17 @@ class PrimarySaleProvider with ChangeNotifier {
     }
   }
 
-  Future<void> searchProducts(String query, {String? saleType, int? partnerId}) async {
+  Future<void> searchProducts(String query, {String? saleType, int? partnerId, bool? inStockOnly}) async {
     _error = null;
     notifyListeners();
 
     try {
-      _products = await _apiService.getProducts(search: query, saleType: saleType, partnerId: partnerId);
+      _products = await _apiService.getProducts(
+        search: query,
+        saleType: saleType,
+        partnerId: partnerId,
+        inStockOnly: inStockOnly,
+      );
     } catch (e) {
       _error = e.toString();
     } finally {

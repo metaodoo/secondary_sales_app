@@ -10,6 +10,7 @@ import 'package:secondary_sales/features/routes/screens/new_joint_visit_screen.d
 import 'package:secondary_sales/features/sales/screens/order_creation_screen.dart';
 import 'package:secondary_sales/features/sales/screens/out_of_geo_fence_screen.dart';
 import 'package:secondary_sales/features/sales/screens/secondary_orders_list_screen.dart';
+import 'package:secondary_sales/features/auth/auth_provider.dart';
 
 class CustomerActionBottomSheet extends StatefulWidget {
   final String customerName;
@@ -253,8 +254,11 @@ class _CustomerActionBottomSheetState extends State<CustomerActionBottomSheet> {
 
           ElevatedButton(
             onPressed: () {
-              Navigator.pop(context); // Close bottom sheet
+              final authProv = context.read<AuthProvider>();
+              final canSkipCheckin = authProv.session?.user.permissions?.canCreateOrderWithoutCheckin ?? false;
+
               if (isCheckedIn) {
+                Navigator.pop(context); // Close bottom sheet
                 Navigator.push(
                   context,
                   MaterialPageRoute(
@@ -267,7 +271,8 @@ class _CustomerActionBottomSheetState extends State<CustomerActionBottomSheet> {
                     ),
                   ),
                 );
-              } else {
+              } else if (canSkipCheckin) {
+                Navigator.pop(context); // Close bottom sheet
                 Navigator.push(
                   context,
                   MaterialPageRoute(
@@ -277,6 +282,45 @@ class _CustomerActionBottomSheetState extends State<CustomerActionBottomSheet> {
                       routeId: routeProv.activeRoute?.id,
                       visitId: routeProv.currentVisitId,
                     ),
+                  ),
+                );
+              } else {
+                showDialog(
+                  context: context,
+                  builder: (ctx) => AlertDialog(
+                    title: const Text('Check-in Required'),
+                    content: const Text(
+                      'You must check in to the outlet before creating a secondary sales order.',
+                    ),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.pop(ctx),
+                        child: const Text('Cancel'),
+                      ),
+                      ElevatedButton(
+                        onPressed: () async {
+                          Navigator.pop(ctx); // Close dialog
+                          final employeeId = authProv.session?.user.employeeId;
+                          if (employeeId != null) {
+                            try {
+                              await routeProv.checkIn(employeeId, widget.outletId);
+                              if (context.mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(content: Text('Checked in successfully!')),
+                                );
+                              }
+                            } catch (e) {
+                              if (context.mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(content: Text('Check-in failed: $e')),
+                                );
+                              }
+                            }
+                          }
+                        },
+                        child: const Text('Check In Now'),
+                      ),
+                    ],
                   ),
                 );
               }

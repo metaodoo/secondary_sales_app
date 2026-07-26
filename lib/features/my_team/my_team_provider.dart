@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:secondary_sales/data/api/api_service.dart';
+import 'package:secondary_sales/data/models/dashboard/dashboard_summary.dart';
 
 class MyTeamMember {
   final int id;
@@ -9,6 +10,8 @@ class MyTeamMember {
   final bool isActiveToday;
   final String attendanceStatus;
   final String? lastSyncTime;
+  final double achievedQty;
+  final double targetQty;
 
   MyTeamMember({
     required this.id,
@@ -18,7 +21,39 @@ class MyTeamMember {
     required this.isActiveToday,
     required this.attendanceStatus,
     this.lastSyncTime,
+    this.achievedQty = 0,
+    this.targetQty = 0,
   });
+
+  bool get hasSalesProgress => targetQty > 0 || achievedQty > 0;
+  double get salesPercent =>
+      targetQty <= 0 ? 0 : (achievedQty / targetQty * 100);
+  double get salesFraction =>
+      targetQty <= 0 ? 0 : (achievedQty / targetQty).clamp(0.0, 1.0);
+
+  MyTeamMember copyWith({
+    int? id,
+    String? name,
+    String? workEmail,
+    String? avatarUrl,
+    bool? isActiveToday,
+    String? attendanceStatus,
+    String? lastSyncTime,
+    double? achievedQty,
+    double? targetQty,
+  }) {
+    return MyTeamMember(
+      id: id ?? this.id,
+      name: name ?? this.name,
+      workEmail: workEmail ?? this.workEmail,
+      avatarUrl: avatarUrl ?? this.avatarUrl,
+      isActiveToday: isActiveToday ?? this.isActiveToday,
+      attendanceStatus: attendanceStatus ?? this.attendanceStatus,
+      lastSyncTime: lastSyncTime ?? this.lastSyncTime,
+      achievedQty: achievedQty ?? this.achievedQty,
+      targetQty: targetQty ?? this.targetQty,
+    );
+  }
 
   factory MyTeamMember.fromMap(Map<String, dynamic> map) {
     return MyTeamMember(
@@ -119,11 +154,24 @@ class MyTeamProvider with ChangeNotifier {
     notifyListeners();
 
     try {
-      final res = await _apiService.getMyTeam(date: date);
+      final resFuture = _apiService.getMyTeam(date: date);
+      final progressFuture = _fetchProgressByEmployee(date: date);
+      final res = await resFuture;
+      final progressByEmployee = await progressFuture;
       if (res['success'] == true) {
         final data = res['data'] as Map<String, dynamic>? ?? {};
         final list = data['my_team'] as List? ?? [];
-        _teamMembers = list.map((item) => MyTeamMember.fromMap(item as Map<String, dynamic>)).toList();
+        _teamMembers = list
+            .map((item) => MyTeamMember.fromMap(item as Map<String, dynamic>))
+            .map((member) {
+              final progress = progressByEmployee[member.id];
+              if (progress == null) return member;
+              return member.copyWith(
+                achievedQty: progress.achievedQty,
+                targetQty: progress.targetQty,
+              );
+            })
+            .toList();
       } else {
         _error = res['message'] ?? 'Failed to retrieve team directory.';
       }
@@ -132,6 +180,26 @@ class MyTeamProvider with ChangeNotifier {
     } finally {
       _isLoading = false;
       notifyListeners();
+    }
+  }
+
+  Future<Map<int, TeamMemberProgress>> _fetchProgressByEmployee({
+    String? date,
+  }) async {
+    try {
+      final day = date != null ? DateTime.tryParse(date) : DateTime.now();
+      if (day == null) return const <int, TeamMemberProgress>{};
+
+      final summary = await _apiService.getDashboardSummary(
+        preset: 'custom',
+        dateFrom: day,
+        dateTo: day,
+      );
+
+      return {for (final report in summary.reportMembers) report.id: report};
+    } catch (_) {
+      // The team directory still works without sales progress; keep it best-effort.
+      return const <int, TeamMemberProgress>{};
     }
   }
 
@@ -179,7 +247,11 @@ class MyTeamProvider with ChangeNotifier {
         _selectedEmployeeName = data['employee']?['name'] as String?;
         _barikoiApiKey = data['barikoi_api_key'] as String?;
         final list = data['attendances'] as List? ?? [];
-        _checkpointsShifts = list.map((item) => AttendanceShift.fromMap(item as Map<String, dynamic>)).toList();
+        _checkpointsShifts = list
+            .map(
+              (item) => AttendanceShift.fromMap(item as Map<String, dynamic>),
+            )
+            .toList();
       } else {
         _error = res['message'] ?? 'Failed to retrieve employee checkpoints.';
       }

@@ -126,6 +126,31 @@ class LeaveProvider extends ChangeNotifier {
     }
   }
 
+  /// Fetches a single leave by id, for deep-linking from a notification where
+  /// the list may not be loaded or may not contain that record. Returns null
+  /// when the fetch fails or the caller is not allowed to see it.
+  Future<Map<String, dynamic>?> fetchLeaveById(int leaveId) async {
+    if (_employeeId == 0) return null;
+
+    try {
+      final response = await _apiService.getLeaveDetails(
+        employeeId: _employeeId,
+        leaveId: leaveId,
+      );
+      if (response['success'] == true) {
+        final data = response['data'];
+        if (data is Map) return Map<String, dynamic>.from(data);
+        return null;
+      }
+      _errorMessage = response['message'];
+    } catch (e) {
+      _errorMessage = 'Failed to fetch leave: $e';
+    }
+
+    notifyListeners();
+    return null;
+  }
+
   Future<bool> submitLeaveRequest({
     required int leaveTypeId,
     required String dateFrom,

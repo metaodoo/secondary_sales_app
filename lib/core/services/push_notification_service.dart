@@ -7,7 +7,8 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import 'package:secondary_sales/data/api/api_service.dart';
-import 'package:secondary_sales/features/sales/screens/order_detail_screen.dart';
+import 'package:secondary_sales/data/models/notifications/app_notification.dart';
+import 'package:secondary_sales/features/notifications/notification_router.dart';
 
 class PushNotificationService {
   PushNotificationService._();
@@ -19,8 +20,10 @@ class PushNotificationService {
   static StreamSubscription<String>? _tokenRefreshSubscription;
   static String? _accessToken;
   static String? _sessionId;
-  static int? _pendingSaleOrderId;
-  static String? _pendingSaleOrderName;
+
+  /// A tap can arrive before the session is restored or the navigator exists
+  /// (cold start from a notification), so the target is queued until both are.
+  static NotificationLink? _pendingLink;
 
   static Future<void> initialize({
     required GlobalKey<NavigatorState> navigatorKey,
@@ -59,7 +62,7 @@ class PushNotificationService {
       unawaited(_registerToken(token));
     });
 
-    _openPendingSaleOrderIfPossible();
+    _openPendingNotificationIfPossible();
   }
 
   static Future<void> clearAuthenticatedSession({
@@ -94,7 +97,7 @@ class PushNotificationService {
   }
 
   static void openPendingNotificationIfAny() {
-    _openPendingSaleOrderIfPossible();
+    _openPendingNotificationIfPossible();
   }
 
   static Future<String?> _safeGetToken() async {
@@ -149,47 +152,49 @@ class PushNotificationService {
 
   static String get _appVersion => '1.0.0';
 
-  static void _handleNotificationTap(RemoteMessage message) {
-    final data = message.data;
-    if (data['type'] != 'sale_order_confirmed' ||
-        data['model'] != 'sale.order') {
-      return;
-    }
-
-    final orderId = int.tryParse(data['id']?.toString() ?? '');
-    if (orderId == null) {
-      return;
-    }
-
-    _pendingSaleOrderId = orderId;
-    _pendingSaleOrderName = data['name']?.toString();
-    _openPendingSaleOrderIfPossible();
+  /// Builds a record reference from an FCM data payload. Firebase requires every
+  /// data value to be a string, so `id` arrives as "42" rather than 42 — the
+  /// shared parse helpers in [NotificationLink] coerce it.
+  static NotificationLink? _linkFromPushData(Map<String, dynamic> data) {
+    return NotificationLink.fromMapOrNull({
+      'model': data['model'],
+      'id': data['id'],
+      'name': data['name'],
+      'sale_type': data['sale_type'],
+      'action_link': data['action_link'],
+    });
   }
 
-  static void _openPendingSaleOrderIfPossible() {
-    final orderId = _pendingSaleOrderId;
-    final navigator = _navigatorKey?.currentState;
-    if (orderId == null || navigator == null || _accessToken == null) {
+  static void _handleNotificationTap(RemoteMessage message) {
+    final link = _linkFromPushData(message.data);
+    if (link == null) {
       return;
     }
 
-    _pendingSaleOrderId = null;
-    final fallbackName = _pendingSaleOrderName ?? 'Sale Order #$orderId';
-    _pendingSaleOrderName = null;
+    _pendingLink = link;
+    _openPendingNotificationIfPossible();
+  }
+
+  /// Routes through [NotificationRouter] — the same registry the in-app
+  /// "Open record" button uses — so a push tap and a list tap land identically,
+  /// and a new record type only has to be registered in one place. Models with
+  /// no registered screen are silently ignored.
+  static void _openPendingNotificationIfPossible() {
+    final link = _pendingLink;
+    final navigator = _navigatorKey?.currentState;
+    if (link == null || navigator == null || _accessToken == null) {
+      return;
+    }
+
+    _pendingLink = null;
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final currentNavigator = _navigatorKey?.currentState;
       if (currentNavigator == null) {
-        _pendingSaleOrderId = orderId;
-        _pendingSaleOrderName = fallbackName;
+        _pendingLink = link;
         return;
       }
-      currentNavigator.push(
-        MaterialPageRoute(
-          builder: (_) =>
-              OrderDetailScreen(orderId: orderId, fallbackName: fallbackName),
-        ),
-      );
+      unawaited(NotificationRouter.open(currentNavigator, link));
     });
   }
 }

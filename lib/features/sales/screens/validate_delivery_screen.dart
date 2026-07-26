@@ -10,6 +10,7 @@ import 'package:secondary_sales/features/sales/primary_sale_provider.dart';
 import 'package:secondary_sales/core/access/permission_gate.dart';
 import 'package:secondary_sales/core/access/access_resources.dart';
 import 'package:secondary_sales/core/widgets/ss_ui.dart';
+import 'package:secondary_sales/core/widgets/stock_excess_dialog.dart';
 
 class ValidateDeliveryScreen extends StatefulWidget {
   const ValidateDeliveryScreen({
@@ -323,6 +324,22 @@ class _ValidateDeliveryScreenState extends State<ValidateDeliveryScreen> {
       return;
     }
 
+    // Stock excess validation - block if any line exceeds available stock
+    final excessItems = <StockExcessItem>[];
+    for (final input in _inputs) {
+      if (input.quantityDone > input.move.availableQty) {
+        excessItems.add(StockExcessItem(
+          productName: input.move.product?.name ?? 'Unknown',
+          enteredQty: input.quantityDone,
+          availableQty: input.move.availableQty,
+        ));
+      }
+    }
+    if (excessItems.isNotEmpty) {
+      await showStockExcessValidationDialog(context, excessItems: excessItems);
+      return;
+    }
+
     if (widget.saleType == 'primary') {
       final order = await context.read<PrimarySaleProvider>().validateDelivery(
         orderId: widget.orderId,
@@ -430,9 +447,7 @@ class _ValidateDeliveryScreenState extends State<ValidateDeliveryScreen> {
       if (input.quantityDone > input.move.orderedQty) {
         return 'Delivery quantity cannot exceed ordered quantity.';
       }
-      if (input.quantityDone > input.move.availableQty) {
-        return 'Delivery quantity cannot exceed available stock.';
-      }
+
       if (_isSecondary || !input.move.requiresLots || input.quantityDone <= 0) continue;
 
       final allocated = _allocatedQty(input);
@@ -450,10 +465,7 @@ class _ValidateDeliveryScreenState extends State<ValidateDeliveryScreen> {
   void _changeLineQty(DeliveryLineInput input, double delta) {
     setState(() {
       final next = input.quantityDone + delta;
-      final maxAllowed = input.move.orderedQty < input.move.availableQty
-          ? input.move.orderedQty
-          : input.move.availableQty;
-      input.quantityDone = next.clamp(0, maxAllowed).toDouble();
+      input.quantityDone = next.clamp(0, input.move.orderedQty).toDouble();
 
       if (input.move.requiresLots && input.lots.isNotEmpty && delta < 0) {
         // Quantity reduced: trim existing lot allocations from the last lot first.
@@ -467,10 +479,7 @@ class _ValidateDeliveryScreenState extends State<ValidateDeliveryScreen> {
 
   void _setLineQty(DeliveryLineInput input, double val) {
     setState(() {
-      final maxAllowed = input.move.orderedQty < input.move.availableQty
-          ? input.move.orderedQty
-          : input.move.availableQty;
-      input.quantityDone = val.clamp(0, maxAllowed).toDouble();
+      input.quantityDone = val.clamp(0, input.move.orderedQty).toDouble();
 
       if (input.move.requiresLots && input.lots.isNotEmpty) {
         _trimLotsToQty(input);

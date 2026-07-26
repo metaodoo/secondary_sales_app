@@ -167,6 +167,7 @@ class MobileAuthPermissions {
     this.canEditQcQty = false,
     this.canEditEffectiveQty = false,
     this.skipAttendanceGeolocation = false,
+    this.canCreateOrderWithoutCheckin = false,
   });
 
   final bool canViewAllReturns;
@@ -174,6 +175,7 @@ class MobileAuthPermissions {
   final bool canEditQcQty;
   final bool canEditEffectiveQty;
   final bool skipAttendanceGeolocation;
+  final bool canCreateOrderWithoutCheckin;
 
   factory MobileAuthPermissions.fromMap(Map<String, dynamic> map) {
     return MobileAuthPermissions(
@@ -182,6 +184,7 @@ class MobileAuthPermissions {
       canEditQcQty: map['can_edit_qc_qty'] == true,
       canEditEffectiveQty: map['can_edit_effective_qty'] == true,
       skipAttendanceGeolocation: map['skip_attendance_geolocation'] == true,
+      canCreateOrderWithoutCheckin: map['can_create_order_without_checkin'] == true,
     );
   }
 
@@ -192,6 +195,7 @@ class MobileAuthPermissions {
       'can_edit_qc_qty': canEditQcQty,
       'can_edit_effective_qty': canEditEffectiveQty,
       'skip_attendance_geolocation': skipAttendanceGeolocation,
+      'can_create_order_without_checkin': canCreateOrderWithoutCheckin,
     };
   }
 }

@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:secondary_sales/core/theme/app_theme.dart';
 import 'package:flutter/material.dart';
+import 'package:secondary_sales/core/util/parse.dart';
 import 'package:printing/printing.dart';
 import 'package:provider/provider.dart';
 
@@ -469,7 +470,7 @@ String _money(SaleOrderDetail order, double value) {
 
 String _formatServerDate(String value) {
   if (value.isEmpty) return '-';
-  final parsed = DateTime.tryParse(value);
+  final parsed = asDateTime(value);
   if (parsed == null) return value.split('.').first;
   const months = [
     'Jan',

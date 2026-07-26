@@ -20,41 +20,87 @@ class ScrapsListScreen extends StatefulWidget {
 }
 
 class _ScrapsListScreenState extends State<ScrapsListScreen> {
+  static const int _pageSize = 20;
+
   final TextEditingController _searchController = TextEditingController();
+  final ScrollController _scrollController = ScrollController();
   Timer? _searchDebounce;
   String _state = 'all';
   List<ReturnScrapSummary> _scraps = [];
-
-  @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) => _fetchScraps());
-  }
+  int _page = 1;
+  bool _hasMore = true;
+  bool _isLoadingMore = false;
 
   @override
   void dispose() {
     _searchDebounce?.cancel();
+    _scrollController.dispose();
     _searchController.dispose();
     super.dispose();
   }
 
-  Future<void> _fetchScraps() async {
+  @override
+  void initState() {
+    super.initState();
+    _scrollController.addListener(_onScroll);
+    WidgetsBinding.instance.addPostFrameCallback((_) => _fetchScraps(reset: true));
+  }
+
+  Future<void> _fetchScraps({bool reset = false}) async {
+    if (reset) {
+      _page = 1;
+      _hasMore = true;
+      _isLoadingMore = false;
+    }
+    if (!reset && (!_hasMore || _isLoadingMore)) {
+      return;
+    }
+
+    if (!mounted) return;
+    setState(() {
+      if (!reset) {
+        _isLoadingMore = true;
+      }
+    });
+
     final provider = context.read<ScrapProvider>();
     final results = await provider.fetchScraps(
+      page: _page,
+      pageSize: _pageSize,
       search: _searchController.text,
       state: _state,
       type: widget.moduleType,
     );
     if (mounted) {
       setState(() {
-        _scraps = results;
+        if (reset) {
+          _scraps = results;
+        } else {
+          _scraps.addAll(results);
+        }
+        _hasMore = results.length == _pageSize;
+        if (_hasMore) {
+          _page += 1;
+        }
+        _isLoadingMore = false;
       });
     }
   }
 
   void _onSearchChanged(String value) {
     _searchDebounce?.cancel();
-    _searchDebounce = Timer(const Duration(milliseconds: 350), _fetchScraps);
+    _searchDebounce = Timer(
+      const Duration(milliseconds: 350),
+      () => _fetchScraps(reset: true),
+    );
+  }
+
+  void _onScroll() {
+    if (!_scrollController.hasClients) return;
+    if (_scrollController.position.pixels >=
+        _scrollController.position.maxScrollExtent - 200) {
+      _fetchScraps();
+    }
   }
 
   Future<void> _openCreateScrap() async {
@@ -146,7 +192,7 @@ class _ScrapsListScreenState extends State<ScrapsListScreen> {
                 onChanged: (value) {
                   if (value != null) {
                     setState(() => _state = value);
-                    _fetchScraps();
+                    _fetchScraps(reset: true);
                     Navigator.pop(context);
                   }
                 },
@@ -203,8 +249,9 @@ class _ScrapsListScreenState extends State<ScrapsListScreen> {
           : null,
       body: SafeArea(
         child: RefreshIndicator(
-          onRefresh: _fetchScraps,
+          onRefresh: () => _fetchScraps(reset: true),
           child: ListView(
+            controller: _scrollController,
             padding: const EdgeInsets.fromLTRB(24, 24, 24, kSsFabScrollPadding),
             children: [
               // Search Field
@@ -350,7 +397,7 @@ class _ScrapsListScreenState extends State<ScrapsListScreen> {
                             moduleType: widget.moduleType,
                           ),
                         ),
-                      ).then((_) => _fetchScraps());
+                      ).then((_) => _fetchScraps(reset: true));
                     },
                     borderRadius: BorderRadius.circular(12),
                     child: Container(
@@ -455,6 +502,11 @@ class _ScrapsListScreenState extends State<ScrapsListScreen> {
                     ),
                   );
                 }),
+                if (_isLoadingMore)
+                  const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 16),
+                    child: Center(child: CircularProgressIndicator()),
+                  ),
               ],
             ],
           ),

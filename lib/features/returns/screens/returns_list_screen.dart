@@ -20,41 +20,87 @@ class ReturnsListScreen extends StatefulWidget {
 }
 
 class _ReturnsListScreenState extends State<ReturnsListScreen> {
+  static const int _pageSize = 20;
+
   final TextEditingController _searchController = TextEditingController();
+  final ScrollController _scrollController = ScrollController();
   Timer? _searchDebounce;
   String _state = 'all';
   List<ReturnScrapSummary> _returns = [];
-
-  @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) => _fetchReturns());
-  }
+  int _page = 1;
+  bool _hasMore = true;
+  bool _isLoadingMore = false;
 
   @override
   void dispose() {
     _searchDebounce?.cancel();
+    _scrollController.dispose();
     _searchController.dispose();
     super.dispose();
   }
 
-  Future<void> _fetchReturns() async {
+  @override
+  void initState() {
+    super.initState();
+    _scrollController.addListener(_onScroll);
+    WidgetsBinding.instance.addPostFrameCallback((_) => _fetchReturns(reset: true));
+  }
+
+  Future<void> _fetchReturns({bool reset = false}) async {
+    if (reset) {
+      _page = 1;
+      _hasMore = true;
+      _isLoadingMore = false;
+    }
+    if (!reset && (!_hasMore || _isLoadingMore)) {
+      return;
+    }
+
+    if (!mounted) return;
+    setState(() {
+      if (!reset) {
+        _isLoadingMore = true;
+      }
+    });
+
     final provider = context.read<ReturnProvider>();
     final results = await provider.fetchReturns(
+      page: _page,
+      pageSize: _pageSize,
       search: _searchController.text,
       state: _state,
       type: widget.moduleType,
     );
     if (mounted) {
       setState(() {
-        _returns = results;
+        if (reset) {
+          _returns = results;
+        } else {
+          _returns.addAll(results);
+        }
+        _hasMore = results.length == _pageSize;
+        if (_hasMore) {
+          _page += 1;
+        }
+        _isLoadingMore = false;
       });
     }
   }
 
   void _onSearchChanged(String value) {
     _searchDebounce?.cancel();
-    _searchDebounce = Timer(const Duration(milliseconds: 350), _fetchReturns);
+    _searchDebounce = Timer(
+      const Duration(milliseconds: 350),
+      () => _fetchReturns(reset: true),
+    );
+  }
+
+  void _onScroll() {
+    if (!_scrollController.hasClients) return;
+    if (_scrollController.position.pixels >=
+        _scrollController.position.maxScrollExtent - 200) {
+      _fetchReturns();
+    }
   }
 
   Future<void> _openCreateReturn() async {
@@ -146,7 +192,7 @@ class _ReturnsListScreenState extends State<ReturnsListScreen> {
                 onChanged: (value) {
                   if (value != null) {
                     setState(() => _state = value);
-                    _fetchReturns();
+                    _fetchReturns(reset: true);
                     Navigator.pop(context);
                   }
                 },
@@ -203,8 +249,9 @@ class _ReturnsListScreenState extends State<ReturnsListScreen> {
           : null,
       body: SafeArea(
         child: RefreshIndicator(
-          onRefresh: _fetchReturns,
+          onRefresh: () => _fetchReturns(reset: true),
           child: ListView(
+            controller: _scrollController,
             padding: const EdgeInsets.fromLTRB(24, 24, 24, kSsFabScrollPadding),
             children: [
               // Search Field
@@ -350,7 +397,7 @@ class _ReturnsListScreenState extends State<ReturnsListScreen> {
                             moduleType: widget.moduleType,
                           ),
                         ),
-                      ).then((_) => _fetchReturns());
+                      ).then((_) => _fetchReturns(reset: true));
                     },
                     borderRadius: BorderRadius.circular(12),
                     child: Container(
@@ -455,6 +502,11 @@ class _ReturnsListScreenState extends State<ReturnsListScreen> {
                     ),
                   );
                 }),
+                if (_isLoadingMore)
+                  const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 16),
+                    child: Center(child: CircularProgressIndicator()),
+                  ),
               ],
             ],
           ),

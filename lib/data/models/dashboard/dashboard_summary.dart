@@ -121,10 +121,15 @@ class DashboardAttendanceSummary {
 }
 
 class AttendanceWindow {
-  const AttendanceWindow({required this.present, required this.absent});
+  const AttendanceWindow({
+    required this.present,
+    required this.absent,
+    this.late = 0,
+  });
 
   final int present;
   final int absent;
+  final int late;
 
   int get total => present + absent;
 
@@ -133,6 +138,7 @@ class AttendanceWindow {
     return AttendanceWindow(
       present: asInt(map['present']),
       absent: asInt(map['absent']),
+      late: asInt(map['late']),
     );
   }
 }

@@ -6,6 +6,14 @@ import 'package:secondary_sales/core/constants.dart';
 import 'package:secondary_sales/features/auth/auth_provider.dart';
 import 'package:secondary_sales/core/widgets/ss_ui.dart';
 
+/// Shown when the server will not enumerate its databases. This is the normal
+/// response from Odoo.sh and any instance running with `list_db = False`, not an
+/// error the user needs to resolve — those servers host a single database and
+/// select it from the hostname.
+const String _kDbListUnavailable =
+    'This server does not publish a database list (normal for Odoo.sh). '
+    'Leave the database field blank — the server will select its own.';
+
 class ConnectionSetupScreen extends StatefulWidget {
   const ConnectionSetupScreen({super.key});
 
@@ -16,8 +24,8 @@ class ConnectionSetupScreen extends StatefulWidget {
 class _ConnectionSetupScreenState extends State<ConnectionSetupScreen> {
   final _formKey = GlobalKey<FormState>();
   final _serverController = TextEditingController(text: AppConstants.baseUrl);
+  final _dbController = TextEditingController(text: AppConstants.dbName);
   List<String> _databases = [];
-  String? _selectedDatabase;
   bool _isLoadingDatabases = false;
   bool _isConfirming = false;
   String? _error;
@@ -25,6 +33,7 @@ class _ConnectionSetupScreenState extends State<ConnectionSetupScreen> {
   @override
   void dispose() {
     _serverController.dispose();
+    _dbController.dispose();
     super.dispose();
   }
 
@@ -47,14 +56,23 @@ class _ConnectionSetupScreenState extends State<ConnectionSetupScreen> {
       if (!mounted) return;
       setState(() {
         _databases = databases;
-        _selectedDatabase = databases.isNotEmpty ? databases.first : null;
+        if (databases.isNotEmpty && _dbController.text.trim().isEmpty) {
+          _dbController.text = databases.first;
+        }
         if (databases.isEmpty) {
-          _error = 'No databases were returned by this server.';
+          _error = _kDbListUnavailable;
         }
       });
     } catch (e) {
+      // Servers with the database manager disabled — every Odoo.sh build, and
+      // any instance run with list_db = False — reject this call outright. That
+      // is not a setup failure: they host exactly one database and resolve it
+      // from the hostname, so the field can simply be left blank.
       if (!mounted) return;
-      setState(() => _error = e.toString());
+      setState(() {
+        _databases = [];
+        _error = '$_kDbListUnavailable\n\nDetails: $e';
+      });
     } finally {
       if (mounted) {
         setState(() => _isLoadingDatabases = false);
@@ -64,11 +82,6 @@ class _ConnectionSetupScreenState extends State<ConnectionSetupScreen> {
 
   Future<void> _confirm() async {
     if (!_formKey.currentState!.validate()) return;
-    final selectedDatabase = _selectedDatabase;
-    if (selectedDatabase == null || selectedDatabase.isEmpty) {
-      setState(() => _error = 'Select a database first.');
-      return;
-    }
 
     setState(() {
       _isConfirming = true;
@@ -76,9 +89,10 @@ class _ConnectionSetupScreenState extends State<ConnectionSetupScreen> {
     });
 
     try {
+      // An empty database is valid and means "let the server resolve it".
       await context.read<AuthProvider>().setupConnection(
         baseUrl: _serverController.text,
-        dbName: selectedDatabase,
+        dbName: _dbController.text.trim(),
       );
     } catch (e) {
       if (!mounted) return;
@@ -116,7 +130,8 @@ class _ConnectionSetupScreenState extends State<ConnectionSetupScreen> {
                   ),
                   const SizedBox(height: 8),
                   const Text(
-                    'Select the Odoo database for this device.',
+                    'Enter your Odoo server URL. Tap Load to pick a database, or '
+                    'leave it blank to use the server default.',
                     style: TextStyle(
                       color: AppColors.textSecondary,
                       fontSize: 16,
@@ -162,7 +177,6 @@ class _ConnectionSetupScreenState extends State<ConnectionSetupScreen> {
                             onChanged: (_) {
                               setState(() {
                                 _databases = [];
-                                _selectedDatabase = null;
                                 _error = null;
                               });
                             },
@@ -177,41 +191,17 @@ class _ConnectionSetupScreenState extends State<ConnectionSetupScreen> {
                           Row(
                             children: [
                               Expanded(
-                                child: DropdownButtonFormField<String>(
-                                  key: ValueKey(
-                                    '${_databases.join('|')}|$_selectedDatabase',
-                                  ),
-                                  initialValue:
-                                      _databases.contains(_selectedDatabase)
-                                      ? _selectedDatabase
-                                      : null,
-                                  items: _databases
-                                      .map(
-                                        (database) => DropdownMenuItem<String>(
-                                          value: database,
-                                          child: Text(
-                                            database,
-                                            overflow: TextOverflow.ellipsis,
-                                          ),
-                                        ),
-                                      )
-                                      .toList(),
-                                  onChanged: isBusy
-                                      ? null
-                                      : (value) {
-                                          setState(
-                                            () => _selectedDatabase = value,
-                                          );
-                                        },
+                                // Free text rather than a dropdown: servers with
+                                // the database manager disabled return no list to
+                                // populate one, and a dropdown offers no way to
+                                // proceed without an item. Optional by design.
+                                child: TextFormField(
+                                  controller: _dbController,
+                                  enabled: !isBusy,
+                                  textInputAction: TextInputAction.done,
                                   decoration: _inputDecoration(
-                                    hintText: 'Select database',
+                                    hintText: 'Database (optional)',
                                   ),
-                                  validator: (value) {
-                                    if (value == null || value.isEmpty) {
-                                      return 'Database is required';
-                                    }
-                                    return null;
-                                  },
                                 ),
                               ),
                               const SizedBox(width: 12),
@@ -237,6 +227,26 @@ class _ConnectionSetupScreenState extends State<ConnectionSetupScreen> {
                               ),
                             ],
                           ),
+                          if (_databases.isNotEmpty) ...[
+                            const SizedBox(height: 8),
+                            Wrap(
+                              spacing: 8,
+                              runSpacing: 4,
+                              children: _databases
+                                  .map(
+                                    (database) => ActionChip(
+                                      label: Text(database),
+                                      onPressed: isBusy
+                                          ? null
+                                          : () => setState(
+                                              () => _dbController.text =
+                                                  database,
+                                            ),
+                                    ),
+                                  )
+                                  .toList(),
+                            ),
+                          ],
                           if (_error != null) ...[
                             const SizedBox(height: 12),
                             ErrorPanel(_error!),

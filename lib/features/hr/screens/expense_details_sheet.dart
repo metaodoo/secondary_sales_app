@@ -8,13 +8,21 @@ class ExpenseDetailsSheet extends StatefulWidget {
 
   const ExpenseDetailsSheet({super.key, required this.sheetSummary});
 
-  static void show(BuildContext context, Map<String, dynamic> sheetSummary) {
+  /// [provider] lets a caller outside the expense dashboard's subtree — a
+  /// notification deep link — supply its own instance, since ExpenseProvider is
+  /// created per-screen rather than in the global MultiProvider.
+  static void show(
+    BuildContext context,
+    Map<String, dynamic> sheetSummary, {
+    ExpenseProvider? provider,
+  }) {
+    final expenseProvider = provider ?? context.read<ExpenseProvider>();
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (ctx) => ChangeNotifierProvider.value(
-        value: context.read<ExpenseProvider>(),
+        value: expenseProvider,
         child: ExpenseDetailsSheet(sheetSummary: sheetSummary),
       ),
     );
@@ -41,7 +49,7 @@ class _ExpenseDetailsSheetState extends State<ExpenseDetailsSheet> {
     super.dispose();
   }
 
-  Color _getStatusColor(String status) {
+  Color _getStatusColor(String? status) {
     switch (status) {
       case 'approve':
       case 'approved':
@@ -60,7 +68,7 @@ class _ExpenseDetailsSheetState extends State<ExpenseDetailsSheet> {
     }
   }
 
-  Color _getStatusBgColor(String status) {
+  Color _getStatusBgColor(String? status) {
     return _getStatusColor(status).withOpacity(0.1);
   }
 
@@ -116,8 +124,17 @@ class _ExpenseDetailsSheetState extends State<ExpenseDetailsSheet> {
   @override
   Widget build(BuildContext context) {
     final provider = context.watch<ExpenseProvider>();
-    final isPendingMode = provider.activeTab == 'pending';
     final sheetId = widget.sheetSummary['id'];
+
+    // The dashboard passes a full summary and renders the header immediately; a
+    // notification deep link knows only the id, so prefer the fetched details and
+    // fall back to whatever the summary carries.
+    final details = provider.selectedSheetDetails;
+    final title = (details?['title'] ?? widget.sheetSummary['title'])?.toString();
+    final reportDate = (details?['date'] ?? widget.sheetSummary['date'])?.toString();
+    final status = (details?['status'] ?? widget.sheetSummary['status'])?.toString();
+    final statusLabel =
+        (details?['status_label'] ?? widget.sheetSummary['status_label'])?.toString();
 
     return DraggableScrollableSheet(
       initialChildSize: 0.85,
@@ -156,36 +173,39 @@ class _ExpenseDetailsSheetState extends State<ExpenseDetailsSheet> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            widget.sheetSummary['title'] ?? 'Expense Report',
+                            title ?? 'Expense Report',
                             style: const TextStyle(
                               fontSize: 18,
                               fontWeight: FontWeight.bold,
                               color: AppColors.textPrimary,
                             ),
                           ),
-                          const SizedBox(height: 4),
-                          Text(
-                            'Report Date: ${widget.sheetSummary['date']}',
-                            style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
-                          ),
+                          if (reportDate != null && reportDate.isNotEmpty) ...[
+                            const SizedBox(height: 4),
+                            Text(
+                              'Report Date: $reportDate',
+                              style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                            ),
+                          ],
                         ],
                       ),
                     ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                      decoration: BoxDecoration(
-                        color: _getStatusBgColor(widget.sheetSummary['status']),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Text(
-                        widget.sheetSummary['status_label'] ?? 'DRAFT',
-                        style: TextStyle(
-                          color: _getStatusColor(widget.sheetSummary['status']),
-                          fontWeight: FontWeight.bold,
-                          fontSize: 12,
+                    if (statusLabel != null && statusLabel.isNotEmpty)
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: _getStatusBgColor(status),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Text(
+                          statusLabel,
+                          style: TextStyle(
+                            color: _getStatusColor(status),
+                            fontWeight: FontWeight.bold,
+                            fontSize: 12,
+                          ),
                         ),
                       ),
-                    ),
                   ],
                 ),
               ),

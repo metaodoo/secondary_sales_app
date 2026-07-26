@@ -4,6 +4,8 @@ part of '../api_service.dart';
 /// Sales endpoints for the secondary sales API.
 extension SalesApi on ApiService {
   Future<List<PrimaryOrder>> getRecentOrders({
+    int page = 1,
+    int pageSize = 20,
     String? search,
     String? status,
     DateTime? dateFrom,
@@ -15,7 +17,8 @@ extension SalesApi on ApiService {
     final params = <String, dynamic>{
       'employee_id': _activeEmployeeId,
       'sale_type': saleType,
-      'page_size': 20,
+      'page': page,
+      'page_size': pageSize,
     };
     if (outletId != null) {
       params['outlet_id'] = outletId;

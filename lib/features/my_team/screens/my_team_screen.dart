@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
-import 'package:secondary_sales/core/theme/app_theme.dart';
-import 'package:secondary_sales/core/widgets/ss_ui.dart';
-import 'package:secondary_sales/features/my_team/my_team_provider.dart';
-import 'package:secondary_sales/features/auth/auth_provider.dart';
-import 'package:secondary_sales/features/my_team/screens/subordinate_barikoi_checkpoints_screen.dart';
 import 'package:intl/intl.dart';
+import 'package:provider/provider.dart';
+
+import 'package:secondary_sales/core/theme/app_theme.dart';
+import 'package:secondary_sales/core/util/parse.dart';
+import 'package:secondary_sales/core/widgets/ss_ui.dart';
+import 'package:secondary_sales/features/auth/auth_provider.dart';
+import 'package:secondary_sales/features/my_team/my_team_provider.dart';
+import 'package:secondary_sales/features/my_team/screens/subordinate_barikoi_checkpoints_screen.dart';
 
 class MyTeamScreen extends StatefulWidget {
   const MyTeamScreen({super.key});
@@ -22,9 +24,7 @@ class _MyTeamScreenState extends State<MyTeamScreen> {
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _fetchTeam();
-    });
+    WidgetsBinding.instance.addPostFrameCallback((_) => _fetchTeam());
   }
 
   @override
@@ -39,7 +39,7 @@ class _MyTeamScreenState extends State<MyTeamScreen> {
   }
 
   Future<void> _selectDate(BuildContext context) async {
-    final DateTime? picked = await showDatePicker(
+    final picked = await showDatePicker(
       context: context,
       initialDate: _selectedDate,
       firstDate: DateTime(2020),
@@ -57,24 +57,44 @@ class _MyTeamScreenState extends State<MyTeamScreen> {
         );
       },
     );
-    if (picked != null && picked != _selectedDate) {
-      setState(() {
-        _selectedDate = picked;
-      });
-      _fetchTeam();
-    }
+    if (picked == null || picked == _selectedDate) return;
+    setState(() => _selectedDate = picked);
+    _fetchTeam();
+  }
+
+  void _openMapView(MyTeamMember member, String dateStr) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => SubordinateBarikoiCheckpointsScreen(
+          employeeId: member.id,
+          employeeName: member.name,
+          initialDateStr: dateStr,
+        ),
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
-    final myTeamProvider = context.watch<MyTeamProvider>();
+    final provider = context.watch<MyTeamProvider>();
     final formattedDate = DateFormat('yyyy-MM-dd').format(_selectedDate);
 
-    // Filter local list
-    final filteredMembers = myTeamProvider.teamMembers.where((member) {
-      return member.name.toLowerCase().contains(_searchQuery.toLowerCase()) ||
-          member.workEmail.toLowerCase().contains(_searchQuery.toLowerCase());
+    final filteredMembers = provider.teamMembers.where((member) {
+      final query = _searchQuery.toLowerCase();
+      return member.name.toLowerCase().contains(query) ||
+          member.workEmail.toLowerCase().contains(query);
     }).toList();
+
+    final onShiftCount = filteredMembers
+        .where((member) => member.isActiveToday)
+        .length;
+    final checkedOutCount = filteredMembers
+        .where((member) => member.attendanceStatus == 'Checked-Out')
+        .length;
+    final withTargetCount = filteredMembers
+        .where((member) => member.hasSalesProgress)
+        .length;
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -106,296 +126,562 @@ class _MyTeamScreenState extends State<MyTeamScreen> {
           ),
         ],
       ),
-      body: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          // Filter Panel
-          Container(
-            color: Colors.white,
-            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
-            child: Column(
-              children: [
-                // Date Selector row
-                InkWell(
-                  onTap: () => _selectDate(context),
-                  borderRadius: BorderRadius.circular(8),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 10.0),
-                    decoration: BoxDecoration(
-                      border: Border.all(color: AppColors.borderSoft),
-                      borderRadius: BorderRadius.circular(8),
-                      color: AppColors.surfaceTint,
-                    ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Row(
-                          children: [
-                            const Icon(Icons.calendar_today, size: 18, color: AppColors.primaryStrong),
-                            const SizedBox(width: 10),
-                            Text(
-                              'Date: ${DateFormat('MMMM dd, yyyy').format(_selectedDate)}',
-                              style: const TextStyle(
-                                fontSize: 15,
-                                fontWeight: FontWeight.w600,
-                                color: AppColors.textPrimary,
-                              ),
-                            ),
-                          ],
-                        ),
-                        const Icon(Icons.arrow_drop_down, color: AppColors.textSecondary),
-                      ],
-                    ),
-                  ),
+      body: RefreshIndicator(
+        onRefresh: () async => _fetchTeam(),
+        child: ListView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+          children: [
+            _TeamOverviewCard(
+              selectedDate: _selectedDate,
+              totalCount: filteredMembers.length,
+              onShiftCount: onShiftCount,
+              checkedOutCount: checkedOutCount,
+              withTargetCount: withTargetCount,
+            ),
+            const SizedBox(height: 14),
+            _FiltersCard(
+              selectedDate: _selectedDate,
+              searchController: _searchController,
+              searchQuery: _searchQuery,
+              onSelectDate: () => _selectDate(context),
+              onChanged: (value) => setState(() => _searchQuery = value),
+              onClear: () {
+                _searchController.clear();
+                setState(() => _searchQuery = '');
+              },
+            ),
+            const SizedBox(height: 16),
+            const SectionHeader(title: 'Team Members'),
+            const SizedBox(height: 6),
+            const Text(
+              'Use Open map view to inspect the selected day\'s checkpoints and travel route.',
+              style: TextStyle(color: AppColors.textSecondary, fontSize: 13),
+            ),
+            const SizedBox(height: 12),
+            if (provider.error != null) ErrorPanel(provider.error!),
+            if (provider.isLoading && provider.teamMembers.isEmpty)
+              const LoadingState(message: 'Retrieving team directory...')
+            else if (filteredMembers.isEmpty)
+              _EmptyTeamState(searchQuery: _searchQuery)
+            else ...[
+              if (provider.isLoading) ...[
+                const LinearProgressIndicator(),
+                const SizedBox(height: 12),
+              ],
+              for (final member in filteredMembers) ...[
+                _SubordinateCard(
+                  member: member,
+                  dateStr: formattedDate,
+                  onOpenMap: () => _openMapView(member, formattedDate),
                 ),
                 const SizedBox(height: 12),
-                // Search Input
-                TextField(
-                  controller: _searchController,
-                  onChanged: (val) {
-                    setState(() {
-                      _searchQuery = val;
-                    });
-                  },
-                  decoration: InputDecoration(
-                    hintText: 'Search subordinates by name...',
-                    prefixIcon: const Icon(Icons.search, color: AppColors.textSecondary),
-                    suffixIcon: _searchQuery.isNotEmpty
-                        ? IconButton(
-                            icon: const Icon(Icons.clear, color: AppColors.textSecondary),
-                            onPressed: () {
-                              _searchController.clear();
-                              setState(() {
-                                _searchQuery = '';
-                              });
-                            },
-                          )
-                        : null,
-                    filled: true,
-                    fillColor: AppColors.surfaceTint,
-                    contentPadding: const EdgeInsets.symmetric(vertical: 0, horizontal: 16),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(8),
-                      borderSide: const BorderSide(color: AppColors.borderSoft),
+              ],
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _TeamOverviewCard extends StatelessWidget {
+  const _TeamOverviewCard({
+    required this.selectedDate,
+    required this.totalCount,
+    required this.onShiftCount,
+    required this.checkedOutCount,
+    required this.withTargetCount,
+  });
+
+  final DateTime selectedDate;
+  final int totalCount;
+  final int onShiftCount;
+  final int checkedOutCount;
+  final int withTargetCount;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: ssPanelDecoration(),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            DateFormat('EEEE, MMMM d, yyyy').format(selectedDate),
+            style: const TextStyle(
+              color: AppColors.textSecondary,
+              fontWeight: FontWeight.w700,
+              fontSize: 13,
+            ),
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            'Team snapshot',
+            style: TextStyle(
+              color: AppColors.textPrimary,
+              fontWeight: FontWeight.w800,
+              fontSize: 20,
+            ),
+          ),
+          const SizedBox(height: 14),
+          Row(
+            children: [
+              Expanded(
+                child: _OverviewStat(
+                  label: 'Members',
+                  value: totalCount.toString(),
+                  bg: AppColors.primarySoft,
+                  fg: AppColors.primaryStrong,
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: _OverviewStat(
+                  label: 'On Shift',
+                  value: onShiftCount.toString(),
+                  bg: AppColors.successSoft,
+                  fg: const Color(0xFF166534),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: _OverviewStat(
+                  label: 'Checked Out',
+                  value: checkedOutCount.toString(),
+                  bg: const Color(0xFFEFF6FF),
+                  fg: AppColors.primaryStrong,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            decoration: BoxDecoration(
+              color: AppColors.surfaceTint,
+              borderRadius: BorderRadius.circular(AppRadii.medium),
+              border: Border.all(color: AppColors.borderSoft),
+            ),
+            child: Text(
+              '$withTargetCount member${withTargetCount == 1 ? '' : 's'} have sales-vs-target data for this day.',
+              style: const TextStyle(
+                color: AppColors.textSecondary,
+                fontWeight: FontWeight.w600,
+                fontSize: 12,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _OverviewStat extends StatelessWidget {
+  const _OverviewStat({
+    required this.label,
+    required this.value,
+    required this.bg,
+    required this.fg,
+  });
+
+  final String label;
+  final String value;
+  final Color bg;
+  final Color fg;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: TextStyle(
+              color: fg.withValues(alpha: 0.85),
+              fontWeight: FontWeight.w700,
+              fontSize: 11,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            value,
+            style: TextStyle(
+              color: fg,
+              fontWeight: FontWeight.w900,
+              fontSize: 20,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _FiltersCard extends StatelessWidget {
+  const _FiltersCard({
+    required this.selectedDate,
+    required this.searchController,
+    required this.searchQuery,
+    required this.onSelectDate,
+    required this.onChanged,
+    required this.onClear,
+  });
+
+  final DateTime selectedDate;
+  final TextEditingController searchController;
+  final String searchQuery;
+  final VoidCallback onSelectDate;
+  final ValueChanged<String> onChanged;
+  final VoidCallback onClear;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: ssPanelDecoration(),
+      child: Column(
+        children: [
+          InkWell(
+            onTap: onSelectDate,
+            borderRadius: BorderRadius.circular(AppRadii.medium),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+              decoration: BoxDecoration(
+                color: AppColors.surfaceTint,
+                borderRadius: BorderRadius.circular(AppRadii.medium),
+                border: Border.all(color: AppColors.borderSoft),
+              ),
+              child: Row(
+                children: [
+                  const Icon(
+                    Icons.calendar_today,
+                    size: 18,
+                    color: AppColors.primaryStrong,
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      DateFormat('MMMM d, yyyy').format(selectedDate),
+                      style: const TextStyle(
+                        color: AppColors.textPrimary,
+                        fontWeight: FontWeight.w700,
+                        fontSize: 15,
+                      ),
                     ),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(8),
-                      borderSide: const BorderSide(color: AppColors.borderSoft),
+                  ),
+                  const Icon(Icons.expand_more, color: AppColors.textSecondary),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: searchController,
+            onChanged: onChanged,
+            decoration:
+                ssInputDecoration(
+                  'Search subordinates by name or email',
+                  Icons.search,
+                ).copyWith(
+                  suffixIcon: searchQuery.isNotEmpty
+                      ? IconButton(
+                          icon: const Icon(
+                            Icons.clear,
+                            color: AppColors.textSecondary,
+                          ),
+                          onPressed: onClear,
+                        )
+                      : null,
+                ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _EmptyTeamState extends StatelessWidget {
+  const _EmptyTeamState({required this.searchQuery});
+
+  final String searchQuery;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 40),
+      decoration: ssPanelDecoration(),
+      child: Column(
+        children: [
+          Icon(
+            Icons.group_off_outlined,
+            size: 56,
+            color: AppColors.textSecondary.withValues(alpha: 0.55),
+          ),
+          const SizedBox(height: 14),
+          Text(
+            searchQuery.isNotEmpty
+                ? 'No subordinates found matching "$searchQuery".'
+                : 'No subordinates assigned or active on this date.',
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              color: AppColors.textSecondary,
+              fontSize: 15,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SubordinateCard extends StatelessWidget {
+  const _SubordinateCard({
+    required this.member,
+    required this.dateStr,
+    required this.onOpenMap,
+  });
+
+  final MyTeamMember member;
+  final String dateStr;
+  final VoidCallback onOpenMap;
+
+  @override
+  Widget build(BuildContext context) {
+    final badge = _statusBadge(member.attendanceStatus);
+    final percent = member.salesPercent.round();
+    final salesColor = percent >= 85
+        ? const Color(0xFF16A34A)
+        : percent >= 70
+        ? const Color(0xFFD97706)
+        : const Color(0xFFDC2626);
+
+    return Container(
+      decoration: ssPanelDecoration(),
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              CircleAvatar(
+                radius: 24,
+                backgroundColor: AppColors.primaryTint,
+                backgroundImage: member.avatarUrl != null
+                    ? NetworkImage(
+                        '${context.read<AuthProvider>().baseUrl}${member.avatarUrl}',
+                      )
+                    : null,
+                child: member.avatarUrl == null
+                    ? Text(
+                        member.name.isNotEmpty
+                            ? member.name[0].toUpperCase()
+                            : '?',
+                        style: const TextStyle(
+                          color: AppColors.primaryStrong,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 20,
+                        ),
+                      )
+                    : null,
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      member.name,
+                      style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w800,
+                        color: AppColors.textPrimary,
+                      ),
                     ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(8),
-                      borderSide: const BorderSide(color: AppColors.primaryStrong),
-                    ),
+                    if (member.workEmail.isNotEmpty) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        member.workEmail,
+                        style: const TextStyle(
+                          fontSize: 13,
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              const SizedBox(width: 10),
+              badge,
+            ],
+          ),
+          const SizedBox(height: 14),
+          if (member.hasSalesProgress) ...[
+            Row(
+              children: [
+                const Text(
+                  'Sales vs target',
+                  style: TextStyle(
+                    color: AppColors.textSecondary,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 12,
+                  ),
+                ),
+                const Spacer(),
+                Text(
+                  '${_fmtQty(member.achievedQty)} / ${_fmtQty(member.targetQty)} units',
+                  style: const TextStyle(
+                    color: AppColors.textPrimary,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 12,
                   ),
                 ),
               ],
             ),
-          ),
-          const SizedBox(height: 8),
-
-          // Main Subordinate list
-          Expanded(
-            child: myTeamProvider.isLoading && myTeamProvider.teamMembers.isEmpty
-                ? const Center(
-                    child: LoadingState(message: 'Retrieving team directory...'),
-                  )
-                : myTeamProvider.error != null && myTeamProvider.teamMembers.isEmpty
-                    ? SingleChildScrollView(
-                        padding: const EdgeInsets.all(16.0),
-                        child: ErrorPanel(myTeamProvider.error!),
-                      )
-                    : RefreshIndicator(
-                        onRefresh: () async => _fetchTeam(),
-                        child: ListView(
-                          physics: const AlwaysScrollableScrollPhysics(),
-                          padding: const EdgeInsets.all(16.0),
-                          children: [
-                            if (myTeamProvider.error != null) ...[
-                              ErrorPanel(myTeamProvider.error!),
-                              const SizedBox(height: 12),
-                            ],
-                            if (myTeamProvider.isLoading) ...[
-                              const LinearProgressIndicator(),
-                              const SizedBox(height: 12),
-                            ],
-                            if (filteredMembers.isEmpty)
-                              Padding(
-                                padding: const EdgeInsets.all(32.0),
-                                child: Column(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    Icon(
-                                      Icons.group_off_outlined,
-                                      size: 64,
-                                      color: AppColors.textSecondary.withValues(alpha: 0.5),
-                                    ),
-                                    const SizedBox(height: 16),
-                                    Text(
-                                      _searchQuery.isNotEmpty
-                                          ? 'No subordinates found matching "$_searchQuery".'
-                                          : 'No subordinates assigned or active today.',
-                                      textAlign: TextAlign.center,
-                                      style: const TextStyle(
-                                        fontSize: 16,
-                                        color: AppColors.textSecondary,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              )
-                            else
-                              ...filteredMembers.map(
-                                (member) => Padding(
-                                  padding: const EdgeInsets.only(bottom: 12),
-                                  child: _buildSubordinateCard(context, member, formattedDate),
-                                ),
-                              ),
-                          ],
-                        ),
-                      ),
+            const SizedBox(height: 8),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(999),
+              child: LinearProgressIndicator(
+                value: member.salesFraction,
+                minHeight: 8,
+                backgroundColor: AppColors.borderMuted,
+                valueColor: AlwaysStoppedAnimation<Color>(salesColor),
+              ),
+            ),
+            const SizedBox(height: 6),
+            Align(
+              alignment: Alignment.centerRight,
+              child: Text(
+                '$percent%',
+                style: TextStyle(
+                  color: salesColor,
+                  fontWeight: FontWeight.w800,
+                  fontSize: 12,
+                ),
+              ),
+            ),
+          ] else ...[
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              decoration: BoxDecoration(
+                color: AppColors.surfaceTint,
+                borderRadius: BorderRadius.circular(AppRadii.medium),
+              ),
+              child: const Text(
+                'Sales target data is not available for this member on the selected date.',
+                style: TextStyle(color: AppColors.textSecondary, fontSize: 12),
+              ),
+            ),
+          ],
+          const SizedBox(height: 14),
+          Row(
+            children: [
+              const Icon(Icons.sync, size: 14, color: AppColors.textSecondary),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  member.lastSyncTime != null
+                      ? 'Sync ${_formatSync(member.lastSyncTime!)}'
+                      : 'No sync data',
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 10),
+              TextButton.icon(
+                onPressed: onOpenMap,
+                style: TextButton.styleFrom(
+                  backgroundColor: AppColors.primarySoft,
+                  foregroundColor: AppColors.primaryStrong,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 10,
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                ),
+                icon: const Icon(Icons.map_outlined, size: 18),
+                label: const Text(
+                  'Open map view',
+                  style: TextStyle(fontWeight: FontWeight.w700),
+                ),
+              ),
+            ],
           ),
         ],
       ),
     );
   }
 
-  Widget _buildSubordinateCard(BuildContext context, MyTeamMember member, String dateStr) {
-    Color statusColor;
-    Color statusBgColor;
-
-    switch (member.attendanceStatus) {
+  Widget _statusBadge(String status) {
+    switch (status) {
       case 'Active Shift':
-        statusColor = const Color(0xFF16A34A); // Green
-        statusBgColor = const Color(0xFFDCFCE7);
-        break;
-      case 'Checked-Out':
-        statusColor = AppColors.primaryStrong; // Blue
-        statusBgColor = AppColors.primarySoft;
-        break;
-      default:
-        statusColor = AppColors.textSecondary; // Grey
-        statusBgColor = AppColors.borderMuted;
-    }
-
-    return GestureDetector(
-      onTap: () {
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (_) => SubordinateBarikoiCheckpointsScreen(
-              employeeId: member.id,
-              employeeName: member.name,
-              initialDateStr: dateStr,
-            ),
-          ),
+        return _StatusBadge(
+          label: 'On Shift',
+          fg: const Color(0xFF166534),
+          bg: AppColors.successSoft,
         );
-      },
-      child: Container(
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: AppColors.borderSoft),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.02),
-              blurRadius: 6,
-              offset: const Offset(0, 3),
-            ),
-          ],
-        ),
-        padding: const EdgeInsets.all(16.0),
-        child: Row(
-          children: [
-            // Avatar
-            CircleAvatar(
-              radius: 24,
-              backgroundColor: AppColors.primaryTint,
-              backgroundImage: member.avatarUrl != null
-                  ? NetworkImage('${context.read<AuthProvider>().baseUrl}${member.avatarUrl}')
-                  : null,
-              child: member.avatarUrl == null
-                  ? Text(
-                      member.name.isNotEmpty ? member.name[0].toUpperCase() : '?',
-                      style: const TextStyle(
-                        color: AppColors.primaryStrong,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 20,
-                      ),
-                    )
-                  : null,
-            ),
-            const SizedBox(width: 16),
-            // Middle Details
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    member.name,
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                      color: AppColors.textPrimary,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  if (member.workEmail.isNotEmpty)
-                    Text(
-                      member.workEmail,
-                      style: const TextStyle(
-                        fontSize: 13,
-                        color: AppColors.textSecondary,
-                      ),
-                    ),
-                  const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      const Icon(Icons.sync, size: 14, color: AppColors.textSecondary),
-                      const SizedBox(width: 4),
-                      Text(
-                        member.lastSyncTime != null
-                            ? 'Sync: ${member.lastSyncTime}'
-                            : 'No sync data',
-                        style: const TextStyle(
-                          fontSize: 11,
-                          color: AppColors.textSecondary,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-            // Right Status Badge and Arrow
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: statusBgColor,
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Text(
-                    member.attendanceStatus,
-                    style: TextStyle(
-                      color: statusColor,
-                      fontSize: 11,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                const Icon(
-                  Icons.arrow_forward_ios,
-                  size: 14,
-                  color: AppColors.textSecondary,
-                ),
-              ],
-            ),
-          ],
-        ),
+      case 'Checked-Out':
+        return const _StatusBadge(
+          label: 'Checked Out',
+          fg: AppColors.primaryStrong,
+          bg: AppColors.primarySoft,
+        );
+      default:
+        return const _StatusBadge(
+          label: 'Not Checked-In',
+          fg: AppColors.textSecondary,
+          bg: AppColors.borderMuted,
+        );
+    }
+  }
+}
+
+class _StatusBadge extends StatelessWidget {
+  const _StatusBadge({required this.label, required this.fg, required this.bg});
+
+  final String label;
+  final Color fg;
+  final Color bg;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(color: fg, fontWeight: FontWeight.w700, fontSize: 11),
       ),
     );
   }
+}
+
+String _fmtQty(double value) {
+  if (value == value.roundToDouble()) return value.toInt().toString();
+  return value.toStringAsFixed(1);
+}
+
+String _formatSync(String raw) {
+  final parsed = asDateTime(raw);
+  if (parsed == null) return raw;
+  return DateFormat('MMM d, h:mm a').format(parsed);
 }

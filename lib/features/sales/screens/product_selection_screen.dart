@@ -22,12 +22,18 @@ class _ProductSelectionScreenState extends State<ProductSelectionScreen> {
   final TextEditingController _searchController = TextEditingController();
   Timer? _searchDebounce;
   final Map<int, OrderLineEntry> _selectedLines = {};
+  bool _inStockOnly = false;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<PrimarySaleProvider>().searchProducts('', saleType: widget.saleType, partnerId: widget.partnerId);
+      context.read<PrimarySaleProvider>().searchProducts(
+        '',
+        saleType: widget.saleType,
+        partnerId: widget.partnerId,
+        inStockOnly: _inStockOnly,
+      );
     });
   }
 
@@ -41,7 +47,12 @@ class _ProductSelectionScreenState extends State<ProductSelectionScreen> {
   void _onSearchChanged(String query) {
     _searchDebounce?.cancel();
     _searchDebounce = Timer(const Duration(milliseconds: 350), () {
-      context.read<PrimarySaleProvider>().searchProducts(query, saleType: widget.saleType, partnerId: widget.partnerId);
+      context.read<PrimarySaleProvider>().searchProducts(
+        query,
+        saleType: widget.saleType,
+        partnerId: widget.partnerId,
+        inStockOnly: _inStockOnly,
+      );
     });
   }
 
@@ -172,11 +183,61 @@ class _ProductSelectionScreenState extends State<ProductSelectionScreen> {
               ),
             ),
 
+            // Stock > 0 Filter Toggle
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24),
+              child: Row(
+                children: [
+                  FilterChip(
+                    selected: _inStockOnly,
+                    avatar: Icon(
+                      _inStockOnly ? Icons.check_circle : Icons.inventory_2_outlined,
+                      size: 16,
+                      color: _inStockOnly ? Colors.white : AppColors.primary,
+                    ),
+                    label: Text(
+                      widget.saleType == 'secondary' ? 'Van / DB Stock > 0' : 'Warehouse Stock > 0',
+                      style: TextStyle(
+                        color: _inStockOnly ? Colors.white : AppColors.textPrimary,
+                        fontWeight: FontWeight.w600,
+                        fontSize: 13,
+                      ),
+                    ),
+                    selectedColor: AppColors.primary,
+                    backgroundColor: Colors.white,
+                    side: BorderSide(
+                      color: _inStockOnly ? AppColors.primary : AppColors.borderSoft,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    onSelected: (selected) {
+                      setState(() {
+                        _inStockOnly = selected;
+                      });
+                      context.read<PrimarySaleProvider>().searchProducts(
+                        _searchController.text,
+                        saleType: widget.saleType,
+                        partnerId: widget.partnerId,
+                        inStockOnly: _inStockOnly,
+                      );
+                    },
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 8),
+
             // Products list
             Expanded(
               child: RefreshIndicator(
                 onRefresh: () async {
-                  await provider.searchProducts(_searchController.text, saleType: widget.saleType, partnerId: widget.partnerId);
+                  await provider.searchProducts(
+                    _searchController.text,
+                    saleType: widget.saleType,
+                    partnerId: widget.partnerId,
+                    inStockOnly: _inStockOnly,
+                  );
                 },
                 child: provider.isLoading && provider.products.isEmpty
                     ? const Center(child: CircularProgressIndicator())
@@ -210,6 +271,7 @@ class _ProductSelectionScreenState extends State<ProductSelectionScreen> {
                           return ProductSelectionCard(
                             product: product,
                             quantity: qty,
+                            saleType: widget.saleType,
                             onTap: () => _toggleProduct(product),
                             onDecrease: () => _changeQuantity(product, -1),
                             onIncrease: () => _changeQuantity(product, 1),
@@ -283,6 +345,7 @@ class ProductSelectionCard extends StatelessWidget {
     required this.onTap,
     required this.onDecrease,
     required this.onIncrease,
+    this.saleType = 'primary',
     this.onQuantityChanged,
   });
 
@@ -291,7 +354,20 @@ class ProductSelectionCard extends StatelessWidget {
   final VoidCallback onTap;
   final VoidCallback onDecrease;
   final VoidCallback onIncrease;
+  final String saleType;
   final ValueChanged<int>? onQuantityChanged;
+
+  /// The API scopes stock by sale type: on secondary it returns van-location and
+  /// distributor-location figures, on primary it returns warehouse stock and
+  /// leaves the distributor figure at 0. Labelling both as Van/DB was therefore
+  /// wrong on primary, where the second number is not a real quantity at all.
+  String _stockLabel() {
+    final stock = product.stock?.toInt() ?? 0;
+    if (saleType != 'secondary') {
+      return 'Warehouse Stock: $stock';
+    }
+    return 'Van Stock: $stock   |   DB Stock: ${product.distributorStock?.toInt() ?? 0}';
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -332,7 +408,7 @@ class ProductSelectionCard extends StatelessWidget {
                   ),
                   const SizedBox(height: 6),
                   Text(
-                    'Van Stock: ${product.stock?.toInt() ?? 0}   |   DB Stock: ${product.distributorStock?.toInt() ?? 0}',
+                    _stockLabel(),
                     style: const TextStyle(
                       color: AppColors.textSecondary,
                       fontSize: 13,

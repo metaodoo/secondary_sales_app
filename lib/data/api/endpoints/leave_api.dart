@@ -43,6 +43,19 @@ extension LeaveApi on ApiService {
     });
   }
 
+  /// Fetches one leave by id. Backs deep-linking from a notification, where the
+  /// list has not necessarily been loaded. Returns the same item shape as
+  /// [getLeaveList] plus an `attachments` array.
+  Future<Map<String, dynamic>> getLeaveDetails({
+    required int employeeId,
+    required int leaveId,
+  }) async {
+    return _post('/api/v1/hr/leave/details', {
+      'employee_id': employeeId,
+      'leave_id': leaveId,
+    });
+  }
+
   Future<Map<String, dynamic>> submitLeaveAction({
     required int employeeId,
     required int leaveId,

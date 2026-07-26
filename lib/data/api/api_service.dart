@@ -16,6 +16,7 @@ import 'package:secondary_sales/data/models/delivery_item.dart';
 import 'package:secondary_sales/data/models/inventory/warehouse.dart';
 import 'package:secondary_sales/data/models/inventory/virtual_transfer.dart';
 import 'package:secondary_sales/data/models/dashboard/dashboard_summary.dart';
+import 'package:secondary_sales/data/models/notifications/app_notification.dart';
 import 'package:secondary_sales/core/access/access_control.dart';
 import 'package:secondary_sales/core/access/access_resources.dart';
 import 'package:secondary_sales/core/util/parse.dart';
@@ -38,6 +39,7 @@ part 'endpoints/access_api.dart';
 part 'endpoints/my_team_api.dart';
 part 'endpoints/location_api.dart';
 part 'endpoints/dashboard_api.dart';
+part 'endpoints/notification_api.dart';
 
 class ApiService {
   ApiService._internal();
@@ -85,10 +87,15 @@ class ApiService {
   };
 
   Uri _buildApiUri(String path) {
+    // A blank db name means "let the server decide", not a missing setting:
+    // single-database deployments (Odoo.sh) resolve the database from the
+    // hostname and refuse to list databases at all, so there is nothing to send.
+    final dbName = AppConstants.dbName;
+    if (dbName.isEmpty) {
+      return Uri.parse('${AppConstants.baseUrl}$path');
+    }
     final separator = path.contains('?') ? '&' : '?';
-    return Uri.parse(
-      '${AppConstants.baseUrl}$path${separator}db=${AppConstants.dbName}',
-    );
+    return Uri.parse('${AppConstants.baseUrl}$path${separator}db=$dbName');
   }
 
   Future<Map<String, dynamic>> _post(
