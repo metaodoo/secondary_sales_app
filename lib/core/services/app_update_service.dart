@@ -4,6 +4,7 @@ import 'package:firebase_app_distribution/firebase_app_distribution.dart'
     as app_distribution;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -36,11 +37,20 @@ import 'package:url_launcher/url_launcher.dart';
 class AppUpdateService {
   AppUpdateService._();
 
+  /// Channel to [MainActivity.openAppTester].
+  static const MethodChannel _channel = MethodChannel(
+    'secondary_sales/app_update',
+  );
+
   /// Tester link from Firebase Console → App Distribution → **Invite links**.
   ///
-  /// Opening it hands off to the App Tester app when installed, and falls back
-  /// to the browser otherwise. Leave empty and the prompt still appears, just
-  /// without a button — the tester is told to open App Tester themselves.
+  /// Used only as a fallback for a device without App Tester installed. It is
+  /// an *enrolment* page — it registers the visitor as a tester and says
+  /// "You're in", which is useless to someone who already is one — so it must
+  /// never be the primary path to a build. That is what
+  /// [_channel]'s `openAppTester` is for.
+  ///
+  /// Leave empty and a device without App Tester simply gets no button.
   static const String testerInviteUrl =
       'https://appdistribution.firebase.dev/i/ad96c9e8f7c36a5e';
 
@@ -205,16 +215,30 @@ class AppUpdateService {
     });
   }
 
+  /// Opens App Tester, where the tester's releases are listed and installing is
+  /// a single tap.
+  ///
+  /// Falls back to [testerInviteUrl] only when App Tester is not installed,
+  /// since that link enrols a tester rather than showing them a build.
   static Future<void> _openTesterApp() async {
+    try {
+      final opened = await _channel.invokeMethod<bool>('openAppTester');
+      if (opened ?? false) return;
+      _record('App Tester not installed; falling back to invite link');
+    } catch (e) {
+      _record('openAppTester failed: $e');
+    }
+
+    if (testerInviteUrl.isEmpty) return;
     try {
       await launchUrl(
         Uri.parse(testerInviteUrl),
         // Must leave this app: the whole point is that the download and install
-        // happen in App Tester's process, not ours.
+        // happen in another process, not ours.
         mode: LaunchMode.externalApplication,
       );
     } catch (e) {
-      _record('could not open tester app: $e');
+      _record('could not open invite link: $e');
     }
   }
 }

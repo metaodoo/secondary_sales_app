@@ -14,10 +14,13 @@ firebase appdistribution:distribute → tester group
         ↓
 Employee opens the app
         ↓
-AppUpdateService.checkForUpdate()  → Firebase SDK compares versionCode
+AppUpdateService.checkForUpdate()  → isNewReleaseAvailable() compares versionCode
         ↓
-"New version available" dialog → Download → Install
+"Update available" dialog → opens App Tester → Download → Install
 ```
+
+The install deliberately happens in App Tester's process rather than this app's.
+See §2.3.
 
 Android only. iOS is not wired up (there is no `ios/Runner/GoogleService-Info.plist`
 in this repo, so Firebase is not initialised on iOS).
@@ -32,6 +35,8 @@ in this repo, so Firebase is not initialised on iOS).
 | [`android/app/build.gradle.kts`](../android/app/build.gradle.kts) | Release signing config + App Distribution flavor strategy |
 | [`lib/core/services/app_update_service.dart`](../lib/core/services/app_update_service.dart) | Wraps the App Distribution SDK |
 | [`lib/main.dart`](../lib/main.dart) | Fires the update check after the first frame |
+| [`android/app/src/main/kotlin/.../MainActivity.kt`](../android/app/src/main/kotlin/com/example/secondary_sales/MainActivity.kt) | `openAppTester` method channel |
+| [`android/app/src/main/AndroidManifest.xml`](../android/app/src/main/AndroidManifest.xml) | `<queries>` entries so App Tester is visible to launch |
 | `pubspec.yaml` | Added `firebase_app_distribution: ^1.2.0` |
 | `android/key.properties` *(untracked)* | Local signing credentials |
 | `android/app/upload-keystore.jks` *(untracked)* | The release signing key |
@@ -83,6 +88,50 @@ with a dedicated, stable upload key.
 `android/app/build.gradle.kts` reads `android/key.properties` when present and
 falls back to debug signing when it is absent, so a fresh clone can still run
 `flutter run --release` without any secrets.
+
+### 2.3 Why `updateIfNewReleaseAvailable()` is not used
+
+That is the SDK's one-call "check, prompt, download, install" helper, and it is
+the obvious thing to reach for. It was used originally and had to be removed:
+on a test device it downloaded the APK and then **crashed the app** at the
+install hand-off, leaving the tester in a loop — relaunch, prompt, download,
+crash, repeat — with no way into the app.
+
+The crash cannot be handled from Dart. The plugin's Android side fires the
+native call and returns success immediately without attaching a listener to the
+returned `UpdateTask`:
+
+```kotlin
+"updateIfNewReleaseAvailable" -> {
+    firebaseAppDistribution.updateIfNewReleaseAvailable()
+    result.success(null)   // fires and forgets
+}
+```
+
+So download progress and every `FirebaseAppDistributionException` are discarded
+before they can reach Dart — and a hard crash would bypass a listener anyway.
+Note the contrast with `isNewReleaseAvailable`, which *does* wire up success and
+failure listeners; that is why detection is reliable and only the update flow
+was blind.
+
+Only the detection half is therefore used. The install is delegated to the App
+Tester app via the `openAppTester` method channel, which downloads in its own
+process — where a failure cannot take this app down with it.
+
+**Do not "fix" this by restoring the one-call helper.** If the underlying crash
+is ever diagnosed (see §7), the current design is still the safer one.
+
+Two supporting details:
+
+- `MainActivity` tries several applicationIds for App Tester, since it has
+  shipped under more than one. Any id it tries must also appear in the
+  manifest's `<queries>` block — since Android 11, `getLaunchIntentForPackage()`
+  returns null for undeclared packages even when the app is installed, which
+  would silently degrade to the browser fallback.
+- `AppUpdateService.testerInviteUrl` is a **fallback only**, for a device with no
+  App Tester installed. It is an *enrolment* page: it registers the visitor as a
+  tester and shows "You're in", which is useless to someone who already is one.
+  It must never be the primary route to a build.
 
 ---
 
@@ -255,13 +304,22 @@ monotonic per workflow. App Distribution offers an update only when the new
 | Workflow fails on the keystore step | `ANDROID_KEYSTORE_BASE64` unset or truncated. Re-generate with `base64 -w0`. |
 | `Request had insufficient authentication scopes` | Service account lacks **Firebase App Distribution Admin**. |
 | Testers get email but no in-app prompt | They never completed the SDK's Google sign-in (§5 step 4). |
-| Dialog appears but install silently fails | "Install unknown apps" denied for the app in Android settings. |
+| Dialog appears but install silently fails | "Install unknown apps" denied — grant it for **App Tester**, which is the installer here, not for this app. If the toggle is greyed out on Android 13+, tap ⋮ → *Allow restricted settings* first. |
+| App downloads the update then crashes, every launch | The old `updateIfNewReleaseAvailable()` path. Fixed by §2.3 — but the fix only takes effect once a build **containing** it is installed, and the broken installer is what would install it. Break the loop with one manual APK install (§6). |
+| **Update** opens a browser showing "You're in!" | App Tester is not installed, so the invite-link fallback ran. Install App Tester. If it *is* installed, the `<queries>` entries are missing or its applicationId changed — see §2.3. |
+| Tester gets no email | They are in **All testers** but not in the `testers` group. Only group members receive a distribution. The two lists are different things. |
+| Re-running a workflow produces no update | A re-run reuses `github.run_number`, so `versionCode` is unchanged and nothing outranks the installed build. Start a **new** run instead. |
+| `invalid source release: 21` in CI | `maplibre_gl` pins `sourceCompatibility` to 21. CI must provision JDK 21; local builds hide this because Android Studio's bundled JBR is already 21. |
 
 ### Local release build
 
 ```bash
-flutter build apk --release --build-number=999
+flutter build apk --release --build-number=999 --target-platform android-arm64
 ```
+
+Match CI's flags, or the local APK differs from what testers receive. Pick a
+`--build-number` above the newest CI run or the result will not be treated as an
+update.
 
 Requires `android/key.properties` + the keystore. Without them the build still
 succeeds using debug signing, but the result is **not** distributable as an update.
@@ -270,9 +328,13 @@ succeeds using debug signing, but the result is **not** distributable as an upda
 
 ## 8. Known trade-offs
 
-- **APK size ~90 MB.** A universal APK carrying every ABI. `--split-per-abi`
-  would roughly third it, but App Distribution would then need one upload per
-  ABI. Left as-is for simplicity; revisit if download size becomes a complaint.
+- **APK is `arm64-v8a` only, ~51 MB** (down from ~87 MB universal). Builds one
+  ABI instead of three, which also skips two of three AOT compilations.
+  32-bit-only devices and x86_64 emulators cannot install it; add `,android-arm`
+  to the `--target-platform` flag if a rep turns up with a 32-bit phone.
+- **No Gradle caching in CI**, so every run re-downloads Android dependencies and
+  spends 5–9 minutes in `assembleRelease`. Adding `cache: gradle` to the
+  `setup-java` step would cut steady-state runs to roughly 4–6 minutes.
 - **`applicationId` is still `com.example.secondary_sales`.** A placeholder from
   `flutter create`. Changing it now would invalidate `google-services.json`, break
   FCM tokens, and orphan every install — so it was deliberately left alone. If it
@@ -282,3 +344,57 @@ succeeds using debug signing, but the result is **not** distributable as an upda
 - **The plugin is community-maintained** (`thomaspucci.com`), not official
   FlutterFire. It is a thin wrapper over Google's own SDK, so the risk is
   concentrated in the wrapper rather than the update logic.
+
+---
+
+## 9. Reverting this integration
+
+The whole feature lives in commits `b7a66b8..1effed1`, on top of `a02a68a`.
+Nothing unrelated is mixed into that range, so today it comes out in one step:
+
+```bash
+git revert --no-commit a02a68a..HEAD
+git commit -m "revert: remove Firebase App Distribution CI/CD"
+```
+
+That stops being true as soon as other work lands on `main`. After that, revert
+per file using the table below.
+
+### What each change does
+
+| Path | Purpose | Safe to remove alone? |
+| --- | --- | --- |
+| `.github/workflows/android-release.yml` | Builds and uploads every `main` push | Yes — deleting it stops all automation and changes nothing in the app |
+| `lib/core/services/app_update_service.dart` | In-app update detection and prompt | Yes, with the `main.dart` call site |
+| `lib/main.dart` (`initState` post-frame call) | Invokes the check at startup | Yes |
+| `pubspec.yaml` / `pubspec.lock` (`firebase_app_distribution`) | The SDK | Only after the service is gone |
+| `android/app/src/main/kotlin/.../MainActivity.kt` | `openAppTester` method channel | Yes, with the service |
+| `android/app/src/main/AndroidManifest.xml` (`<queries>` packages) | Package visibility for App Tester | Yes — harmless if left |
+| `android/app/build.gradle.kts` (`missingDimensionStrategy`) | Selects the SDK's real implementation over its no-op stub | Only with the SDK; removing it while the SDK stays makes every check silently return "no update" |
+| `android/app/build.gradle.kts` (signing config) | 🔴 Release signing | **See the warning below** |
+| `docs/APP_DISTRIBUTION_CI.md` | This document | Yes |
+
+### 🔴 The signing change is not cleanly revertible
+
+Reverting `build.gradle.kts` returns release builds to debug signing. Android
+refuses to replace an app with one signed by a different key, so **every device
+running a CI-signed build must uninstall before it can install anything else** —
+losing its local data and login. That cost scales with however many reps are
+onboarded when the revert happens.
+
+If the goal is only to stop the automation, delete the workflow and leave the
+signing config alone. Consistent release signing is worth keeping regardless of
+how builds get distributed.
+
+### State outside the repository
+
+None of this is touched by `git revert`, and all of it is safe to leave in place
+— it costs nothing while dormant:
+
+- **GitHub** → Settings → Secrets: the six `ANDROID_*` / `FIREBASE_*` secrets
+- **Google Cloud** → the `github-app-distribution` service account and its key
+- **Firebase** → App Distribution: the `testers` group, the invite link, the
+  uploaded releases
+- **Locally** → `android/key.properties` and `android/app/upload-keystore.jks`,
+  both gitignored. Keep the keystore backed up even if this feature is removed;
+  it is unrecoverable and any future release signing needs it.

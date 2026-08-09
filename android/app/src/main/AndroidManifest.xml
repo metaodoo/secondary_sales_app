@@ -68,5 +68,14 @@
             <action android:name="android.intent.action.PROCESS_TEXT"/>
             <data android:mimeType="text/plain"/>
         </intent>
+
+        <!-- AppUpdateService sends testers to the Firebase App Tester app to
+             install a new build. Since Android 11, getLaunchIntentForPackage()
+             returns null for any package not declared here, even when it is
+             installed - so without these the launch silently falls back to the
+             browser. Both ids are listed because App Tester has shipped under
+             more than one. -->
+        <package android:name="dev.firebase.appdistribution.apptester" />
+        <package android:name="com.google.firebase.appdistribution.apptester" />
     </queries>
 </manifest>
