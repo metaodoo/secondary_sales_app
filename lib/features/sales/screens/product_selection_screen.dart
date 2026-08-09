@@ -7,12 +7,15 @@ import 'package:provider/provider.dart';
 import 'package:secondary_sales/data/models/sales/order_line_entry.dart';
 import 'package:secondary_sales/data/models/sales/product.dart';
 import 'package:secondary_sales/features/sales/primary_sale_provider.dart';
-import 'package:secondary_sales/core/widgets/ss_ui.dart';
 
 class ProductSelectionScreen extends StatefulWidget {
   final String saleType;
   final int? partnerId;
-  const ProductSelectionScreen({super.key, this.saleType = 'primary', this.partnerId});
+  const ProductSelectionScreen({
+    super.key,
+    this.saleType = 'primary',
+    this.partnerId,
+  });
 
   @override
   State<ProductSelectionScreen> createState() => _ProductSelectionScreenState();
@@ -23,6 +26,7 @@ class _ProductSelectionScreenState extends State<ProductSelectionScreen> {
   Timer? _searchDebounce;
   final Map<int, OrderLineEntry> _selectedLines = {};
   bool _inStockOnly = false;
+  String _sortBy = 'name_asc';
 
   @override
   void initState() {
@@ -33,6 +37,7 @@ class _ProductSelectionScreenState extends State<ProductSelectionScreen> {
         saleType: widget.saleType,
         partnerId: widget.partnerId,
         inStockOnly: _inStockOnly,
+        sortBy: _sortBy,
       );
     });
   }
@@ -52,6 +57,7 @@ class _ProductSelectionScreenState extends State<ProductSelectionScreen> {
         saleType: widget.saleType,
         partnerId: widget.partnerId,
         inStockOnly: _inStockOnly,
+        sortBy: _sortBy,
       );
     });
   }
@@ -74,69 +80,34 @@ class _ProductSelectionScreenState extends State<ProductSelectionScreen> {
     });
   }
 
-  void _changeQuantity(Product product, int delta) {
-    setState(() {
-      if (!_selectedLines.containsKey(product.id)) {
-        if (delta > 0) {
-          _selectedLines[product.id] = OrderLineEntry(
-            product: product,
-            quantity: delta,
-          );
-        }
-        return;
-      }
-      final line = _selectedLines[product.id]!;
-      final next = line.quantity + delta;
-      if (next <= 0) {
-        _selectedLines.remove(product.id);
-      } else {
-        line.quantity = next;
-      }
-    });
-  }
-
   @override
   Widget build(BuildContext context) {
     final provider = context.watch<PrimarySaleProvider>();
-    final selectedCount = _selectedLines.values.fold(
+    final int selectedCount = _selectedLines.values.fold(
       0,
       (sum, line) => sum + line.quantity,
     );
-    final hasItems = _selectedLines.isNotEmpty;
+    final bool hasItems = selectedCount > 0;
 
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
         backgroundColor: Colors.white,
         elevation: 0,
-        scrolledUnderElevation: 0,
         leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: AppColors.textPrimary),
           onPressed: () => Navigator.pop(context),
-          icon: const Icon(
-            Icons.arrow_back,
+        ),
+        title: Text(
+          widget.saleType == 'secondary'
+              ? 'Select Secondary Products'
+              : 'Select Primary Products',
+          style: const TextStyle(
             color: AppColors.textPrimary,
-            size: 28,
-          ),
-        ),
-        title: const Text(
-          'Select Products',
-          style: TextStyle(
-            color: AppColors.primaryStrong,
             fontWeight: FontWeight.bold,
-            fontSize: 22,
+            fontSize: 18,
           ),
         ),
-        centerTitle: true,
-        actions: [
-          IconButton(
-            onPressed: () {},
-            icon: const Icon(
-              Icons.search,
-              color: AppColors.textPrimary,
-              size: 26,
-            ),
-          ),
-        ],
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(1),
           child: Container(color: AppColors.borderMuted, height: 1),
@@ -183,22 +154,49 @@ class _ProductSelectionScreenState extends State<ProductSelectionScreen> {
               ),
             ),
 
-            // Stock > 0 Filter Toggle
+            // Product Count & Sorting Controls Bar
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 24),
               child: Row(
                 children: [
+                  // Product Count Badge
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 6,
+                    ),
+                    decoration: BoxDecoration(
+                      color: AppColors.primary.withOpacity(0.08),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Text(
+                      '${provider.totalProductCount > 0 ? provider.totalProductCount : provider.products.length} Products',
+                      style: const TextStyle(
+                        color: AppColors.primary,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ),
+                  const Spacer(),
+                  // In Stock Filter
                   FilterChip(
                     selected: _inStockOnly,
                     avatar: Icon(
-                      _inStockOnly ? Icons.check_circle : Icons.inventory_2_outlined,
+                      _inStockOnly
+                          ? Icons.check_circle
+                          : Icons.inventory_2_outlined,
                       size: 16,
                       color: _inStockOnly ? Colors.white : AppColors.primary,
                     ),
                     label: Text(
-                      widget.saleType == 'secondary' ? 'Van / DB Stock > 0' : 'Warehouse Stock > 0',
+                      widget.saleType == 'secondary'
+                          ? 'Stock > 0'
+                          : 'In Stock Only',
                       style: TextStyle(
-                        color: _inStockOnly ? Colors.white : AppColors.textPrimary,
+                        color: _inStockOnly
+                            ? Colors.white
+                            : AppColors.textPrimary,
                         fontWeight: FontWeight.w600,
                         fontSize: 13,
                       ),
@@ -206,7 +204,9 @@ class _ProductSelectionScreenState extends State<ProductSelectionScreen> {
                     selectedColor: AppColors.primary,
                     backgroundColor: Colors.white,
                     side: BorderSide(
-                      color: _inStockOnly ? AppColors.primary : AppColors.borderSoft,
+                      color: _inStockOnly
+                          ? AppColors.primary
+                          : AppColors.borderSoft,
                     ),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(20),
@@ -220,8 +220,46 @@ class _ProductSelectionScreenState extends State<ProductSelectionScreen> {
                         saleType: widget.saleType,
                         partnerId: widget.partnerId,
                         inStockOnly: _inStockOnly,
+                        sortBy: _sortBy,
                       );
                     },
+                  ),
+                  const SizedBox(width: 4),
+                  // Sort Dropdown Menu
+                  PopupMenuButton<String>(
+                    initialValue: _sortBy,
+                    icon: const Icon(Icons.sort, color: AppColors.textPrimary),
+                    tooltip: 'Sort Products',
+                    onSelected: (value) {
+                      setState(() {
+                        _sortBy = value;
+                      });
+                      context.read<PrimarySaleProvider>().searchProducts(
+                        _searchController.text,
+                        saleType: widget.saleType,
+                        partnerId: widget.partnerId,
+                        inStockOnly: _inStockOnly,
+                        sortBy: _sortBy,
+                      );
+                    },
+                    itemBuilder: (context) => const [
+                      PopupMenuItem(
+                        value: 'name_asc',
+                        child: Text('Name (A to Z)'),
+                      ),
+                      PopupMenuItem(
+                        value: 'qty_desc',
+                        child: Text('Available Qty (High → Low)'),
+                      ),
+                      PopupMenuItem(
+                        value: 'qty_asc',
+                        child: Text('Available Qty (Low → High)'),
+                      ),
+                      PopupMenuItem(
+                        value: 'expiry_asc',
+                        child: Text('Expiry Date (Earliest First)'),
+                      ),
+                    ],
                   ),
                 ],
               ),
@@ -266,27 +304,14 @@ class _ProductSelectionScreenState extends State<ProductSelectionScreen> {
                         itemCount: provider.products.length,
                         itemBuilder: (context, index) {
                           final product = provider.products[index];
-                          final selectedLine = _selectedLines[product.id];
-                          final qty = selectedLine?.quantity ?? 0;
+                          final isSelected = _selectedLines.containsKey(
+                            product.id,
+                          );
                           return ProductSelectionCard(
                             product: product,
-                            quantity: qty,
+                            isSelected: isSelected,
                             saleType: widget.saleType,
                             onTap: () => _toggleProduct(product),
-                            onDecrease: () => _changeQuantity(product, -1),
-                            onIncrease: () => _changeQuantity(product, 1),
-                            onQuantityChanged: (newQty) {
-                              setState(() {
-                                if (newQty <= 0) {
-                                  _selectedLines.remove(product.id);
-                                } else {
-                                  _selectedLines[product.id] = OrderLineEntry(
-                                    product: product,
-                                    quantity: newQty,
-                                  );
-                                }
-                              });
-                            },
                           );
                         },
                       ),
@@ -310,7 +335,7 @@ class _ProductSelectionScreenState extends State<ProductSelectionScreen> {
                     color: hasItems ? Colors.white : AppColors.textSecondary,
                   ),
                   label: Text(
-                    'Add $selectedCount Items',
+                    'Add ${_selectedLines.length} Items',
                     style: TextStyle(
                       color: hasItems ? Colors.white : AppColors.textSecondary,
                       fontWeight: FontWeight.bold,
@@ -341,26 +366,16 @@ class ProductSelectionCard extends StatelessWidget {
   const ProductSelectionCard({
     super.key,
     required this.product,
-    required this.quantity,
+    required this.isSelected,
     required this.onTap,
-    required this.onDecrease,
-    required this.onIncrease,
     this.saleType = 'primary',
-    this.onQuantityChanged,
   });
 
   final Product product;
-  final int quantity;
+  final bool isSelected;
   final VoidCallback onTap;
-  final VoidCallback onDecrease;
-  final VoidCallback onIncrease;
   final String saleType;
-  final ValueChanged<int>? onQuantityChanged;
 
-  /// The API scopes stock by sale type: on secondary it returns van-location and
-  /// distributor-location figures, on primary it returns warehouse stock and
-  /// leaves the distributor figure at 0. Labelling both as Van/DB was therefore
-  /// wrong on primary, where the second number is not a real quantity at all.
   String _stockLabel() {
     final stock = product.stock?.toInt() ?? 0;
     if (saleType != 'secondary') {
@@ -371,7 +386,6 @@ class ProductSelectionCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final bool isSelected = quantity > 0;
     return GestureDetector(
       onTap: onTap,
       child: Container(
@@ -414,88 +428,17 @@ class ProductSelectionCard extends StatelessWidget {
                       fontSize: 13,
                     ),
                   ),
-                  const SizedBox(height: 12),
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      // Minus button
-                      Container(
-                        width: 38,
-                        height: 38,
-                        decoration: BoxDecoration(
-                          border: Border.all(color: AppColors.borderSoft),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: IconButton(
-                          padding: EdgeInsets.zero,
-                          icon: const Icon(
-                            Icons.remove,
-                            size: 18,
-                            color: AppColors.textSecondary,
-                          ),
-                          onPressed: isSelected ? onDecrease : null,
-                        ),
+                  if (product.nearestExpiry != null) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      'Nearest Expiry: ${product.nearestExpiry}',
+                      style: TextStyle(
+                        color: Colors.orange.shade800,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
                       ),
-                      const SizedBox(width: 12),
-                      SizedBox(
-                        width: 52,
-                        height: 38,
-                        child: TextField(
-                          keyboardType: const TextInputType.numberWithOptions(decimal: false),
-                          textAlign: TextAlign.center,
-                          style: const TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 15,
-                            color: AppColors.textPrimary,
-                          ),
-                          decoration: InputDecoration(
-                            contentPadding: const EdgeInsets.symmetric(horizontal: 4, vertical: 0),
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(8),
-                              borderSide: const BorderSide(color: AppColors.borderSoft),
-                            ),
-                            enabledBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(8),
-                              borderSide: const BorderSide(color: AppColors.borderSoft),
-                            ),
-                            focusedBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(8),
-                              borderSide: const BorderSide(color: AppColors.primary, width: 2),
-                            ),
-                          ),
-                          enabled: isSelected,
-                          onChanged: (val) {
-                            final parsed = int.tryParse(val);
-                            if (parsed != null && parsed >= 0 && onQuantityChanged != null) {
-                              onQuantityChanged!(parsed);
-                            }
-                          },
-                          controller: TextEditingController(
-                            text: '$quantity',
-                          )..selection = TextSelection.collapsed(offset: '$quantity'.length),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      // Plus button
-                      Container(
-                        width: 38,
-                        height: 38,
-                        decoration: BoxDecoration(
-                          border: Border.all(color: AppColors.borderSoft),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: IconButton(
-                          padding: EdgeInsets.zero,
-                          icon: const Icon(
-                            Icons.add,
-                            size: 18,
-                            color: AppColors.textSecondary,
-                          ),
-                          onPressed: onIncrease,
-                        ),
-                      ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ],
               ),
             ),

@@ -35,7 +35,42 @@ class _LeaveRequestSheetState extends State<LeaveRequestSheet> {
   String? _attachmentBase64;
   bool _validationTriggered = false;
 
+  Map<String, dynamic>? get _selectedLeaveType {
+    if (_selectedLeaveTypeId == null) return null;
+    final provider = context.read<LeaveProvider>();
+    try {
+      return provider.leaveTypes.firstWhere((t) => t['id'] == _selectedLeaveTypeId);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  void _onLeaveTypeChanged(int? newTypeId) {
+    setState(() {
+      _selectedLeaveTypeId = newTypeId;
+      final selectedType = _selectedLeaveType;
+      final policy = (selectedType != null ? (selectedType['date_policy'] ?? 'any') : 'any').toString();
+      final now = DateTime.now();
+      final today = DateTime(now.year, now.month, now.day);
+
+      if (policy == 'past_today') {
+        if (_startDate != null && _startDate!.isAfter(today)) _startDate = null;
+        if (_endDate != null && _endDate!.isAfter(today)) _endDate = null;
+      } else if (policy == 'today_only') {
+        if (_startDate != null && (_startDate!.year != today.year || _startDate!.month != today.month || _startDate!.day != today.day)) {
+          _startDate = today;
+        }
+        if (_endDate != null && (_endDate!.year != today.year || _endDate!.month != today.month || _endDate!.day != today.day)) {
+          _endDate = today;
+        }
+      }
+    });
+  }
+
   void _submit() async {
+    final provider = context.read<LeaveProvider>();
+    if (provider.isSubmitting) return;
+
     setState(() {
       _validationTriggered = true;
     });
@@ -47,7 +82,6 @@ class _LeaveRequestSheetState extends State<LeaveRequestSheet> {
       return;
     }
 
-    final provider = context.read<LeaveProvider>();
     final success = await provider.submitLeaveRequest(
       leaveTypeId: _selectedLeaveTypeId!,
       dateFrom: _startDate!.toString().split(' ')[0],
@@ -64,19 +98,50 @@ class _LeaveRequestSheetState extends State<LeaveRequestSheet> {
       showDialog(
         context: context,
         builder: (context) => AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          title: const Row(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          titlePadding: const EdgeInsets.fromLTRB(24, 24, 24, 12),
+          contentPadding: const EdgeInsets.fromLTRB(24, 0, 24, 16),
+          title: Row(
             children: [
-              Icon(Icons.warning_amber_rounded, color: Colors.orange, size: 28),
-              SizedBox(width: 8),
-              Text('Validation Error'),
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: const BoxDecoration(
+                  color: Color(0xFFFEF3C7),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.info_outline, color: Color(0xFFD97706), size: 24),
+              ),
+              const SizedBox(width: 12),
+              const Expanded(
+                child: Text(
+                  'Leave Policy Requirement',
+                  style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
+                ),
+              ),
             ],
           ),
-          content: Text(provider.requestError ?? 'Failed to submit request.'),
+          content: Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: AppColors.background,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: AppColors.borderSoft),
+            ),
+            child: Text(
+              provider.requestError ?? 'Could not submit your leave request. Please check date selections.',
+              style: const TextStyle(fontSize: 14, height: 1.4, color: AppColors.textPrimary),
+            ),
+          ),
           actions: [
-            TextButton(
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+              ),
               onPressed: () => Navigator.pop(context),
-              child: const Text('OK', style: TextStyle(fontWeight: FontWeight.bold)),
+              child: const Text('Understand & Adjust Dates', style: TextStyle(fontWeight: FontWeight.bold)),
             ),
           ],
         ),
@@ -142,6 +207,8 @@ class _LeaveRequestSheetState extends State<LeaveRequestSheet> {
   @override
   Widget build(BuildContext context) {
     final provider = context.watch<LeaveProvider>();
+    final selectedType = _selectedLeaveType;
+    final selectedPolicy = (selectedType != null ? (selectedType['date_policy'] ?? 'any') : 'any').toString();
     
     return Container(
       decoration: const BoxDecoration(
@@ -243,8 +310,22 @@ class _LeaveRequestSheetState extends State<LeaveRequestSheet> {
                       ),
                     );
                   }).toList(),
-                  onChanged: provider.isSubmitting ? null : (val) => setState(() => _selectedLeaveTypeId = val),
+                  onChanged: provider.isSubmitting ? null : _onLeaveTypeChanged,
                 ),
+              if (selectedType != null) ...[
+                const SizedBox(height: 6),
+                Padding(
+                  padding: const EdgeInsets.only(left: 4),
+                  child: Text(
+                    selectedPolicy == 'past_today'
+                        ? 'ℹ️ Can apply for previous days or today only (no future dates).'
+                        : selectedPolicy == 'today_only'
+                            ? 'ℹ️ Can apply for today only.'
+                            : 'ℹ️ Can apply for any date (past, today, or future).',
+                    style: const TextStyle(fontSize: 12, color: AppColors.primary, fontWeight: FontWeight.w500),
+                  ),
+                ),
+              ],
               const SizedBox(height: 16),
 
               const Text('Duration', style: TextStyle(fontWeight: FontWeight.bold)),

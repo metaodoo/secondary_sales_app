@@ -293,8 +293,8 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
     final summary = dash.summary;
 
     final user = auth.user;
-    final userName = user?.employeeName ?? user?.name ?? 'User';
-    final firstName = userName.trim().split(' ').first;
+    final userName = user?.employeeName ?? user?.name;
+    final firstName = firstNameFromName(userName);
 
     final canAccessPrimary = auth.canAccessPrimarySales;
     final canAccessSecondary = auth.canAccessSecondarySales;
@@ -455,6 +455,7 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
                   builder: (context, _) => _AttendanceHero(
                     summary: summary,
                     busy: _attendance.isActionLoading,
+                    loadingMessage: _attendance.loadingMessage,
                     onToggle: () =>
                         _toggleAttendance(summary?.isCheckedIn ?? false),
                     onOpen: () => _open(const AttendanceScreen()),
@@ -565,6 +566,7 @@ class _AttendanceHero extends StatelessWidget {
   const _AttendanceHero({
     required this.summary,
     required this.busy,
+    this.loadingMessage = '',
     required this.onToggle,
     required this.onOpen,
   });
@@ -573,6 +575,9 @@ class _AttendanceHero extends StatelessWidget {
 
   /// True while a check-in/out network action is in flight (shows a spinner).
   final bool busy;
+
+  /// Detailed loading status message.
+  final String loadingMessage;
 
   /// One-tap check-in / check-out (the button).
   final VoidCallback onToggle;
@@ -591,7 +596,13 @@ class _AttendanceHero extends StatelessWidget {
     final String title;
     final String subtitle;
 
-    if (checkedIn) {
+    if (busy && loadingMessage.isNotEmpty) {
+      bg = AppColors.primarySoft;
+      fg = AppColors.primary;
+      icon = Icons.camera_alt;
+      title = 'Attendance';
+      subtitle = loadingMessage;
+    } else if (checkedIn) {
       bg = AppColors.successSoft;
       fg = const Color(0xFF166534);
       icon = Icons.check_circle;
@@ -605,7 +616,7 @@ class _AttendanceHero extends StatelessWidget {
       icon = Icons.schedule;
       title = known ? "You're not checked in" : 'Attendance';
       subtitle = known
-          ? 'One tap · captures your location'
+          ? 'One tap · selfie & location'
           : 'Check in / out and view history';
     }
 
@@ -993,10 +1004,11 @@ class _AttendanceRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Row(
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        SizedBox(
-          width: 72,
+        Padding(
+          padding: const EdgeInsets.only(bottom: 8),
           child: Text(
             label.toUpperCase(),
             style: const TextStyle(
@@ -1007,37 +1019,35 @@ class _AttendanceRow extends StatelessWidget {
             ),
           ),
         ),
-        Expanded(
-          child: Row(
-            children: [
-              Expanded(
-                child: _AttendanceStat(
-                  label: 'Present',
-                  value: window.present.toString(),
-                  bg: AppColors.successSoft,
-                  fg: const Color(0xFF166534),
-                ),
+        Row(
+          children: [
+            Expanded(
+              child: _AttendanceStat(
+                label: 'Present',
+                value: window.present.toString(),
+                bg: AppColors.successSoft,
+                fg: const Color(0xFF166534),
               ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: _AttendanceStat(
-                  label: 'Absent',
-                  value: window.absent.toString(),
-                  bg: const Color(0xFFFEE2E2),
-                  fg: const Color(0xFFB91C1C),
-                ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: _AttendanceStat(
+                label: 'Absent',
+                value: window.absent.toString(),
+                bg: const Color(0xFFFEE2E2),
+                fg: const Color(0xFFB91C1C),
               ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: _AttendanceStat(
-                  label: 'Late',
-                  value: window.late.toString(),
-                  bg: const Color(0xFFFEF3C7),
-                  fg: const Color(0xFFB45309),
-                ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: _AttendanceStat(
+                label: 'Late',
+                value: window.late.toString(),
+                bg: const Color(0xFFFEF3C7),
+                fg: const Color(0xFFB45309),
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ],
     );
@@ -1586,6 +1596,7 @@ class _ModulesGrid extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (items.isEmpty) return const SizedBox.shrink();
     return GridView.count(
       crossAxisCount: 2,
       crossAxisSpacing: 14,

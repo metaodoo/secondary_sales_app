@@ -8,6 +8,7 @@ import 'package:secondary_sales/features/employees/screens/sales_officer_list_sc
 import 'package:secondary_sales/features/hr/screens/attendance_screen.dart';
 import 'package:secondary_sales/features/hr/screens/leave_dashboard_screen.dart';
 import 'package:secondary_sales/features/hr/screens/location_buffer_screen.dart';
+import 'package:secondary_sales/core/widgets/ss_ui.dart';
 
 class SettingsTab extends StatelessWidget {
   const SettingsTab({super.key, this.onBack, this.onOpenMenu});
@@ -23,16 +24,7 @@ class SettingsTab extends StatelessWidget {
     final role = user?.role ?? 'Primary Sales';
     final email = user?.name ?? '';
 
-    // Generate initials for profile icon
-    String initials = 'U';
-    if (userName.isNotEmpty) {
-      final parts = userName.trim().split(' ');
-      if (parts.length > 1) {
-        initials = '${parts[0][0]}${parts[1][0]}'.toUpperCase();
-      } else if (parts[0].isNotEmpty) {
-        initials = parts[0][0].toUpperCase();
-      }
-    }
+    final initials = initialsFromName(userName);
 
     return Scaffold(
       backgroundColor: AppColors.background,

@@ -313,6 +313,9 @@ class _ValidateDeliveryScreenState extends State<ValidateDeliveryScreen> {
   }
 
   Future<void> _confirmDelivery() async {
+    FocusScope.of(context).unfocus();
+    await Future<void>.delayed(Duration.zero);
+
     final prepare = _prepare;
     if (prepare == null || isReadOnly) return;
 
@@ -324,14 +327,32 @@ class _ValidateDeliveryScreenState extends State<ValidateDeliveryScreen> {
       return;
     }
 
-    // Stock excess validation - block if any line exceeds available stock
+    // Secondary delivery allows native Odoo backorders when total demand exceeds
+    // fresh van stock, but the damaged/QC bucket itself cannot exceed fresh stock.
     final excessItems = <StockExcessItem>[];
     for (final input in _inputs) {
-      if (input.quantityDone > input.move.availableQty) {
+      if (_isSecondary) {
+        final extraQty =
+            input.move.damagedExpiredQty + input.move.damageQualityQty;
+        if (extraQty > input.move.availableQty) {
+          excessItems.add(StockExcessItem(
+            productName: input.move.product?.name ?? 'Unknown',
+            enteredQty: extraQty,
+            availableQty: input.move.availableQty,
+          ));
+        }
+        continue;
+      }
+
+      final effectiveAvailable =
+          input.move.availableQty +
+          input.move.damagedExpiredQty +
+          input.move.damageQualityQty;
+      if (input.quantityDone > effectiveAvailable) {
         excessItems.add(StockExcessItem(
           productName: input.move.product?.name ?? 'Unknown',
           enteredQty: input.quantityDone,
-          availableQty: input.move.availableQty,
+          availableQty: effectiveAvailable,
         ));
       }
     }
@@ -449,11 +470,6 @@ class _ValidateDeliveryScreenState extends State<ValidateDeliveryScreen> {
       }
 
       if (_isSecondary || !input.move.requiresLots || input.quantityDone <= 0) continue;
-
-      final allocated = _allocatedQty(input);
-      if ((allocated - input.quantityDone).abs() > 0.0001) {
-        return 'Lot allocated quantity must match delivery quantity for ${input.move.product?.name ?? 'product'}.';
-      }
     }
     return null;
   }
@@ -467,13 +483,6 @@ class _ValidateDeliveryScreenState extends State<ValidateDeliveryScreen> {
       final next = input.quantityDone + delta;
       input.quantityDone = next.clamp(0, input.move.orderedQty).toDouble();
 
-      if (input.move.requiresLots && input.lots.isNotEmpty && delta < 0) {
-        // Quantity reduced: trim existing lot allocations from the last lot first.
-        // No API call — reserved stock at this picking's location is not "available"
-        // to the auto-assign endpoint and would return a false insufficient-stock error.
-        _trimLotsToQty(input);
-      }
-      // For increase: the mismatch warning appears and the user uses +/- or Add Lot.
     });
   }
 
@@ -481,38 +490,13 @@ class _ValidateDeliveryScreenState extends State<ValidateDeliveryScreen> {
     setState(() {
       input.quantityDone = val.clamp(0, input.move.orderedQty).toDouble();
 
-      if (input.move.requiresLots && input.lots.isNotEmpty) {
-        _trimLotsToQty(input);
-      }
     });
-  }
-
-  void _trimLotsToQty(DeliveryLineInput input) {
-    final target = input.quantityDone;
-    if (target <= 0) {
-      input.lots.clear();
-      return;
-    }
-    for (int i = input.lots.length - 1; i >= 0; i--) {
-      final priorAllocated = input.lots
-          .take(i)
-          .fold<double>(0.0, (s, l) => s + l.quantity);
-      final canTake = (target - priorAllocated).clamp(
-        0.0,
-        input.lots[i].quantity,
-      );
-      if (canTake <= 0) {
-        input.lots.removeAt(i);
-      } else {
-        input.lots[i].quantity = canTake;
-      }
-    }
   }
 
   void _changeLotQty(DeliveryLotInput lot, double maxQty, double delta) {
     setState(() {
       final next = lot.quantity + delta;
-      lot.quantity = next.clamp(0, maxQty).toDouble();
+      lot.quantity = next.clamp(0, double.infinity).toDouble();
     });
   }
 
@@ -711,31 +695,14 @@ class _ValidateDeliveryScreenState extends State<ValidateDeliveryScreen> {
                               lotInput.lot = selectedLot;
                               if (lotInput.quantity <= 0 &&
                                   selectedLot != null) {
-                                final otherAllocated = input.lots
-                                    .where((l) => l != lotInput)
-                                    .fold<double>(0, (s, l) => s + l.quantity);
-                                final remaining =
-                                    (input.quantityDone - otherAllocated).clamp(
-                                      0.0,
-                                      input.quantityDone,
-                                    );
-                                lotInput.quantity = 1.0.clamp(0.0, remaining);
+                                lotInput.quantity = 1.0;
                               }
                             });
                           },
                           onLotMinus: (lotInput) =>
-                              _changeLotQty(lotInput, input.quantityDone, -1),
-                          onLotPlus: (lotInput) {
-                            final otherAllocated = input.lots
-                                .where((l) => l != lotInput)
-                                .fold<double>(0.0, (s, l) => s + l.quantity);
-                            final maxForLot =
-                                (input.quantityDone - otherAllocated).clamp(
-                                  0.0,
-                                  input.quantityDone,
-                                );
-                            _changeLotQty(lotInput, maxForLot, 1);
-                          },
+                              _changeLotQty(lotInput, double.infinity, -1),
+                          onLotPlus: (lotInput) =>
+                              _changeLotQty(lotInput, double.infinity, 1),
                         ),
                       );
                     }),
@@ -1216,12 +1183,7 @@ class _DeliveryLinePanel extends StatelessWidget {
                     onMinus: () => onLotMinus(lotInput),
                     onPlus: () => onLotPlus(lotInput),
                     onQuantityInput: (newVal) {
-                      final otherAllocated = input.lots
-                          .where((l) => l != lotInput)
-                          .fold<double>(0.0, (s, l) => s + l.quantity);
-                      final maxForLot = (input.quantityDone - otherAllocated)
-                          .clamp(0.0, input.quantityDone);
-                      onLotQtyInput?.call(lotInput, newVal.clamp(0, maxForLot));
+                      onLotQtyInput?.call(lotInput, newVal.clamp(0, double.infinity));
                     },
                   ),
                 ),
@@ -1229,8 +1191,7 @@ class _DeliveryLinePanel extends StatelessWidget {
               if (!isReadOnly)
                 Text(
                   'Total Allocated: ${formatQty(allocatedQty)} / '
-                  '${formatQty(input.quantityDone)} $uomName'
-                  '${allocationMatches ? '' : ' (Must match delivery quantity)'}',
+                  '${formatQty(input.quantityDone)} $uomName',
                   style: TextStyle(
                     color: allocationMatches
                         ? const Color(0xFF16A34A)

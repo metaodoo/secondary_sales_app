@@ -25,12 +25,14 @@ extension AttendanceApi on ApiService {
     required String action, // "check_in" or "check_out"
     required double latitude,
     required double longitude,
+    String? checkInImage,
   }) async {
     return _post('/api/v1/hr/attendance/action', {
       'employee_id': employeeId,
       'action': action,
       'latitude': latitude,
       'longitude': longitude,
+      'check_in_image': checkInImage,
     });
   }
 }

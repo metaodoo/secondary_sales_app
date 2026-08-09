@@ -1,4 +1,7 @@
+import 'dart:convert';
+import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:secondary_sales/core/theme/app_theme.dart';
 import 'package:provider/provider.dart';
 
@@ -12,11 +15,15 @@ import 'package:secondary_sales/core/widgets/stock_excess_dialog.dart';
 class CreateScrapScreen extends StatefulWidget {
   final int? scrapId;
   final String moduleType;
+  final String title;
+  final String productSelectionTitle;
 
   const CreateScrapScreen({
     super.key,
     this.scrapId,
     this.moduleType = 'primary',
+    this.title = 'Scraps',
+    this.productSelectionTitle = 'Select Scrap Products',
   });
 
   @override
@@ -24,6 +31,9 @@ class CreateScrapScreen extends StatefulWidget {
 }
 
 class _CreateScrapScreenState extends State<CreateScrapScreen> {
+  bool get _allowsPrimaryOverstock =>
+      widget.moduleType.toLowerCase() == 'primary' || widget.moduleType.isEmpty;
+
   final List<VirtualTransferLineEntry> _lines = [];
   final Map<int, List<TransferLot>> _lotsByProduct = {};
   bool _isLoadingLots = false;
@@ -31,6 +41,39 @@ class _CreateScrapScreenState extends State<CreateScrapScreen> {
   bool _isPreparing = true;
   bool _isReadOnly = false;
   String? _selectedDamageType;
+
+  File? _challanImageFile;
+  String? _challanImageBase64;
+  String? _challanImageName;
+
+  Future<void> _pickChallanImage(ImageSource source) async {
+    try {
+      final picker = ImagePicker();
+      final picked = await picker.pickImage(
+        source: source,
+        maxWidth: 1600,
+        maxHeight: 1600,
+        imageQuality: 80,
+      );
+      if (picked == null) return;
+      final file = File(picked.path);
+      final bytes = await file.readAsBytes();
+      final base64Str = base64Encode(bytes);
+      setState(() {
+        _challanImageFile = file;
+        _challanImageBase64 = base64Str;
+        _challanImageName = picked.name.isNotEmpty
+            ? picked.name
+            : 'return_scrap_${DateTime.now().millisecondsSinceEpoch}.jpg';
+      });
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to pick photo: $e')),
+        );
+      }
+    }
+  }
 
   @override
   void initState() {
@@ -57,6 +100,8 @@ class _CreateScrapScreenState extends State<CreateScrapScreen> {
             'distributor': details['distributor'],
             'source_location': details['source_location'],
             'warehouse': details['destination_location'],
+            'return_book_number': details['return_book_number'],
+            'return_book_page': details['return_book_page'],
           };
 
           final linesData = details['lines'] as List<dynamic>? ?? [];
@@ -71,7 +116,7 @@ class _CreateScrapScreenState extends State<CreateScrapScreen> {
               product: product,
               quantity: qty,
               soQty: (ld['so_qty'] as num?)?.toDouble(),
-              qcQty: (ld['qc_qty'] as num?)?.toDouble(),
+              qcQty: ((ld['warehouse_qty'] ?? ld['qc_qty']) as num?)?.toDouble(),
             );
 
             final lotLinesData = ld['lot_lines'] as List<dynamic>? ?? [];
@@ -82,14 +127,14 @@ class _CreateScrapScreenState extends State<CreateScrapScreen> {
                 final lotName = lotData['name'] as String;
                 final lotQty = (ll['quantity'] as num?)?.toDouble() ?? 0.0;
                 final soQty = (ll['so_qty'] as num?)?.toDouble();
-                final qcQty = (ll['qc_qty'] as num?)?.toDouble();
+                final qcQty = ((ll['warehouse_qty'] ?? ll['qc_qty']) as num?)?.toDouble() ?? lotQty;
                 final lotAvail =
                     (lotData['available_qty'] as num?)?.toDouble() ?? lotQty;
 
                 final maxCurrent = [
                   lotQty,
                   soQty ?? 0.0,
-                  qcQty ?? 0.0,
+                  qcQty,
                 ].reduce((a, b) => a > b ? a : b);
                 final finalAvail = lotAvail > maxCurrent
                     ? lotAvail
@@ -131,6 +176,7 @@ class _CreateScrapScreenState extends State<CreateScrapScreen> {
             distributorId: resolvedDistributorId,
           );
           if (mounted && products != null) {
+            final auth = context.read<AuthProvider>();
             setState(() {
               _lines.clear();
               for (final p in products) {
@@ -139,7 +185,9 @@ class _CreateScrapScreenState extends State<CreateScrapScreen> {
                   _lines.add(
                     VirtualTransferLineEntry(
                       product: product,
-                      quantity: 0.0,
+                      quantity: product.availableQty,
+                      soQty: auth.canEditSoQty ? product.availableQty : null,
+                      qcQty: auth.canEditWarehouseQty ? product.availableQty : null,
                     ),
                   );
                 }
@@ -170,6 +218,7 @@ class _CreateScrapScreenState extends State<CreateScrapScreen> {
         builder: (_) => ScrapProductSelectionScreen(
           distributorId: distributorId,
           initialLines: _lines,
+          title: widget.productSelectionTitle,
         ),
       ),
     );
@@ -231,14 +280,14 @@ class _CreateScrapScreenState extends State<CreateScrapScreen> {
       if (auth.canEditSoQty) {
         final current = lotInput.soQty ?? lotInput.quantity;
         final next = current + delta;
-        lotInput.soQty = next.clamp(0, maxQty).toDouble();
-      } else if (auth.canEditQcQty) {
+        lotInput.soQty = next.clamp(0, double.infinity).toDouble();
+      } else if (auth.canEditWarehouseQty) {
         final current = lotInput.qcQty ?? lotInput.quantity;
         final next = current + delta;
-        lotInput.qcQty = next.clamp(0, maxQty).toDouble();
+        lotInput.qcQty = next.clamp(0, double.infinity).toDouble();
       } else {
         final next = lotInput.quantity + delta;
-        lotInput.quantity = next.clamp(0, maxQty).toDouble();
+        lotInput.quantity = next.clamp(0, double.infinity).toDouble();
       }
     });
   }
@@ -247,18 +296,106 @@ class _CreateScrapScreenState extends State<CreateScrapScreen> {
     return line.lotLines.fold<double>(0, (sum, lot) => sum + lot.quantity);
   }
 
-  double _allocatedSoQty(VirtualTransferLineEntry line) {
-    return line.lotLines.fold<double>(
-      0,
-      (sum, lot) => sum + (lot.soQty ?? lot.quantity),
-    );
+  void _syncSingleLotFromLine(VirtualTransferLineEntry line) {
+    if (!_allowsPrimaryOverstock || line.product.tracking == 'none') {
+      return;
+    }
+    if (line.lotLines.length != 1) {
+      return;
+    }
+    final lotInput = line.lotLines.first;
+    lotInput.quantity = line.quantity;
+    if (line.soQty != null) {
+      lotInput.soQty = line.soQty;
+    }
+    if (line.qcQty != null) {
+      lotInput.qcQty = line.qcQty;
+    }
   }
 
-  double _allocatedQcQty(VirtualTransferLineEntry line) {
-    return line.lotLines.fold<double>(
-      0,
-      (sum, lot) => sum + (lot.qcQty ?? lot.quantity),
-    );
+  double _submittedTrackedLotQty(TransferLotInput lotInput, AuthProvider auth) {
+    if (_allowsPrimaryOverstock && auth.canEditSoQty) {
+      return lotInput.soQty ?? lotInput.quantity;
+    }
+    if (_allowsPrimaryOverstock && auth.canEditWarehouseQty) {
+      return lotInput.qcQty ?? lotInput.quantity;
+    }
+    return lotInput.quantity;
+  }
+
+  double _submittedTrackedLineQty(VirtualTransferLineEntry line, AuthProvider auth) {
+    return line.lotLines.fold<double>(0, (sum, lot) {
+      if (lot.lot == null) {
+        return sum;
+      }
+      return sum + _submittedTrackedLotQty(lot, auth);
+    });
+  }
+
+  double _submittedTrackedSoQty(VirtualTransferLineEntry line) {
+    return line.lotLines.fold<double>(0, (sum, lot) {
+      if (lot.lot == null) {
+        return sum;
+      }
+      return sum + (lot.soQty ?? lot.quantity);
+    });
+  }
+
+  double _submittedTrackedQcQty(VirtualTransferLineEntry line) {
+    return line.lotLines.fold<double>(0, (sum, lot) {
+      if (lot.lot == null) {
+        return sum;
+      }
+      return sum + (lot.qcQty ?? lot.quantity);
+    });
+  }
+
+  bool _lineHasSubmittedQty(VirtualTransferLineEntry line, AuthProvider auth) {
+    final qty = line.product.tracking != 'none'
+        ? _submittedTrackedLineQty(line, auth)
+        : line.quantity;
+    final soQty = line.product.tracking != 'none'
+        ? _submittedTrackedSoQty(line)
+        : line.soQty;
+    final qcQty = line.product.tracking != 'none'
+        ? _submittedTrackedQcQty(line)
+        : line.qcQty;
+
+    return qty > 0 || (soQty ?? 0.0) > 0 || (qcQty ?? 0.0) > 0;
+  }
+
+  List<Map<String, dynamic>> _buildLinesPayload(AuthProvider auth) {
+    return _lines.where((line) => _lineHasSubmittedQty(line, auth)).map((line) {
+      final selectedLots = line.lotLines.where((l) => l.lot != null).toList();
+      final qty = line.product.tracking != 'none'
+          ? _submittedTrackedLineQty(line, auth)
+          : line.quantity;
+      final soQty = line.product.tracking != 'none'
+          ? _submittedTrackedSoQty(line)
+          : line.soQty;
+      final qcQty = line.product.tracking != 'none'
+          ? _submittedTrackedQcQty(line)
+          : line.qcQty;
+
+      return {
+        'product_id': line.product.id,
+        'product_uom_qty': 0.0,
+        'quantity': qty,
+        if (soQty != null && soQty > 0) 'so_qty': soQty,
+        if (qcQty != null && qcQty > 0) 'warehouse_qty': qcQty,
+        'lot_lines': selectedLots
+            .map(
+              (l) => {
+                'lot_id': l.lot!.lotId,
+                'product_uom_qty': 0.0,
+                'quantity': _submittedTrackedLotQty(l, auth),
+                if (l.soQty != null && l.soQty! > 0) 'so_qty': l.soQty,
+                if (l.qcQty != null && l.qcQty! > 0) 'warehouse_qty': l.qcQty,
+              },
+            )
+            .toList(),
+      };
+    }).toList();
   }
 
   Future<void> _createScrap() async {
@@ -272,36 +409,45 @@ class _CreateScrapScreenState extends State<CreateScrapScreen> {
       return;
     }
 
-    // Stock excess validation - block if any line exceeds available stock
-    final excessItems = <StockExcessItem>[];
-    for (final line in _lines) {
-      if (line.quantity > line.product.availableQty) {
-        excessItems.add(StockExcessItem(
-          productName: line.product.name,
-          enteredQty: line.quantity,
-          availableQty: line.product.availableQty,
-        ));
+    if (!_allowsPrimaryOverstock) {
+      final excessItems = <StockExcessItem>[];
+      for (final line in _lines) {
+        if (line.quantity > line.product.availableQty) {
+          excessItems.add(StockExcessItem(
+            productName: line.product.name,
+            enteredQty: line.quantity,
+            availableQty: line.product.availableQty,
+          ));
+        }
+      }
+      if (excessItems.isNotEmpty) {
+        await showStockExcessValidationDialog(context, excessItems: excessItems);
+        return;
       }
     }
-    if (excessItems.isNotEmpty) {
-      await showStockExcessValidationDialog(context, excessItems: excessItems);
+
+    final auth = context.read<AuthProvider>();
+    final linesData = _buildLinesPayload(auth);
+    if (linesData.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Add at least one product')),
+      );
       return;
     }
 
-    final linesData = _lines.map((line) {
-      final qty = line.quantity;
-      final soQty = line.soQty;
-      final qcQty = line.qcQty;
-
-      return {
-        'product_id': line.product.id,
-        'product_uom_qty': 0.0,
-        'quantity': qty,
-        if (soQty != null && soQty > 0) 'so_qty': soQty,
-        if (qcQty != null && qcQty > 0) 'qc_qty': qcQty,
-        'lot_lines': const [],
-      };
-    }).toList();
+    // Mandatory Photo Evidence Validation for Primary Sales Scrap
+    if ((widget.moduleType.toLowerCase() == 'primary' || widget.moduleType.isEmpty) &&
+        widget.scrapId == null) {
+      if (_challanImageBase64 == null || _challanImageBase64!.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Return Challan Photo Evidence is required for Primary Sales Scrap.'),
+            backgroundColor: Colors.red,
+          ),
+        );
+        return;
+      }
+    }
 
     Map<String, dynamic>? result;
     if (widget.scrapId != null) {
@@ -317,6 +463,8 @@ class _CreateScrapScreenState extends State<CreateScrapScreen> {
         distributorId: distributorId,
         type: widget.moduleType,
         damageType: _selectedDamageType,
+        attachmentBase64: _challanImageBase64,
+        attachmentFilename: _challanImageName,
       );
     }
 
@@ -325,7 +473,7 @@ class _CreateScrapScreenState extends State<CreateScrapScreen> {
       final error = context.read<ScrapProvider>().error;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(error ?? 'Failed to create return delivery'),
+          content: Text(error ?? 'Failed to create ${widget.title.toLowerCase()}'),
           backgroundColor: Colors.red,
         ),
       );
@@ -333,8 +481,8 @@ class _CreateScrapScreenState extends State<CreateScrapScreen> {
     }
 
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Scrap delivery created successfully!'),
+      SnackBar(
+        content: Text('${widget.title} created successfully!'),
         backgroundColor: Colors.green,
       ),
     );
@@ -349,20 +497,8 @@ class _CreateScrapScreenState extends State<CreateScrapScreen> {
     try {
       if (action == 'validate') {
         // Save first!
-        final linesData = _lines.map((line) {
-          final qty = line.quantity;
-          final soQty = line.soQty;
-          final qcQty = line.qcQty;
-
-          return {
-            'product_id': line.product.id,
-            'product_uom_qty': 0.0,
-            'quantity': qty,
-            if (soQty != null && soQty > 0) 'so_qty': soQty,
-            if (qcQty != null && qcQty > 0) 'qc_qty': qcQty,
-            'lot_lines': const [],
-          };
-        }).toList();
+        final auth = context.read<AuthProvider>();
+        final linesData = _buildLinesPayload(auth);
 
         final saveRes = await context.read<ScrapProvider>().updateScrapDelivery(
           widget.scrapId!,
@@ -384,6 +520,7 @@ class _CreateScrapScreenState extends State<CreateScrapScreen> {
       final res = await context.read<ScrapProvider>().executeScrapAction(
         widget.scrapId!,
         action,
+        type: widget.moduleType,
       );
       if (!mounted) return;
 
@@ -396,7 +533,7 @@ class _CreateScrapScreenState extends State<CreateScrapScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
-              'Scrap ${action == 'validate' ? 'validated' : 'cancelled'} successfully',
+              '${widget.title} ${action == 'validate' ? 'validated' : 'cancelled'} successfully',
             ),
             backgroundColor: Colors.green,
           ),
@@ -420,14 +557,14 @@ class _CreateScrapScreenState extends State<CreateScrapScreen> {
     final provider = context.watch<ScrapProvider>();
     final auth = context.watch<AuthProvider>();
     final canEditSoQty = auth.canEditSoQty;
-    final canEditQcQty = auth.canEditQcQty;
+    final canEditWarehouseQty = auth.canEditWarehouseQty;
     final canEditEffectiveQty = auth.canEditEffectiveQty;
 
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
-        title: const Text(
-          'Scraps',
+        title: Text(
+          widget.title,
           style: TextStyle(color: Colors.black87, fontWeight: FontWeight.bold),
         ),
         backgroundColor: Colors.white,
@@ -618,6 +755,56 @@ class _CreateScrapScreenState extends State<CreateScrapScreen> {
                                   ],
                                 ),
                               ),
+                              if (widget.moduleType.toLowerCase() == 'primary' || widget.moduleType.isEmpty) ...[
+                                const SizedBox(height: 16),
+                                const Text(
+                                  'Return Book & Page (Auto-Assigned)',
+                                  style: TextStyle(
+                                    color: Colors.black54,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                                const SizedBox(height: 6),
+                                Container(
+                                  width: double.infinity,
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 16,
+                                    vertical: 12,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFF0F4F9),
+                                    borderRadius: BorderRadius.circular(8),
+                                    border: Border.all(
+                                      color: const Color(0xFFDDE6F2),
+                                    ),
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      const Icon(
+                                        Icons.menu_book,
+                                        size: 20,
+                                        color: AppColors.primary,
+                                      ),
+                                      const SizedBox(width: 10),
+                                      Expanded(
+                                        child: Text(
+                                          _prepareData?['return_book_number'] != null || _prepareData?['return_book_page'] != null
+                                              ? '${_prepareData?['return_book_number'] ?? '-'} (Page ${_prepareData?['return_book_page'] ?? '-'})'
+                                              : (_prepareData?['next_return_book_number'] != null || _prepareData?['next_return_book_page'] != null
+                                                  ? '${_prepareData?['next_return_book_number'] ?? '-'} (Page ${_prepareData?['next_return_book_page'] ?? '-'})'
+                                                  : 'No active Return Book assigned'),
+                                          style: const TextStyle(
+                                            color: Colors.black87,
+                                            fontSize: 14,
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
                             ],
                           ),
                         ),
@@ -672,6 +859,137 @@ class _CreateScrapScreenState extends State<CreateScrapScreen> {
                           ),
                           hint: const Text('Select Damage Type'),
                         ),
+                        if (widget.moduleType.toLowerCase() == 'primary' ||
+                            widget.moduleType.isEmpty) ...[
+                          const SizedBox(height: 16),
+                          const Row(
+                            children: [
+                              Text(
+                                'Return Challan Photo Evidence',
+                                style: TextStyle(
+                                  color: Colors.black87,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              Text(
+                                ' *',
+                                style: TextStyle(
+                                  color: Colors.red,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 6),
+                          Container(
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(
+                                color: _challanImageFile == null
+                                    ? const Color(0xFFDDE6F2)
+                                    : AppColors.primary,
+                                width: _challanImageFile == null ? 1 : 1.5,
+                              ),
+                            ),
+                            child: _challanImageFile == null
+                                ? Row(
+                                    children: [
+                                      Expanded(
+                                        child: OutlinedButton.icon(
+                                          onPressed: _isReadOnly
+                                              ? null
+                                              : () => _pickChallanImage(
+                                                    ImageSource.camera,
+                                                  ),
+                                          icon: const Icon(
+                                            Icons.camera_alt_outlined,
+                                            size: 18,
+                                          ),
+                                          label: const Text('Camera'),
+                                          style: OutlinedButton.styleFrom(
+                                            foregroundColor: AppColors.primary,
+                                            side: const BorderSide(
+                                              color: AppColors.primary,
+                                            ),
+                                            shape: RoundedRectangleBorder(
+                                              borderRadius:
+                                                  BorderRadius.circular(8),
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 12),
+                                      Expanded(
+                                        child: OutlinedButton.icon(
+                                          onPressed: _isReadOnly
+                                              ? null
+                                              : () => _pickChallanImage(
+                                                    ImageSource.gallery,
+                                                  ),
+                                          icon: const Icon(
+                                            Icons.photo_library_outlined,
+                                            size: 18,
+                                          ),
+                                          label: const Text('Gallery'),
+                                          style: OutlinedButton.styleFrom(
+                                            foregroundColor: AppColors.primary,
+                                            side: const BorderSide(
+                                              color: AppColors.primary,
+                                            ),
+                                            shape: RoundedRectangleBorder(
+                                              borderRadius:
+                                                  BorderRadius.circular(8),
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  )
+                                : Row(
+                                    children: [
+                                      ClipRRect(
+                                        borderRadius: BorderRadius.circular(6),
+                                        child: Image.file(
+                                          _challanImageFile!,
+                                          width: 50,
+                                          height: 50,
+                                          fit: BoxFit.cover,
+                                        ),
+                                      ),
+                                      const SizedBox(width: 12),
+                                      Expanded(
+                                        child: Text(
+                                          _challanImageName ?? 'Photo Attached',
+                                          style: const TextStyle(
+                                            fontWeight: FontWeight.w600,
+                                            fontSize: 13,
+                                          ),
+                                          maxLines: 2,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ),
+                                      if (!_isReadOnly)
+                                        IconButton(
+                                          icon: const Icon(
+                                            Icons.delete_outline,
+                                            color: Colors.red,
+                                          ),
+                                          onPressed: () {
+                                            setState(() {
+                                              _challanImageFile = null;
+                                              _challanImageBase64 = null;
+                                              _challanImageName = null;
+                                            });
+                                          },
+                                        ),
+                                    ],
+                                  ),
+                          ),
+                        ],
                         const SizedBox(height: 24),
 
                         // Scrap Items Header
@@ -724,16 +1042,14 @@ class _CreateScrapScreenState extends State<CreateScrapScreen> {
                                 setState(() {
                                   lotInput.lot = selectedLot;
                                   if (selectedLot != null) {
-                                    final initVal = 1
-                                        .clamp(0, selectedLot.availableQty)
-                                        .toDouble();
+                                    final initVal = 1.0;
                                     if (canEditSoQty) {
                                       if (lotInput.soQty == null ||
                                           lotInput.soQty! <= 0) {
                                         lotInput.soQty = initVal;
                                       }
                                       lotInput.quantity = 0;
-                                    } else if (canEditQcQty) {
+                                    } else if (canEditWarehouseQty) {
                                       if (lotInput.qcQty == null ||
                                           lotInput.qcQty! <= 0) {
                                         lotInput.qcQty = initVal;
@@ -749,52 +1065,66 @@ class _CreateScrapScreenState extends State<CreateScrapScreen> {
                               },
                               onLotMinus: (lotInput) => _changeLotQty(
                                 lotInput,
-                                lotInput.lot?.availableQty ??
-                                    line.product.availableQty,
+                                double.infinity,
                                 -1,
                               ),
                               onLotPlus: (lotInput) => _changeLotQty(
                                 lotInput,
-                                lotInput.lot?.availableQty ??
-                                    line.product.availableQty,
+                                double.infinity,
                                 1,
                               ),
                               allocatedQty: _allocatedQty(line),
                               isReadOnly: _isReadOnly,
                               canEditSoQty: canEditSoQty,
-                              canEditQcQty: canEditQcQty,
+                              canEditWarehouseQty: canEditWarehouseQty,
                               canEditEffectiveQty: canEditEffectiveQty,
+                              allowOverstock: _allowsPrimaryOverstock,
                               onSoQtyChanged: (newQty) {
                                 setState(() {
-                                  line.soQty = newQty;
+                                  line.soQty = (_allowsPrimaryOverstock
+                                          ? newQty.clamp(0, double.infinity)
+                                          : newQty.clamp(0, line.product.availableQty))
+                                      .toDouble();
+                                  if (_allowsPrimaryOverstock) {
+                                    line.quantity = line.soQty ?? line.quantity;
+                                  }
+                                  _syncSingleLotFromLine(line);
                                 });
                               },
                               onQcQtyChanged: (newQty) {
                                 setState(() {
-                                  line.qcQty = newQty;
+                                  line.qcQty = (_allowsPrimaryOverstock
+                                          ? newQty.clamp(0, double.infinity)
+                                          : newQty.clamp(0, line.product.availableQty))
+                                      .toDouble();
+                                  if (_allowsPrimaryOverstock) {
+                                    line.quantity = line.qcQty ?? line.quantity;
+                                  }
+                                  _syncSingleLotFromLine(line);
                                 });
                               },
                               onQuantityChanged: (newQty) {
                                 setState(() {
-                                  line.quantity = newQty.clamp(1, double.infinity);
+                                  line.quantity = (_allowsPrimaryOverstock
+                                          ? newQty.clamp(0, double.infinity)
+                                          : newQty.clamp(0, line.product.availableQty))
+                                      .toDouble();
+                                  _syncSingleLotFromLine(line);
                                   // trigger rebuild
                                   _allocatedQty(line);
                                 });
                               },
                               onLotQtyInput: (lotInput, newLotQty) {
                                 setState(() {
-                                  final maxQty =
-                                      lotInput.lot?.availableQty ??
-                                      line.product.availableQty;
-                                  final clampedVal = newLotQty
-                                      .clamp(0, maxQty)
+                                  final enteredVal = newLotQty
+                                      .clamp(0, double.infinity)
                                       .toDouble();
                                   if (canEditSoQty) {
-                                    lotInput.soQty = clampedVal;
-                                  } else if (canEditQcQty) {
-                                    lotInput.qcQty = clampedVal;
+                                    lotInput.soQty = enteredVal;
+                                  } else if (canEditWarehouseQty) {
+                                    lotInput.qcQty = enteredVal;
                                   } else {
-                                    lotInput.quantity = clampedVal;
+                                    lotInput.quantity = enteredVal;
                                   }
                                 });
                               },
@@ -931,8 +1261,9 @@ class _ScrapLineCard extends StatelessWidget {
     required this.allocatedQty,
     this.isReadOnly = false,
     this.canEditSoQty = false,
-    this.canEditQcQty = false,
+    this.canEditWarehouseQty = false,
     this.canEditEffectiveQty = false,
+    this.allowOverstock = false,
     this.onQuantityChanged,
     this.onSoQtyChanged,
     this.onQcQtyChanged,
@@ -952,8 +1283,9 @@ class _ScrapLineCard extends StatelessWidget {
   final double allocatedQty;
   final bool isReadOnly;
   final bool canEditSoQty;
-  final bool canEditQcQty;
+  final bool canEditWarehouseQty;
   final bool canEditEffectiveQty;
+  final bool allowOverstock;
   final ValueChanged<double>? onQuantityChanged;
   final ValueChanged<double>? onSoQtyChanged;
   final ValueChanged<double>? onQcQtyChanged;
@@ -1025,7 +1357,7 @@ class _ScrapLineCard extends StatelessWidget {
             ),
           ),
 
-          if (false) ...[
+          if (line.product.requiresLots) ...[
             Container(
               color: Colors.white,
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -1068,7 +1400,7 @@ class _ScrapLineCard extends StatelessWidget {
                             ? (newVal) => onLotQtyInput!(lotInput, newVal)
                             : null,
                         canEditSoQty: canEditSoQty,
-                        canEditQcQty: canEditQcQty,
+                        canEditWarehouseQty: canEditWarehouseQty,
                         canEditEffectiveQty: canEditEffectiveQty,
                       ),
                     ),
@@ -1130,25 +1462,27 @@ class _ScrapLineCard extends StatelessWidget {
                     value: line.soQty ?? 0,
                     isReadOnly: isReadOnly || !canEditSoQty,
                     min: 0,
-                    max: line.product.availableQty,
+                    max: allowOverstock ? double.infinity : line.product.availableQty,
                     onChanged: onSoQtyChanged,
                   ),
-                  _buildQtyRow(
-                    title: 'QC Qty',
-                    value: line.qcQty ?? 0,
-                    isReadOnly: isReadOnly || !canEditQcQty,
-                    min: 0,
-                    max: line.product.availableQty,
-                    onChanged: onQcQtyChanged,
-                  ),
-                  _buildQtyRow(
-                    title: 'Scrap Qty',
-                    value: line.quantity,
-                    isReadOnly: isReadOnly || !canEditEffectiveQty,
-                    min: 0,
-                    max: line.product.availableQty,
-                    onChanged: onQuantityChanged,
-                  ),
+                  if (canEditWarehouseQty)
+                    _buildQtyRow(
+                      title: 'Warehouse Qty',
+                      value: line.qcQty ?? 0,
+                      isReadOnly: isReadOnly,
+                      min: 0,
+                      max: allowOverstock ? double.infinity : line.product.availableQty,
+                      onChanged: onQcQtyChanged,
+                    ),
+                  if (canEditEffectiveQty)
+                    _buildQtyRow(
+                      title: 'QC Qty (Effective)',
+                      value: line.quantity,
+                      isReadOnly: isReadOnly,
+                      min: 0,
+                      max: allowOverstock ? double.infinity : line.product.availableQty,
+                      onChanged: onQuantityChanged,
+                    ),
                 ],
               ),
             ),
@@ -1218,7 +1552,7 @@ class _ScrapLotRow extends StatelessWidget {
     this.isReadOnly = false,
     this.onQuantityChanged,
     required this.canEditSoQty,
-    required this.canEditQcQty,
+    required this.canEditWarehouseQty,
     required this.canEditEffectiveQty,
   });
 
@@ -1231,7 +1565,7 @@ class _ScrapLotRow extends StatelessWidget {
   final bool isReadOnly;
   final ValueChanged<double>? onQuantityChanged;
   final bool canEditSoQty;
-  final bool canEditQcQty;
+  final bool canEditWarehouseQty;
   final bool canEditEffectiveQty;
 
   @override
@@ -1241,7 +1575,7 @@ class _ScrapLotRow extends StatelessWidget {
     if (canEditSoQty) {
       activeQty = lotInput.soQty ?? lotInput.quantity;
       label = 'SO Qty';
-    } else if (canEditQcQty) {
+    } else if (canEditWarehouseQty) {
       activeQty = lotInput.qcQty ?? lotInput.quantity;
       label = 'QC Qty';
     } else {

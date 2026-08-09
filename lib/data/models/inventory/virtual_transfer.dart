@@ -66,12 +66,14 @@ class TransferLot {
   final String lotName;
   final double availableQty;
   final double scrapQty;
+  final double damagedQualityQty;
 
   TransferLot({
     required this.lotId,
     required this.lotName,
     required this.availableQty,
     this.scrapQty = 0.0,
+    this.damagedQualityQty = 0.0,
   });
 
   factory TransferLot.fromMap(Map<String, dynamic> map) {
@@ -80,6 +82,7 @@ class TransferLot {
       lotName: map['lot_name'] ?? '',
       availableQty: asDouble(map['available_qty']),
       scrapQty: asDouble(map['scrap_qty']),
+      damagedQualityQty: asDouble(map['damaged_quality_qty']),
     );
   }
 }
@@ -92,6 +95,7 @@ class VirtualTransferLineEntry {
     this.qcQty,
     this.freshQty,
     this.scrapQty,
+    this.damagedQualityQty,
     List<TransferLotInput>? lotLines,
   }) : lotLines = lotLines ?? [];
 
@@ -101,6 +105,7 @@ class VirtualTransferLineEntry {
   double? qcQty;
   double? freshQty;
   double? scrapQty;
+  double? damagedQualityQty;
   final List<TransferLotInput> lotLines;
 }
 
@@ -112,6 +117,7 @@ class TransferLotInput {
     this.qcQty,
     this.freshQty,
     this.scrapQty,
+    this.damagedQualityQty,
   });
 
   TransferLot? lot;
@@ -120,6 +126,7 @@ class TransferLotInput {
   double? qcQty;
   double? freshQty;
   double? scrapQty;
+  double? damagedQualityQty;
 }
 
 class VirtualTransfer {
@@ -127,11 +134,13 @@ class VirtualTransfer {
   final String name;
   final String state;
   final String? vanOperationType;
+  final String? generatedTransferType;
   final String? ssTransferCategory;
-  final String? scheduledDate;
+  final DateTime? scheduledDate;
   final Map<String, dynamic>? distributor;
   final Map<String, dynamic>? sourceLocation;
   final Map<String, dynamic>? destinationLocation;
+  final List<VirtualTransfer> generatedTransfers;
   final List<VirtualTransferLine> lines;
 
   VirtualTransfer({
@@ -139,26 +148,35 @@ class VirtualTransfer {
     required this.name,
     required this.state,
     this.vanOperationType,
+    this.generatedTransferType,
     this.ssTransferCategory,
     this.scheduledDate,
     this.distributor,
     this.sourceLocation,
     this.destinationLocation,
+    required this.generatedTransfers,
     required this.lines,
   });
 
   factory VirtualTransfer.fromMap(Map<String, dynamic> map) {
+    final rawGeneratedTransfers = map['generated_transfers'];
     final rawLines = map['lines'];
     return VirtualTransfer(
       id: asInt(map['id']),
       name: map['name'] ?? '',
       state: map['state'] ?? '',
       vanOperationType: map['van_operation_type'],
+      generatedTransferType: map['generated_transfer_type'],
       ssTransferCategory: map['ss_transfer_category'],
-      scheduledDate: map['scheduled_date'],
+      scheduledDate: asDateTime(map['scheduled_date']),
       distributor: asMapOrNull(map['distributor']),
       sourceLocation: asMapOrNull(map['source_location']),
       destinationLocation: asMapOrNull(map['destination_location']),
+      generatedTransfers: rawGeneratedTransfers is List
+          ? rawGeneratedTransfers
+                .map((item) => VirtualTransfer.fromMap(asMap(item)))
+                .toList()
+          : [],
       lines: rawLines is List
           ? rawLines
                 .map((item) => VirtualTransferLine.fromMap(asMap(item)))
@@ -178,8 +196,9 @@ class VirtualTransferLine {
   final double demandQty;
   final double quantity;
   final double soQty;
-  final double qcQty;
+  final double warehouseQty;
   final double scrapQty;
+  final double damagedQualityQty;
   final Map<String, dynamic>? uom;
   final List<Map<String, dynamic>> lotLines;
 
@@ -190,8 +209,9 @@ class VirtualTransferLine {
     required this.demandQty,
     required this.quantity,
     this.soQty = 0,
-    this.qcQty = 0,
+    this.warehouseQty = 0,
     required this.scrapQty,
+    this.damagedQualityQty = 0,
     this.uom,
     required this.lotLines,
   });
@@ -205,11 +225,17 @@ class VirtualTransferLine {
       demandQty: asDouble(map['demand_qty']),
       quantity: asDouble(map['quantity']),
       soQty: asDouble(map['so_qty']),
-      qcQty: asDouble(map['qc_qty']),
+      warehouseQty: asDouble(map['warehouse_qty']),
       scrapQty: asDouble(map['scrap_qty']),
+      damagedQualityQty: asDouble(map['damaged_quality_qty']),
       uom: asMapOrNull(map['uom']),
       lotLines: rawLots is List ? rawLots.map(asMap).toList() : [],
     );
+  }
+
+  double get freshQty {
+    final fresh = quantity - scrapQty - damagedQualityQty;
+    return fresh < 0 ? 0 : fresh;
   }
 
   String get productName => product?['name']?.toString() ?? '-';

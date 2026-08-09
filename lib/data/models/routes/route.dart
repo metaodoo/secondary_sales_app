@@ -2,7 +2,6 @@ import 'package:secondary_sales/core/util/parse.dart';
 class RouteModel {
   final int id;
   final String name;
-  final String? code;
   final bool active;
   final int? distributorId;
   final String? distributorName;
@@ -13,7 +12,6 @@ class RouteModel {
   RouteModel({
     required this.id,
     required this.name,
-    this.code,
     required this.active,
     this.distributorId,
     this.distributorName,
@@ -30,7 +28,6 @@ class RouteModel {
     return RouteModel(
       id: asInt(map['id']),
       name: map['name'] ?? '',
-      code: map['code'],
       active: map['active'] != false,
       distributorId: dist != null ? asInt(dist['id']) : null,
       distributorName: dist != null ? dist['name'] : null,

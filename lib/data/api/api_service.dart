@@ -17,6 +17,7 @@ import 'package:secondary_sales/data/models/inventory/warehouse.dart';
 import 'package:secondary_sales/data/models/inventory/virtual_transfer.dart';
 import 'package:secondary_sales/data/models/dashboard/dashboard_summary.dart';
 import 'package:secondary_sales/data/models/notifications/app_notification.dart';
+import 'package:secondary_sales/data/models/routes/visit_reason.dart';
 import 'package:secondary_sales/core/access/access_control.dart';
 import 'package:secondary_sales/core/access/access_resources.dart';
 import 'package:secondary_sales/core/util/parse.dart';

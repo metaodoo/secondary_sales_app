@@ -158,10 +158,12 @@ class OrderLineCard extends StatelessWidget {
               const SizedBox(width: 8),
               // Qty input field
               SizedBox(
-                width: 50,
+                width: 85,
                 height: 38,
                 child: TextField(
-                  keyboardType: const TextInputType.numberWithOptions(decimal: false),
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: false,
+                  ),
                   textAlign: TextAlign.center,
                   style: const TextStyle(
                     fontWeight: FontWeight.bold,
@@ -169,7 +171,10 @@ class OrderLineCard extends StatelessWidget {
                     color: AppColors.textPrimary,
                   ),
                   decoration: InputDecoration(
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 4, vertical: 0),
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 4,
+                      vertical: 0,
+                    ),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(8),
                       borderSide: const BorderSide(color: AppColors.borderSoft),
@@ -180,7 +185,10 @@ class OrderLineCard extends StatelessWidget {
                     ),
                     focusedBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(8),
-                      borderSide: const BorderSide(color: AppColors.primary, width: 2),
+                      borderSide: const BorderSide(
+                        color: AppColors.primary,
+                        width: 2,
+                      ),
                     ),
                   ),
                   onChanged: (val) {
@@ -190,9 +198,10 @@ class OrderLineCard extends StatelessWidget {
                       onChanged();
                     }
                   },
-                  controller: TextEditingController(
-                    text: '${line.quantity}',
-                  )..selection = TextSelection.collapsed(offset: '${line.quantity}'.length),
+                  controller: TextEditingController(text: '${line.quantity}')
+                    ..selection = TextSelection.collapsed(
+                      offset: '${line.quantity}'.length,
+                    ),
                 ),
               ),
               const SizedBox(width: 8),

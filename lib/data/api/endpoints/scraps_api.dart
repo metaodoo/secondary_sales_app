@@ -92,6 +92,8 @@ extension ScrapsApi on ApiService {
     int? distributorId,
     String? type,
     String? damageType,
+    String? attachmentBase64,
+    String? attachmentFilename,
   }) async {
     final params = <String, dynamic>{
       'employee_id': _activeEmployeeId,
@@ -105,6 +107,12 @@ extension ScrapsApi on ApiService {
     }
     if (damageType != null && damageType.isNotEmpty) {
       params['damage_type'] = damageType;
+    }
+    if (attachmentBase64 != null && attachmentBase64.isNotEmpty) {
+      params['attachment_base64'] = attachmentBase64;
+    }
+    if (attachmentFilename != null && attachmentFilename.isNotEmpty) {
+      params['attachment_filename'] = attachmentFilename;
     }
 
     final result = await _post('${AppConstants.scrapsEndpoint}/create', params);
@@ -152,11 +160,16 @@ extension ScrapsApi on ApiService {
     throw Exception(result['message'] ?? 'Failed to update scrap delivery');
   }
 
-  Future<Map<String, dynamic>> scrapAction(int scrapId, String action) async {
+  Future<Map<String, dynamic>> scrapAction(
+    int scrapId,
+    String action, {
+    String? type,
+  }) async {
     final params = <String, dynamic>{
       'employee_id': _activeEmployeeId,
       'action': action,
     };
+    if (type != null && type.isNotEmpty) params['type'] = type;
     final result = await _post(
       '${AppConstants.scrapsEndpoint}/$scrapId/action',
       params,

@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:secondary_sales/core/theme/app_theme.dart';
+import 'package:secondary_sales/core/constants.dart';
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -13,7 +14,23 @@ import 'package:secondary_sales/core/access/access_resources.dart';
 
 class ReturnsListScreen extends StatefulWidget {
   final String moduleType;
-  const ReturnsListScreen({super.key, this.moduleType = 'primary'});
+  final String title;
+  final String createLabel;
+  final String createScreenTitle;
+  final String productSelectionTitle;
+  final String endpoint;
+  final String? createActionKey;
+
+  const ReturnsListScreen({
+    super.key,
+    this.moduleType = 'primary',
+    this.title = 'Returns List',
+    this.createLabel = 'New Return',
+    this.createScreenTitle = 'Returns',
+    this.productSelectionTitle = 'Select Return Products',
+    this.endpoint = AppConstants.returnsEndpoint,
+    this.createActionKey,
+  });
 
   @override
   State<ReturnsListScreen> createState() => _ReturnsListScreenState();
@@ -70,6 +87,7 @@ class _ReturnsListScreenState extends State<ReturnsListScreen> {
       search: _searchController.text,
       state: _state,
       type: widget.moduleType,
+      endpoint: widget.endpoint,
     );
     if (mounted) {
       setState(() {
@@ -107,7 +125,12 @@ class _ReturnsListScreenState extends State<ReturnsListScreen> {
     await Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (_) => CreateReturnScreen(moduleType: widget.moduleType),
+        builder: (_) => CreateReturnScreen(
+          moduleType: widget.moduleType,
+          title: widget.createScreenTitle,
+          productSelectionTitle: widget.productSelectionTitle,
+          endpoint: widget.endpoint,
+        ),
       ),
     );
     if (mounted) {
@@ -168,8 +191,8 @@ class _ReturnsListScreenState extends State<ReturnsListScreen> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
-                'Filter Returns',
+              Text(
+                'Filter ${widget.title}',
                 style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 16),
@@ -224,8 +247,8 @@ class _ReturnsListScreenState extends State<ReturnsListScreen> {
           ),
           onPressed: () => Navigator.pop(context),
         ),
-        title: const Text(
-          'Returns List',
+        title: Text(
+          widget.title,
           style: TextStyle(
             color: AppColors.primaryStrong,
             fontWeight: FontWeight.bold,
@@ -244,8 +267,8 @@ class _ReturnsListScreenState extends State<ReturnsListScreen> {
           child: Container(color: AppColors.borderMuted, height: 1),
         ),
       ),
-      floatingActionButton: auth.canDo(AppAction.returnCreateFor(widget.moduleType))
-          ? SsCreateFab(label: 'New Return', onPressed: _openCreateReturn)
+      floatingActionButton: auth.canDo(widget.createActionKey ?? AppAction.returnCreateFor(widget.moduleType))
+          ? SsCreateFab(label: widget.createLabel, onPressed: _openCreateReturn)
           : null,
       body: SafeArea(
         child: RefreshIndicator(
@@ -384,8 +407,9 @@ class _ReturnsListScreenState extends State<ReturnsListScreen> {
                   final origin = ret.origin?.toString() ?? '-';
                   // In standard odoo origin may look like 'Return from Distributor A'
                   final customerName = origin.replaceAll('Return from ', '');
-                  final date =
-                      ret.scheduledDate?.toString().split(' ')[0] ?? '-';
+                  final date = ret.scheduledDate == null
+                      ? '-'
+                      : '${ret.scheduledDate!.year.toString().padLeft(4, '0')}-${ret.scheduledDate!.month.toString().padLeft(2, '0')}-${ret.scheduledDate!.day.toString().padLeft(2, '0')}';
 
                   return InkWell(
                     onTap: () {
@@ -395,6 +419,9 @@ class _ReturnsListScreenState extends State<ReturnsListScreen> {
                           builder: (_) => CreateReturnScreen(
                             returnId: ret.id,
                             moduleType: widget.moduleType,
+                            title: widget.createScreenTitle,
+                            productSelectionTitle: widget.productSelectionTitle,
+                            endpoint: widget.endpoint,
                           ),
                         ),
                       ).then((_) => _fetchReturns(reset: true));
@@ -450,6 +477,23 @@ class _ReturnsListScreenState extends State<ReturnsListScreen> {
                               color: Colors.black87,
                             ),
                           ),
+                          if (ret.returnBookNumber != null || ret.returnBookPage != null) ...[
+                            const SizedBox(height: 6),
+                            Row(
+                              children: [
+                                const Icon(Icons.menu_book, size: 14, color: AppColors.primary),
+                                const SizedBox(width: 6),
+                                Text(
+                                  '${ret.returnBookNumber ?? '-'} (Pg ${ret.returnBookPage ?? '-'})',
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                    color: AppColors.primary,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
                           const Padding(
                             padding: EdgeInsets.symmetric(vertical: 12),
                             child: Divider(

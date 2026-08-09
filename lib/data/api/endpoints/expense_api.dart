@@ -38,12 +38,16 @@ extension ExpenseApi on ApiService {
     String? title,
     String? description,
     required List<Map<String, dynamic>> expenses,
+    String? attachment,
+    String? attachmentName,
   }) async {
     return _post('/api/v1/hr/expense/sheet/create', {
       'employee_id': employeeId,
       if (title != null) 'title': title,
       if (description != null) 'description': description,
       'expenses': expenses,
+      if (attachment != null) 'attachment': attachment,
+      if (attachmentName != null) 'attachment_name': attachmentName,
     });
   }
 

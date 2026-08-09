@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:secondary_sales/data/models/routes/route.dart';
+import 'package:secondary_sales/data/models/routes/visit_reason.dart';
 import 'package:secondary_sales/data/api/api_service.dart';
 import 'package:secondary_sales/core/services/location_service.dart';
 
@@ -7,6 +8,7 @@ class RouteProvider with ChangeNotifier {
   final ApiService _apiService = ApiService.instance;
 
   List<RouteModel> _routes = [];
+  List<VisitReason> _visitReasons = [];
   RouteModel? _activeRoute;
   int _loadingCount = 0;
   String? _error;
@@ -18,6 +20,7 @@ class RouteProvider with ChangeNotifier {
   int? _lastEmployeeId;
 
   List<RouteModel> get routes => _routes;
+  List<VisitReason> get visitReasons => _visitReasons;
   RouteModel? get activeRoute => _activeRoute;
   bool get isLoading => _loadingCount > 0;
   String? get error => _error;
@@ -26,6 +29,17 @@ class RouteProvider with ChangeNotifier {
   int? get currentVisitId => _currentVisitId;
   DateTime? get checkInTime => _checkInTime;
   Set<int> get checkedOutOutletIds => _checkedOutOutletIds;
+
+  Future<List<VisitReason>> fetchVisitReasons() async {
+    try {
+      _visitReasons = await _apiService.getVisitReasons();
+      notifyListeners();
+      return _visitReasons;
+    } catch (e) {
+      _error = e.toString();
+      return _visitReasons;
+    }
+  }
 
   void updateAuth({String? accessToken, String? sessionId, int? employeeId}) {
     _apiService.updateAccessToken(accessToken);
@@ -97,7 +111,6 @@ class RouteProvider with ChangeNotifier {
 
   Future<RouteModel?> createRoute({
     required String name,
-    String? code,
     int? distributorId,
     List<int>? employeeIds,
   }) async {
@@ -108,7 +121,6 @@ class RouteProvider with ChangeNotifier {
     try {
       final map = await _apiService.createRoute(
         name: name,
-        code: code,
         distributorId: distributorId,
         employeeIds: employeeIds,
       );
@@ -127,7 +139,6 @@ class RouteProvider with ChangeNotifier {
   Future<RouteModel?> updateRoute(
     int routeId, {
     required String name,
-    String? code,
     int? distributorId,
     List<int>? employeeIds,
     bool? active,
@@ -141,7 +152,6 @@ class RouteProvider with ChangeNotifier {
       final map = await _apiService.updateRoute(
         routeId,
         name: name,
-        code: code,
         distributorId: distributorId,
         employeeIds: employeeIds,
         active: active,
@@ -291,14 +301,12 @@ class RouteProvider with ChangeNotifier {
     _error = null;
     notifyListeners();
     try {
-      // Geofenced action: require a fresh, reasonably accurate fix so a stale
-      // cached position from a previous location can't pass the outlet geofence.
-      // 50 m mirrors the default outlet radius (ss_attendance_radius); relax if
-      // field GPS proves too strict.
+      // Geofenced action: require a fresh fix so a stale cached position from a
+      // previous outlet can neither fail the geofence you are standing in nor
+      // pass one you are nowhere near.
       final position = await LocationService.getCurrentPosition(
         requireFresh: true,
         timeLimit: const Duration(seconds: 15),
-        maxAccuracyMeters: 50,
       );
       final res = await _apiService.createVisit(
         employeeId,
@@ -308,6 +316,7 @@ class RouteProvider with ChangeNotifier {
       );
       _checkedInOutletId = outletId;
       _currentVisitId = res['id'];
+      _requiresVisitReason = res['requires_visit_reason'] == true;
       _checkInTime = DateTime.now();
       _checkedOutOutletIds.remove(outletId);
     } catch (e) {
@@ -319,7 +328,12 @@ class RouteProvider with ChangeNotifier {
     }
   }
 
-  Future<void> checkOut() async {
+  /// Whether the open visit has produced no sale order, in which case the
+  /// server requires a reason before it will accept the check-out.
+  bool _requiresVisitReason = false;
+  bool get requiresVisitReason => _requiresVisitReason;
+
+  Future<void> checkOut({int? visitReasonId, String? reasonNotes, double? saleAmount}) async {
     if (_currentVisitId == null) return;
     _loadingCount++;
     _error = null;
@@ -328,12 +342,16 @@ class RouteProvider with ChangeNotifier {
       await _apiService.updateVisit(
         _currentVisitId!,
         checkOutTime: DateTime.now().toUtc().toIso8601String(),
+        visitReasonId: visitReasonId,
+        reasonNotes: reasonNotes,
+        saleAmount: saleAmount,
       );
       if (_checkedInOutletId != null) {
         _checkedOutOutletIds.add(_checkedInOutletId!);
       }
       _checkedInOutletId = null;
       _currentVisitId = null;
+      _requiresVisitReason = false;
       _checkInTime = null;
     } catch (e) {
       _error = e.toString();
@@ -356,6 +374,7 @@ class RouteProvider with ChangeNotifier {
       if (activeVisit != null) {
         _checkedInOutletId = activeVisit['outlet_id'];
         _currentVisitId = activeVisit['id'];
+        _requiresVisitReason = activeVisit['requires_visit_reason'] == true;
         final checkInStr = activeVisit['check_in_time'];
         if (checkInStr != null) {
           String parsedTimeStr = checkInStr;
@@ -367,6 +386,7 @@ class RouteProvider with ChangeNotifier {
       } else {
         _checkedInOutletId = null;
         _currentVisitId = null;
+        _requiresVisitReason = false;
         _checkInTime = null;
       }
       notifyListeners();

@@ -7,6 +7,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:secondary_sales/features/routes/route_provider.dart';
 import 'package:secondary_sales/features/routes/screens/outlet_visit_history_screen.dart';
 import 'package:secondary_sales/features/routes/screens/new_joint_visit_screen.dart';
+import 'package:secondary_sales/core/access/access_resources.dart';
 import 'package:secondary_sales/features/sales/screens/order_creation_screen.dart';
 import 'package:secondary_sales/features/sales/screens/out_of_geo_fence_screen.dart';
 import 'package:secondary_sales/features/sales/screens/secondary_orders_list_screen.dart';
@@ -33,6 +34,7 @@ class CustomerActionBottomSheet extends StatefulWidget {
 class _CustomerActionBottomSheetState extends State<CustomerActionBottomSheet> {
   Timer? _timer;
   Duration _duration = const Duration();
+  bool _isCheckingIn = false;
 
   @override
   void initState() {
@@ -67,15 +69,13 @@ class _CustomerActionBottomSheetState extends State<CustomerActionBottomSheet> {
   }
 
   Future<void> _makeCall() async {
-    final phoneNumber = (widget.mobile != null && widget.mobile!.trim().isNotEmpty)
+    final phoneNumber =
+        (widget.mobile != null && widget.mobile!.trim().isNotEmpty)
         ? widget.mobile!.trim()
         : (widget.phone != null && widget.phone!.trim().isNotEmpty)
-            ? widget.phone!.trim()
-            : '';
-    final Uri launchUri = Uri(
-      scheme: 'tel',
-      path: phoneNumber,
-    );
+        ? widget.phone!.trim()
+        : '';
+    final Uri launchUri = Uri(scheme: 'tel', path: phoneNumber);
     try {
       if (await canLaunchUrl(launchUri)) {
         await launchUrl(launchUri);
@@ -94,9 +94,9 @@ class _CustomerActionBottomSheetState extends State<CustomerActionBottomSheet> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error launching dialer: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error launching dialer: $e')));
       }
     }
   }
@@ -210,52 +210,59 @@ class _CustomerActionBottomSheetState extends State<CustomerActionBottomSheet> {
             ],
           ),
           const SizedBox(height: 12),
-          Row(
-            children: [
-              Expanded(
-                child: _buildActionBtn(
-                  Icons.handshake_outlined,
-                  'Joint\nVisit',
-                  onTap: () async {
-                    if (!isCheckedIn) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text(
-                            "Please check in first to start a joint visit.",
+          if (context.watch<AuthProvider>().canView(AppScreen.newJointVisit))
+            Row(
+              children: [
+                Expanded(
+                  child: _buildActionBtn(
+                    Icons.handshake_outlined,
+                    'Joint\nVisit',
+                    onTap: () async {
+                      if (!isCheckedIn) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text(
+                              "Please check in first to start a joint visit.",
+                            ),
+                          ),
+                        );
+                        return;
+                      }
+                      final result = await Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => NewJointVisitScreen(
+                            outletId: widget.outletId,
+                            outletName: widget.customerName,
+                            currentVisitId: routeProv.currentVisitId,
                           ),
                         ),
                       );
-                      return;
-                    }
-                    final result = await Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => NewJointVisitScreen(
-                          outletId: widget.outletId,
-                          outletName: widget.customerName,
-                          currentVisitId: routeProv.currentVisitId,
-                        ),
-                      ),
-                    );
-                    if (!context.mounted) return;
-                    if (result == true) {
-                      Navigator.pop(context); // close bottom sheet
-                    }
-                  },
+                      if (!context.mounted) return;
+                      if (result == true) {
+                        Navigator.pop(context); // close bottom sheet
+                      }
+                    },
+                  ),
                 ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(child: const SizedBox()),
-              const SizedBox(width: 12),
-              Expanded(child: const SizedBox()),
-            ],
-          ),
+                const SizedBox(width: 12),
+                const Expanded(child: SizedBox()),
+                const SizedBox(width: 12),
+                const Expanded(child: SizedBox()),
+              ],
+            ),
           const SizedBox(height: 32),
 
           ElevatedButton(
             onPressed: () {
               final authProv = context.read<AuthProvider>();
-              final canSkipCheckin = authProv.session?.user.permissions?.canCreateOrderWithoutCheckin ?? false;
+              final canSkipCheckin =
+                  authProv
+                      .session
+                      ?.user
+                      .permissions
+                      ?.canCreateOrderWithoutCheckin ??
+                  false;
 
               if (isCheckedIn) {
                 Navigator.pop(context); // Close bottom sheet
@@ -298,26 +305,47 @@ class _CustomerActionBottomSheetState extends State<CustomerActionBottomSheet> {
                         child: const Text('Cancel'),
                       ),
                       ElevatedButton(
-                        onPressed: () async {
-                          Navigator.pop(ctx); // Close dialog
-                          final employeeId = authProv.session?.user.employeeId;
-                          if (employeeId != null) {
-                            try {
-                              await routeProv.checkIn(employeeId, widget.outletId);
-                              if (context.mounted) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(content: Text('Checked in successfully!')),
-                                );
-                              }
-                            } catch (e) {
-                              if (context.mounted) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(content: Text('Check-in failed: $e')),
-                                );
-                              }
-                            }
-                          }
-                        },
+                        onPressed: _isCheckingIn
+                            ? null
+                            : () async {
+                                Navigator.pop(ctx); // Close dialog
+                                final employeeId =
+                                    authProv.session?.user.employeeId;
+                                if (employeeId != null) {
+                                  if (mounted)
+                                    setState(() => _isCheckingIn = true);
+                                  try {
+                                    await routeProv.checkIn(
+                                      employeeId,
+                                      widget.outletId,
+                                    );
+                                    if (context.mounted) {
+                                      ScaffoldMessenger.of(
+                                        context,
+                                      ).showSnackBar(
+                                        const SnackBar(
+                                          content: Text(
+                                            'Checked in successfully!',
+                                          ),
+                                        ),
+                                      );
+                                    }
+                                  } catch (e) {
+                                    if (context.mounted) {
+                                      ScaffoldMessenger.of(
+                                        context,
+                                      ).showSnackBar(
+                                        SnackBar(
+                                          content: Text('Check-in failed: $e'),
+                                        ),
+                                      );
+                                    }
+                                  } finally {
+                                    if (mounted)
+                                      setState(() => _isCheckingIn = false);
+                                  }
+                                }
+                              },
                         child: const Text('Check In Now'),
                       ),
                     ],
@@ -333,14 +361,23 @@ class _CustomerActionBottomSheetState extends State<CustomerActionBottomSheet> {
                 borderRadius: BorderRadius.circular(8),
               ),
             ),
-            child: const Text(
-              'New Order',
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
+            child: _isCheckingIn
+                ? const SizedBox(
+                    height: 20,
+                    width: 20,
+                    child: CircularProgressIndicator(
+                      color: Colors.white,
+                      strokeWidth: 2.5,
+                    ),
+                  )
+                : const Text(
+                    'New Order',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
           ),
           const SizedBox(height: 16),
 

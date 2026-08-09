@@ -42,6 +42,14 @@
             android:name="flutterEmbedding"
             android:value="2" />
 
+        <!-- Impeller rasterizes the AppBar content area as a solid grey block on
+             Android; the same widget tree renders correctly on the Skia-backed
+             Linux build. Fall back to Skia until the triggering widget is found.
+             Revisit before Flutter drops the Android Skia backend. -->
+        <meta-data
+            android:name="io.flutter.embedding.android.EnableImpeller"
+            android:value="false" />
+
         <!-- flutter_background_service declares this service without a
              foregroundServiceType; Android 14+ (target 36) requires one to be
              set in the manifest. Merge the "location" type onto it. -->

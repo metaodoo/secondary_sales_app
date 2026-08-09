@@ -161,16 +161,19 @@ class _SecondaryOrdersListScreenState extends State<SecondaryOrdersListScreen> {
     switch (state.toLowerCase()) {
       case 'draft':
         return 'Draft';
-      case 'sent':
-        return 'Sent';
       case 'sale':
-        return 'Confirm';
-      case 'done':
-        return 'Done';
+      case 'confirmed':
+        return 'Confirmed';
+      case 'delivery_partial':
+        return 'Delivery Partially Done';
+      case 'delivery_full':
+        return 'Delivery Fully Done';
       case 'cancel':
+      case 'cancelled':
         return 'Cancelled';
+      case 'all':
       default:
-        return 'Status';
+        return 'All Status';
     }
   }
 
@@ -309,9 +312,15 @@ class _SecondaryOrdersListScreenState extends State<SecondaryOrdersListScreen> {
                       itemBuilder: (context) => const [
                         PopupMenuItem(value: 'all', child: Text('All Status')),
                         PopupMenuItem(value: 'draft', child: Text('Draft')),
-                        PopupMenuItem(value: 'sent', child: Text('Sent')),
-                        PopupMenuItem(value: 'sale', child: Text('Confirm')),
-                        PopupMenuItem(value: 'done', child: Text('Done')),
+                        PopupMenuItem(value: 'sale', child: Text('Confirmed')),
+                        PopupMenuItem(
+                          value: 'delivery_partial',
+                          child: Text('Delivery Partially Done'),
+                        ),
+                        PopupMenuItem(
+                          value: 'delivery_full',
+                          child: Text('Delivery Fully Done'),
+                        ),
                         PopupMenuItem(
                           value: 'cancel',
                           child: Text('Cancelled'),

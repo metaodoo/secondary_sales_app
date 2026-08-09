@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/scheduler.dart';
 import 'package:secondary_sales/data/api/api_service.dart';
 import 'package:secondary_sales/features/auth/auth_provider.dart';
 
@@ -37,19 +38,34 @@ class LeaveProvider extends ChangeNotifier {
   String get activeTab => _activeTab;
   String? get dateFrom => _dateFrom;
   String? get dateTo => _dateTo;
-  String? get searchQuery => _searchQuery;
-
   LeaveProvider(this._authProvider) {
-    _apiService.updateAccessToken(_authProvider.accessToken);
-    _apiService.updateSessionId(_authProvider.sessionId);
-    _apiService.updateEmployeeId(_authProvider.employeeId);
-    
-    // Initial loads
-    fetchLeaveTypes();
-    fetchLeaveList();
+    updateAuth();
   }
 
-  int get _employeeId => _authProvider.user?.employeeId ?? 0;
+  int _loadedForEmployeeId = 0;
+
+  void updateAuth({String? accessToken, String? sessionId, int? employeeId}) {
+    _apiService.updateAccessToken(accessToken ?? _authProvider.accessToken);
+    _apiService.updateSessionId(sessionId ?? _authProvider.sessionId);
+    _apiService.updateEmployeeId(employeeId ?? _authProvider.employeeId);
+
+    // Keyed on employee identity rather than "are the lists empty": an empty
+    // result is indistinguishable from "not loaded yet", so the old guard
+    // refetched on every auth notification for anyone with no leave records.
+    final currentEmpId = employeeId ?? _authProvider.employeeId ?? 0;
+    if (currentEmpId == 0 || currentEmpId == _loadedForEmployeeId) return;
+    _loadedForEmployeeId = currentEmpId;
+
+    // ProxyProvider.update() runs during build, and both fetches call
+    // notifyListeners() synchronously before their first await -- doing that
+    // here throws "markNeedsBuild called during build".
+    SchedulerBinding.instance.addPostFrameCallback((_) {
+      fetchLeaveTypes();
+      fetchLeaveList();
+    });
+  }
+
+  int get _employeeId => _authProvider.user?.employeeId ?? _authProvider.employeeId ?? 0;
 
   void clearError() {
     _errorMessage = null;
@@ -159,7 +175,16 @@ class LeaveProvider extends ChangeNotifier {
     String? attachment,
     String? attachmentName,
   }) async {
-    if (_employeeId == 0) return false;
+    _apiService.updateAccessToken(_authProvider.accessToken);
+    _apiService.updateSessionId(_authProvider.sessionId);
+    _apiService.updateEmployeeId(_authProvider.employeeId);
+
+    if (_employeeId == 0) {
+      _requestError = 'Your user account is not linked to an active employee record. Please contact your system administrator.';
+      notifyListeners();
+      return false;
+    }
+
     _isSubmitting = true;
     _errorMessage = null;
     _requestError = null;

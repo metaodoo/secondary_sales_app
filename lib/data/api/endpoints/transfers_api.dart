@@ -129,6 +129,7 @@ extension TransfersApi on ApiService {
         if (vanOperationType == 'unload') ...{
           'fresh_qty': line.freshQty ?? line.quantity,
           'scrap_qty': line.scrapQty ?? 0.0,
+          'damaged_quality_qty': line.damagedQualityQty ?? 0.0,
         } else ...{
           'quantity': line.quantity,
         }
@@ -138,12 +139,19 @@ extension TransfersApi on ApiService {
         // Lots are resolved up-front by TransferProvider before this call, so
         // here we only serialize the resolved/selected lot lines.
         payload['lot_lines'] = line.lotLines
-            .where((l) => l.lot != null && ((l.freshQty ?? l.quantity) > 0 || (l.scrapQty ?? 0) > 0))
+            .where(
+              (l) => l.lot != null && (
+                (l.freshQty ?? l.quantity) > 0 ||
+                (l.scrapQty ?? 0) > 0 ||
+                (l.damagedQualityQty ?? 0) > 0
+              ),
+            )
             .map((l) => {
                   'lot_id': l.lot!.lotId,
                   if (vanOperationType == 'unload') ...{
                     'fresh_qty': l.freshQty ?? l.quantity,
                     'scrap_qty': l.scrapQty ?? 0.0,
+                    'damaged_quality_qty': l.damagedQualityQty ?? 0.0,
                   } else ...{
                     'quantity': l.quantity,
                   }
@@ -183,6 +191,7 @@ extension TransfersApi on ApiService {
         if (vanOperationType == 'unload') ...{
           'fresh_qty': line.freshQty ?? line.quantity,
           'scrap_qty': line.scrapQty ?? 0.0,
+          'damaged_quality_qty': line.damagedQualityQty ?? 0.0,
         } else ...{
           'quantity': line.quantity,
         }
@@ -192,12 +201,19 @@ extension TransfersApi on ApiService {
         // Lots are resolved up-front by TransferProvider before this call, so
         // here we only serialize the resolved/selected lot lines.
         payload['lot_lines'] = line.lotLines
-            .where((l) => l.lot != null && ((l.freshQty ?? l.quantity) > 0 || (l.scrapQty ?? 0) > 0))
+            .where(
+              (l) => l.lot != null && (
+                (l.freshQty ?? l.quantity) > 0 ||
+                (l.scrapQty ?? 0) > 0 ||
+                (l.damagedQualityQty ?? 0) > 0
+              ),
+            )
             .map((l) => {
                   'lot_id': l.lot!.lotId,
                   if (vanOperationType == 'unload') ...{
                     'fresh_qty': l.freshQty ?? l.quantity,
                     'scrap_qty': l.scrapQty ?? 0.0,
+                    'damaged_quality_qty': l.damagedQualityQty ?? 0.0,
                   } else ...{
                     'quantity': l.quantity,
                   }

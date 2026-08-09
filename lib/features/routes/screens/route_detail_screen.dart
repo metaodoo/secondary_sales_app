@@ -366,15 +366,6 @@ class _RouteDetailScreenState extends State<RouteDetailScreen> {
                   ),
                 ),
               ),
-              if (route.code != null)
-                Text(
-                  'Code: ${route.code}',
-                  style: const TextStyle(
-                    color: AppColors.textSecondary,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 13,
-                  ),
-                ),
             ],
           ),
           const SizedBox(height: 12),
@@ -580,7 +571,12 @@ class _AddOutletBottomSheetState extends State<_AddOutletBottomSheet>
       final street = _streetController.text.trim();
       final city = _cityController.text.trim();
 
-      final position = await LocationService.getCurrentPosition();
+      // This position becomes the outlet's permanent geofence centre, so a
+      // stale cached fix here would break every future check-in at this outlet.
+      final position = await LocationService.getCurrentPosition(
+        requireFresh: true,
+        timeLimit: const Duration(seconds: 15),
+      );
 
       if (!mounted) return;
 

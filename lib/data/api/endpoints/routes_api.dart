@@ -66,7 +66,6 @@ extension RoutesApi on ApiService {
 
   Future<Map<String, dynamic>> createRoute({
     required String name,
-    String? code,
     int? distributorId,
     List<int>? employeeIds,
   }) async {
@@ -74,7 +73,6 @@ extension RoutesApi on ApiService {
       'employee_id': _activeEmployeeId,
       'name': name,
     };
-    if (code != null) params['code'] = code;
     if (distributorId != null) params['distributor_id'] = distributorId;
     if (employeeIds != null) params['employee_ids'] = employeeIds;
 
@@ -98,7 +96,6 @@ extension RoutesApi on ApiService {
   Future<Map<String, dynamic>> updateRoute(
     int routeId, {
     required String name,
-    String? code,
     int? distributorId,
     List<int>? employeeIds,
     bool? active,
@@ -108,7 +105,6 @@ extension RoutesApi on ApiService {
       'employee_id': _activeEmployeeId,
       'name': name,
     };
-    if (code != null) params['code'] = code;
     if (distributorId != null) params['distributor_id'] = distributorId;
     if (employeeIds != null) params['employee_ids'] = employeeIds;
     if (active != null) params['active'] = active;

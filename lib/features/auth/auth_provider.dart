@@ -23,6 +23,7 @@ class AuthProvider with ChangeNotifier {
   String? _odooSessionId;
   bool _isInitializing = true;
   bool _isLoading = false;
+  bool _tokenRefreshFailed = false;
   String? _error;
 
   MobileAuthSession? get session => _session;
@@ -33,6 +34,14 @@ class AuthProvider with ChangeNotifier {
   bool get isLoading => _isLoading;
   String? get error => _error;
   bool get isAuthenticated => _session != null;
+
+  /// True when a refresh failed for network reasons and the session was kept.
+  /// The session still looks authenticated but its access token is dead, so
+  /// every request will 401 until a refresh succeeds. Deliberately not folded
+  /// into [isAuthenticated] -- doing so would bounce the user to login on a
+  /// dropped connection, which is exactly what the network-error branch of
+  /// [refreshSession] exists to avoid.
+  bool get tokenRefreshFailed => _tokenRefreshFailed;
   bool get isConnectionConfigured => AppConstants.hasSavedConnection;
   String? get sessionId => _session?.sessionId ?? _odooSessionId;
   String get baseUrl => AppConstants.baseUrl;
@@ -85,9 +94,9 @@ class AuthProvider with ChangeNotifier {
     AppAction.returnsEditSoQty,
     user?.permissions?.canEditSoQty ?? false,
   );
-  bool get canEditQcQty => _enforcedOr(
-    AppAction.returnsEditQcQty,
-    user?.permissions?.canEditQcQty ?? false,
+  bool get canEditWarehouseQty => _enforcedOr(
+    AppAction.returnsEditWarehouseQty,
+    user?.permissions?.canEditWarehouseQty ?? false,
   );
   bool get canEditEffectiveQty => _enforcedOr(
     AppAction.returnsEditEffectiveQty,
@@ -100,24 +109,24 @@ class AuthProvider with ChangeNotifier {
 
   bool canSaveReturnFor(String moduleType) => _enforcedOr(
     AppAction.returnSaveFor(moduleType),
-    canEditSoQty || canEditQcQty || canEditEffectiveQty,
+    canEditSoQty || canEditWarehouseQty || canEditEffectiveQty,
   );
   bool canCancelReturnFor(String moduleType) => _enforcedOr(
     AppAction.returnCancelFor(moduleType),
-    canEditSoQty || canEditQcQty,
+    canEditSoQty || canEditWarehouseQty,
   );
   bool canValidateReturnFor(String moduleType) =>
-      _enforcedOr(AppAction.returnValidateFor(moduleType), canEditQcQty);
+      _enforcedOr(AppAction.returnValidateFor(moduleType), canEditWarehouseQty);
   bool canSaveScrapFor(String moduleType) => _enforcedOr(
     AppAction.scrapSaveFor(moduleType),
-    canEditSoQty || canEditQcQty || canEditEffectiveQty,
+    canEditSoQty || canEditWarehouseQty || canEditEffectiveQty,
   );
   bool canCancelScrapFor(String moduleType) => _enforcedOr(
     AppAction.scrapCancelFor(moduleType),
-    canEditSoQty || canEditQcQty,
+    canEditSoQty || canEditWarehouseQty,
   );
   bool canValidateScrapFor(String moduleType) =>
-      _enforcedOr(AppAction.scrapValidateFor(moduleType), canEditQcQty);
+      _enforcedOr(AppAction.scrapValidateFor(moduleType), canEditWarehouseQty);
 
   bool get canSaveReturn => canSaveReturnFor('primary');
   bool get canCancelReturn => canCancelReturnFor('primary');
@@ -194,6 +203,9 @@ class AuthProvider with ChangeNotifier {
       );
       _odooSessionId = _session!.sessionId;
       _authService.updateSessionId(_session!.sessionId);
+      ApiService.instance.updateAccessToken(_session!.accessToken);
+      ApiService.instance.updateSessionId(_session!.sessionId);
+      ApiService.instance.updateEmployeeId(_session!.user.employeeId);
 
       if (expiresAt != null && expiresAt.isBefore(DateTime.now())) {
         await refreshSession();
@@ -230,6 +242,7 @@ class AuthProvider with ChangeNotifier {
       }
       _session = session;
       _odooSessionId = session.sessionId;
+      _tokenRefreshFailed = false;
       _authService.updateSessionId(session.sessionId);
       await _storeSession(session);
       unawaited(
@@ -239,6 +252,7 @@ class AuthProvider with ChangeNotifier {
         ),
       );
       unawaited(refreshAccessControl());
+      unawaited(_autoSyncCatalogIfAllowed());
       return true;
     } catch (e) {
       _error = e.toString();
@@ -265,6 +279,9 @@ class AuthProvider with ChangeNotifier {
       );
       _session = refreshed;
       _odooSessionId = refreshed.sessionId;
+      ApiService.instance.updateAccessToken(refreshed.accessToken);
+      ApiService.instance.updateSessionId(refreshed.sessionId);
+      ApiService.instance.updateEmployeeId(refreshed.user.employeeId);
       await _storeSession(refreshed);
       unawaited(
         PushNotificationService.bindAuthenticatedSession(
@@ -272,6 +289,10 @@ class AuthProvider with ChangeNotifier {
           sessionId: refreshed.sessionId,
         ),
       );
+      _tokenRefreshFailed = false;
+      // The session object was replaced. Without this, ProxyProvider.update
+      // never runs and every dependent provider keeps the stale session.
+      notifyListeners();
       return true;
     } catch (e) {
       _error = e.toString();
@@ -288,8 +309,15 @@ class AuthProvider with ChangeNotifier {
           errStr.contains('http 5'); // server errors (502, 503, 504) are temporary
       
       if (!isNetworkError) {
-        await logout(callServer: false);
+        await logout(callServer: false); // logout() notifies.
+        return false;
       }
+
+      // Keep the session so a flaky connection does not log the user out, but
+      // record that its token is dead -- otherwise the app looks authenticated
+      // while every request 401s, with nothing surfaced to the UI.
+      _tokenRefreshFailed = true;
+      notifyListeners();
       return false;
     }
   }
@@ -332,6 +360,14 @@ class AuthProvider with ChangeNotifier {
     return result;
   }
 
+  Future<void> _autoSyncCatalogIfAllowed() async {
+    try {
+      await syncAccessCatalog();
+    } catch (_) {
+      // Ignored for non-admin accounts without catalog sync permissions.
+    }
+  }
+
   void _primeApiService(MobileAuthSession session) {
     ApiService.instance.updateAccessToken(session.accessToken);
     ApiService.instance.updateSessionId(session.sessionId);
@@ -353,6 +389,7 @@ class AuthProvider with ChangeNotifier {
     }
 
     _session = null;
+    _tokenRefreshFailed = false;
     _odooSessionId = sessionId;
     _error = null;
     notifyListeners();

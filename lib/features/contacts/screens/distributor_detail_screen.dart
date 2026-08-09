@@ -31,12 +31,7 @@ class _DistributorDetailScreenState extends State<DistributorDetailScreen> {
   }
 
   String _getInitials(String name) {
-    if (name.isEmpty) return 'SO';
-    final parts = name.trim().split(' ');
-    if (parts.length >= 2) {
-      return '${parts[0][0]}${parts[1][0]}'.toUpperCase();
-    }
-    return name[0].toUpperCase();
+    return initialsFromName(name, fallback: 'SO');
   }
 
   @override

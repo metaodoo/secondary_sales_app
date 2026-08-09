@@ -15,6 +15,8 @@ import 'package:secondary_sales/features/my_team/my_team_provider.dart';
 import 'package:secondary_sales/features/auth/screens/auth_gate.dart';
 import 'package:secondary_sales/features/dashboard/dashboard_provider.dart';
 import 'package:secondary_sales/features/notifications/notification_provider.dart';
+import 'package:secondary_sales/features/hr/leave_provider.dart';
+import 'package:secondary_sales/features/hr/attendance_provider.dart';
 import 'package:secondary_sales/features/dashboard/screens/home_dashboard_screen.dart';
 import 'package:secondary_sales/data/api/api_service.dart';
 import 'package:secondary_sales/core/services/push_notification_service.dart';
@@ -208,6 +210,30 @@ Future<void> main() async {
             if (!auth.isAuthenticated) {
               provider.clearData(notify: false);
             }
+            return provider;
+          },
+        ),
+        ChangeNotifierProxyProvider<AuthProvider, LeaveProvider>(
+          create: (ctx) => LeaveProvider(ctx.read<AuthProvider>()),
+          update: (_, auth, leave) {
+            final provider = leave ?? LeaveProvider(auth);
+            provider.updateAuth(
+              accessToken: auth.accessToken,
+              sessionId: auth.sessionId,
+              employeeId: auth.employeeId,
+            );
+            return provider;
+          },
+        ),
+        ChangeNotifierProxyProvider<AuthProvider, AttendanceProvider>(
+          create: (ctx) => AttendanceProvider(ctx.read<AuthProvider>()),
+          update: (_, auth, attendance) {
+            final provider = attendance ?? AttendanceProvider(auth);
+            provider.updateAuth(
+              accessToken: auth.accessToken,
+              sessionId: auth.sessionId,
+              employeeId: auth.employeeId,
+            );
             return provider;
           },
         ),

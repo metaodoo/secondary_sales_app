@@ -31,7 +31,13 @@ extension SalesApi on ApiService {
       params['search'] = query;
     }
     if (status != null && status.isNotEmpty && status != 'all') {
-      params['state'] = status;
+      if (status == 'delivery_partial') {
+        params['delivery_status'] = 'partial';
+      } else if (status == 'delivery_full') {
+        params['delivery_status'] = 'full';
+      } else {
+        params['state'] = status;
+      }
     }
     if (dateFrom != null) {
       params['date_from'] =
@@ -154,7 +160,8 @@ extension SalesApi on ApiService {
         return {
           'product_id': item['product_id'],
           'product_uom_qty': item['order_qty'],
-          'damaged_qty': item['damaged_qty'],
+          'damaged_expired_qty': item['damaged_expired_qty'],
+          'damage_quality_qty': item['damage_quality_qty'],
           'price_unit': item['price_unit'],
         };
       }).toList(),
@@ -226,7 +233,8 @@ extension SalesApi on ApiService {
         return {
           'product_id': item['product_id'],
           'product_uom_qty': item['order_qty'],
-          'damaged_qty': item['damaged_qty'],
+          'damaged_expired_qty': item['damaged_expired_qty'],
+          'damage_quality_qty': item['damage_quality_qty'],
           'price_unit': item['price_unit'],
         };
       }).toList(),

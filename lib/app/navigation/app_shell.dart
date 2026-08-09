@@ -45,7 +45,8 @@ class _AppShellState extends State<AppShell> {
   // so the two floating buttons don't collide.
   static const Set<int> _tabsWithOwnFab = {
     AppShellIndex.sales,
-    AppShellIndex.vanLoading,
+    AppShellIndex.vanLoad,
+    AppShellIndex.vanUnload,
   };
 
   @override
@@ -245,11 +246,8 @@ class _AppShellState extends State<AppShell> {
         onBack: _goBack,
         onOpenMenu: () => _scaffoldKey.currentState?.openDrawer(),
       ),
-      () => VanOperationsListScreen(
-        onProfileTap: () => _setIndex(5),
-        onBack: _goBack,
-        onOpenMenu: () => _scaffoldKey.currentState?.openDrawer(),
-      ),
+      () => const VanOperationsListScreen(operationType: 'load'),
+      () => const VanOperationsListScreen(operationType: 'unload'),
     ];
 
     return PopScope(

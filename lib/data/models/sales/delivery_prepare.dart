@@ -103,6 +103,8 @@ class DeliveryMoveLine {
     this.uomName,
     this.lotLines,
     this.availableQty = 0.0,
+    this.damagedExpiredQty = 0.0,
+    this.damageQualityQty = 0.0,
   });
 
   final int moveId;
@@ -115,6 +117,8 @@ class DeliveryMoveLine {
   final String? uomName;
   final List<DeliveryLotLine>? lotLines;
   final double availableQty;
+  final double damagedExpiredQty;
+  final double damageQualityQty;
 
   String get tracking => product?.tracking ?? 'none';
   bool get requiresLots => tracking != 'none';
@@ -138,6 +142,8 @@ class DeliveryMoveLine {
           .map((item) => DeliveryLotLine.fromMap(item.cast<String, dynamic>()))
           .toList(),
       availableQty: asDouble(map['available_qty']),
+      damagedExpiredQty: asDouble(map['damaged_expired_qty'] ?? 0.0),
+      damageQualityQty: asDouble(map['damage_quality_qty'] ?? 0.0),
     );
   }
 }

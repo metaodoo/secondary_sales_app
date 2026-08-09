@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:secondary_sales/core/theme/app_theme.dart';
+import 'package:secondary_sales/core/constants.dart';
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -13,10 +14,14 @@ class ReturnProductSelectionScreen extends StatefulWidget {
     super.key,
     required this.distributorId,
     required this.initialLines,
+    this.title = 'Select Return Products',
+    this.endpoint = AppConstants.returnsEndpoint,
   });
 
   final int distributorId;
   final List<VirtualTransferLineEntry> initialLines;
+  final String title;
+  final String endpoint;
 
   @override
   State<ReturnProductSelectionScreen> createState() =>
@@ -54,6 +59,7 @@ class _ReturnProductSelectionScreenState
     final results = await context.read<ReturnProvider>().fetchReturnProducts(
       distributorId: widget.distributorId,
       search: _searchController.text,
+      endpoint: widget.endpoint,
     );
     if (!mounted) return;
     setState(() {
@@ -106,8 +112,8 @@ class _ReturnProductSelectionScreenState
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text(
-                          'Select Return Products',
+                        Text(
+                          widget.title,
                           style: TextStyle(
                             color: Colors.white,
                             fontWeight: FontWeight.w800,
@@ -226,11 +232,6 @@ class _ReturnProductCard extends StatelessWidget {
             Text(
               '${product.code ?? 'No code'} • ${product.uomName}',
               style: const TextStyle(color: AppColors.textSecondary),
-            ),
-            const SizedBox(height: 6),
-            Text(
-              'Available: ${product.availableQty.toStringAsFixed(0)} ${product.uomName}',
-              style: const TextStyle(color: Color(0xFF16A34A)),
             ),
           ],
         ),

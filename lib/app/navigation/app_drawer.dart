@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import 'package:secondary_sales/app/navigation/app_shell_config.dart';
 import 'package:secondary_sales/app/navigation/menu_catalog.dart';
 import 'package:secondary_sales/core/theme/app_theme.dart';
+import 'package:secondary_sales/core/widgets/ss_ui.dart';
 import 'package:secondary_sales/features/auth/auth_provider.dart';
 
 /// Global navigation drawer, rendered from [visibleMenuSections].
@@ -262,11 +263,5 @@ class _MenuTile extends StatelessWidget {
 }
 
 String _initialsOf(String name) {
-  final trimmed = name.trim();
-  if (trimmed.isEmpty) return 'U';
-  final parts = trimmed.split(RegExp(r'\s+'));
-  if (parts.length > 1 && parts[1].isNotEmpty) {
-    return '${parts[0][0]}${parts[1][0]}'.toUpperCase();
-  }
-  return parts[0][0].toUpperCase();
+  return initialsFromName(name);
 }

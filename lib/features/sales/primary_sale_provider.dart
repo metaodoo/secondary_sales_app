@@ -13,6 +13,7 @@ class PrimarySaleProvider with ChangeNotifier {
 
   List<DistributionHub> _hubs = [];
   List<Product> _products = [];
+  int _totalProductCount = 0;
   List<PrimaryOrder> _recentOrders = [];
   DistributionHub? _selectedDistributor;
   SaleOrderDetail? _selectedOrder;
@@ -24,6 +25,7 @@ class PrimarySaleProvider with ChangeNotifier {
 
   List<DistributionHub> get hubs => _hubs;
   List<Product> get products => _products;
+  int get totalProductCount => _totalProductCount;
   List<PrimaryOrder> get recentOrders => _recentOrders;
   DistributionHub? get selectedDistributor => _selectedDistributor;
   SaleOrderDetail? get selectedOrder => _selectedOrder;
@@ -212,17 +214,26 @@ class PrimarySaleProvider with ChangeNotifier {
     }
   }
 
-  Future<void> searchProducts(String query, {String? saleType, int? partnerId, bool? inStockOnly}) async {
+  Future<void> searchProducts(
+    String query, {
+    String? saleType,
+    int? partnerId,
+    bool? inStockOnly,
+    String? sortBy,
+  }) async {
     _error = null;
     notifyListeners();
 
     try {
-      _products = await _apiService.getProducts(
+      final res = await _apiService.getProductsWithCount(
         search: query,
         saleType: saleType,
         partnerId: partnerId,
         inStockOnly: inStockOnly,
+        sortBy: sortBy,
       );
+      _products = res.products;
+      _totalProductCount = res.totalCount;
     } catch (e) {
       _error = e.toString();
     } finally {
@@ -230,13 +241,19 @@ class PrimarySaleProvider with ChangeNotifier {
     }
   }
 
-  Future<SaleOrderDetail?> fetchOrderDetail(int orderId, {String saleType = 'primary'}) async {
+  Future<SaleOrderDetail?> fetchOrderDetail(
+    int orderId, {
+    String saleType = 'primary',
+  }) async {
     _loadingCount++;
     _error = null;
     notifyListeners();
 
     try {
-      _selectedOrder = await _apiService.getPrimarySaleOrderDetail(orderId, saleType: saleType);
+      _selectedOrder = await _apiService.getPrimarySaleOrderDetail(
+        orderId,
+        saleType: saleType,
+      );
       return _selectedOrder;
     } catch (e) {
       _error = e.toString();
@@ -247,13 +264,19 @@ class PrimarySaleProvider with ChangeNotifier {
     }
   }
 
-  Future<SaleOrderDetail?> cancelOrder(int orderId, {String saleType = 'primary'}) async {
+  Future<SaleOrderDetail?> cancelOrder(
+    int orderId, {
+    String saleType = 'primary',
+  }) async {
     _loadingCount++;
     _error = null;
     notifyListeners();
 
     try {
-      _selectedOrder = await _apiService.cancelPrimarySaleOrder(orderId, saleType: saleType);
+      _selectedOrder = await _apiService.cancelPrimarySaleOrder(
+        orderId,
+        saleType: saleType,
+      );
       await fetchRecentOrders(saleType: saleType);
       return _selectedOrder;
     } catch (e) {
@@ -265,13 +288,19 @@ class PrimarySaleProvider with ChangeNotifier {
     }
   }
 
-  Future<SaleOrderDetail?> confirmOrder(int orderId, {String saleType = 'primary'}) async {
+  Future<SaleOrderDetail?> confirmOrder(
+    int orderId, {
+    String saleType = 'primary',
+  }) async {
     _loadingCount++;
     _error = null;
     notifyListeners();
 
     try {
-      _selectedOrder = await _apiService.confirmPrimarySaleOrder(orderId, saleType: saleType);
+      _selectedOrder = await _apiService.confirmPrimarySaleOrder(
+        orderId,
+        saleType: saleType,
+      );
       await fetchRecentOrders(saleType: saleType);
       return _selectedOrder;
     } catch (e) {
@@ -283,13 +312,19 @@ class PrimarySaleProvider with ChangeNotifier {
     }
   }
 
-  Future<Map<String, dynamic>?> printOrder(int orderId, {String saleType = 'primary'}) async {
+  Future<Map<String, dynamic>?> printOrder(
+    int orderId, {
+    String saleType = 'primary',
+  }) async {
     _loadingCount++;
     _error = null;
     notifyListeners();
 
     try {
-      final data = await _apiService.printPrimarySaleOrder(orderId, saleType: saleType);
+      final data = await _apiService.printPrimarySaleOrder(
+        orderId,
+        saleType: saleType,
+      );
       return data;
     } catch (e) {
       _error = e.toString();

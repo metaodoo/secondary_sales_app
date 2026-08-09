@@ -16,7 +16,8 @@ class OrderLineModel {
   final int dbStock;
   final int vanStock;
   int orderQty;
-  int damagedQty;
+  int damagedExpiredQty;
+  int damageQualityQty;
 
   OrderLineModel({
     required this.productId,
@@ -25,7 +26,8 @@ class OrderLineModel {
     this.dbStock = 0,
     this.vanStock = 0,
     this.orderQty = 0,
-    this.damagedQty = 0,
+    this.damagedExpiredQty = 0,
+    this.damageQualityQty = 0,
   });
 
   double get lineTotal => unitPrice * orderQty;
@@ -83,9 +85,13 @@ class _OrderCreationScreenState extends State<OrderCreationScreen> {
                 productName: line.product!.name,
                 unitPrice: line.priceUnit,
                 dbStock: line.product!.distributorQtyAvailable?.toInt() ?? 0,
-                vanStock: (line.product!.qtyAvailable ?? (line.orderedQty + line.balanceQty)).toInt(),
+                vanStock:
+                    (line.product!.qtyAvailable ??
+                            (line.orderedQty + line.balanceQty))
+                        .toInt(),
                 orderQty: line.orderedQty.toInt(),
-                damagedQty: line.damagedQty.toInt(),
+                damagedExpiredQty: line.damagedExpiredQty.toInt(),
+                damageQualityQty: line.damageQualityQty.toInt(),
               ),
             );
           }
@@ -110,7 +116,11 @@ class _OrderCreationScreenState extends State<OrderCreationScreen> {
   Future<void> _showProductSelection() async {
     final provider = context.read<PrimarySaleProvider>();
     if (provider.products.isEmpty) {
-      await provider.searchProducts('', saleType: 'secondary', partnerId: widget.outletId);
+      await provider.searchProducts(
+        '',
+        saleType: 'secondary',
+        partnerId: widget.outletId,
+      );
     }
     if (!mounted) return;
 
@@ -150,7 +160,7 @@ class _OrderCreationScreenState extends State<OrderCreationScreen> {
 
   Future<void> _submitOrder() async {
     if (lines.isEmpty) return;
-    
+
     setState(() {
       _isSubmitting = true;
     });
@@ -162,12 +172,17 @@ class _OrderCreationScreenState extends State<OrderCreationScreen> {
       apiService.updateSessionId(auth.sessionId);
       apiService.updateEmployeeId(auth.employeeId);
 
-      final items = lines.map((l) => {
-        'product_id': l.productId,
-        'order_qty': l.orderQty,
-        'damaged_qty': l.damagedQty,
-        'price_unit': l.unitPrice,
-      }).toList();
+      final items = lines
+          .map(
+            (l) => {
+              'product_id': l.productId,
+              'order_qty': l.orderQty,
+              'damaged_expired_qty': l.damagedExpiredQty,
+              'damage_quality_qty': l.damageQualityQty,
+              'price_unit': l.unitPrice,
+            },
+          )
+          .toList();
 
       if (widget.editOrderId != null) {
         await apiService.updateSecondarySaleOrder(
@@ -237,7 +252,11 @@ class _OrderCreationScreenState extends State<OrderCreationScreen> {
     return Scaffold(
       backgroundColor: const Color(0xFFF8F9FB),
       appBar: AppBar(
-        title: Text(widget.editOrderId != null ? 'Edit Secondary Sales' : 'Secondary Sales'),
+        title: Text(
+          widget.editOrderId != null
+              ? 'Edit Secondary Sales'
+              : 'Secondary Sales',
+        ),
         centerTitle: true,
         actions: [
           const Padding(
@@ -273,7 +292,9 @@ class _OrderCreationScreenState extends State<OrderCreationScreen> {
                             decoration: BoxDecoration(
                               color: const Color(0xFFEDF0FF),
                               borderRadius: BorderRadius.circular(12),
-                              border: Border.all(color: const Color(0xFFD6DDFB)),
+                              border: Border.all(
+                                color: const Color(0xFFD6DDFB),
+                              ),
                             ),
                             child: Row(
                               children: [
@@ -283,12 +304,17 @@ class _OrderCreationScreenState extends State<OrderCreationScreen> {
                                     color: AppColors.primaryStrong,
                                     shape: BoxShape.circle,
                                   ),
-                                  child: const Icon(Icons.storefront, color: Colors.white, size: 24),
+                                  child: const Icon(
+                                    Icons.storefront,
+                                    color: Colors.white,
+                                    size: 24,
+                                  ),
                                 ),
                                 const SizedBox(width: 16),
                                 Expanded(
                                   child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
                                     children: [
                                       Text(
                                         widget.customerName,
@@ -327,8 +353,12 @@ class _OrderCreationScreenState extends State<OrderCreationScreen> {
                                 ),
                               ),
                               TextButton.icon(
-                                onPressed: _addDummyProduct, // TODO: Open Product Selection Screen
-                                icon: const Icon(Icons.add_circle_outline, size: 18),
+                                onPressed:
+                                    _addDummyProduct, // TODO: Open Product Selection Screen
+                                icon: const Icon(
+                                  Icons.add_circle_outline,
+                                  size: 18,
+                                ),
                                 label: const Text('Add Items'),
                                 style: TextButton.styleFrom(
                                   foregroundColor: AppColors.primaryStrong,
@@ -347,7 +377,9 @@ class _OrderCreationScreenState extends State<OrderCreationScreen> {
                                 child: Text(
                                   'No products added yet.\nClick "Add Items" to begin.',
                                   textAlign: TextAlign.center,
-                                  style: TextStyle(color: AppColors.textSecondary),
+                                  style: TextStyle(
+                                    color: AppColors.textSecondary,
+                                  ),
                                 ),
                               ),
                             )
@@ -363,12 +395,15 @@ class _OrderCreationScreenState extends State<OrderCreationScreen> {
                               decoration: BoxDecoration(
                                 color: const Color(0xFFEDF0FF),
                                 borderRadius: BorderRadius.circular(12),
-                                border: Border.all(color: const Color(0xFFD6DDFB)),
+                                border: Border.all(
+                                  color: const Color(0xFFD6DDFB),
+                                ),
                               ),
                               child: Column(
                                 children: [
                                   Row(
-                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                    mainAxisAlignment:
+                                        MainAxisAlignment.spaceBetween,
                                     children: [
                                       const Text(
                                         'Subtotal',
@@ -388,10 +423,14 @@ class _OrderCreationScreenState extends State<OrderCreationScreen> {
                                   ),
                                   const Padding(
                                     padding: EdgeInsets.symmetric(vertical: 12),
-                                    child: Divider(color: Color(0xFFD6DDFB), height: 1),
+                                    child: Divider(
+                                      color: Color(0xFFD6DDFB),
+                                      height: 1,
+                                    ),
                                   ),
                                   Row(
-                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                    mainAxisAlignment:
+                                        MainAxisAlignment.spaceBetween,
                                     children: [
                                       const Text(
                                         'Net Total',
@@ -418,7 +457,7 @@ class _OrderCreationScreenState extends State<OrderCreationScreen> {
                       ),
                     ),
                   ),
-                  
+
                   // Bottom Confirm Button
                   Container(
                     padding: const EdgeInsets.all(20),
@@ -513,14 +552,18 @@ class _OrderCreationScreenState extends State<OrderCreationScreen> {
                     lines.remove(line);
                   });
                 },
-                icon: const Icon(Icons.delete_outline, color: Colors.red, size: 20),
+                icon: const Icon(
+                  Icons.delete_outline,
+                  color: Colors.red,
+                  size: 20,
+                ),
                 padding: EdgeInsets.zero,
                 constraints: const BoxConstraints(),
               ),
             ],
           ),
           const SizedBox(height: 12),
-          
+
           // Stock Badges
           Row(
             children: [
@@ -529,12 +572,12 @@ class _OrderCreationScreenState extends State<OrderCreationScreen> {
               _buildBadge('Van: ${line.vanStock}'),
             ],
           ),
-          
+
           const Padding(
             padding: EdgeInsets.symmetric(vertical: 12),
             child: Divider(color: AppColors.borderSoft, height: 1),
           ),
-          
+
           // Qty Controls
           Row(
             children: [
@@ -552,30 +595,45 @@ class _OrderCreationScreenState extends State<OrderCreationScreen> {
               const SizedBox(width: 16),
               Expanded(
                 child: _buildQtyControl(
-                  label: 'Damaged Qty',
-                  value: line.damagedQty,
+                  label: 'Damaged Expire Qty',
+                  value: line.damagedExpiredQty,
                   onChanged: (val) {
                     setState(() {
-                      line.damagedQty = val;
+                      line.damagedExpiredQty = val;
                     });
                   },
                 ),
               ),
             ],
           ),
-          
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: _buildQtyControl(
+                  label: 'Damage Quality Qty',
+                  value: line.damageQualityQty,
+                  onChanged: (val) {
+                    setState(() {
+                      line.damageQualityQty = val;
+                    });
+                  },
+                ),
+              ),
+              const SizedBox(width: 16),
+              const Expanded(child: SizedBox()),
+            ],
+          ),
+
           const SizedBox(height: 16),
-          
+
           // Line Total
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const Text(
                 'Line Total',
-                style: TextStyle(
-                  fontSize: 11,
-                  color: AppColors.textSecondary,
-                ),
+                style: TextStyle(fontSize: 11, color: AppColors.textSecondary),
               ),
               const SizedBox(height: 4),
               Text(
@@ -621,10 +679,7 @@ class _OrderCreationScreenState extends State<OrderCreationScreen> {
       children: [
         Text(
           label,
-          style: const TextStyle(
-            fontSize: 11,
-            color: AppColors.textSecondary,
-          ),
+          style: const TextStyle(fontSize: 11, color: AppColors.textSecondary),
         ),
         const SizedBox(height: 6),
         Container(
@@ -644,10 +699,12 @@ class _OrderCreationScreenState extends State<OrderCreationScreen> {
                 constraints: const BoxConstraints(minWidth: 32),
               ),
               SizedBox(
-                width: 48,
+                width: 80,
                 height: 32,
                 child: TextField(
-                  keyboardType: const TextInputType.numberWithOptions(decimal: false),
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: false,
+                  ),
                   textAlign: TextAlign.center,
                   style: const TextStyle(
                     fontSize: 14,
@@ -656,11 +713,17 @@ class _OrderCreationScreenState extends State<OrderCreationScreen> {
                   ),
                   decoration: const InputDecoration(
                     isDense: true,
-                    contentPadding: EdgeInsets.symmetric(horizontal: 4, vertical: 6),
+                    contentPadding: EdgeInsets.symmetric(
+                      horizontal: 4,
+                      vertical: 6,
+                    ),
                     border: InputBorder.none,
                     enabledBorder: InputBorder.none,
                     focusedBorder: UnderlineInputBorder(
-                      borderSide: BorderSide(color: AppColors.primary, width: 2),
+                      borderSide: BorderSide(
+                        color: AppColors.primary,
+                        width: 2,
+                      ),
                     ),
                   ),
                   onChanged: (val) {
@@ -669,9 +732,10 @@ class _OrderCreationScreenState extends State<OrderCreationScreen> {
                       onChanged(parsed);
                     }
                   },
-                  controller: TextEditingController(
-                    text: value.toString(),
-                  )..selection = TextSelection.collapsed(offset: value.toString().length),
+                  controller: TextEditingController(text: value.toString())
+                    ..selection = TextSelection.collapsed(
+                      offset: value.toString().length,
+                    ),
                 ),
               ),
               IconButton(
@@ -688,5 +752,3 @@ class _OrderCreationScreenState extends State<OrderCreationScreen> {
     );
   }
 }
-
-

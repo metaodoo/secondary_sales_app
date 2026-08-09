@@ -10,6 +10,7 @@ extension ReturnsApi on ApiService {
     String? state,
     int? distributorId,
     String? type,
+    String endpoint = AppConstants.returnsEndpoint,
   }) async {
     final params = <String, dynamic>{
       'employee_id': _activeEmployeeId,
@@ -21,7 +22,7 @@ extension ReturnsApi on ApiService {
     if (distributorId != null) params['distributor_id'] = distributorId;
     if (type != null && type.isNotEmpty) params['type'] = type;
 
-    final result = await _post(AppConstants.returnsEndpoint, params);
+    final result = await _post(endpoint, params);
     if (result['success'] == true) {
       return {
         'data': List<Map<String, dynamic>>.from(result['data']),
@@ -31,12 +32,15 @@ extension ReturnsApi on ApiService {
     throw Exception(result['message'] ?? 'Failed to load returns');
   }
 
-  Future<Map<String, dynamic>> prepareReturn({int? distributorId}) async {
+  Future<Map<String, dynamic>> prepareReturn({
+    int? distributorId,
+    String endpoint = AppConstants.returnsEndpoint,
+  }) async {
     final params = <String, dynamic>{'employee_id': _activeEmployeeId};
     if (distributorId != null) params['distributor_id'] = distributorId;
 
     final result = await _post(
-      '${AppConstants.returnsEndpoint}/prepare',
+      '$endpoint/prepare',
       params,
     );
     if (result['success'] == true) {
@@ -48,13 +52,14 @@ extension ReturnsApi on ApiService {
   Future<List<Map<String, dynamic>>> getReturnProducts({
     String? search,
     int? distributorId,
+    String endpoint = AppConstants.returnsEndpoint,
   }) async {
     final params = <String, dynamic>{'employee_id': _activeEmployeeId};
     if (search != null && search.isNotEmpty) params['search'] = search;
     if (distributorId != null) params['distributor_id'] = distributorId;
 
     final result = await _post(
-      '${AppConstants.returnsEndpoint}/products',
+      '$endpoint/products',
       params,
     );
     if (result['success'] == true) {
@@ -66,12 +71,13 @@ extension ReturnsApi on ApiService {
   Future<Map<String, dynamic>> getReturnProductLots(
     int productId, {
     int? distributorId,
+    String endpoint = AppConstants.returnsEndpoint,
   }) async {
     final params = <String, dynamic>{'employee_id': _activeEmployeeId};
     if (distributorId != null) params['distributor_id'] = distributorId;
 
     final result = await _post(
-      '${AppConstants.returnsEndpoint}/products/$productId/lots',
+      '$endpoint/products/$productId/lots',
       params,
     );
     if (result['success'] == true) {
@@ -86,6 +92,9 @@ extension ReturnsApi on ApiService {
     String? type,
     String? challanNumber,
     String? damageType,
+    String? attachmentBase64,
+    String? attachmentFilename,
+    String endpoint = AppConstants.returnsEndpoint,
   }) async {
     final params = <String, dynamic>{
       'employee_id': _activeEmployeeId,
@@ -99,9 +108,15 @@ extension ReturnsApi on ApiService {
     if (damageType != null && damageType.isNotEmpty) {
       params['damage_type'] = damageType;
     }
+    if (attachmentBase64 != null && attachmentBase64.isNotEmpty) {
+      params['attachment_base64'] = attachmentBase64;
+    }
+    if (attachmentFilename != null && attachmentFilename.isNotEmpty) {
+      params['attachment_filename'] = attachmentFilename;
+    }
 
     final result = await _post(
-      '${AppConstants.returnsEndpoint}/create',
+      '$endpoint/create',
       params,
     );
     if (result['success'] == true) {
@@ -110,12 +125,16 @@ extension ReturnsApi on ApiService {
     throw Exception(result['message'] ?? 'Failed to create return delivery');
   }
 
-  Future<Map<String, dynamic>> getReturnDetails(int returnId, {String? type}) async {
+  Future<Map<String, dynamic>> getReturnDetails(
+    int returnId, {
+    String? type,
+    String endpoint = AppConstants.returnsEndpoint,
+  }) async {
     final params = <String, dynamic>{'employee_id': _activeEmployeeId};
     if (type != null && type.isNotEmpty) params['type'] = type;
 
     final result = await _post(
-      '${AppConstants.returnsEndpoint}/$returnId',
+      '$endpoint/$returnId',
       params,
     );
     if (result['success'] == true) {
@@ -130,6 +149,7 @@ extension ReturnsApi on ApiService {
     String? type,
     String? challanNumber,
     String? damageType,
+    String endpoint = AppConstants.returnsEndpoint,
   }) async {
     final params = <String, dynamic>{
       'employee_id': _activeEmployeeId,
@@ -144,7 +164,7 @@ extension ReturnsApi on ApiService {
     }
 
     final result = await _post(
-      '${AppConstants.returnsEndpoint}/$returnId/update',
+      '$endpoint/$returnId/update',
       params,
     );
     if (result['success'] == true) {
@@ -153,13 +173,19 @@ extension ReturnsApi on ApiService {
     throw Exception(result['message'] ?? 'Failed to update return delivery');
   }
 
-  Future<Map<String, dynamic>> returnAction(int returnId, String action) async {
+  Future<Map<String, dynamic>> returnAction(
+    int returnId,
+    String action, {
+    String? type,
+    String endpoint = AppConstants.returnsEndpoint,
+  }) async {
     final params = <String, dynamic>{
       'employee_id': _activeEmployeeId,
       'action': action,
     };
+    if (type != null && type.isNotEmpty) params['type'] = type;
     final result = await _post(
-      '${AppConstants.returnsEndpoint}/$returnId/action',
+      '$endpoint/$returnId/action',
       params,
     );
     if (result['success'] == true) {

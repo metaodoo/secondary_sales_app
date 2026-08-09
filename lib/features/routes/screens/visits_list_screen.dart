@@ -26,8 +26,31 @@ class VisitsListScreen extends StatefulWidget {
 class _VisitsListScreenState extends State<VisitsListScreen> {
   @override
   Widget build(BuildContext context) {
+    final canViewJointVisits = context.read<AuthProvider>().canView(
+      AppScreen.newJointVisit,
+    );
+    final tabs = <Tab>[
+      const Tab(text: 'Standard Visits'),
+      if (canViewJointVisits) const Tab(text: 'Joint Visits'),
+    ];
+    final tabViews = <Widget>[
+      _VisitListTab(
+        visitType: 'standard',
+        routeId: widget.routeId,
+        dateFrom: widget.dateFrom,
+        dateTo: widget.dateTo,
+      ),
+      if (canViewJointVisits)
+        _VisitListTab(
+          visitType: 'join',
+          routeId: widget.routeId,
+          dateFrom: widget.dateFrom,
+          dateTo: widget.dateTo,
+        ),
+    ];
+
     return DefaultTabController(
-      length: 2,
+      length: tabs.length,
       child: Scaffold(
         backgroundColor: AppColors.background,
         appBar: AppBar(
@@ -42,32 +65,14 @@ class _VisitsListScreenState extends State<VisitsListScreen> {
               fontSize: 22,
             ),
           ),
-          bottom: const TabBar(
+          bottom: TabBar(
             labelColor: AppColors.primaryStrong,
             unselectedLabelColor: AppColors.textSecondary,
             indicatorColor: AppColors.primaryStrong,
-            tabs: [
-              Tab(text: 'Standard Visits'),
-              Tab(text: 'Joint Visits'),
-            ],
+            tabs: tabs,
           ),
         ),
-        body: TabBarView(
-          children: [
-            _VisitListTab(
-              visitType: 'standard',
-              routeId: widget.routeId,
-              dateFrom: widget.dateFrom,
-              dateTo: widget.dateTo,
-            ),
-            _VisitListTab(
-              visitType: 'join',
-              routeId: widget.routeId,
-              dateFrom: widget.dateFrom,
-              dateTo: widget.dateTo,
-            ),
-          ],
-        ),
+        body: TabBarView(children: tabViews),
       ),
     );
   }

@@ -3,8 +3,14 @@ part of '../api_service.dart';
 
 /// Catalog endpoints for the secondary sales API.
 extension CatalogApi on ApiService {
-  Future<List<Product>> getProducts({String? search, String? saleType, int? partnerId, bool? inStockOnly}) async {
-    final params = <String, dynamic>{'page_size': 100, 'active': true};
+  Future<ProductsResponse> getProductsWithCount({
+    String? search,
+    String? saleType,
+    int? partnerId,
+    bool? inStockOnly,
+    String? sortBy,
+  }) async {
+    final params = <String, dynamic>{'page_size': 1000, 'active': true};
     final query = search?.trim();
     if (query != null && query.isNotEmpty) {
       params['name'] = query;
@@ -19,20 +25,50 @@ extension CatalogApi on ApiService {
     if (inStockOnly == true) {
       params['in_stock_only'] = true;
     }
+    if (sortBy != null && sortBy.isNotEmpty) {
+      params['sort_by'] = sortBy;
+    }
 
     final result = await _post(AppConstants.productsEndpoint, params);
     if (result['success'] == true) {
-      final List<dynamic> data = result['products'] ?? [];
-      return data.map((json) => Product.fromMap(json)).toList();
+      final List<dynamic> data = result['products'] ?? result['data'] ?? [];
+      final products = data.map((json) => Product.fromMap(json)).toList();
+      final int total = asInt(
+        result['total_count'] ??
+            result['total'] ??
+            result['pagination']?['total'] ??
+            products.length,
+      );
+      return ProductsResponse(products: products, totalCount: total);
     }
     throw Exception(
       result['error'] ?? result['message'] ?? 'Failed to load products',
     );
   }
 
+  Future<List<Product>> getProducts({
+    String? search,
+    String? saleType,
+    int? partnerId,
+    bool? inStockOnly,
+    String? sortBy,
+  }) async {
+    final res = await getProductsWithCount(
+      search: search,
+      saleType: saleType,
+      partnerId: partnerId,
+      inStockOnly: inStockOnly,
+      sortBy: sortBy,
+    );
+    return res.products;
+  }
+
   Future<List<Map<String, dynamic>>> getMediums() async {
     final params = <String, dynamic>{};
-    final result = await _post('${AppConstants.apiPrefix}/sales/mediums', params);
+    final result = await _post(
+      '${AppConstants.apiPrefix}/sales/mediums',
+      params,
+    );
     if (result['success'] == true) {
       final List<dynamic> data = result['data'] ?? [];
       return data.map((e) => Map<String, dynamic>.from(e)).toList();

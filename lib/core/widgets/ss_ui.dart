@@ -5,6 +5,36 @@ import 'package:secondary_sales/core/theme/app_theme.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:secondary_sales/features/settings/screens/settings_tab.dart';
 
+String initialsFromName(String? rawName, {String fallback = 'U'}) {
+  final trimmed = rawName?.trim() ?? '';
+  if (trimmed.isEmpty) return fallback;
+
+  final parts = trimmed
+      .split(RegExp(r'\s+'))
+      .where((part) => part.isNotEmpty)
+      .toList();
+  if (parts.isEmpty) return fallback;
+
+  final firstInitial = parts.first[0];
+  if (parts.length > 1) {
+    final secondInitial = parts[1][0];
+    return '$firstInitial$secondInitial'.toUpperCase();
+  }
+  return firstInitial.toUpperCase();
+}
+
+String firstNameFromName(String? rawName, {String fallback = 'User'}) {
+  final trimmed = rawName?.trim() ?? '';
+  if (trimmed.isEmpty) return fallback;
+
+  final parts = trimmed
+      .split(RegExp(r'\s+'))
+      .where((part) => part.isNotEmpty)
+      .toList();
+  if (parts.isEmpty) return fallback;
+  return parts.first;
+}
+
 class ProfileAvatar extends StatelessWidget {
   const ProfileAvatar({super.key, this.onTap, this.borderColor});
 
@@ -16,26 +46,17 @@ class ProfileAvatar extends StatelessWidget {
     final auth = context.watch<AuthProvider>();
     final user = auth.user;
     final userName = user?.employeeName ?? user?.name ?? 'User';
-
-    String initials = 'U';
-    if (userName.isNotEmpty) {
-      final parts = userName.trim().split(' ');
-      if (parts.length > 1) {
-        initials = '${parts[0][0]}${parts[1][0]}'.toUpperCase();
-      } else if (parts[0].isNotEmpty) {
-        initials = parts[0][0].toUpperCase();
-      }
-    }
+    final initials = initialsFromName(userName);
 
     return GestureDetector(
-      onTap: onTap ??
+      onTap:
+          onTap ??
           () {
             Navigator.push(
               context,
               MaterialPageRoute(
-                builder: (_) => SettingsTab(
-                  onBack: () => Navigator.pop(context),
-                ),
+                builder: (_) =>
+                    SettingsTab(onBack: () => Navigator.pop(context)),
               ),
             );
           },
@@ -197,12 +218,16 @@ class SsCreateFab extends StatelessWidget {
     return FloatingActionButton.extended(
       onPressed: onPressed,
       heroTag: heroTag,
-      backgroundColor:
-          onPressed == null ? AppColors.primary.withValues(alpha: 0.45) : AppColors.primary,
+      backgroundColor: onPressed == null
+          ? AppColors.primary.withValues(alpha: 0.45)
+          : AppColors.primary,
       icon: Icon(icon, color: Colors.white),
       label: Text(
         label,
-        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+        style: const TextStyle(
+          color: Colors.white,
+          fontWeight: FontWeight.bold,
+        ),
       ),
     );
   }
@@ -321,14 +346,15 @@ Future<void> ssShowQtyInputDialog({
           autofocus: true,
           decoration: InputDecoration(
             hintText: 'Enter quantity',
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
           ),
         ),
         actions: <Widget>[
           TextButton(
-            child: const Text('Cancel', style: TextStyle(color: AppColors.textSecondary)),
+            child: const Text(
+              'Cancel',
+              style: TextStyle(color: AppColors.textSecondary),
+            ),
             onPressed: () {
               Navigator.of(context).pop();
             },
@@ -440,12 +466,14 @@ class _SmallStepperState extends State<SmallStepper> {
           GestureDetector(
             onTap: _isEditing ? null : _startEditing,
             child: SizedBox(
-              width: 52,
+              width: 85,
               child: _isEditing
                   ? TextField(
                       controller: _controller,
                       focusNode: _focusNode,
-                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                      keyboardType: const TextInputType.numberWithOptions(
+                        decimal: true,
+                      ),
                       textAlign: TextAlign.center,
                       style: const TextStyle(
                         fontWeight: FontWeight.w800,
@@ -453,7 +481,10 @@ class _SmallStepperState extends State<SmallStepper> {
                       ),
                       decoration: const InputDecoration(
                         isDense: true,
-                        contentPadding: EdgeInsets.symmetric(horizontal: 4, vertical: 6),
+                        contentPadding: EdgeInsets.symmetric(
+                          horizontal: 4,
+                          vertical: 6,
+                        ),
                         border: OutlineInputBorder(
                           borderSide: BorderSide(color: Color(0xFF2563EB)),
                           borderRadius: BorderRadius.all(Radius.circular(6)),
@@ -463,7 +494,10 @@ class _SmallStepperState extends State<SmallStepper> {
                           borderRadius: BorderRadius.all(Radius.circular(6)),
                         ),
                         focusedBorder: OutlineInputBorder(
-                          borderSide: BorderSide(color: Color(0xFF2563EB), width: 2),
+                          borderSide: BorderSide(
+                            color: Color(0xFF2563EB),
+                            width: 2,
+                          ),
                           borderRadius: BorderRadius.all(Radius.circular(6)),
                         ),
                         filled: true,
@@ -533,9 +567,10 @@ String ssFormatDate(DateTime date) {
 }
 
 void ssShowLocationErrorDialog(BuildContext context, String message) {
-  final bool isGpsDisabled = message.toLowerCase().contains('disabled') || 
-                             message.toLowerCase().contains('enable gps');
-  
+  final bool isGpsDisabled =
+      message.toLowerCase().contains('disabled') ||
+      message.toLowerCase().contains('enable gps');
+
   showDialog(
     context: context,
     builder: (BuildContext context) {
@@ -564,7 +599,7 @@ void ssShowLocationErrorDialog(BuildContext context, String message) {
                 ),
               ),
               const SizedBox(height: 20),
-              
+
               // Title
               const Text(
                 'Location Mismatch',
@@ -576,7 +611,7 @@ void ssShowLocationErrorDialog(BuildContext context, String message) {
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 12),
-              
+
               // Message
               Text(
                 message,
@@ -588,7 +623,7 @@ void ssShowLocationErrorDialog(BuildContext context, String message) {
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 24),
-              
+
               // Action Buttons
               Row(
                 children: [

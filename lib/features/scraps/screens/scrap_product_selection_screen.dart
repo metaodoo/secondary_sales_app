@@ -13,10 +13,12 @@ class ScrapProductSelectionScreen extends StatefulWidget {
     super.key,
     required this.distributorId,
     required this.initialLines,
+    this.title = 'Select Scrap Products',
   });
 
   final int distributorId;
   final List<VirtualTransferLineEntry> initialLines;
+  final String title;
 
   @override
   State<ScrapProductSelectionScreen> createState() =>
@@ -107,8 +109,8 @@ class _ScrapProductSelectionScreenState
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text(
-                          'Select Scrap Products',
+                        Text(
+                          widget.title,
                           style: TextStyle(
                             color: Colors.white,
                             fontWeight: FontWeight.w800,

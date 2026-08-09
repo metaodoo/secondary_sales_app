@@ -9,13 +9,27 @@ import 'package:secondary_sales/features/transfers/screens/virtual_transfer_deta
 import 'package:secondary_sales/core/widgets/ss_ui.dart';
 import 'package:secondary_sales/core/theme/app_theme.dart';
 
+/// Lists van transfers for one direction.
+///
+/// Load and unload are separate destinations rather than one screen with a
+/// toggle, so [operationType] is fixed for the life of the screen: it selects
+/// the menu entry's list, its single create button, and its title.
 class VanOperationsListScreen extends StatefulWidget {
   const VanOperationsListScreen({
     super.key,
+    required this.operationType,
     this.onProfileTap,
     this.onBack,
     this.onOpenMenu,
-  });
+  }) : assert(
+         operationType == 'load' || operationType == 'unload',
+         "operationType must be 'load' or 'unload'",
+       );
+
+  /// Either 'load' or 'unload'. Sent to the backend as
+  /// van_operation_type; the endpoint defaults to 'all' when omitted,
+  /// which is precisely what these two screens exist to avoid.
+  final String operationType;
 
   final VoidCallback? onProfileTap;
   final VoidCallback? onBack;
@@ -29,7 +43,6 @@ class VanOperationsListScreen extends StatefulWidget {
 class _VanOperationsListScreenState extends State<VanOperationsListScreen> {
   final TextEditingController _searchController = TextEditingController();
   Timer? _searchDebounce;
-  String _operationType = 'load';
   DateTime? _dateFromFilter;
   DateTime? _dateToFilter;
 
@@ -49,7 +62,7 @@ class _VanOperationsListScreenState extends State<VanOperationsListScreen> {
   Future<void> _fetchOperations() {
     return context.read<TransferProvider>().fetchVirtualTransfers(
       search: _searchController.text,
-      vanOperationType: _operationType,
+      vanOperationType: widget.operationType,
       dateFrom: _dateFromFilter,
       dateTo: _dateToFilter,
     );
@@ -148,29 +161,19 @@ class _VanOperationsListScreenState extends State<VanOperationsListScreen> {
     final provider = context.watch<TransferProvider>();
     final transfers = provider.virtualTransfers;
     final bool hasDateFilter = _dateFromFilter != null && _dateToFilter != null;
+    final bool isLoad = widget.operationType == 'load';
 
     return Scaffold(
       backgroundColor: AppColors.background,
-      // Two actions, so they stack rather than sit side by side. Distinct hero
-      // tags are required: two FABs on one route with the default tag throw.
-      floatingActionButton: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.end,
-        children: [
-          SsCreateFab(
-            heroTag: 'vanNewUnload',
-            label: 'New Unload',
-            onPressed:
-                provider.isLoading ? null : () => _openCreateTransfer('unload'),
-          ),
-          const SizedBox(height: 12),
-          SsCreateFab(
-            heroTag: 'vanNewLoad',
-            label: 'New Load',
-            onPressed:
-                provider.isLoading ? null : () => _openCreateTransfer('load'),
-          ),
-        ],
+      // One action per screen now that load and unload are separate menus.
+      // The hero tag still varies by direction: both screens live in the same
+      // shell stack, and two FABs sharing a tag throw during the transition.
+      floatingActionButton: SsCreateFab(
+        heroTag: isLoad ? 'vanNewLoad' : 'vanNewUnload',
+        label: isLoad ? 'New Load' : 'New Unload',
+        onPressed: provider.isLoading
+            ? null
+            : () => _openCreateTransfer(widget.operationType),
       ),
       appBar: AppBar(
         backgroundColor: AppColors.surface,
@@ -200,9 +203,9 @@ class _VanOperationsListScreenState extends State<VanOperationsListScreen> {
                 icon: const Icon(Icons.menu, color: AppColors.textPrimary),
                 onPressed: () => Scaffold.of(context).openDrawer(),
               ),
-        title: const Text(
-          'Van Operations',
-          style: TextStyle(
+        title: Text(
+          isLoad ? 'Van Load' : 'Van Unload',
+          style: const TextStyle(
             color: AppColors.primaryStrong,
             fontWeight: FontWeight.bold,
             fontSize: 22,
@@ -329,73 +332,6 @@ class _VanOperationsListScreenState extends State<VanOperationsListScreen> {
                     ),
                     const SizedBox(height: 24),
 
-                    // Load / Unload Toggle
-                    Container(
-                      height: 48,
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFE5E9F2),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: GestureDetector(
-                              onTap: () {
-                                setState(() => _operationType = 'load');
-                                _fetchOperations();
-                              },
-                              child: Container(
-                                decoration: BoxDecoration(
-                                  color: _operationType == 'load'
-                                      ? AppColors.primary
-                                      : Colors.transparent,
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                alignment: Alignment.center,
-                                child: Text(
-                                  'Load',
-                                  style: TextStyle(
-                                    color: _operationType == 'load'
-                                        ? Colors.white
-                                        : AppColors.textSecondary,
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 16,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ),
-                          Expanded(
-                            child: GestureDetector(
-                              onTap: () {
-                                setState(() => _operationType = 'unload');
-                                _fetchOperations();
-                              },
-                              child: Container(
-                                decoration: BoxDecoration(
-                                  color: _operationType == 'unload'
-                                      ? AppColors.primary
-                                      : Colors.transparent,
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                alignment: Alignment.center,
-                                child: Text(
-                                  'Unload',
-                                  style: TextStyle(
-                                    color: _operationType == 'unload'
-                                        ? Colors.white
-                                        : AppColors.textSecondary,
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 16,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 24),
 
                     if (provider.error != null) ErrorPanel(provider.error!),
                     if (provider.isLoading && transfers.isEmpty)
@@ -491,7 +427,9 @@ class _VanOperationsListScreenState extends State<VanOperationsListScreen> {
                   const Icon(Icons.access_time, size: 16, color: AppColors.textSecondary),
                   const SizedBox(width: 6),
                   Text(
-                    transfer.scheduledDate ?? 'Unknown date',
+                    transfer.scheduledDate == null
+                        ? 'Unknown date'
+                        : '${transfer.scheduledDate!.day.toString().padLeft(2, '0')} ${['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][transfer.scheduledDate!.month - 1]} ${transfer.scheduledDate!.year}',
                     style: const TextStyle(
                       color: AppColors.textSecondary,
                       fontSize: 14,

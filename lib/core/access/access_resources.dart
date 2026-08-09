@@ -85,6 +85,8 @@ class AppScreen {
   // Primary/secondary return delivery.
   static const returnsList = 'screen.primary_sale.returns.list';
   static const createReturn = 'screen.primary_sale.returns.create';
+  static const qcReturnsList = 'screen.primary_sale.qc_returns.list';
+  static const createQcReturn = 'screen.primary_sale.qc_returns.create';
   static const secondaryReturnsList = 'screen.secondary_sale.returns.list';
   static const secondaryCreateReturn = 'screen.secondary_sale.returns.create';
 
@@ -128,7 +130,8 @@ class AppAction {
   // intentionally remain shared until the backend exposes per-flow flags.
   static const returnsViewAll = 'action.return_delivery.view_all';
   static const returnsEditSoQty = 'action.return_delivery.edit_so_qty';
-  static const returnsEditQcQty = 'action.return_delivery.edit_qc_qty';
+  static const returnsEditWarehouseQty =
+      'action.return_delivery.edit_warehouse_qty';
   static const returnsEditEffectiveQty =
       'action.return_delivery.edit_effective_qty';
 
@@ -158,6 +161,12 @@ class AppAction {
   static const returnsSave = 'action.primary_sale.returns.save';
   static const returnsCancel = 'action.primary_sale.returns.cancel';
   static const returnsValidate = 'action.primary_sale.returns.validate';
+
+  // Primary QC return delivery.
+  static const qcReturnCreate = 'action.primary_sale.qc_returns.create';
+  static const qcReturnsSave = 'action.primary_sale.qc_returns.save';
+  static const qcReturnsCancel = 'action.primary_sale.qc_returns.cancel';
+  static const qcReturnsValidate = 'action.primary_sale.qc_returns.validate';
 
   // Secondary return delivery.
   static const secondaryReturnCreate = 'action.secondary_sale.returns.create';
@@ -189,6 +198,7 @@ class AppAction {
   // Visits.
   static const visitCheckIn = 'action.secondary_sale.visits.check_in';
   static const visitCheckOut = 'action.secondary_sale.visits.check_out';
+  static const visitSaleAmount = 'field.secondary_sale.visits.sale_amount';
 
   // HR / Leaves / Accounts.
   static const leaveCreate = 'action.hr.leave.create';
@@ -577,6 +587,20 @@ const List<AccessResource> accessCatalog = [
     legacyKeys: ['screen.returns.create'],
   ),
   AccessResource(
+    AppScreen.qcReturnsList,
+    'screen',
+    'primary_sale',
+    'Primary Sales - QC Return List',
+    _ps,
+  ),
+  AccessResource(
+    AppScreen.createQcReturn,
+    'screen',
+    'primary_sale',
+    'Primary Sales - Create QC Return',
+    _ps,
+  ),
+  AccessResource(
     AppScreen.secondaryReturnsList,
     'screen',
     'secondary_sale',
@@ -689,12 +713,12 @@ const List<AccessResource> accessCatalog = [
     legacyKeys: ['action.returns.edit_so_qty'],
   ),
   AccessResource(
-    AppAction.returnsEditQcQty,
+    AppAction.returnsEditWarehouseQty,
     'action',
     'return_delivery',
-    'Return Delivery - Edit QC Quantity',
+    'Return Delivery - Edit Warehouse Quantity',
     _psSs,
-    legacyKeys: ['action.returns.edit_qc_qty'],
+    legacyKeys: ['action.returns.edit_warehouse_qty'],
   ),
   AccessResource(
     AppAction.returnsEditEffectiveQty,
@@ -841,6 +865,36 @@ const List<AccessResource> accessCatalog = [
     'Primary Sales - Validate Return Delivery',
     _ps,
     legacyKeys: ['action.returns.validate'],
+  ),
+
+  // Primary QC return delivery actions.
+  AccessResource(
+    AppAction.qcReturnCreate,
+    'action',
+    'primary_sale',
+    'Primary Sales - Create QC Return',
+    _ps,
+  ),
+  AccessResource(
+    AppAction.qcReturnsSave,
+    'action',
+    'primary_sale',
+    'Primary Sales - Save QC Return',
+    _ps,
+  ),
+  AccessResource(
+    AppAction.qcReturnsCancel,
+    'action',
+    'primary_sale',
+    'Primary Sales - Cancel QC Return',
+    _ps,
+  ),
+  AccessResource(
+    AppAction.qcReturnsValidate,
+    'action',
+    'primary_sale',
+    'Primary Sales - Validate QC Return',
+    _ps,
   ),
 
   // Secondary return delivery actions.
@@ -1001,6 +1055,14 @@ const List<AccessResource> accessCatalog = [
     'Secondary Sales - Visit Check Out',
     _ss,
     legacyKeys: ['action.visits.check_out'],
+  ),
+  AccessResource(
+    AppAction.visitSaleAmount,
+    'action',
+    'secondary_sale',
+    'Secondary Sales - Visit Sale Amount Field',
+    _ss,
+    legacyKeys: ['field.visits.sale_amount'],
   ),
 
   // HR / Accounts.

@@ -136,7 +136,8 @@ class SaleOrderDetailLine {
     required this.orderedQty,
     required this.deliveredQty,
     required this.balanceQty,
-    required this.damagedQty,
+    required this.damagedExpiredQty,
+    required this.damageQualityQty,
     this.uomName,
     required this.priceUnit,
     required this.discount,
@@ -149,7 +150,8 @@ class SaleOrderDetailLine {
   final double orderedQty;
   final double deliveredQty;
   final double balanceQty;
-  final double damagedQty;
+  final double damagedExpiredQty;
+  final double damageQualityQty;
   final String? uomName;
   final double priceUnit;
   final double discount;
@@ -167,7 +169,8 @@ class SaleOrderDetailLine {
       orderedQty: asDouble(map['product_uom_qty']),
       deliveredQty: asDouble(map['qty_delivered']),
       balanceQty: asDouble(map['balance_qty']),
-      damagedQty: asDouble(map['damaged_qty'] ?? 0.0),
+      damagedExpiredQty: asDouble(map['damaged_expired_qty'] ?? 0.0),
+      damageQualityQty: asDouble(map['damage_quality_qty'] ?? 0.0),
       uomName: uom is Map ? asNullableString(uom['name']) : null,
       priceUnit: asDouble(map['price_unit']),
       discount: asDouble(map['discount']),
@@ -219,7 +222,7 @@ class DeliveryOrderSummary {
   final String name;
   final String state;
   final String? stateLabel;
-  final String? scheduledDate;
+  final DateTime? scheduledDate;
 
   factory DeliveryOrderSummary.fromMap(Map<String, dynamic> map) {
     return DeliveryOrderSummary(
@@ -227,7 +230,7 @@ class DeliveryOrderSummary {
       name: (map['name'] ?? '').toString(),
       state: (map['state'] ?? '').toString(),
       stateLabel: asNullableString(map['state_label']),
-      scheduledDate: asNullableString(map['scheduled_date']),
+      scheduledDate: asDateTime(map['scheduled_date']),
     );
   }
 }

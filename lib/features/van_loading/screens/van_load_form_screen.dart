@@ -29,9 +29,11 @@ class _TargetItem {
   final double targetQty;
   final double availableStock;
   final double scrapStock;
+  final double damagedQualityStock;
   double demandQty;
   double freshUnloadQty;
   double scrapUnloadQty;
+  double damagedQualityUnloadQty;
 
   _TargetItem({
     required this.productId,
@@ -42,9 +44,11 @@ class _TargetItem {
     required this.targetQty,
     required this.availableStock,
     this.scrapStock = 0.0,
+    this.damagedQualityStock = 0.0,
     this.demandQty = 0.0,
     this.freshUnloadQty = 0.0,
     this.scrapUnloadQty = 0.0,
+    this.damagedQualityUnloadQty = 0.0,
   });
 }
 
@@ -100,10 +104,22 @@ class _VanLoadFormScreenState extends State<VanLoadFormScreen> {
         final productId = t['product_id'] ?? 0;
         final avail = (t['available_stock'] ?? 0.0).toDouble();
         final scrap = (t['scrap_stock'] ?? 0.0).toDouble();
+        final damagedQualityStock = (
+          t['damaged_quality_stock'] ??
+          t['damage_quality_stock'] ??
+          t['quality_stock'] ??
+          t['scrap_quality_stock'] ??
+          0.0
+        ).toDouble();
+
+        if (!widget.isLoad && widget.existingTransfer == null && avail == 0.0 && scrap == 0.0 && damagedQualityStock == 0.0) {
+          continue;
+        }
 
         double demand = 0.0;
         double freshUnload = avail;
         double scrapUnload = scrap;
+        double damagedQualityUnload = damagedQualityStock;
 
         if (widget.existingTransfer != null) {
           final existingLine = widget.existingTransfer!.lines.firstWhere(
@@ -114,6 +130,7 @@ class _VanLoadFormScreenState extends State<VanLoadFormScreen> {
               demandQty: 0.0,
               quantity: 0.0,
               scrapQty: 0.0,
+              damagedQualityQty: 0.0,
               lotLines: [],
             ),
           );
@@ -122,18 +139,38 @@ class _VanLoadFormScreenState extends State<VanLoadFormScreen> {
             if (isLoadTransfer) {
               demand = existingLine.demandQty;
             } else {
-              scrapUnload = existingLine.scrapQty;
-              freshUnload = existingLine.quantity - existingLine.scrapQty;
+              final relatedTransfers = <VirtualTransfer>[
+                widget.existingTransfer!,
+                ...widget.existingTransfer!.generatedTransfers,
+              ];
+              freshUnload = 0.0;
+              scrapUnload = 0.0;
+              damagedQualityUnload = 0.0;
+              for (final transfer in relatedTransfers) {
+                final transferLine = transfer.lines.where((l) => l.product?['id'] == productId);
+                final bucket = transfer.generatedTransferType ?? 'fresh';
+                for (final line in transferLine) {
+                  if (bucket == 'scrap_damaged') {
+                    scrapUnload += line.quantity;
+                  } else if (bucket == 'scrap_quality') {
+                    damagedQualityUnload += line.quantity;
+                  } else {
+                    freshUnload += line.quantity;
+                  }
+                }
+              }
             }
           } else {
             demand = 0.0;
             freshUnload = 0.0;
             scrapUnload = 0.0;
+            damagedQualityUnload = 0.0;
           }
         } else {
           demand = 0.0;
           freshUnload = avail;
           scrapUnload = scrap;
+          damagedQualityUnload = damagedQualityStock;
         }
 
         items.add(_TargetItem(
@@ -145,9 +182,11 @@ class _VanLoadFormScreenState extends State<VanLoadFormScreen> {
           targetQty: (t['daily_target_qty'] ?? 0.0).toDouble(),
           availableStock: avail,
           scrapStock: scrap,
+          damagedQualityStock: damagedQualityStock,
           demandQty: demand,
           freshUnloadQty: freshUnload,
           scrapUnloadQty: scrapUnload,
+          damagedQualityUnloadQty: damagedQualityUnload,
         ));
       }
 
@@ -192,7 +231,7 @@ class _VanLoadFormScreenState extends State<VanLoadFormScreen> {
           ));
         }
       } else {
-        if (item.freshUnloadQty > 0 || item.scrapUnloadQty > 0) {
+        if (item.freshUnloadQty > 0 || item.scrapUnloadQty > 0 || item.damagedQualityUnloadQty > 0) {
           final product = TransferProduct(
             id: item.productId,
             name: item.productName,
@@ -202,9 +241,10 @@ class _VanLoadFormScreenState extends State<VanLoadFormScreen> {
           );
           lines.add(VirtualTransferLineEntry(
             product: product,
-            quantity: item.freshUnloadQty + item.scrapUnloadQty,
+            quantity: item.freshUnloadQty + item.scrapUnloadQty + item.damagedQualityUnloadQty,
             freshQty: item.freshUnloadQty,
             scrapQty: item.scrapUnloadQty,
+            damagedQualityQty: item.damagedQualityUnloadQty,
           ));
         }
       }
@@ -224,9 +264,9 @@ class _VanLoadFormScreenState extends State<VanLoadFormScreen> {
     }
 
     // Stock excess validation - block if any line exceeds available stock
-    if (widget.isLoad) {
-      final excessItems = <StockExcessItem>[];
-      for (final item in _items) {
+    final excessItems = <StockExcessItem>[];
+    for (final item in _items) {
+      if (widget.isLoad) {
         if (item.demandQty > 0 && item.demandQty > item.availableStock) {
           excessItems.add(StockExcessItem(
             productName: item.productName,
@@ -234,11 +274,34 @@ class _VanLoadFormScreenState extends State<VanLoadFormScreen> {
             availableQty: item.availableStock,
           ));
         }
+      } else {
+        // Van Unload validation
+        if (item.freshUnloadQty > 0 && item.freshUnloadQty > item.availableStock) {
+          excessItems.add(StockExcessItem(
+            productName: '${item.productName} (Fresh)',
+            enteredQty: item.freshUnloadQty,
+            availableQty: item.availableStock,
+          ));
+        }
+        if (item.scrapUnloadQty > 0 && item.scrapUnloadQty > item.scrapStock) {
+          excessItems.add(StockExcessItem(
+            productName: '${item.productName} (Scrap)',
+            enteredQty: item.scrapUnloadQty,
+            availableQty: item.scrapStock,
+          ));
+        }
+        if (item.damagedQualityUnloadQty > 0 && item.damagedQualityUnloadQty > item.damagedQualityStock) {
+          excessItems.add(StockExcessItem(
+            productName: '${item.productName} (Damage Quality)',
+            enteredQty: item.damagedQualityUnloadQty,
+            availableQty: item.damagedQualityStock,
+          ));
+        }
       }
-      if (excessItems.isNotEmpty) {
-        await showStockExcessValidationDialog(context, excessItems: excessItems);
-        return;
-      }
+    }
+    if (excessItems.isNotEmpty) {
+      await showStockExcessValidationDialog(context, excessItems: excessItems);
+      return;
     }
 
     final VirtualTransfer? transfer;
@@ -695,114 +758,163 @@ class _VanLoadFormScreenState extends State<VanLoadFormScreen> {
                                       ),
                                     ),
                                     const SizedBox(height: 16),
-                                    Row(
+                                    Column(
                                       children: [
-                                        Expanded(
-                                          child: Column(
-                                            crossAxisAlignment: CrossAxisAlignment.start,
-                                            children: [
-                                              const Text(
-                                                'Fresh Qty',
-                                                style: TextStyle(
-                                                  color: AppColors.textSecondary,
-                                                  fontWeight: FontWeight.w600,
-                                                  fontSize: 12,
-                                                ),
-                                              ),
-                                              const SizedBox(height: 6),
-                                              SizedBox(
-                                                height: 42,
-                                                child: TextField(
-                                                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                                                  decoration: InputDecoration(
-                                                    hintText: 'Enter qty',
-                                                    hintStyle: const TextStyle(color: AppColors.textSecondary, fontSize: 14),
-                                                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 0),
-                                                    border: OutlineInputBorder(
-                                                      borderRadius: BorderRadius.circular(8),
-                                                      borderSide: const BorderSide(color: Color(0xFFDDE6F2)),
-                                                    ),
-                                                    enabledBorder: OutlineInputBorder(
-                                                      borderRadius: BorderRadius.circular(8),
-                                                      borderSide: const BorderSide(color: Color(0xFFDDE6F2)),
+                                        Row(
+                                          children: [
+                                            Expanded(
+                                              child: Column(
+                                                crossAxisAlignment: CrossAxisAlignment.start,
+                                                children: [
+                                                  const Text(
+                                                    'Fresh Qty',
+                                                    style: TextStyle(
+                                                      color: AppColors.textSecondary,
+                                                      fontWeight: FontWeight.w600,
+                                                      fontSize: 12,
                                                     ),
                                                   ),
-                                                  onChanged: (val) {
-                                                    final qty = double.tryParse(val) ?? 0;
-                                                    setState(() {
-                                                      if (qty > item.availableStock) {
-                                                        item.freshUnloadQty = item.availableStock;
-                                                      } else {
-                                                        item.freshUnloadQty = qty;
-                                                      }
-                                                    });
-                                                  },
-                                                  controller: TextEditingController(
-                                                    text: item.freshUnloadQty > 0 ? item.freshUnloadQty.toStringAsFixed(0) : '',
-                                                  )..selection = TextSelection.collapsed(
-                                                      offset: item.freshUnloadQty > 0 ? item.freshUnloadQty.toStringAsFixed(0).length : 0,
-                                                    ),
-                                                ),
-                                              ),
-                                            ],
-                                          ),
-                                        ),
-                                        const SizedBox(width: 16),
-                                        Expanded(
-                                          child: Column(
-                                            crossAxisAlignment: CrossAxisAlignment.start,
-                                            children: [
-                                              const Text(
-                                                'Scrap Qty',
-                                                style: TextStyle(
-                                                  color: AppColors.textSecondary,
-                                                  fontWeight: FontWeight.w600,
-                                                  fontSize: 12,
-                                                ),
-                                              ),
-                                              const SizedBox(height: 6),
-                                              SizedBox(
-                                                height: 42,
-                                                child: TextField(
-                                                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                                                  decoration: InputDecoration(
-                                                    hintText: 'Enter qty',
-                                                    hintStyle: const TextStyle(color: AppColors.textSecondary, fontSize: 14),
-                                                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 0),
-                                                    border: OutlineInputBorder(
-                                                      borderRadius: BorderRadius.circular(8),
-                                                      borderSide: const BorderSide(color: Color(0xFFDDE6F2)),
-                                                    ),
-                                                    enabledBorder: OutlineInputBorder(
-                                                      borderRadius: BorderRadius.circular(8),
-                                                      borderSide: const BorderSide(color: Color(0xFFDDE6F2)),
+                                                  const SizedBox(height: 6),
+                                                  SizedBox(
+                                                    height: 42,
+                                                    child: TextField(
+                                                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                                                      decoration: InputDecoration(
+                                                        hintText: 'Enter qty',
+                                                        hintStyle: const TextStyle(color: AppColors.textSecondary, fontSize: 14),
+                                                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 0),
+                                                        border: OutlineInputBorder(
+                                                          borderRadius: BorderRadius.circular(8),
+                                                          borderSide: const BorderSide(color: Color(0xFFDDE6F2)),
+                                                        ),
+                                                        enabledBorder: OutlineInputBorder(
+                                                          borderRadius: BorderRadius.circular(8),
+                                                          borderSide: const BorderSide(color: Color(0xFFDDE6F2)),
+                                                        ),
+                                                      ),
+                                                      onChanged: (val) {
+                                                        final qty = double.tryParse(val) ?? 0;
+                                                        setState(() {
+                                                          item.freshUnloadQty = qty;
+                                                        });
+                                                      },
+                                                      controller: TextEditingController(
+                                                        text: item.freshUnloadQty > 0 ? item.freshUnloadQty.toStringAsFixed(0) : '',
+                                                      )..selection = TextSelection.collapsed(
+                                                          offset: item.freshUnloadQty > 0 ? item.freshUnloadQty.toStringAsFixed(0).length : 0,
+                                                        ),
                                                     ),
                                                   ),
-                                                  onChanged: (val) {
-                                                    final qty = double.tryParse(val) ?? 0;
-                                                    setState(() {
-                                                      if (qty > item.scrapStock) {
-                                                        item.scrapUnloadQty = item.scrapStock;
-                                                      } else {
-                                                        item.scrapUnloadQty = qty;
-                                                      }
-                                                    });
-                                                  },
-                                                  controller: TextEditingController(
-                                                    text: item.scrapUnloadQty > 0 ? item.scrapUnloadQty.toStringAsFixed(0) : '',
-                                                  )..selection = TextSelection.collapsed(
-                                                      offset: item.scrapUnloadQty > 0 ? item.scrapUnloadQty.toStringAsFixed(0).length : 0,
-                                                    ),
-                                                ),
+                                                ],
                                               ),
-                                            ],
-                                          ),
+                                            ),
+                                            const SizedBox(width: 16),
+                                            Expanded(
+                                              child: Column(
+                                                crossAxisAlignment: CrossAxisAlignment.start,
+                                                children: [
+                                                  const Text(
+                                                    'Scrap Qty',
+                                                    style: TextStyle(
+                                                      color: AppColors.textSecondary,
+                                                      fontWeight: FontWeight.w600,
+                                                      fontSize: 12,
+                                                    ),
+                                                  ),
+                                                  const SizedBox(height: 6),
+                                                  SizedBox(
+                                                    height: 42,
+                                                    child: TextField(
+                                                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                                                      decoration: InputDecoration(
+                                                        hintText: 'Enter qty',
+                                                        hintStyle: const TextStyle(color: AppColors.textSecondary, fontSize: 14),
+                                                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 0),
+                                                        border: OutlineInputBorder(
+                                                          borderRadius: BorderRadius.circular(8),
+                                                          borderSide: const BorderSide(color: Color(0xFFDDE6F2)),
+                                                        ),
+                                                        enabledBorder: OutlineInputBorder(
+                                                          borderRadius: BorderRadius.circular(8),
+                                                          borderSide: const BorderSide(color: Color(0xFFDDE6F2)),
+                                                        ),
+                                                      ),
+                                                      onChanged: (val) {
+                                                        final qty = double.tryParse(val) ?? 0;
+                                                        setState(() {
+                                                          item.scrapUnloadQty = qty;
+                                                        });
+                                                      },
+                                                      controller: TextEditingController(
+                                                        text: item.scrapUnloadQty > 0 ? item.scrapUnloadQty.toStringAsFixed(0) : '',
+                                                      )..selection = TextSelection.collapsed(
+                                                          offset: item.scrapUnloadQty > 0 ? item.scrapUnloadQty.toStringAsFixed(0).length : 0,
+                                                        ),
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+                                          ],
                                         ),
-                                      ],
+                                        const SizedBox(height: 12),
+                                        Row(
+                                          children: [
+                                            Expanded(
+                                              child: Column(
+                                                crossAxisAlignment: CrossAxisAlignment.start,
+                                                children: [
+                                                  const Text(
+                                                    'Damage Quality Qty',
+                                                    style: TextStyle(
+                                                      color: AppColors.textSecondary,
+                                                      fontWeight: FontWeight.w600,
+                                                      fontSize: 12,
+                                                    ),
+                                                  ),
+                                                  const SizedBox(height: 6),
+                                                  SizedBox(
+                                                    height: 42,
+                                                    child: TextField(
+                                                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                                                      decoration: InputDecoration(
+                                                        hintText: 'Enter qty',
+                                                        hintStyle: const TextStyle(color: AppColors.textSecondary, fontSize: 14),
+                                                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 0),
+                                                        border: OutlineInputBorder(
+                                                          borderRadius: BorderRadius.circular(8),
+                                                          borderSide: const BorderSide(color: Color(0xFFDDE6F2)),
+                                                        ),
+                                                        enabledBorder: OutlineInputBorder(
+                                                          borderRadius: BorderRadius.circular(8),
+                                                          borderSide: const BorderSide(color: Color(0xFFDDE6F2)),
+                                                        ),
+                                                      ),
+                                                      onChanged: (val) {
+                                                        final qty = double.tryParse(val) ?? 0;
+                                                        setState(() {
+                                                          item.damagedQualityUnloadQty = qty;
+                                                        });
+                                                      },
+                                                      controller: TextEditingController(
+                                                        text: item.damagedQualityUnloadQty > 0 ? item.damagedQualityUnloadQty.toStringAsFixed(0) : '',
+                                                      )..selection = TextSelection.collapsed(
+                                                          offset: item.damagedQualityUnloadQty > 0 ? item.damagedQualityUnloadQty.toStringAsFixed(0).length : 0,
+                                                        ),
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+                                            const SizedBox(width: 16),
+                                            const Expanded(child: SizedBox()),
+                                          ],
+                                        ),
+                                    ],
                                     ),
                                     const SizedBox(height: 8),
                                     Text(
-                                      'Available Fresh: ${item.availableStock.toStringAsFixed(0)} | Scrap: ${item.scrapStock.toStringAsFixed(0)}',
+                                      'Available Fresh: ${item.availableStock.toStringAsFixed(0)} | Scrap: ${item.scrapStock.toStringAsFixed(0)} | Damage Quality: ${item.damagedQualityStock.toStringAsFixed(0)}',
                                       style: const TextStyle(
                                         color: AppColors.textSecondary,
                                         fontSize: 12,

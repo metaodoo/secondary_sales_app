@@ -9,6 +9,7 @@ import 'package:secondary_sales/data/models/sales/sale_order_detail.dart';
 import 'package:secondary_sales/features/sales/primary_sale_provider.dart';
 import 'package:secondary_sales/features/sales/screens/validate_delivery_screen.dart';
 import 'package:secondary_sales/core/widgets/ss_ui.dart';
+import 'package:secondary_sales/core/widgets/dashboard_cards.dart';
 
 class OrderDetailScreen extends StatefulWidget {
   const OrderDetailScreen({
@@ -31,13 +32,19 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<PrimarySaleProvider>().fetchOrderDetail(widget.orderId, saleType: widget.saleType);
+      context.read<PrimarySaleProvider>().fetchOrderDetail(
+        widget.orderId,
+        saleType: widget.saleType,
+      );
     });
   }
 
   Future<void> _printOrder() async {
     final provider = context.read<PrimarySaleProvider>();
-    final result = await provider.printOrder(widget.orderId, saleType: widget.saleType);
+    final result = await provider.printOrder(
+      widget.orderId,
+      saleType: widget.saleType,
+    );
     if (!mounted) return;
 
     if (result == null) {
@@ -90,7 +97,10 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     );
     if (!mounted) return;
     if (updated != null) {
-      context.read<PrimarySaleProvider>().fetchOrderDetail(widget.orderId, saleType: widget.saleType);
+      context.read<PrimarySaleProvider>().fetchOrderDetail(
+        widget.orderId,
+        saleType: widget.saleType,
+      );
     }
   }
 
@@ -116,9 +126,11 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
             ),
             Expanded(
               child: RefreshIndicator(
-                onRefresh: () => context
-                    .read<PrimarySaleProvider>()
-                    .fetchOrderDetail(widget.orderId, saleType: widget.saleType),
+                onRefresh: () =>
+                    context.read<PrimarySaleProvider>().fetchOrderDetail(
+                      widget.orderId,
+                      saleType: widget.saleType,
+                    ),
                 child: ListView(
                   padding: const EdgeInsets.all(16),
                   children: [
@@ -158,7 +170,9 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                                 )
                               : const Icon(Icons.print_outlined),
                           label: Text(
-                            provider.isLoading ? 'Downloading...' : 'Print Order',
+                            provider.isLoading
+                                ? 'Downloading...'
+                                : 'Print Order',
                             style: const TextStyle(fontWeight: FontWeight.w800),
                           ),
                           style: OutlinedButton.styleFrom(
@@ -192,28 +206,10 @@ class _OrderStatusPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    Color delivBgColor;
-    Color delivTextColor;
-    String delivText;
-
-    switch (order.deliveryStatus.toLowerCase()) {
-      case 'full':
-        delivBgColor = const Color(0xFFDCFCE7);
-        delivTextColor = const Color(0xFF16A34A);
-        delivText = 'DELIVERED';
-        break;
-      case 'partial':
-        delivBgColor = const Color(0xFFFEF3C7);
-        delivTextColor = const Color(0xFFD97706);
-        delivText = 'PARTIAL';
-        break;
-      case 'no':
-      default:
-        delivBgColor = AppColors.borderMuted;
-        delivTextColor = AppColors.textSecondary;
-        delivText = 'PENDING';
-        break;
-    }
+    final statusBadge = getPrimaryOrderStatusBadge(
+      order.state,
+      order.deliveryStatus,
+    );
 
     return Container(
       padding: const EdgeInsets.all(16),
@@ -226,50 +222,25 @@ class _OrderStatusPanel extends StatelessWidget {
             style: TextStyle(color: AppColors.textSecondary),
           ),
           const SizedBox(height: 12),
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 8,
-                ),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFE7EEFF),
-                  borderRadius: BorderRadius.circular(999),
-                ),
-                child: Text(
-                  order.state.toUpperCase(),
-                  style: const TextStyle(
-                    color: Color(0xFF2563EB),
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            decoration: BoxDecoration(
+              color: statusBadge.bgColor,
+              borderRadius: BorderRadius.circular(999),
+            ),
+            child: Text(
+              statusBadge.label.toUpperCase(),
+              style: TextStyle(
+                color: statusBadge.textColor,
+                fontWeight: FontWeight.w800,
               ),
-              const SizedBox(width: 8),
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 8,
-                ),
-                decoration: BoxDecoration(
-                  color: delivBgColor,
-                  borderRadius: BorderRadius.circular(999),
-                ),
-                child: Text(
-                  delivText,
-                  style: TextStyle(
-                    color: delivTextColor,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-              ),
-            ],
+            ),
           ),
           const SizedBox(height: 14),
-          Text('Created: ${_formatServerDate(order.dateOrder)}'),
+          Text('Created: ${_formatServerDate(asDateTime(order.dateOrder))}'),
           const SizedBox(height: 8),
           Text(
-            'Expected Delivery: ${_formatServerDate(order.expectedDeliveryDate ?? '')}',
+            'Expected Delivery: ${_formatServerDate(asDateTime(order.expectedDeliveryDate))}',
           ),
         ],
       ),
@@ -327,33 +298,39 @@ class _OrderLinesPanel extends StatelessWidget {
                     style: const TextStyle(color: AppColors.textSecondary),
                   ),
                   const SizedBox(height: 14),
-                  Row(
+                  Column(
                     children: [
-                      Expanded(
-                        child: _QtyTile(
-                          label: 'Ordered',
-                          value: formatQty(line.orderedQty),
-                          color: AppColors.primarySoft,
-                          valueColor: const Color(0xFF2563EB),
-                        ),
+                      _QtyRow(
+                        label: 'Ordered Qty',
+                        value: formatQty(line.orderedQty),
+                        color: AppColors.primarySoft,
+                        valueColor: const Color(0xFF2563EB),
                       ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: _QtyTile(
-                          label: 'Delivered',
-                          value: formatQty(line.deliveredQty),
-                          color: const Color(0xFFECFDF3),
-                          valueColor: const Color(0xFF16A34A),
+                      if (line.damagedExpiredQty > 0)
+                        _QtyRow(
+                          label: 'Damaged Expire Qty',
+                          value: formatQty(line.damagedExpiredQty),
+                          color: const Color(0xFFFEF2F2),
+                          valueColor: const Color(0xFFDC2626),
                         ),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: _QtyTile(
-                          label: 'Balance',
-                          value: formatQty(line.balanceQty),
+                      if (line.damageQualityQty > 0)
+                        _QtyRow(
+                          label: 'Damage Quality Qty',
+                          value: formatQty(line.damageQualityQty),
                           color: const Color(0xFFFFF7ED),
                           valueColor: const Color(0xFFEA580C),
                         ),
+                      _QtyRow(
+                        label: 'Delivered Qty',
+                        value: formatQty(line.deliveredQty),
+                        color: const Color(0xFFECFDF3),
+                        valueColor: const Color(0xFF16A34A),
+                      ),
+                      _QtyRow(
+                        label: 'Balance Qty',
+                        value: formatQty(line.balanceQty),
+                        color: const Color(0xFFFFF7ED),
+                        valueColor: const Color(0xFFEA580C),
                       ),
                     ],
                   ),
@@ -367,8 +344,8 @@ class _OrderLinesPanel extends StatelessWidget {
   }
 }
 
-class _QtyTile extends StatelessWidget {
-  const _QtyTile({
+class _QtyRow extends StatelessWidget {
+  const _QtyRow({
     required this.label,
     required this.value,
     required this.color,
@@ -383,18 +360,30 @@ class _QtyTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(vertical: 10),
+      margin: const EdgeInsets.only(bottom: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
         color: color,
-        borderRadius: BorderRadius.circular(6),
+        borderRadius: BorderRadius.circular(8),
       ),
-      child: Column(
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label, style: const TextStyle(color: AppColors.textSecondary)),
-          const SizedBox(height: 3),
+          Text(
+            label,
+            style: const TextStyle(
+              color: AppColors.textSecondary,
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
           Text(
             value,
-            style: TextStyle(color: valueColor, fontWeight: FontWeight.w800),
+            style: TextStyle(
+              color: valueColor,
+              fontSize: 14,
+              fontWeight: FontWeight.bold,
+            ),
           ),
         ],
       ),
@@ -468,10 +457,9 @@ String _money(SaleOrderDetail order, double value) {
   return '${order.amounts.currencySymbol ?? '৳'}${value.toStringAsFixed(2)}';
 }
 
-String _formatServerDate(String value) {
-  if (value.isEmpty) return '-';
-  final parsed = asDateTime(value);
-  if (parsed == null) return value.split('.').first;
+String _formatServerDate(DateTime? value) {
+  if (value == null) return '-';
+  final parsed = value;
   const months = [
     'Jan',
     'Feb',
@@ -583,7 +571,7 @@ class _DeliveriesPanel extends StatelessWidget {
                               ),
                               const SizedBox(width: 6),
                               Text(
-                                _formatServerDate(picking.scheduledDate ?? ''),
+                                _formatServerDate(picking.scheduledDate),
                                 style: const TextStyle(
                                   color: AppColors.textSecondary,
                                   fontSize: 13,

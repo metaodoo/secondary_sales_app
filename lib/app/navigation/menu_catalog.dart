@@ -156,9 +156,15 @@ List<MenuSection> buildMenuSections(String moduleType) {
     sections.add(
       MenuSection('Field & Inventory', [
         MenuDestination(
-          label: 'Van Operations',
+          label: 'Van Load',
           icon: Icons.local_shipping_outlined,
-          shellIndex: AppShellIndex.vanLoading,
+          shellIndex: AppShellIndex.vanLoad,
+          visibleWhen: (a) => a.canView(AppScreen.vanOperationsList),
+        ),
+        MenuDestination(
+          label: 'Van Unload',
+          icon: Icons.unarchive_outlined,
+          shellIndex: AppShellIndex.vanUnload,
           visibleWhen: (a) => a.canView(AppScreen.vanOperationsList),
         ),
         MenuDestination(
@@ -168,10 +174,18 @@ List<MenuSection> buildMenuSections(String moduleType) {
           builder: (_) => const DeliveriesListScreen(moduleType: 'secondary'),
         ),
         MenuDestination(
-          label: 'Scrap Operation',
+          label: 'Return Delivery',
+          icon: Icons.assignment_return_outlined,
+          screenKey: AppScreen.secondaryReturnsList,
+          builder: (_) => const ReturnsListScreen(moduleType: 'secondary'),
+          visibleWhen: (_) => false,
+        ),
+        MenuDestination(
+          label: 'Return Scrap',
           icon: Icons.recycling_outlined,
           screenKey: AppScreen.secondaryScrapsList,
           builder: (_) => const ScrapsListScreen(moduleType: 'secondary'),
+          visibleWhen: (_) => false,
         ),
         MenuDestination(
           label: 'Visit History',

@@ -127,6 +127,61 @@ class _VirtualTransferDetailScreenState
     };
   }
 
+  List<VirtualTransferLine> _aggregateUnloadLines(VirtualTransfer transfer) {
+    final byProduct = <int, VirtualTransferLine>{};
+    final relatedTransfers = <VirtualTransfer>[
+      transfer,
+      ...transfer.generatedTransfers,
+    ];
+    for (final relatedTransfer in relatedTransfers) {
+      final bucket = relatedTransfer.generatedTransferType ?? 'fresh';
+      for (final line in relatedTransfer.lines) {
+        final productId = line.product?['id'];
+        if (productId is! int) {
+          continue;
+        }
+        final freshQty = bucket == 'fresh' ? line.quantity : 0.0;
+        final scrapQty = bucket == 'scrap_damaged'
+            ? line.quantity
+            : line.scrapQty;
+        final damagedQualityQty = bucket == 'scrap_quality'
+            ? line.quantity
+            : line.damagedQualityQty;
+        final existing = byProduct[productId];
+        if (existing == null) {
+          byProduct[productId] = VirtualTransferLine(
+            moveId: line.moveId,
+            state: line.state,
+            product: line.product,
+            demandQty: line.demandQty,
+            quantity: freshQty + scrapQty + damagedQualityQty,
+            soQty: line.soQty,
+            warehouseQty: line.warehouseQty,
+            scrapQty: scrapQty,
+            damagedQualityQty: damagedQualityQty,
+            uom: line.uom,
+            lotLines: List<Map<String, dynamic>>.from(line.lotLines),
+          );
+          continue;
+        }
+        byProduct[productId] = VirtualTransferLine(
+          moveId: existing.moveId,
+          state: existing.state,
+          product: existing.product,
+          demandQty: existing.demandQty + line.demandQty,
+          quantity: existing.quantity + freshQty + scrapQty + damagedQualityQty,
+          soQty: existing.soQty + line.soQty,
+          warehouseQty: existing.warehouseQty + line.warehouseQty,
+          scrapQty: existing.scrapQty + scrapQty,
+          damagedQualityQty: existing.damagedQualityQty + damagedQualityQty,
+          uom: existing.uom,
+          lotLines: [...existing.lotLines, ...line.lotLines],
+        );
+      }
+    }
+    return byProduct.values.toList();
+  }
+
   @override
   Widget build(BuildContext context) {
     final provider = context.watch<TransferProvider>();
@@ -140,8 +195,10 @@ class _VirtualTransferDetailScreenState
               future: _transferFuture,
               builder: (context, snapshot) {
                 final transfer = snapshot.data ?? widget.initialTransfer;
-                final bool isLoad = transfer.vanOperationType?.toLowerCase() == 'load';
-                final bool isScrap = transfer.ssTransferCategory?.toLowerCase() == 'scrap';
+                final bool isLoad =
+                    transfer.vanOperationType?.toLowerCase() == 'load';
+                final bool isScrap =
+                    transfer.ssTransferCategory?.toLowerCase() == 'scrap';
                 final String subtitle = isLoad
                     ? 'Van Load'
                     : (isScrap ? 'Van Scrap Unload' : 'Van Unload');
@@ -153,10 +210,8 @@ class _VirtualTransferDetailScreenState
                     onPressed: () => Navigator.pop(context),
                     icon: const Icon(Icons.arrow_back, color: Colors.white),
                   ),
-                  trailing: ![
-                    'done',
-                    'cancel',
-                  ].contains(transfer.state.toLowerCase())
+                  trailing:
+                      !['done', 'cancel'].contains(transfer.state.toLowerCase())
                       ? IconButton(
                           icon: const Icon(Icons.edit, color: Colors.white),
                           onPressed: () => _editTransfer(transfer),
@@ -188,6 +243,12 @@ class _VirtualTransferDetailScreenState
                   }
 
                   final transfer = snapshot.data ?? widget.initialTransfer;
+
+                  final isUnload =
+                      transfer.vanOperationType?.toLowerCase() == 'unload';
+                  final displayLines = isUnload
+                      ? _aggregateUnloadLines(transfer)
+                      : transfer.lines;
 
                   return RefreshIndicator(
                     onRefresh: _refresh,
@@ -255,7 +316,15 @@ class _VirtualTransferDetailScreenState
                           ),
                         ),
                         const SizedBox(height: 10),
-                        ...transfer.lines.map((line) => _MoveLineCard(line)),
+                        ...displayLines.map(
+                          (line) => _MoveLineCard(
+                            line,
+                            isUnload: isUnload,
+                            isPrimaryReturn:
+                                transfer.ssTransferCategory?.toLowerCase() ==
+                                'primary_return',
+                          ),
+                        ),
                       ],
                     ),
                   );
@@ -364,9 +433,15 @@ class _DetailRow extends StatelessWidget {
 }
 
 class _MoveLineCard extends StatelessWidget {
-  const _MoveLineCard(this.line);
+  const _MoveLineCard(
+    this.line, {
+    this.isUnload = false,
+    this.isPrimaryReturn = false,
+  });
 
   final VirtualTransferLine line;
+  final bool isUnload;
+  final bool isPrimaryReturn;
 
   @override
   Widget build(BuildContext context) {
@@ -382,44 +457,84 @@ class _MoveLineCard extends StatelessWidget {
             style: const TextStyle(fontWeight: FontWeight.w800),
           ),
           const SizedBox(height: 8),
-          Row(
-            children: [
-              const Text(
-                'Quantity',
-                style: TextStyle(color: AppColors.textSecondary),
-              ),
-              const Spacer(),
-              Text(
-                '${(line.quantity > 0 ? line.quantity : line.demandQty).toStringAsFixed(0)} ${line.uomName}',
-                style: const TextStyle(fontWeight: FontWeight.w800),
-              ),
-            ],
-          ),
-          if (line.requiresLots && line.lotLines.isNotEmpty) ...[
+          if (isUnload) ...[
+            _qtyRow('Fresh Qty', line.freshQty, line.uomName),
+            _qtyRow('Scrap Qty', line.scrapQty, line.uomName),
+            _qtyRow('Damage Quality Qty', line.damagedQualityQty, line.uomName),
+            const Divider(height: 22),
+            _qtyRow('Total Qty', line.quantity, line.uomName, emphasize: true),
+          ] else ...[
+            _qtyRow(
+              'Quantity',
+              line.quantity > 0 ? line.quantity : line.demandQty,
+              line.uomName,
+              emphasize: true,
+            ),
+          ],
+          if (isPrimaryReturn &&
+              line.requiresLots &&
+              line.lotLines.isNotEmpty) ...[
             const Divider(height: 22),
             ...line.lotLines.map((lotLine) {
               final lot = lotLine['lot'];
               final lotName = lot is Map ? lot['name'] : null;
               final quantity = lotLine['quantity'];
+              final scrapQty = lotLine['scrap_qty'];
+              final damagedQualityQty = lotLine['damaged_quality_qty'];
               return Padding(
-                padding: const EdgeInsets.only(bottom: 4),
-                child: Row(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Expanded(
-                      child: Text(
-                        lotName?.toString() ?? 'Lot',
-                        style: const TextStyle(color: AppColors.textSecondary),
-                      ),
+                    Text(
+                      lotName?.toString() ?? 'Lot',
+                      style: const TextStyle(color: AppColors.textSecondary),
                     ),
+                    const SizedBox(height: 4),
                     Text(
                       '${quantity ?? 0} ${line.uomName}',
                       style: const TextStyle(fontWeight: FontWeight.w700),
                     ),
+                    if (isUnload &&
+                        ((scrapQty ?? 0) > 0 ||
+                            (damagedQualityQty ?? 0) > 0)) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        'Scrap: ${scrapQty ?? 0} | Damage Quality: ${damagedQualityQty ?? 0}',
+                        style: const TextStyle(
+                          color: AppColors.textSecondary,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
                   ],
                 ),
               );
             }),
           ],
+        ],
+      ),
+    );
+  }
+
+  Widget _qtyRow(
+    String label,
+    double qty,
+    String uomName, {
+    bool emphasize = false,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: Row(
+        children: [
+          Text(label, style: const TextStyle(color: AppColors.textSecondary)),
+          const Spacer(),
+          Text(
+            '${qty.toStringAsFixed(0)} $uomName',
+            style: TextStyle(
+              fontWeight: emphasize ? FontWeight.w800 : FontWeight.w700,
+            ),
+          ),
         ],
       ),
     );

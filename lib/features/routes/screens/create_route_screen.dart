@@ -22,7 +22,6 @@ class CreateRouteScreen extends StatefulWidget {
 class _CreateRouteScreenState extends State<CreateRouteScreen> {
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
-  final _codeController = TextEditingController();
 
   DistributionHub? _selectedDealer;
   final List<SalesEmployee> _selectedEmployees = [];
@@ -50,7 +49,6 @@ class _CreateRouteScreenState extends State<CreateRouteScreen> {
   void _initializeData() {
     if (widget.route != null) {
       _nameController.text = widget.route!.name;
-      _codeController.text = widget.route!.code ?? '';
 
       // Initialize selected dealer
       if (widget.route!.distributorId != null) {
@@ -80,7 +78,6 @@ class _CreateRouteScreenState extends State<CreateRouteScreen> {
   @override
   void dispose() {
     _nameController.dispose();
-    _codeController.dispose();
     super.dispose();
   }
 
@@ -207,7 +204,6 @@ class _CreateRouteScreenState extends State<CreateRouteScreen> {
 
     try {
       final name = _nameController.text.trim();
-      final code = _codeController.text.trim();
       final distributorId = _selectedDealer!.id;
       final employeeIds = _selectedEmployees.map((e) => e.id).toList();
 
@@ -215,7 +211,6 @@ class _CreateRouteScreenState extends State<CreateRouteScreen> {
       if (widget.route == null) {
         result = await context.read<RouteProvider>().createRoute(
           name: name,
-          code: code.isEmpty ? null : code,
           distributorId: distributorId,
           employeeIds: employeeIds,
         );
@@ -223,7 +218,6 @@ class _CreateRouteScreenState extends State<CreateRouteScreen> {
         result = await context.read<RouteProvider>().updateRoute(
           widget.route!.id,
           name: name,
-          code: code.isEmpty ? null : code,
           distributorId: distributorId,
           employeeIds: employeeIds,
           active: widget.route!.active,
@@ -317,20 +311,6 @@ class _CreateRouteScreenState extends State<CreateRouteScreen> {
                   },
                 ),
                 const SizedBox(height: 16),
-                const Text(
-                  'Route Code (Optional)',
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    color: AppColors.textPrimary,
-                    fontSize: 13,
-                  ),
-                ),
-                const SizedBox(height: 6),
-                TextFormField(
-                  controller: _codeController,
-                  decoration: ssInputDecoration('e.g. NW-A', Icons.qr_code),
-                ),
-
                 const SizedBox(height: 24),
 
                 // SECTION: DEALER ASSIGNMENT

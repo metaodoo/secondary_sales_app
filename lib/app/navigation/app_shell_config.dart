@@ -9,7 +9,8 @@ class AppShellIndex {
   static const int sales = 3;
   static const int createOrder = 4;
   static const int profile = 5;
-  static const int vanLoading = 6;
+  static const int vanLoad = 6;
+  static const int vanUnload = 7;
 }
 
 class AppShellNavItem {
@@ -53,7 +54,8 @@ class AppShellNavItem {
     // Filter by moduleType
     if (moduleType == 'primary') {
       if (stackIndex == AppShellIndex.routes ||
-          stackIndex == AppShellIndex.vanLoading) {
+          stackIndex == AppShellIndex.vanLoad ||
+          stackIndex == AppShellIndex.vanUnload) {
         return false;
       }
     } else if (moduleType == 'secondary') {
@@ -95,11 +97,22 @@ const List<AppShellNavItem> appShellNavItems = [
     selectedIcon: Icons.receipt_long,
     requiresPrimarySalesAccess: true,
   ),
+  // Load and unload are separate destinations rather than one screen with an
+  // in-page toggle. They are different tasks done at different times of day,
+  // and the backend lists them separately (van_operation_type on
+  // /virtual-transfers). Both are gated by the same access key.
   AppShellNavItem(
-    stackIndex: AppShellIndex.vanLoading,
-    label: 'Van Operations',
+    stackIndex: AppShellIndex.vanLoad,
+    label: 'Van Load',
     icon: Icons.local_shipping_outlined,
     selectedIcon: Icons.local_shipping,
+    screenKey: AppScreen.vanOperationsList,
+  ),
+  AppShellNavItem(
+    stackIndex: AppShellIndex.vanUnload,
+    label: 'Van Unload',
+    icon: Icons.unarchive_outlined,
+    selectedIcon: Icons.unarchive,
     screenKey: AppScreen.vanOperationsList,
   ),
 ];

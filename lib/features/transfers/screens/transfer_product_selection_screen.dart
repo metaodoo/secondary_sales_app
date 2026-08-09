@@ -73,21 +73,6 @@ class _TransferProductSelectionScreenState
     });
   }
 
-  void _changeQuantity(TransferProduct product, double delta) {
-    final line = _selectedLines[product.id];
-    if (line == null) return;
-    setState(() {
-      final next = line.quantity + delta;
-      if (next < 1) {
-        line.quantity = 1;
-      } else if (next > product.availableQty) {
-        line.quantity = product.availableQty;
-      } else {
-        line.quantity = next;
-      }
-    });
-  }
-
   void _finish() {
     if (_selectedLines.isEmpty) return;
     Navigator.pop(context, _selectedLines.values.toList());
@@ -171,12 +156,8 @@ class _TransferProductSelectionScreenState
                       final line = _selectedLines[product.id];
                       return _TransferProductCard(
                         product: product,
-                        quantity: line?.quantity ?? 1,
                         isSelected: line != null,
                         onTap: () => _toggleProduct(product),
-                        onDecrease: () => _changeQuantity(product, -1),
-                        onIncrease: () => _changeQuantity(product, 1),
-                        onQuantityInput: (newVal) => _changeQuantity(product, newVal - (line?.quantity ?? 1)),
                       );
                     }),
                 ],
@@ -192,21 +173,13 @@ class _TransferProductSelectionScreenState
 class _TransferProductCard extends StatelessWidget {
   const _TransferProductCard({
     required this.product,
-    required this.quantity,
     required this.isSelected,
     required this.onTap,
-    required this.onDecrease,
-    required this.onIncrease,
-    this.onQuantityInput,
   });
 
   final TransferProduct product;
-  final double quantity;
   final bool isSelected;
   final VoidCallback onTap;
-  final VoidCallback onDecrease;
-  final VoidCallback onIncrease;
-  final ValueChanged<double>? onQuantityInput;
 
   @override
   Widget build(BuildContext context) {
@@ -225,45 +198,58 @@ class _TransferProductCard extends StatelessWidget {
           ),
           borderRadius: BorderRadius.circular(10),
         ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+        child: Row(
           children: [
-            Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    product.name,
-                    style: const TextStyle(fontWeight: FontWeight.w800),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          product.name,
+                          style: const TextStyle(fontWeight: FontWeight.w800),
+                        ),
+                      ),
+                      if (product.requiresLots)
+                        const Icon(
+                          Icons.qr_code_2,
+                          color: AppColors.textSecondary,
+                        ),
+                    ],
                   ),
-                ),
-                if (product.requiresLots)
-                  const Icon(Icons.qr_code_2, color: AppColors.textSecondary),
-              ],
-            ),
-            const SizedBox(height: 6),
-            Text(
-              '${product.code ?? 'No code'} • ${product.uomName}',
-              style: const TextStyle(color: AppColors.textSecondary),
-            ),
-            const SizedBox(height: 6),
-            Text(
-              'Available: ${product.availableQty.toStringAsFixed(0)} ${product.uomName}',
-              style: const TextStyle(color: Color(0xFF16A34A)),
-            ),
-            if (isSelected) ...[
-              const SizedBox(height: 12),
-              SmallStepper(
-                value: quantity.toStringAsFixed(0),
-                onMinus: onDecrease,
-                onPlus: onIncrease,
-                onValueInput: (val) {
-                  final parsed = double.tryParse(val);
-                  if (parsed != null && onQuantityInput != null) {
-                    onQuantityInput!(parsed);
-                  }
-                },
+                  const SizedBox(height: 6),
+                  Text(
+                    '${product.code ?? 'No code'} • ${product.uomName}',
+                    style: const TextStyle(color: AppColors.textSecondary),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    'Available: ${product.availableQty.toStringAsFixed(0)} ${product.uomName}',
+                    style: const TextStyle(color: Color(0xFF16A34A)),
+                  ),
+                ],
               ),
-            ],
+            ),
+            const SizedBox(width: 12),
+            Container(
+              width: 24,
+              height: 24,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: isSelected ? const Color(0xFF2563EB) : Colors.white,
+                border: Border.all(
+                  color: isSelected
+                      ? const Color(0xFF2563EB)
+                      : AppColors.borderSoft,
+                  width: 2,
+                ),
+              ),
+              child: isSelected
+                  ? const Icon(Icons.check, color: Colors.white, size: 14)
+                  : null,
+            ),
           ],
         ),
       ),

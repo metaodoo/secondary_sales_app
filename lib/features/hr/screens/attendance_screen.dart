@@ -265,10 +265,25 @@ class _AttendanceScreenContentState extends State<_AttendanceScreenContent>
                               provider.performAction(isCheckedIn ? 'check_out' : 'check_in');
                             },
                       child: provider.isActionLoading
-                          ? const SizedBox(
-                              width: 20,
-                              height: 20,
-                              child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                          ? Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                const SizedBox(
+                                  width: 20,
+                                  height: 20,
+                                  child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                                ),
+                                if (provider.loadingMessage.isNotEmpty) ...[
+                                  const SizedBox(width: 10),
+                                  Flexible(
+                                    child: Text(
+                                      provider.loadingMessage,
+                                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                ],
+                              ],
                             )
                           : Text(isCheckedIn ? 'Check Out' : 'Check In', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
                     ),

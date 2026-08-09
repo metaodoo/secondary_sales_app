@@ -142,8 +142,12 @@ class MobileAuthUser {
       permissions: permsValue is Map
           ? MobileAuthPermissions.fromMap(permsValue.cast<String, dynamic>())
           : null,
-      employeeId: asIntOrNull(map['employee_id']),
-      employeeName: asNullableString(map['employee_name']),
+      employeeId: asIntOrNull(map['employee_id']) ??
+          (map['employee'] is Map ? asIntOrNull(map['employee']['id']) : null) ??
+          asIntOrNull(map['employeeId']),
+      employeeName: asNullableString(map['employee_name']) ??
+          (map['employee'] is Map ? asNullableString(map['employee']['name']) : null) ??
+          asNullableString(map['employeeName']),
     );
   }
 
@@ -164,7 +168,7 @@ class MobileAuthPermissions {
   const MobileAuthPermissions({
     this.canViewAllReturns = false,
     this.canEditSoQty = false,
-    this.canEditQcQty = false,
+    this.canEditWarehouseQty = false,
     this.canEditEffectiveQty = false,
     this.skipAttendanceGeolocation = false,
     this.canCreateOrderWithoutCheckin = false,
@@ -172,7 +176,7 @@ class MobileAuthPermissions {
 
   final bool canViewAllReturns;
   final bool canEditSoQty;
-  final bool canEditQcQty;
+  final bool canEditWarehouseQty;
   final bool canEditEffectiveQty;
   final bool skipAttendanceGeolocation;
   final bool canCreateOrderWithoutCheckin;
@@ -181,7 +185,7 @@ class MobileAuthPermissions {
     return MobileAuthPermissions(
       canViewAllReturns: map['can_view_all_returns'] == true,
       canEditSoQty: map['can_edit_so_qty'] == true,
-      canEditQcQty: map['can_edit_qc_qty'] == true,
+      canEditWarehouseQty: map['can_edit_warehouse_qty'] == true,
       canEditEffectiveQty: map['can_edit_effective_qty'] == true,
       skipAttendanceGeolocation: map['skip_attendance_geolocation'] == true,
       canCreateOrderWithoutCheckin: map['can_create_order_without_checkin'] == true,
@@ -192,7 +196,7 @@ class MobileAuthPermissions {
     return {
       'can_view_all_returns': canViewAllReturns,
       'can_edit_so_qty': canEditSoQty,
-      'can_edit_qc_qty': canEditQcQty,
+      'can_edit_warehouse_qty': canEditWarehouseQty,
       'can_edit_effective_qty': canEditEffectiveQty,
       'skip_attendance_geolocation': skipAttendanceGeolocation,
       'can_create_order_without_checkin': canCreateOrderWithoutCheckin,

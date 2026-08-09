@@ -106,6 +106,8 @@ class ScrapProvider with ChangeNotifier {
     int? distributorId,
     String? type,
     String? damageType,
+    String? attachmentBase64,
+    String? attachmentFilename,
   }) async {
     _loadingCount++;
     _error = null;
@@ -117,6 +119,8 @@ class ScrapProvider with ChangeNotifier {
         distributorId: distributorId,
         type: type,
         damageType: damageType,
+        attachmentBase64: attachmentBase64,
+        attachmentFilename: attachmentFilename,
       );
     } catch (e) {
       _error = e.toString();
@@ -174,14 +178,15 @@ class ScrapProvider with ChangeNotifier {
 
   Future<Map<String, dynamic>?> executeScrapAction(
     int scrapId,
-    String action,
-  ) async {
+    String action, {
+    String? type,
+  }) async {
     _loadingCount++;
     _error = null;
     notifyListeners();
 
     try {
-      return await _apiService.scrapAction(scrapId, action);
+      return await _apiService.scrapAction(scrapId, action, type: type);
     } catch (e) {
       _error = e.toString();
       return null;

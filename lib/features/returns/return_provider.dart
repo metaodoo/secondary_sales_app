@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:secondary_sales/data/api/api_service.dart';
+import 'package:secondary_sales/core/constants.dart';
 import 'package:secondary_sales/data/models/return_scrap_summary.dart';
 
 /// Owns the return-delivery flow (distributor -> company returns).
@@ -25,6 +26,7 @@ class ReturnProvider with ChangeNotifier {
     String? state,
     int? distributorId,
     String? type,
+    String endpoint = AppConstants.returnsEndpoint,
   }) async {
     _loadingCount++;
     _error = null;
@@ -38,6 +40,7 @@ class ReturnProvider with ChangeNotifier {
         state: state,
         distributorId: distributorId,
         type: type,
+        endpoint: endpoint,
       );
       final data = List<Map<String, dynamic>>.from(res['data'] ?? []);
       return data.map(ReturnScrapSummary.fromMap).toList();
@@ -50,13 +53,16 @@ class ReturnProvider with ChangeNotifier {
     }
   }
 
-  Future<Map<String, dynamic>?> prepareReturn({int? distributorId}) async {
+  Future<Map<String, dynamic>?> prepareReturn({
+    int? distributorId,
+    String endpoint = AppConstants.returnsEndpoint,
+  }) async {
     _loadingCount++;
     _error = null;
     notifyListeners();
 
     try {
-      return await _apiService.prepareReturn(distributorId: distributorId);
+      return await _apiService.prepareReturn(distributorId: distributorId, endpoint: endpoint);
     } catch (e) {
       _error = e.toString();
       return null;
@@ -69,6 +75,7 @@ class ReturnProvider with ChangeNotifier {
   Future<List<Map<String, dynamic>>> fetchReturnProducts({
     String? search,
     int? distributorId,
+    String endpoint = AppConstants.returnsEndpoint,
   }) async {
     _loadingCount++;
     _error = null;
@@ -78,6 +85,7 @@ class ReturnProvider with ChangeNotifier {
       return await _apiService.getReturnProducts(
         search: search,
         distributorId: distributorId,
+        endpoint: endpoint,
       );
     } catch (e) {
       _error = e.toString();
@@ -91,6 +99,7 @@ class ReturnProvider with ChangeNotifier {
   Future<Map<String, dynamic>?> fetchReturnProductLots(
     int productId, {
     int? distributorId,
+    String endpoint = AppConstants.returnsEndpoint,
   }) async {
     _error = null;
     notifyListeners();
@@ -99,6 +108,7 @@ class ReturnProvider with ChangeNotifier {
       return await _apiService.getReturnProductLots(
         productId,
         distributorId: distributorId,
+        endpoint: endpoint,
       );
     } catch (e) {
       _error = e.toString();
@@ -113,6 +123,9 @@ class ReturnProvider with ChangeNotifier {
     String? type,
     String? challanNumber,
     String? damageType,
+    String? attachmentBase64,
+    String? attachmentFilename,
+    String endpoint = AppConstants.returnsEndpoint,
   }) async {
     _loadingCount++;
     _error = null;
@@ -125,6 +138,9 @@ class ReturnProvider with ChangeNotifier {
         type: type,
         challanNumber: challanNumber,
         damageType: damageType,
+        attachmentBase64: attachmentBase64,
+        attachmentFilename: attachmentFilename,
+        endpoint: endpoint,
       );
     } catch (e) {
       _error = e.toString();
@@ -138,13 +154,14 @@ class ReturnProvider with ChangeNotifier {
   Future<Map<String, dynamic>?> getReturnDetails(
     int returnId, {
     String? type,
+    String endpoint = AppConstants.returnsEndpoint,
   }) async {
     _loadingCount++;
     _error = null;
     notifyListeners();
 
     try {
-      return await _apiService.getReturnDetails(returnId, type: type);
+      return await _apiService.getReturnDetails(returnId, type: type, endpoint: endpoint);
     } catch (e) {
       _error = e.toString();
       return null;
@@ -160,6 +177,7 @@ class ReturnProvider with ChangeNotifier {
     String? type,
     String? challanNumber,
     String? damageType,
+    String endpoint = AppConstants.returnsEndpoint,
   }) async {
     _loadingCount++;
     _error = null;
@@ -172,6 +190,7 @@ class ReturnProvider with ChangeNotifier {
         type: type,
         challanNumber: challanNumber,
         damageType: damageType,
+        endpoint: endpoint,
       );
     } catch (e) {
       _error = e.toString();
@@ -184,14 +203,16 @@ class ReturnProvider with ChangeNotifier {
 
   Future<Map<String, dynamic>?> executeReturnAction(
     int returnId,
-    String action,
-  ) async {
+    String action, {
+    String? type,
+    String endpoint = AppConstants.returnsEndpoint,
+  }) async {
     _loadingCount++;
     _error = null;
     notifyListeners();
 
     try {
-      return await _apiService.returnAction(returnId, action);
+      return await _apiService.returnAction(returnId, action, type: type, endpoint: endpoint);
     } catch (e) {
       _error = e.toString();
       return null;

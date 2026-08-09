@@ -1,6 +1,9 @@
 import 'dart:async';
+import 'dart:convert';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/scheduler.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:secondary_sales/core/services/location_tracking_service.dart';
 import 'package:secondary_sales/data/api/api_service.dart';
 import 'package:secondary_sales/features/auth/auth_provider.dart';
@@ -12,6 +15,7 @@ class AttendanceProvider extends ChangeNotifier {
   bool _isLoadingStatus = false;
   bool _isLoadingHistory = false;
   bool _isActionLoading = false;
+  String _loadingMessage = '';
   
   bool _isCheckedIn = false;
   String? _activeCheckInTime;
@@ -27,6 +31,7 @@ class AttendanceProvider extends ChangeNotifier {
   bool get isLoadingStatus => _isLoadingStatus;
   bool get isLoadingHistory => _isLoadingHistory;
   bool get isActionLoading => _isActionLoading;
+  String get loadingMessage => _loadingMessage;
   bool get isCheckedIn => _isCheckedIn;
   String? get activeCheckInTime => _activeCheckInTime;
   String? get activeCheckInAddress => _activeCheckInAddress;
@@ -37,14 +42,36 @@ class AttendanceProvider extends ChangeNotifier {
   /// immediately). The dashboard hero creates an action-only instance with
   /// `autoLoad: false` so it can reuse [performAction] (GPS + geofence) for a
   /// one-tap check-in without firing the initial status/history requests.
-  AttendanceProvider(this._authProvider, {bool autoLoad = true}) {
+  AttendanceProvider(this._authProvider, {bool autoLoad = true})
+      : _autoLoad = autoLoad {
     _apiService.updateAccessToken(_authProvider.accessToken);
     _apiService.updateSessionId(_authProvider.sessionId);
     _apiService.updateEmployeeId(_authProvider.employeeId);
-    if (autoLoad) {
+    if (_autoLoad) {
+      _loadForEmployeeIfNeeded();
+    }
+  }
+
+  final bool _autoLoad;
+  int _loadedForEmployeeId = 0;
+
+  /// Loads status and history once per employee.
+  ///
+  /// The constructor runs before `restoreSession()` finishes, when
+  /// `_employeeId` is still 0 and both loads silently no-op. Routing the
+  /// constructor and [updateAuth] through here means the load actually happens
+  /// once the session arrives, instead of never.
+  void _loadForEmployeeIfNeeded({int? employeeId}) {
+    final currentEmpId = employeeId ?? _employeeId;
+    if (currentEmpId == 0 || currentEmpId == _loadedForEmployeeId) return;
+    _loadedForEmployeeId = currentEmpId;
+
+    // ProxyProvider.update() runs during build and _loadStatus() calls
+    // notifyListeners() before its first await.
+    SchedulerBinding.instance.addPostFrameCallback((_) {
       _loadStatus();
       _loadHistory();
-    }
+    });
   }
 
   @override
@@ -60,7 +87,16 @@ class AttendanceProvider extends ChangeNotifier {
     await _loadHistory();
   }
 
-  int get _employeeId => _authProvider.user?.employeeId ?? 0;
+  void updateAuth({String? accessToken, String? sessionId, int? employeeId}) {
+    _apiService.updateAccessToken(accessToken ?? _authProvider.accessToken);
+    _apiService.updateSessionId(sessionId ?? _authProvider.sessionId);
+    _apiService.updateEmployeeId(employeeId ?? _authProvider.employeeId);
+    if (_autoLoad) {
+      _loadForEmployeeIfNeeded(employeeId: employeeId);
+    }
+  }
+
+  int get _employeeId => _authProvider.user?.employeeId ?? _authProvider.employeeId ?? 0;
 
   void clearError() {
     _errorMessage = null;
@@ -172,23 +208,65 @@ class AttendanceProvider extends ChangeNotifier {
     if (_employeeId == 0) return false;
     _isActionLoading = true;
     _errorMessage = null;
+    _loadingMessage = action == 'check_in' ? 'Opening camera for selfie...' : 'Processing check-out...';
     notifyListeners();
 
     try {
+      String? checkInImageBase64;
+      if (action == 'check_in') {
+        try {
+          final picker = ImagePicker();
+          final XFile? photo = await picker.pickImage(
+            source: ImageSource.camera,
+            preferredCameraDevice: CameraDevice.front,
+            maxWidth: 1024,
+            maxHeight: 1024,
+            imageQuality: 70,
+          );
+
+          if (photo == null) {
+            _errorMessage = 'Selfie photo is required for attendance check-in.';
+            _isActionLoading = false;
+            _loadingMessage = '';
+            notifyListeners();
+            return false;
+          }
+
+          _loadingMessage = 'Processing photo & fetching GPS...';
+          notifyListeners();
+
+          final bytes = await photo.readAsBytes();
+          checkInImageBase64 = base64Encode(bytes);
+        } catch (e) {
+          debugPrint('Error capturing photo: $e');
+          _errorMessage = 'Failed to capture selfie photo: ${e.toString().replaceAll("Exception: ", "")}';
+          _isActionLoading = false;
+          _loadingMessage = '';
+          notifyListeners();
+          return false;
+        }
+      }
+
       // 1. Get GPS Location
+      _loadingMessage = 'Fetching GPS location...';
+      notifyListeners();
       final position = await _getCurrentLocation();
       if (position == null) {
         _isActionLoading = false;
+        _loadingMessage = '';
         notifyListeners();
         return false;
       }
 
       // 2. Call API
+      _loadingMessage = 'Submitting attendance to server...';
+      notifyListeners();
       final response = await _apiService.submitAttendanceAction(
         employeeId: _employeeId,
         action: action,
         latitude: position.latitude,
         longitude: position.longitude,
+        checkInImage: checkInImageBase64,
       );
 
       if (response['success'] == true) {
@@ -212,6 +290,7 @@ class AttendanceProvider extends ChangeNotifier {
       return false;
     } finally {
       _isActionLoading = false;
+      _loadingMessage = '';
       notifyListeners();
     }
   }

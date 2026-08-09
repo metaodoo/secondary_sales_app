@@ -31,8 +31,8 @@ class DistributionHub {
   factory DistributionHub.fromMap(Map<String, dynamic> map) {
     return DistributionHub(
       id: asInt(map['id']),
-      name: map['name'] ?? '',
-      code: map['code'],
+      name: map['display_name'] ?? map['name'] ?? '',
+      code: map['code'] ?? map['ss_code'],
       address: _buildAddress(map),
       street: map['street'],
       street2: map['street2'],

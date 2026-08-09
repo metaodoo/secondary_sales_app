@@ -61,8 +61,13 @@ class _CreateOutletScreenState extends State<CreateOutletScreen> {
         _capturedPhoto = File(photo.path);
       });
 
-      // Get precise GPS coordinates at the moment of capture
-      final position = await LocationService.getCurrentPosition();
+      // Get precise GPS coordinates at the moment of capture. This position
+      // becomes the outlet's permanent geofence centre, so a stale cached fix
+      // here would break every future check-in at this outlet.
+      final position = await LocationService.getCurrentPosition(
+        requireFresh: true,
+        timeLimit: const Duration(seconds: 15),
+      );
       _capturedLatitude = position.latitude;
       _capturedLongitude = position.longitude;
 

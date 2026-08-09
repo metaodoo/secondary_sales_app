@@ -210,8 +210,19 @@ class ExpenseProvider extends ChangeNotifier {
     String? title,
     String? description,
     required List<Map<String, dynamic>> expenses,
+    String? attachment,
+    String? attachmentName,
   }) async {
-    if (_employeeId == 0) return false;
+    _apiService.updateAccessToken(_authProvider.accessToken);
+    _apiService.updateSessionId(_authProvider.sessionId);
+    _apiService.updateEmployeeId(_authProvider.employeeId);
+
+    if (_employeeId == 0) {
+      _requestError = 'Your user account is not linked to an active employee record.';
+      notifyListeners();
+      return false;
+    }
+
     _isSubmitting = true;
     _errorMessage = null;
     _requestError = null;
@@ -223,6 +234,8 @@ class ExpenseProvider extends ChangeNotifier {
         title: title,
         description: description,
         expenses: expenses,
+        attachment: attachment,
+        attachmentName: attachmentName,
       );
 
       if (response['success'] == true) {

@@ -3,6 +3,19 @@ part of '../api_service.dart';
 
 /// Visits endpoints for the secondary sales API.
 extension VisitsApi on ApiService {
+  Future<List<VisitReason>> getVisitReasons() async {
+    final params = <String, dynamic>{'employee_id': _activeEmployeeId};
+    final result = await _post(
+      '${AppConstants.apiPrefix}/visit-reasons',
+      params,
+    );
+    if (result['success'] == true) {
+      final List<dynamic> data = result['reasons'] ?? result['data'] ?? [];
+      return data.map((json) => VisitReason.fromMap(asMap(json))).toList();
+    }
+    throw Exception(result['message'] ?? 'Failed to fetch visit reasons');
+  }
+
   Future<Map<String, dynamic>> createVisit(
     int employeeId,
     int outletId, {
@@ -34,6 +47,9 @@ extension VisitsApi on ApiService {
     String? checkOutTime,
     String? visitType,
     int? visitedWithId,
+    int? visitReasonId,
+    String? reasonNotes,
+    double? saleAmount,
   }) async {
     final params = <String, dynamic>{'employee_id': _activeEmployeeId};
     if (checkOutTime != null) {
@@ -44,6 +60,15 @@ extension VisitsApi on ApiService {
     }
     if (visitedWithId != null) {
       params['visited_with_id'] = visitedWithId;
+    }
+    if (visitReasonId != null) {
+      params['visit_reason_id'] = visitReasonId;
+    }
+    if (reasonNotes != null) {
+      params['reason_notes'] = reasonNotes;
+    }
+    if (saleAmount != null) {
+      params['sale_amount'] = saleAmount;
     }
 
     final result = await _post(

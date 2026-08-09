@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:secondary_sales/core/theme/app_theme.dart';
 import 'package:provider/provider.dart';
 import 'package:secondary_sales/features/routes/route_provider.dart';
+import 'package:secondary_sales/data/models/routes/visit_reason.dart';
+import 'package:secondary_sales/features/routes/screens/visit_reason_dialog.dart';
 import 'package:secondary_sales/data/models/routes/route.dart';
 import 'package:secondary_sales/features/routes/screens/customer_action_bottom_sheet.dart';
 import 'package:secondary_sales/features/routes/screens/create_outlet_screen.dart';
@@ -307,64 +309,105 @@ class _OfficerCustomerSelectionScreenState
                                   ),
                                   const SizedBox(width: 12),
                                   if (isCheckedIn) ...[
-                                    ElevatedButton(
+                                    ElevatedButton.icon(
                                       onPressed: () async {
-                                        try {
-                                          await routeProv.checkOut();
-                                          if (context.mounted) {
-                                            ScaffoldMessenger.of(
-                                              context,
-                                            ).showSnackBar(
-                                              const SnackBar(
-                                                content: Text(
-                                                  'Checked out successfully',
-                                                ),
+                                        final bool?
+                                        confirm = await showDialog<bool>(
+                                          context: context,
+                                          builder: (ctx) => AlertDialog(
+                                            title: const Text(
+                                              'Confirm Check Out',
+                                            ),
+                                            content: Text(
+                                              'Are you sure you want to check out from ${outlet.name}?',
+                                            ),
+                                            actions: [
+                                              TextButton(
+                                                onPressed: () =>
+                                                    Navigator.pop(ctx, false),
+                                                child: const Text('Cancel'),
                                               ),
-                                            );
+                                              ElevatedButton(
+                                                onPressed: () =>
+                                                    Navigator.pop(ctx, true),
+                                                style: ElevatedButton.styleFrom(
+                                                  backgroundColor: const Color(
+                                                    0xFFDC2626,
+                                                  ),
+                                                ),
+                                                child: const Text('Check Out'),
+                                              ),
+                                            ],
+                                          ),
+                                        );
+                                        if (confirm == true) {
+                                          // A visit that produced no order has
+                                          // to be explained; the server rejects
+                                          // the check-out otherwise.
+                                          VisitReasonSelection? selection;
+                                          if (routeProv.requiresVisitReason) {
+                                            if (!context.mounted) return;
+                                            selection =
+                                                await VisitReasonDialog.show(
+                                                  context,
+                                                );
+                                            if (selection == null) return;
                                           }
-                                        } catch (e) {
-                                          if (context.mounted) {
-                                            ScaffoldMessenger.of(
-                                              context,
-                                            ).showSnackBar(
-                                              SnackBar(
-                                                content: Text(
-                                                  'Checkout failed: $e',
-                                                ),
-                                              ),
+                                          try {
+                                            await routeProv.checkOut(
+                                              visitReasonId:
+                                                  selection?.reasonId,
+                                              reasonNotes: selection?.notes,
+                                              saleAmount: selection?.saleAmount,
                                             );
+                                          } catch (e) {
+                                            if (context.mounted) {
+                                              ScaffoldMessenger.of(
+                                                context,
+                                              ).showSnackBar(
+                                                SnackBar(
+                                                  content: Text(
+                                                    'Check-out failed: ${e.toString().replaceAll('Exception: ', '')}',
+                                                  ),
+                                                ),
+                                              );
+                                            }
                                           }
                                         }
                                       },
-                                      style: ElevatedButton.styleFrom(
-                                        backgroundColor: const Color(
-                                          0xFFEF4444,
-                                        ),
-                                        foregroundColor: Colors.white,
-                                        padding: const EdgeInsets.symmetric(
-                                          horizontal: 16,
-                                          vertical: 8,
-                                        ),
-                                        minimumSize: Size.zero,
-                                        tapTargetSize:
-                                            MaterialTapTargetSize.shrinkWrap,
-                                        elevation: 0,
-                                        shape: RoundedRectangleBorder(
-                                          borderRadius: BorderRadius.circular(
-                                            20,
-                                          ),
-                                        ),
+                                      icon: const Icon(
+                                        Icons.logout_rounded,
+                                        size: 14,
                                       ),
-                                      child: const Text(
+                                      label: const Text(
                                         'Check Out',
                                         style: TextStyle(
                                           fontSize: 12,
-                                          fontWeight: FontWeight.bold,
+                                          fontWeight: FontWeight.w700,
+                                        ),
+                                      ),
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: const Color(
+                                          0xFFDC2626,
+                                        ),
+                                        foregroundColor: Colors.white,
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 14,
+                                          vertical: 8,
+                                        ),
+                                        elevation: 2,
+                                        shadowColor: const Color(
+                                          0xFFDC2626,
+                                        ).withOpacity(0.3),
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius: BorderRadius.circular(
+                                            10,
+                                          ),
                                         ),
                                       ),
                                     ),
                                   ] else ...[
-                                    ElevatedButton(
+                                    ElevatedButton.icon(
                                       onPressed: () async {
                                         if (employeeId == null) return;
                                         if (routeProv.checkedInOutletId !=
@@ -385,42 +428,52 @@ class _OfficerCustomerSelectionScreenState
                                             employeeId,
                                             outlet.id,
                                           );
-                                          _openActionModalFor(
-                                            outlet.id,
-                                            outlet.name,
-                                          );
+                                          if (context.mounted) {
+                                            _openActionModalFor(
+                                              outlet.id,
+                                              outlet.name,
+                                            );
+                                          }
                                         } catch (e) {
                                           if (context.mounted) {
                                             ssShowLocationErrorDialog(
                                               context,
-                                              e.toString().replaceAll('Exception: ', ''),
+                                              e.toString().replaceAll(
+                                                'Exception: ',
+                                                '',
+                                              ),
                                             );
                                           }
                                         }
                                       },
-                                      style: ElevatedButton.styleFrom(
-                                        backgroundColor:
-                                            AppColors.primaryStrong,
-                                        foregroundColor: Colors.white,
-                                        padding: const EdgeInsets.symmetric(
-                                          horizontal: 16,
-                                          vertical: 8,
-                                        ),
-                                        minimumSize: Size.zero,
-                                        tapTargetSize:
-                                            MaterialTapTargetSize.shrinkWrap,
-                                        elevation: 0,
-                                        shape: RoundedRectangleBorder(
-                                          borderRadius: BorderRadius.circular(
-                                            20,
-                                          ),
-                                        ),
+                                      icon: const Icon(
+                                        Icons.location_on_rounded,
+                                        size: 14,
                                       ),
-                                      child: const Text(
+                                      label: const Text(
                                         'Check In',
                                         style: TextStyle(
                                           fontSize: 12,
-                                          fontWeight: FontWeight.bold,
+                                          fontWeight: FontWeight.w700,
+                                        ),
+                                      ),
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: const Color(
+                                          0xFF059669,
+                                        ),
+                                        foregroundColor: Colors.white,
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 14,
+                                          vertical: 8,
+                                        ),
+                                        elevation: 2,
+                                        shadowColor: const Color(
+                                          0xFF059669,
+                                        ).withOpacity(0.35),
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius: BorderRadius.circular(
+                                            10,
+                                          ),
                                         ),
                                       ),
                                     ),

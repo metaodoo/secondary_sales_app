@@ -10,13 +10,17 @@ class ReturnScrapSummary {
     required this.state,
     this.origin,
     this.scheduledDate,
+    this.returnBookNumber,
+    this.returnBookPage,
   });
 
   final int id;
   final String name;
   final String state;
   final String? origin;
-  final String? scheduledDate;
+  final DateTime? scheduledDate;
+  final String? returnBookNumber;
+  final String? returnBookPage;
 
   factory ReturnScrapSummary.fromMap(Map<String, dynamic> map) {
     return ReturnScrapSummary(
@@ -24,7 +28,9 @@ class ReturnScrapSummary {
       name: asNullableString(map['name']) ?? '',
       state: asNullableString(map['state']) ?? '',
       origin: asNullableString(map['origin']),
-      scheduledDate: asNullableString(map['scheduled_date']),
+      scheduledDate: asDateTime(map['scheduled_date']),
+      returnBookNumber: asNullableString(map['return_book_number']),
+      returnBookPage: asNullableString(map['return_book_page']),
     );
   }
 }

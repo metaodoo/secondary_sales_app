@@ -1,4 +1,5 @@
 import 'package:secondary_sales/core/util/parse.dart';
+
 class Product {
   final int id;
   final String name;
@@ -7,6 +8,7 @@ class Product {
   final String? uom;
   final double? stock;
   final double? distributorStock;
+  final String? nearestExpiry;
 
   Product({
     required this.id,
@@ -16,6 +18,7 @@ class Product {
     this.uom,
     this.stock,
     this.distributorStock,
+    this.nearestExpiry,
   });
 
   factory Product.fromMap(Map<String, dynamic> map) {
@@ -27,6 +30,7 @@ class Product {
       uom: map['uom_name'] ?? map['uom']?['name'] ?? 'Unit',
       stock: _nullableDouble(map['qty_available'] ?? map['stock']),
       distributorStock: _nullableDouble(map['distributor_qty_available']),
+      nearestExpiry: map['nearest_expiry'],
     );
   }
 
@@ -34,4 +38,11 @@ class Product {
     if (value == null) return null;
     return asDouble(value);
   }
+}
+
+class ProductsResponse {
+  final List<Product> products;
+  final int totalCount;
+
+  ProductsResponse({required this.products, required this.totalCount});
 }
