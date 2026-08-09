@@ -110,13 +110,50 @@ base64 -w0 android/app/upload-keystore.jks
 Read the passwords out of `android/key.properties` — that file is gitignored and
 exists only on the machine where the key was generated.
 
+Notes that save a debugging session later:
+
+- Secret **names are case-sensitive** and must match the workflow exactly. A
+  typo'd name is not an error at save time — the workflow simply reads an empty
+  value and fails mid-run.
+- Use **Repository secrets**, not *Environment* secrets. Environment secrets only
+  resolve for a job that declares an `environment:` key, which this workflow does
+  not.
+- `ANDROID_KEYSTORE_BASE64` is a single unbroken line (~3,660 chars). Editors
+  soft-wrap it; that is cosmetic, but select it with `Home` then `Shift+End`
+  rather than dragging across the wrapped display, which can introduce real
+  newlines. A corrupted blob fails at `base64 -d` in the *Restore release
+  keystore* step.
+
 ### 3.2 Firebase service account
 
+Use a **dedicated** service account, not the auto-created `firebase-adminsdk`
+one. The Admin SDK account carries broad project access (Realtime Database, Auth,
+Firestore); this key lives in CI, so it should only be able to publish builds.
+It also isn't guaranteed to hold App Distribution permissions, so reusing it
+saves no steps.
+
 1. [Google Cloud Console → Service Accounts](https://console.cloud.google.com/iam-admin/serviceaccounts?project=secondary-sales-6ec10)
-2. **Create service account**, e.g. `github-app-distribution`.
-3. Grant the role **Firebase App Distribution Admin**.
-4. **Keys → Add key → JSON**, download it.
-5. Paste the entire file contents into the `FIREBASE_SERVICE_ACCOUNT` secret.
+2. **+ Create service account** → name `github-app-distribution` →
+   **Create and continue**.
+3. Role: **Firebase App Distribution Admin** → **Continue**.
+4. Step 3 ("Principals with access") is for letting *other humans* impersonate
+   the account. Leave both fields blank → **Done**.
+5. **Verify the role actually landed.** The step-2 checkmark only means you
+   passed through the step, not that a role was chosen. Open **IAM** in the
+   sidebar and confirm `github-app-distribution@secondary-sales-6ec10.iam.gserviceaccount.com`
+   lists **Firebase App Distribution Admin**. If the account is absent from the
+   IAM page entirely, no project role was granted — fix with **Grant access**
+   before going further. A missing role surfaces much later as a 403 /
+   `Request had insufficient authentication scopes` at the upload step.
+6. Creating the account does **not** create a key — a fresh account correctly
+   shows "No keys". Click the account's email → **Keys** → **Add key** →
+   **Create new key** → **JSON** → **Create**.
+7. Paste the entire downloaded file — `{` through `}`, nothing trimmed or
+   reformatted — into the `FIREBASE_SERVICE_ACCOUNT` secret, then delete the
+   download (see §4).
+
+If key creation is refused by policy, the `iam.disableServiceAccountKeyCreation`
+organization policy is blocking it.
 
 ### 3.3 Tester group
 
@@ -151,6 +188,23 @@ every tester must uninstall and reinstall from scratch.
 
 Store a copy in the team password manager, together with its passwords, before
 doing anything else.
+
+The service-account JSON needs the **opposite** treatment — delete your local
+copy once it is in the `FIREBASE_SERVICE_ACCOUNT` secret:
+
+```bash
+rm ~/Downloads/secondary-sales-6ec10-*.json
+```
+
+Google keeps only the public half of that key pair, so there is no re-download.
+That sounds like a reason to hoard it; it isn't. A leftover copy in `~/Downloads`
+is just a loose credential, and replacing a lost or exposed key takes about
+thirty seconds: Service Accounts → `github-app-distribution` → **Keys** → delete
+the old key (revokes it immediately) → **Add key → Create new key → JSON** →
+update the secret. No rebuild needed; the next run picks it up.
+
+Rotate on any suspected exposure — a key pasted into a chat window, a terminal,
+a screenshot, or a shared log. Unlike the keystore, this costs you nothing.
 
 ---
 
