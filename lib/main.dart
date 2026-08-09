@@ -21,6 +21,7 @@ import 'package:secondary_sales/features/dashboard/screens/home_dashboard_screen
 import 'package:secondary_sales/data/api/api_service.dart';
 import 'package:secondary_sales/core/services/push_notification_service.dart';
 import 'package:secondary_sales/core/services/location_tracking_service.dart';
+import 'package:secondary_sales/core/services/app_update_service.dart';
 
 final GlobalKey<NavigatorState> appNavigatorKey = GlobalKey<NavigatorState>();
 
@@ -243,8 +244,26 @@ Future<void> main() async {
   );
 }
 
-class MyApp extends StatelessWidget {
+class MyApp extends StatefulWidget {
   const MyApp({super.key});
+
+  @override
+  State<MyApp> createState() => _MyAppState();
+}
+
+class _MyAppState extends State<MyApp> {
+  @override
+  void initState() {
+    super.initState();
+    // Ask Firebase App Distribution whether a newer build exists and, if so, let
+    // it prompt the rep to update. Deferred to after the first frame so the
+    // native dialog has a rendered app behind it rather than a blank window, and
+    // unawaited so a slow network call never delays startup. No-ops in debug and
+    // on non-Android.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      unawaited(AppUpdateService.checkForUpdate());
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
