@@ -39,11 +39,16 @@ jobs:
           # the default single-commit fetch.
           fetch-depth: 20
 
-      - name: Set up JDK 17
+      - name: Set up JDK 21
         uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: '17'
+          # 21, not 17: the maplibre_gl plugin pins sourceCompatibility to
+          # VERSION_21, so a JDK 17 toolchain fails with "invalid source
+          # release: 21". A 21 JDK still compiles this app's own modules at
+          # their declared 17 target. Locally this is masked by Android
+          # Studio's bundled JBR, which is already 21.
+          java-version: '21'
 
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
@@ -92,7 +97,16 @@ jobs:
         # versionCode needs: App Distribution only offers an update when the new
         # build's versionCode is higher than the installed one. The version NAME
         # still comes from pubspec.yaml — bump that by hand for a real release.
-        run: flutter build apk --release --build-number=${{ github.run_number }}
+        #
+        # --target-platform android-arm64 builds one ABI instead of the default
+        # universal APK's three (armeabi-v7a, arm64-v8a, x86_64). That drops the
+        # artifact from ~87 MB to ~32 MB and skips two of the three AOT
+        # compilations. The cost: 32-bit-only phones and x86_64 emulators cannot
+        # install it. Add ,android-arm to cover 32-bit devices again.
+        run: |
+          flutter build apk --release \
+            --build-number=${{ github.run_number }} \
+            --target-platform android-arm64
 
       - name: Compose release notes
         run: |
