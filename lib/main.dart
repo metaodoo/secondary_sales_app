@@ -261,7 +261,7 @@ class _MyAppState extends State<MyApp> {
     // unawaited so a slow network call never delays startup. No-ops in debug and
     // on non-Android.
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      unawaited(AppUpdateService.checkForUpdate());
+      unawaited(AppUpdateService.checkForUpdate(navigatorKey: appNavigatorKey));
     });
   }
 
