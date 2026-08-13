@@ -1,4 +1,5 @@
 import 'package:secondary_sales/core/util/parse.dart';
+import 'package:secondary_sales/core/widgets/ss_ui.dart';
 import 'package:secondary_sales/data/models/inventory/warehouse.dart';
 
 class SaleOrderDetail {
@@ -7,6 +8,7 @@ class SaleOrderDetail {
     required this.name,
     required this.state,
     required this.dateOrder,
+    this.dateTimeOrder,
     this.expectedDeliveryDate,
     this.distributor,
     this.warehouse,
@@ -22,6 +24,7 @@ class SaleOrderDetail {
   final String name;
   final String state;
   final String dateOrder;
+  final DateTime? dateTimeOrder;
   final String? expectedDeliveryDate;
   final OrderPartner? distributor;
   final Warehouse? warehouse;
@@ -35,11 +38,16 @@ class SaleOrderDetail {
   factory SaleOrderDetail.fromMap(Map<String, dynamic> map) {
     final distributor = map['distributor'];
     final warehouseMap = map['warehouse'];
+    final dtOrder = asDateTime(map['date_order']);
+    final formattedDateOrder = dtOrder != null
+        ? ssFormatDateTime(dtOrder)
+        : (map['date_order'] ?? '').toString();
     return SaleOrderDetail(
       id: asInt(map['id']),
       name: (map['name'] ?? '').toString(),
       state: (map['state'] ?? '').toString(),
-      dateOrder: (map['date_order'] ?? '').toString(),
+      dateTimeOrder: dtOrder,
+      dateOrder: formattedDateOrder,
       expectedDeliveryDate: asNullableString(map['expected_delivery_date']),
       distributor: distributor is Map
           ? OrderPartner.fromMap(distributor.cast<String, dynamic>())

@@ -47,6 +47,19 @@ class AuthProvider with ChangeNotifier {
   String get baseUrl => AppConstants.baseUrl;
   String get dbName => AppConstants.dbName;
 
+  Map<String, String> get authHeaders {
+    final sId = sessionId;
+    final token = accessToken;
+    final db = dbName;
+    return {
+      if (db.isNotEmpty) 'X-Odoo-Database': db,
+      if (db.isNotEmpty) 'X-Odoo-Db': db,
+      if (db.isNotEmpty) 'X-Openerp-Database': db,
+      if (sId != null && sId.isNotEmpty) 'Cookie': 'session_id=$sId',
+      if (token != null && token.isNotEmpty) 'Authorization': 'Bearer $token',
+    };
+  }
+
   /// Legacy "is manager/TSM (not a Sales Officer)" rule. Used as the fallback
   /// for module gates until the matching screen key is enforced server-side.
   bool get _legacyManagerAccess {
@@ -102,6 +115,17 @@ class AuthProvider with ChangeNotifier {
     AppAction.returnsEditEffectiveQty,
     user?.permissions?.canEditEffectiveQty ?? false,
   );
+
+  /// Sales-operation permission over the QC saleable/non-saleable pair on a
+  /// fresh return's transit leg.
+  ///
+  /// There is no `can_edit_qc_qty` group flag on the backend -- group booleans
+  /// are the pre-catalog mechanism and a new permission should not revive them.
+  /// So the fallback is the effective-qty flag, which identifies the same
+  /// sales-operation role, and it applies only until the catalog sync makes
+  /// [AppAction.returnsEditQcQty] enforced.
+  bool get canEditQcQty =>
+      _enforcedOr(AppAction.returnsEditQcQty, canEditEffectiveQty);
   bool get canSkipAttendanceGeo => _enforcedOr(
     AppAction.attendanceSkipGeo,
     user?.permissions?.skipAttendanceGeolocation ?? false,
@@ -297,7 +321,8 @@ class AuthProvider with ChangeNotifier {
     } catch (e) {
       _error = e.toString();
       final errStr = e.toString().toLowerCase();
-      final isNetworkError = e is SocketException ||
+      final isNetworkError =
+          e is SocketException ||
           e is TimeoutException ||
           errStr.contains('socketexception') ||
           errStr.contains('timeoutexception') ||
@@ -306,8 +331,10 @@ class AuthProvider with ChangeNotifier {
           errStr.contains('unreachable') ||
           errStr.contains('network') ||
           errStr.contains('handshake') ||
-          errStr.contains('http 5'); // server errors (502, 503, 504) are temporary
-      
+          errStr.contains(
+            'http 5',
+          ); // server errors (502, 503, 504) are temporary
+
       if (!isNetworkError) {
         await logout(callServer: false); // logout() notifies.
         return false;

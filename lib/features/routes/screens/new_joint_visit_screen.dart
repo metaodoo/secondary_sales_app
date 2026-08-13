@@ -8,12 +8,14 @@ import 'package:secondary_sales/data/models/employees/sales_employee.dart';
 class NewJointVisitScreen extends StatefulWidget {
   final int outletId;
   final String outletName;
+  final int? routeId;
   final int? currentVisitId;
 
   const NewJointVisitScreen({
     super.key,
     required this.outletId,
     required this.outletName,
+    this.routeId,
     this.currentVisitId,
   });
 
@@ -40,7 +42,10 @@ class _NewJointVisitScreenState extends State<NewJointVisitScreen> {
     _apiService.updateEmployeeId(auth.employeeId);
 
     try {
-      final officers = await _apiService.getSubordinateOfficers();
+      final officers = await _apiService.getSubordinateOfficers(
+        routeId: widget.routeId,
+        outletId: widget.outletId,
+      );
       setState(() {
         _officers = officers;
       });

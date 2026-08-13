@@ -7,6 +7,7 @@ import 'package:secondary_sales/features/transfers/transfer_provider.dart';
 import 'package:secondary_sales/core/widgets/ss_ui.dart';
 import 'package:secondary_sales/core/access/permission_gate.dart';
 import 'package:secondary_sales/core/access/access_resources.dart';
+import 'package:secondary_sales/features/auth/auth_provider.dart';
 import 'package:secondary_sales/features/van_loading/screens/van_load_form_screen.dart';
 
 class VirtualTransferDetailScreen extends StatefulWidget {
@@ -307,6 +308,15 @@ class _VirtualTransferDetailScreenState
                             ],
                           ),
                         ),
+                        if (transfer.attachments.isNotEmpty)
+                          _buildAttachmentsCard(
+                            transfer.attachments,
+                            'Photo Evidence (Main Transfer)',
+                          ),
+                        if (transfer.generatedTransfers.isNotEmpty)
+                          _buildGeneratedTransfersCard(
+                            transfer.generatedTransfers,
+                          ),
                         const SizedBox(height: 16),
                         const Text(
                           'Products',
@@ -392,6 +402,247 @@ class _VirtualTransferDetailScreenState
                   ),
                 );
               },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAttachmentsCard(
+    List<TransferAttachment> attachments,
+    String title,
+  ) {
+    final imageAtts = attachments.where((a) => a.isImage).toList();
+    if (imageAtts.isEmpty) return const SizedBox.shrink();
+
+    // Select the latest uploaded attachment (highest ID)
+    final latestAtt = imageAtts.reduce((a, b) => a.id > b.id ? a : b);
+
+    return Container(
+      margin: const EdgeInsets.only(top: 16),
+      padding: const EdgeInsets.all(16),
+      decoration: ssPanelDecoration(),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(
+                Icons.photo_library_outlined,
+                size: 18,
+                color: AppColors.primary,
+              ),
+              const SizedBox(width: 8),
+              Text(
+                title,
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 14,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          GestureDetector(
+            onTap: () => _showImagePreview(context, latestAtt.url, latestAtt.name),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(8),
+              child: Stack(
+                alignment: Alignment.bottomCenter,
+                children: [
+                  Image.network(
+                    latestAtt.url,
+                    headers: context.read<AuthProvider>().authHeaders,
+                    width: double.infinity,
+                    height: 160,
+                    fit: BoxFit.cover,
+                    errorBuilder: (context, error, stackTrace) {
+                      return Container(
+                        width: double.infinity,
+                        height: 160,
+                        color: Colors.grey[200],
+                        child: const Icon(
+                          Icons.broken_image,
+                          color: Colors.grey,
+                          size: 32,
+                        ),
+                      );
+                    },
+                  ),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(
+                      vertical: 6,
+                      horizontal: 12,
+                    ),
+                    color: Colors.black54,
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            latestAtt.name,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w500,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        const Icon(
+                          Icons.fullscreen,
+                          color: Colors.white,
+                          size: 18,
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildGeneratedTransfersCard(
+    List<VirtualTransfer> generatedTransfers,
+  ) {
+    if (generatedTransfers.isEmpty) return const SizedBox.shrink();
+
+    return Container(
+      margin: const EdgeInsets.only(top: 16),
+      padding: const EdgeInsets.all(16),
+      decoration: ssPanelDecoration(),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'AUTO-CREATED RELATED TRANSFERS',
+            style: TextStyle(
+              fontWeight: FontWeight.w800,
+              fontSize: 13,
+              color: AppColors.textSecondary,
+            ),
+          ),
+          const SizedBox(height: 12),
+          ...generatedTransfers.map((rel) {
+            final cat =
+                rel.ssTransferCategory ?? rel.generatedTransferType ?? 'transfer';
+            return Container(
+              margin: const EdgeInsets.only(bottom: 12),
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: AppColors.borderSoft),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Text(
+                        rel.name,
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 14,
+                          color: AppColors.primaryStrong,
+                        ),
+                      ),
+                      const Spacer(),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 3,
+                        ),
+                        decoration: BoxDecoration(
+                          color: _stateColor(rel.state).withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(999),
+                        ),
+                        child: Text(
+                          _stateLabel(rel.state),
+                          style: TextStyle(
+                            color: _stateColor(rel.state),
+                            fontWeight: FontWeight.bold,
+                            fontSize: 11,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Category: ${cat.replaceAll('_', ' ').toUpperCase()}',
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                  if (rel.sourceLocation != null)
+                    Text(
+                      '${_nameOf(rel.sourceLocation)} ➔ ${_nameOf(rel.destinationLocation)}',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+                  if (rel.attachments.isNotEmpty)
+                    _buildAttachmentsCard(
+                      rel.attachments,
+                      'Photo Evidence (${rel.name})',
+                    ),
+                ],
+              ),
+            );
+          }),
+        ],
+      ),
+    );
+  }
+
+  void _showImagePreview(BuildContext context, String imageUrl, String title) {
+    showDialog(
+      context: context,
+      builder: (ctx) => Dialog(
+        backgroundColor: Colors.black,
+        insetPadding: EdgeInsets.zero,
+        child: Stack(
+          alignment: Alignment.topRight,
+          children: [
+            InteractiveViewer(
+              child: Center(
+                child: Image.network(
+                  imageUrl,
+                  headers: context.read<AuthProvider>().authHeaders,
+                  fit: BoxFit.contain,
+                  errorBuilder: (context, err, st) => const Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.broken_image, size: 48, color: Colors.white),
+                      SizedBox(height: 8),
+                      Text(
+                        'Failed to load image',
+                        style: TextStyle(color: Colors.white),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: IconButton(
+                  icon: const Icon(Icons.close, color: Colors.white, size: 30),
+                  onPressed: () => Navigator.pop(ctx),
+                ),
+              ),
             ),
           ],
         ),

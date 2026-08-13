@@ -44,6 +44,20 @@ class _CreateReturnScreenState extends State<CreateReturnScreen> {
   bool _isPreparing = true;
   bool _isReadOnly = false;
 
+  /// Which QC rule this picking carries, as reported by the backend:
+  /// `fresh_split`, `scrap_sum`, or null for a leg the decision does not apply
+  /// to. Served rather than derived so the rule lives in one place.
+  ///
+  /// This screen serves fresh *and* quality returns -- the dashboard routes
+  /// /qc_returns through it -- so it has to handle both modes. Which four
+  /// columns each one uses comes from [qcColumnsFor]; when a mode is active the
+  /// movement is derived by the backend and the app stops sending `quantity`.
+  String? _qcMode;
+
+  bool get _qcSplit => _qcMode != null;
+
+  List<(String, String)> get _qcColumns => qcColumnsFor(_qcMode);
+
   final TextEditingController _challanNumberController =
       TextEditingController();
   String? _selectedDamageType = 'saleable';
@@ -51,6 +65,51 @@ class _CreateReturnScreenState extends State<CreateReturnScreen> {
   File? _challanImageFile;
   String? _challanImageBase64;
   String? _challanImageName;
+  String? _serverImageUrl;
+
+  void _showFullscreenImage(BuildContext context, String imageUrl) {
+    showDialog(
+      context: context,
+      builder: (ctx) => Dialog(
+        backgroundColor: Colors.black,
+        insetPadding: EdgeInsets.zero,
+        child: Stack(
+          alignment: Alignment.topRight,
+          children: [
+            InteractiveViewer(
+              child: Center(
+                child: Image.network(
+                  imageUrl,
+                  headers: context.read<AuthProvider>().authHeaders,
+                  fit: BoxFit.contain,
+                  errorBuilder: (context, err, st) => const Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.broken_image, size: 48, color: Colors.white),
+                      SizedBox(height: 8),
+                      Text(
+                        'Failed to load image',
+                        style: TextStyle(color: Colors.white),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: IconButton(
+                  icon: const Icon(Icons.close, color: Colors.white, size: 30),
+                  onPressed: () => Navigator.pop(ctx),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 
   Future<void> _pickChallanImage(ImageSource source) async {
     try {
@@ -74,9 +133,9 @@ class _CreateReturnScreenState extends State<CreateReturnScreen> {
       });
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to pick photo: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Failed to pick photo: $e')));
       }
     }
   }
@@ -115,8 +174,22 @@ class _CreateReturnScreenState extends State<CreateReturnScreen> {
         _lines.clear();
         _isReadOnly =
             details['state'] == 'done' || details['state'] == 'cancel';
+        _qcMode = details['qc_mode'] as String?;
         _challanNumberController.text = details['challan_number'] ?? '';
         _selectedDamageType = details['damage_type'] ?? 'saleable';
+        final atts = details['attachments'] as List<dynamic>?;
+        if (atts != null && atts.isNotEmpty) {
+          final first = atts.firstWhere(
+            (a) => a['is_image'] == true,
+            orElse: () => atts.first,
+          );
+          if (first != null && first['url'] != null) {
+            final rawUrl = first['url'].toString();
+            _serverImageUrl = rawUrl.startsWith('http')
+                ? rawUrl
+                : '${AppConstants.baseUrl}$rawUrl';
+          }
+        }
         _prepareData = {
           'distributor': details['distributor'],
           'source_location': details['source_location'],
@@ -138,6 +211,14 @@ class _CreateReturnScreenState extends State<CreateReturnScreen> {
             quantity: qty,
             soQty: (ld['so_qty'] as num?)?.toDouble(),
             qcQty: ((ld['warehouse_qty'] ?? ld['qc_qty']) as num?)?.toDouble(),
+            wNonsaleableQty: (ld['w_nonsaleable_qty'] as num?)?.toDouble(),
+            qcSaleableQty: (ld['qc_saleable_qty'] as num?)?.toDouble(),
+            qcNonsaleableQty: (ld['qc_nonsaleable_qty'] as num?)?.toDouble(),
+            // This screen serves quality returns too, which use the scrap pair.
+            // Without these two they read as null, display 0, and get written
+            // back as 0 on the next save.
+            wQcQty: (ld['w_qc_qty'] as num?)?.toDouble(),
+            actualQcQty: (ld['actual_qc_qty'] as num?)?.toDouble(),
           );
 
           final lotLinesData = ld['lot_lines'] as List<dynamic>? ?? [];
@@ -148,18 +229,32 @@ class _CreateReturnScreenState extends State<CreateReturnScreen> {
               final lotName = lotData['name'] as String;
               final lotQty = (ll['quantity'] as num?)?.toDouble() ?? 0.0;
               final soQty = (ll['so_qty'] as num?)?.toDouble();
-              final qcQty = ((ll['warehouse_qty'] ?? ll['qc_qty']) as num?)?.toDouble() ?? lotQty;
+              final qcQty =
+                  ((ll['warehouse_qty'] ?? ll['qc_qty']) as num?)?.toDouble() ??
+                  lotQty;
+              final wNonsaleableQty = (ll['w_nonsaleable_qty'] as num?)
+                  ?.toDouble();
+              final qcSaleableQty = (ll['qc_saleable_qty'] as num?)?.toDouble();
+              final qcNonsaleableQty = (ll['qc_nonsaleable_qty'] as num?)
+                  ?.toDouble();
+              final wQcQty = (ll['w_qc_qty'] as num?)?.toDouble();
+              final actualQcQty = (ll['actual_qc_qty'] as num?)?.toDouble();
               final lotAvail =
                   (lotData['available_qty'] as num?)?.toDouble() ?? lotQty;
 
+              // Never clamp the stepper below a value already recorded against
+              // this lot, whichever column it sits in.
               final maxCurrent = [
                 lotQty,
                 soQty ?? 0.0,
                 qcQty,
+                wNonsaleableQty ?? 0.0,
+                qcSaleableQty ?? 0.0,
+                qcNonsaleableQty ?? 0.0,
+                wQcQty ?? 0.0,
+                actualQcQty ?? 0.0,
               ].reduce((a, b) => a > b ? a : b);
-              final finalAvail = lotAvail > maxCurrent
-                  ? lotAvail
-                  : maxCurrent;
+              final finalAvail = lotAvail > maxCurrent ? lotAvail : maxCurrent;
 
               final tLot = TransferLot(
                 lotId: lotId,
@@ -172,7 +267,12 @@ class _CreateReturnScreenState extends State<CreateReturnScreen> {
                   ..lot = tLot
                   ..quantity = lotQty
                   ..soQty = soQty
-                  ..qcQty = qcQty,
+                  ..qcQty = qcQty
+                  ..wNonsaleableQty = wNonsaleableQty
+                  ..qcSaleableQty = qcSaleableQty
+                  ..qcNonsaleableQty = qcNonsaleableQty
+                  ..wQcQty = wQcQty
+                  ..actualQcQty = actualQcQty,
               );
             }
           }
@@ -188,42 +288,54 @@ class _CreateReturnScreenState extends State<CreateReturnScreen> {
         distributorId: distributorId,
         endpoint: widget.endpoint,
       );
-      if (mounted && data != null) {
-        setState(() {
-          _prepareData = data;
-        });
-
-        final resolvedDistributorId = data['distributor']?['id'] as int?;
-        if (resolvedDistributorId != null) {
-          final products = await provider.fetchReturnProducts(
-            distributorId: resolvedDistributorId,
-            endpoint: widget.endpoint,
-          );
-          if (mounted) {
-            final auth = context.read<AuthProvider>();
-            setState(() {
-              _lines.clear();
-              for (final p in products) {
-                final product = TransferProduct.fromMap(p);
-                if (product.availableQty > 0) {
-                  _lines.add(
-                    VirtualTransferLineEntry(
-                      product: product,
-                      quantity: product.availableQty,
-                      soQty: auth.canEditSoQty ? product.availableQty : null,
-                      qcQty: auth.canEditWarehouseQty ? product.availableQty : null,
-                    ),
-                  );
-                }
-              }
-            });
-          }
-        }
-
+      if (!mounted) return;
+      if (data == null) {
+        // The provider turns a failure into a null result plus `provider.error`.
+        // Clearing the flag is what lets the ErrorPanel below render it -- left
+        // set, the screen spins forever and a perfectly good backend message
+        // ("The assigned distributor has no QC return location") is discarded.
         setState(() {
           _isPreparing = false;
         });
+        return;
       }
+      setState(() {
+        _prepareData = data;
+      });
+
+      final resolvedDistributorId = data['distributor']?['id'] as int?;
+      if (resolvedDistributorId != null) {
+        final products = await provider.fetchReturnProducts(
+          distributorId: resolvedDistributorId,
+          endpoint: widget.endpoint,
+        );
+        if (mounted) {
+          final auth = context.read<AuthProvider>();
+          setState(() {
+            _lines.clear();
+            for (final p in products) {
+              final product = TransferProduct.fromMap(p);
+              if (product.availableQty > 0) {
+                _lines.add(
+                  VirtualTransferLineEntry(
+                    product: product,
+                    quantity: product.availableQty,
+                    soQty: auth.canEditSoQty ? product.availableQty : null,
+                    qcQty: auth.canEditWarehouseQty
+                        ? product.availableQty
+                        : null,
+                  ),
+                );
+              }
+            }
+          });
+        }
+      }
+
+      if (!mounted) return;
+      setState(() {
+        _isPreparing = false;
+      });
     }
   }
 
@@ -318,6 +430,19 @@ class _CreateReturnScreenState extends State<CreateReturnScreen> {
     });
   }
 
+  void _setLotQty(TransferLotInput lotInput, double newQty) {
+    final auth = context.read<AuthProvider>();
+    setState(() {
+      if (auth.canEditSoQty) {
+        lotInput.soQty = newQty.clamp(0, double.infinity).toDouble();
+      } else if (auth.canEditWarehouseQty) {
+        lotInput.qcQty = newQty.clamp(0, double.infinity).toDouble();
+      } else {
+        lotInput.quantity = newQty.clamp(0, double.infinity).toDouble();
+      }
+    });
+  }
+
   double _allocatedQty(VirtualTransferLineEntry line) {
     return line.lotLines.fold<double>(0, (sum, lot) => sum + lot.quantity);
   }
@@ -351,6 +476,15 @@ class _CreateReturnScreenState extends State<CreateReturnScreen> {
     if (line.qcQty != null) {
       lotInput.qcQty = line.qcQty;
     }
+    if (line.wNonsaleableQty != null) {
+      lotInput.wNonsaleableQty = line.wNonsaleableQty;
+    }
+    if (line.qcSaleableQty != null) {
+      lotInput.qcSaleableQty = line.qcSaleableQty;
+    }
+    if (line.qcNonsaleableQty != null) {
+      lotInput.qcNonsaleableQty = line.qcNonsaleableQty;
+    }
   }
 
   double _submittedTrackedLotQty(TransferLotInput lotInput, AuthProvider auth) {
@@ -363,7 +497,10 @@ class _CreateReturnScreenState extends State<CreateReturnScreen> {
     return lotInput.quantity;
   }
 
-  double _submittedTrackedLineQty(VirtualTransferLineEntry line, AuthProvider auth) {
+  double _submittedTrackedLineQty(
+    VirtualTransferLineEntry line,
+    AuthProvider auth,
+  ) {
     return line.lotLines.fold<double>(0, (sum, lot) {
       if (lot.lot == null) {
         return sum;
@@ -390,7 +527,45 @@ class _CreateReturnScreenState extends State<CreateReturnScreen> {
     });
   }
 
+  /// Sum one per-lot column across the lots actually chosen on this line.
+  double _lotSum(
+    VirtualTransferLineEntry line,
+    double? Function(TransferLotInput) pick,
+  ) {
+    return line.lotLines
+        .where((l) => l.lot != null)
+        .fold<double>(0, (sum, l) => sum + (pick(l) ?? 0));
+  }
+
+  /// The four record-keeping quantities for one line, as the API expects them.
+  ///
+  /// For tracked products the line totals are summed from the lots rather than
+  /// read off the line, because the backend rejects any allocation whose
+  /// lot-wise saleable and non-saleable sums do not match their line totals.
+  Map<String, double> _qcSplitLineValues(VirtualTransferLineEntry line) {
+    final tracked = line.product.tracking != 'none';
+    return {
+      for (final (_, field) in _qcColumns)
+        field: tracked
+            ? _lotSum(line, (l) => l.ssQty(field))
+            : (line.ssQty(field) ?? 0.0),
+    };
+  }
+
   bool _lineHasSubmittedQty(VirtualTransferLineEntry line, AuthProvider auth) {
+    if (_qcSplit) {
+      // Any of the four counts, plus the SO quantity the line arrived with.
+      //
+      // Two reasons this is not just "has a QC quantity". The logistics
+      // coordinator saves with the QC pair still at zero, long before sales
+      // operation decides. And `update_delivery` rebuilds leg 2's moves from
+      // whatever this payload contains, so dropping a line here deletes it from
+      // the transfer -- a half-filled save would silently discard the products
+      // nobody had got to yet.
+      final values = _qcSplitLineValues(line);
+      return values.values.any((value) => value > 0) || (line.soQty ?? 0) > 0;
+    }
+
     final qty = line.product.tracking != 'none'
         ? _submittedTrackedLineQty(line, auth)
         : line.quantity;
@@ -416,6 +591,28 @@ class _CreateReturnScreenState extends State<CreateReturnScreen> {
       final qcQty = line.product.tracking != 'none'
           ? _submittedTrackedQcQty(line)
           : line.qcQty;
+
+      if (_qcSplit) {
+        // `quantity` is deliberately absent: on a fresh return's transit leg the
+        // backend drives the movement from qc_saleable_qty, and anything sent
+        // here would be ignored. Sending it anyway would imply the app still
+        // decides what moves.
+        return {
+          'product_id': line.product.id,
+          if (soQty != null && soQty > 0) 'so_qty': soQty,
+          ..._qcSplitLineValues(line),
+          'lot_lines': selectedLots
+              .map(
+                (l) => {
+                  'lot_id': l.lot!.lotId,
+                  if (l.soQty != null && l.soQty! > 0) 'so_qty': l.soQty,
+                  for (final (_, field) in _qcColumns)
+                    field: l.ssQty(field) ?? 0.0,
+                },
+              )
+              .toList(),
+        };
+      }
 
       return {
         'product_id': line.product.id,
@@ -453,15 +650,20 @@ class _CreateReturnScreenState extends State<CreateReturnScreen> {
       final excessItems = <StockExcessItem>[];
       for (final line in _lines) {
         if (line.quantity > line.product.availableQty) {
-          excessItems.add(StockExcessItem(
-            productName: line.product.name,
-            enteredQty: line.quantity,
-            availableQty: line.product.availableQty,
-          ));
+          excessItems.add(
+            StockExcessItem(
+              productName: line.product.name,
+              enteredQty: line.quantity,
+              availableQty: line.product.availableQty,
+            ),
+          );
         }
       }
       if (excessItems.isNotEmpty) {
-        await showStockExcessValidationDialog(context, excessItems: excessItems);
+        await showStockExcessValidationDialog(
+          context,
+          excessItems: excessItems,
+        );
         return;
       }
     }
@@ -469,19 +671,22 @@ class _CreateReturnScreenState extends State<CreateReturnScreen> {
     final auth = context.read<AuthProvider>();
     final linesData = _buildLinesPayload(auth);
     if (linesData.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Add at least one product')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Add at least one product')));
       return;
     }
 
     // Mandatory Photo Evidence Validation for Primary Sales Return
-    if ((widget.moduleType.toLowerCase() == 'primary' || widget.moduleType.isEmpty) &&
+    if ((widget.moduleType.toLowerCase() == 'primary' ||
+            widget.moduleType.isEmpty) &&
         widget.returnId == null) {
       if (_challanImageBase64 == null || _challanImageBase64!.isEmpty) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Return Challan Photo Evidence is required for Primary Sales Return.'),
+            content: Text(
+              'Return Challan Photo Evidence is required for Primary Sales Return.',
+            ),
             backgroundColor: Colors.red,
           ),
         );
@@ -517,7 +722,9 @@ class _CreateReturnScreenState extends State<CreateReturnScreen> {
       final error = context.read<ReturnProvider>().error;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(error ?? 'Failed to create ${widget.title.toLowerCase()}'),
+          content: Text(
+            error ?? 'Failed to create ${widget.title.toLowerCase()}',
+          ),
           backgroundColor: Colors.red,
         ),
       );
@@ -608,6 +815,7 @@ class _CreateReturnScreenState extends State<CreateReturnScreen> {
     final canEditSoQty = auth.canEditSoQty;
     final canEditWarehouseQty = auth.canEditWarehouseQty;
     final canEditEffectiveQty = auth.canEditEffectiveQty;
+    final canEditQcQty = auth.canEditQcQty;
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -804,7 +1012,9 @@ class _CreateReturnScreenState extends State<CreateReturnScreen> {
                                   ],
                                 ),
                               ),
-                              if (widget.moduleType.toLowerCase() == 'primary' || widget.moduleType.isEmpty) ...[
+                              if (widget.moduleType.toLowerCase() ==
+                                      'primary' ||
+                                  widget.moduleType.isEmpty) ...[
                                 const SizedBox(height: 16),
                                 const Text(
                                   'Return Book & Page (Auto-Assigned)',
@@ -838,11 +1048,17 @@ class _CreateReturnScreenState extends State<CreateReturnScreen> {
                                       const SizedBox(width: 10),
                                       Expanded(
                                         child: Text(
-                                          _prepareData?['return_book_number'] != null || _prepareData?['return_book_page'] != null
+                                          _prepareData?['return_book_number'] !=
+                                                      null ||
+                                                  _prepareData?['return_book_page'] !=
+                                                      null
                                               ? '${_prepareData?['return_book_number'] ?? '-'} (Page ${_prepareData?['return_book_page'] ?? '-'})'
-                                              : (_prepareData?['next_return_book_number'] != null || _prepareData?['next_return_book_page'] != null
-                                                  ? '${_prepareData?['next_return_book_number'] ?? '-'} (Page ${_prepareData?['next_return_book_page'] ?? '-'})'
-                                                  : 'No active Return Book assigned'),
+                                              : (_prepareData?['next_return_book_number'] !=
+                                                            null ||
+                                                        _prepareData?['next_return_book_page'] !=
+                                                            null
+                                                    ? '${_prepareData?['next_return_book_number'] ?? '-'} (Page ${_prepareData?['next_return_book_page'] ?? '-'})'
+                                                    : 'No active Return Book assigned'),
                                           style: const TextStyle(
                                             color: Colors.black87,
                                             fontSize: 14,
@@ -855,89 +1071,6 @@ class _CreateReturnScreenState extends State<CreateReturnScreen> {
                                 ),
                               ],
                             ],
-                          ),
-                        ),
-                        const SizedBox(height: 16),
-                        // Challan Number
-                        const Text(
-                          'Challan Number',
-                          style: TextStyle(
-                            color: Colors.black54,
-                            fontSize: 12,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        const SizedBox(height: 6),
-                        TextField(
-                          controller: _challanNumberController,
-                          decoration: InputDecoration(
-                            hintText: 'Enter challan number',
-                            filled: true,
-                            fillColor: Colors.white,
-                            contentPadding: const EdgeInsets.symmetric(
-                              horizontal: 16,
-                              vertical: 12,
-                            ),
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(8),
-                              borderSide: const BorderSide(
-                                color: Color(0xFFDDE6F2),
-                              ),
-                            ),
-                            enabledBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(8),
-                              borderSide: const BorderSide(
-                                color: Color(0xFFDDE6F2),
-                              ),
-                            ),
-                          ),
-                          enabled: !_isReadOnly,
-                        ),
-                        const SizedBox(height: 16),
-                        // Damage Type
-                        const Text(
-                          'Damage Type',
-                          style: TextStyle(
-                            color: Colors.black54,
-                            fontSize: 12,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        const SizedBox(height: 6),
-                        DropdownButtonFormField<String>(
-                          value: _selectedDamageType,
-                          items: const [
-                            DropdownMenuItem(
-                              value: 'saleable',
-                              child: Text('Saleable'),
-                            ),
-                          ],
-                          onChanged: null,
-                          decoration: InputDecoration(
-                            filled: true,
-                            fillColor: AppColors.primarySoft,
-                            contentPadding: const EdgeInsets.symmetric(
-                              horizontal: 16,
-                              vertical: 12,
-                            ),
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(8),
-                              borderSide: const BorderSide(
-                                color: Color(0xFFDDE6F2),
-                              ),
-                            ),
-                            enabledBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(8),
-                              borderSide: const BorderSide(
-                                color: Color(0xFFDDE6F2),
-                              ),
-                            ),
-                            disabledBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(8),
-                              borderSide: const BorderSide(
-                                color: Color(0xFFDDE6F2),
-                              ),
-                            ),
                           ),
                         ),
                         if (widget.moduleType.toLowerCase() == 'primary' ||
@@ -976,7 +1109,8 @@ class _CreateReturnScreenState extends State<CreateReturnScreen> {
                                 width: _challanImageFile == null ? 1 : 1.5,
                               ),
                             ),
-                            child: _challanImageFile == null
+                            child: _challanImageFile == null &&
+                                    _serverImageUrl == null
                                 ? Row(
                                     children: [
                                       Expanded(
@@ -984,8 +1118,8 @@ class _CreateReturnScreenState extends State<CreateReturnScreen> {
                                           onPressed: _isReadOnly
                                               ? null
                                               : () => _pickChallanImage(
-                                                    ImageSource.camera,
-                                                  ),
+                                                  ImageSource.camera,
+                                                ),
                                           icon: const Icon(
                                             Icons.camera_alt_outlined,
                                             size: 18,
@@ -1009,8 +1143,8 @@ class _CreateReturnScreenState extends State<CreateReturnScreen> {
                                           onPressed: _isReadOnly
                                               ? null
                                               : () => _pickChallanImage(
-                                                    ImageSource.gallery,
-                                                  ),
+                                                  ImageSource.gallery,
+                                                ),
                                           icon: const Icon(
                                             Icons.photo_library_outlined,
                                             size: 18,
@@ -1032,28 +1166,84 @@ class _CreateReturnScreenState extends State<CreateReturnScreen> {
                                   )
                                 : Row(
                                     children: [
-                                      ClipRRect(
-                                        borderRadius: BorderRadius.circular(6),
-                                        child: Image.file(
-                                          _challanImageFile!,
-                                          width: 50,
-                                          height: 50,
-                                          fit: BoxFit.cover,
+                                      GestureDetector(
+                                        onTap: () {
+                                          final url = _serverImageUrl;
+                                          if (_challanImageFile == null &&
+                                              url != null) {
+                                            _showFullscreenImage(
+                                              context,
+                                              url,
+                                            );
+                                          }
+                                        },
+                                        child: ClipRRect(
+                                          borderRadius:
+                                              BorderRadius.circular(6),
+                                          child: _challanImageFile != null
+                                              ? Image.file(
+                                                  _challanImageFile!,
+                                                  width: 50,
+                                                  height: 50,
+                                                  fit: BoxFit.cover,
+                                                )
+                                              : Image.network(
+                                                  _serverImageUrl!,
+                                                  headers: context
+                                                      .read<AuthProvider>()
+                                                      .authHeaders,
+                                                  width: 50,
+                                                  height: 50,
+                                                  fit: BoxFit.cover,
+                                                  errorBuilder: (
+                                                    context,
+                                                    err,
+                                                    st,
+                                                  ) =>
+                                                      Container(
+                                                    width: 50,
+                                                    height: 50,
+                                                    color: Colors.grey[300],
+                                                    child: const Icon(
+                                                      Icons.broken_image,
+                                                      size: 24,
+                                                    ),
+                                                  ),
+                                                ),
                                         ),
                                       ),
                                       const SizedBox(width: 12),
                                       Expanded(
-                                        child: Text(
-                                          _challanImageName ?? 'Photo Attached',
-                                          style: const TextStyle(
-                                            fontWeight: FontWeight.w600,
-                                            fontSize: 13,
-                                          ),
-                                          maxLines: 2,
-                                          overflow: TextOverflow.ellipsis,
+                                        child: Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            Text(
+                                              _challanImageFile != null
+                                                  ? (_challanImageName ??
+                                                      'Photo Attached')
+                                                  : 'Uploaded Evidence Photo',
+                                              style: const TextStyle(
+                                                fontWeight: FontWeight.w600,
+                                                fontSize: 13,
+                                              ),
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                            ),
+                                            if (_challanImageFile == null)
+                                              const Text(
+                                                'Tap image to view full photo',
+                                                style: TextStyle(
+                                                  color: AppColors.primary,
+                                                  fontSize: 11,
+                                                ),
+                                              ),
+                                          ],
                                         ),
                                       ),
-                                      if (!_isReadOnly)
+                                      if (!_isReadOnly &&
+                                          _challanImageFile != null)
                                         IconButton(
                                           icon: const Icon(
                                             Icons.delete_outline,
@@ -1144,32 +1334,36 @@ class _CreateReturnScreenState extends State<CreateReturnScreen> {
                                   }
                                 });
                               },
-                              onLotMinus: (lotInput) => _changeLotQty(
-                                lotInput,
-                                double.infinity,
-                                -1,
-                              ),
-                              onLotPlus: (lotInput) => _changeLotQty(
-                                lotInput,
-                                double.infinity,
-                                1,
-                              ),
-                              allocatedQty: canEditSoQty
-                                  ? _allocatedSoQty(line)
-                                  : (canEditWarehouseQty
-                                      ? _allocatedQcQty(line)
-                                      : _allocatedQty(line)),
+                              onLotMinus: (lotInput) =>
+                                  _changeLotQty(lotInput, double.infinity, -1),
+                              onLotPlus: (lotInput) =>
+                                  _changeLotQty(lotInput, double.infinity, 1),
+                              onLotQtyInput: (lotInput, newQty) =>
+                                  _setLotQty(lotInput, newQty),
+                              allocatedQty: _qcSplit
+                                  ? _lotSum(line, (l) => l.qcSaleableQty)
+                                  : (canEditSoQty
+                                        ? _allocatedSoQty(line)
+                                        : (canEditWarehouseQty
+                                              ? _allocatedQcQty(line)
+                                              : _allocatedQty(line))),
                               isReadOnly: _isReadOnly,
                               canEditSoQty: canEditSoQty,
                               canEditWarehouseQty: canEditWarehouseQty,
                               canEditEffectiveQty: canEditEffectiveQty,
+                              canEditQcQty: canEditQcQty,
+                              qcSplit: _qcSplit,
                               allowOverstock: _allowsPrimaryOverstock,
                               onQuantityChanged: (newQty) {
                                 setState(() {
-                                  line.quantity = (_allowsPrimaryOverstock
-                                          ? newQty.clamp(0, double.infinity)
-                                          : newQty.clamp(0, line.product.availableQty))
-                                      .toDouble();
+                                  line.quantity =
+                                      (_allowsPrimaryOverstock
+                                              ? newQty.clamp(0, double.infinity)
+                                              : newQty.clamp(
+                                                  0,
+                                                  line.product.availableQty,
+                                                ))
+                                          .toDouble();
                                   _syncSingleLotFromLine(line);
                                   // trigger rebuild
                                   _allocatedQty(line);
@@ -1177,11 +1371,18 @@ class _CreateReturnScreenState extends State<CreateReturnScreen> {
                               },
                               onSoQtyChanged: (newQty) {
                                 setState(() {
-                                  line.soQty = (_allowsPrimaryOverstock
-                                          ? newQty.clamp(0, double.infinity)
-                                          : newQty.clamp(0, line.product.availableQty))
-                                      .toDouble();
-                                  if (_allowsPrimaryOverstock) {
+                                  line.soQty =
+                                      (_allowsPrimaryOverstock
+                                              ? newQty.clamp(0, double.infinity)
+                                              : newQty.clamp(
+                                                  0,
+                                                  line.product.availableQty,
+                                                ))
+                                          .toDouble();
+                                  // In split mode `quantity` is the backend's to
+                                  // derive from qc_saleable_qty; mirroring it
+                                  // here would be a lie the app then sends back.
+                                  if (_allowsPrimaryOverstock && !_qcSplit) {
                                     line.quantity = line.soQty ?? line.quantity;
                                   }
                                   _syncSingleLotFromLine(line);
@@ -1189,30 +1390,38 @@ class _CreateReturnScreenState extends State<CreateReturnScreen> {
                               },
                               onQcQtyChanged: (newQty) {
                                 setState(() {
-                                  line.qcQty = (_allowsPrimaryOverstock
-                                          ? newQty.clamp(0, double.infinity)
-                                          : newQty.clamp(0, line.product.availableQty))
-                                      .toDouble();
-                                  if (_allowsPrimaryOverstock) {
+                                  line.qcQty =
+                                      (_allowsPrimaryOverstock
+                                              ? newQty.clamp(0, double.infinity)
+                                              : newQty.clamp(
+                                                  0,
+                                                  line.product.availableQty,
+                                                ))
+                                          .toDouble();
+                                  if (_allowsPrimaryOverstock && !_qcSplit) {
                                     line.quantity = line.qcQty ?? line.quantity;
                                   }
                                   _syncSingleLotFromLine(line);
                                 });
                               },
-                              onLotQtyInput: (lotInput, newLotQty) {
+                              onQcColumnChanged: (field, value) {
                                 setState(() {
-                                  final enteredVal = newLotQty
-                                      .clamp(0, double.infinity)
-                                      .toDouble();
-                                  if (canEditSoQty) {
-                                    lotInput.soQty = enteredVal;
-                                  } else if (canEditWarehouseQty) {
-                                    lotInput.qcQty = enteredVal;
-                                  } else {
-                                    lotInput.quantity = enteredVal;
-                                  }
+                                  line.setSsQty(
+                                    field,
+                                    value.clamp(0, double.infinity).toDouble(),
+                                  );
+                                  _syncSingleLotFromLine(line);
                                 });
                               },
+                              onLotFieldChanged: (lotInput, field, value) {
+                                setState(() {
+                                  lotInput.setSsQty(
+                                    field,
+                                    value.clamp(0, double.infinity).toDouble(),
+                                  );
+                                });
+                              },
+                              qcColumns: _qcColumns,
                             ),
                           ),
                       ],
@@ -1348,11 +1557,16 @@ class _ReturnLineCard extends StatelessWidget {
     this.canEditSoQty = false,
     this.canEditWarehouseQty = false,
     this.canEditEffectiveQty = false,
+    this.canEditQcQty = false,
+    this.qcSplit = false,
+    this.qcColumns = const [],
     this.allowOverstock = false,
     this.onQuantityChanged,
     this.onSoQtyChanged,
     this.onQcQtyChanged,
+    this.onQcColumnChanged,
     this.onLotQtyInput,
+    this.onLotFieldChanged,
   });
 
   final VirtualTransferLineEntry line;
@@ -1370,12 +1584,30 @@ class _ReturnLineCard extends StatelessWidget {
   final bool canEditSoQty;
   final bool canEditWarehouseQty;
   final bool canEditEffectiveQty;
+
+  /// Sales-operation permission over the QC saleable/non-saleable pair.
+  final bool canEditQcQty;
+
+  /// Renders the four-column QC form instead of the legacy SO / Warehouse /
+  /// Effective one. Set whenever the picking has a `qc_mode`.
+  final bool qcSplit;
+
+  /// The four (label, wire name) columns that mode uses, from [qcColumnsFor].
+  final List<(String, String)> qcColumns;
   final bool allowOverstock;
   final ValueChanged<double>? onQuantityChanged;
   final ValueChanged<double>? onSoQtyChanged;
   final ValueChanged<double>? onQcQtyChanged;
+
+  /// A QC column edit, as (wire field name, new value).
+  final void Function(String field, double value)? onQcColumnChanged;
   final void Function(TransferLotInput lotInput, double quantity)?
   onLotQtyInput;
+
+  /// Split-mode lot edits, keyed by wire field name. See
+  /// [_ReturnLotRow.onLotFieldChanged].
+  final void Function(TransferLotInput lotInput, String field, double value)?
+  onLotFieldChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -1487,6 +1719,10 @@ class _ReturnLineCard extends StatelessWidget {
                         canEditSoQty: canEditSoQty,
                         canEditWarehouseQty: canEditWarehouseQty,
                         canEditEffectiveQty: canEditEffectiveQty,
+                        canEditQcQty: canEditQcQty,
+                        qcSplit: qcSplit,
+                        qcColumns: qcColumns,
+                        onLotFieldChanged: onLotFieldChanged,
                       ),
                     ),
                   ),
@@ -1564,29 +1800,60 @@ class _ReturnLineCard extends StatelessWidget {
                   _buildQtyRow(
                     title: 'SO Qty',
                     value: line.soQty ?? 0,
-                    isReadOnly: isReadOnly || !canEditSoQty,
+                    // On a transit leg the SO figure was fixed at creation and
+                    // is shown for reference only.
+                    isReadOnly: isReadOnly || qcSplit || !canEditSoQty,
                     min: 0,
-                    max: allowOverstock ? double.infinity : line.product.availableQty,
+                    max: allowOverstock
+                        ? double.infinity
+                        : line.product.availableQty,
                     onChanged: onSoQtyChanged,
                   ),
-                  if (canEditWarehouseQty)
-                    _buildQtyRow(
-                      title: 'Warehouse Qty',
-                      value: line.qcQty ?? 0,
-                      isReadOnly: isReadOnly,
-                      min: 0,
-                      max: allowOverstock ? double.infinity : line.product.availableQty,
-                      onChanged: onQcQtyChanged,
-                    ),
-                  if (canEditEffectiveQty)
-                    _buildQtyRow(
-                      title: 'QC Qty (Effective)',
-                      value: line.quantity,
-                      isReadOnly: isReadOnly,
-                      min: 0,
-                      max: allowOverstock ? double.infinity : line.product.availableQty,
-                      onChanged: onQuantityChanged,
-                    ),
+                  if (qcSplit) ...[
+                    // Each role sees only its own pair -- the warehouse columns
+                    // are noise to sales operation and vice versa. Values the
+                    // user cannot see still round-trip: they are loaded into the
+                    // model and echoed back unchanged on save.
+                    //
+                    // Columns come from the picking's mode, so this renders the
+                    // fresh pair or the scrap pair without knowing which.
+                    // No maximum: sales operation may declare more than the
+                    // return delivered, and the backend allows it.
+                    for (final (index, column) in qcColumns.indexed)
+                      if (index < 2 ? canEditWarehouseQty : canEditQcQty)
+                        _buildQtyRow(
+                          title: column.$1,
+                          value: line.ssQty(column.$2) ?? 0,
+                          isReadOnly: isReadOnly,
+                          min: 0,
+                          max: double.infinity,
+                          onChanged: (value) =>
+                              onQcColumnChanged?.call(column.$2, value),
+                        ),
+                  ] else ...[
+                    if (canEditWarehouseQty)
+                      _buildQtyRow(
+                        title: 'Warehouse Qty',
+                        value: line.qcQty ?? 0,
+                        isReadOnly: isReadOnly,
+                        min: 0,
+                        max: allowOverstock
+                            ? double.infinity
+                            : line.product.availableQty,
+                        onChanged: onQcQtyChanged,
+                      ),
+                    if (canEditEffectiveQty)
+                      _buildQtyRow(
+                        title: 'QC Qty (Effective)',
+                        value: line.quantity,
+                        isReadOnly: isReadOnly,
+                        min: 0,
+                        max: allowOverstock
+                            ? double.infinity
+                            : line.product.availableQty,
+                        onChanged: onQuantityChanged,
+                      ),
+                  ],
                 ],
               ),
             ),
@@ -1658,6 +1925,10 @@ class _ReturnLotRow extends StatelessWidget {
     required this.canEditSoQty,
     required this.canEditWarehouseQty,
     required this.canEditEffectiveQty,
+    this.canEditQcQty = false,
+    this.qcSplit = false,
+    this.qcColumns = const [],
+    this.onLotFieldChanged,
   });
 
   final TransferLotInput lotInput;
@@ -1671,9 +1942,21 @@ class _ReturnLotRow extends StatelessWidget {
   final bool canEditSoQty;
   final bool canEditWarehouseQty;
   final bool canEditEffectiveQty;
+  final bool canEditQcQty;
+  final bool qcSplit;
+  final List<(String, String)> qcColumns;
+
+  /// One callback for all four split quantities, keyed by wire field name, so
+  /// the split form does not have to thread four separate callbacks down
+  /// through the line card.
+  final void Function(TransferLotInput lotInput, String field, double value)?
+  onLotFieldChanged;
 
   @override
   Widget build(BuildContext context) {
+    if (qcSplit) {
+      return _buildSplitLayout();
+    }
     double activeQty = lotInput.quantity;
     String label = 'Return Qty';
     if (canEditSoQty) {
@@ -1697,7 +1980,7 @@ class _ReturnLotRow extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.end,
       children: [
         Expanded(
-          flex: 3,
+          flex: 2,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -1744,7 +2027,7 @@ class _ReturnLotRow extends StatelessWidget {
                 value: lotInput.lot?.lotId,
                 decoration: const InputDecoration(
                   contentPadding: EdgeInsets.symmetric(
-                    horizontal: 12,
+                    horizontal: 8,
                     vertical: 8,
                   ),
                   border: OutlineInputBorder(
@@ -1760,7 +2043,8 @@ class _ReturnLotRow extends StatelessWidget {
                         value: lot.lotId,
                         child: Text(
                           lot.lotName,
-                          style: const TextStyle(fontSize: 14),
+                          style: const TextStyle(fontSize: 13),
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ),
                     )
@@ -1781,9 +2065,9 @@ class _ReturnLotRow extends StatelessWidget {
             ],
           ),
         ),
-        const SizedBox(width: 12),
+        const SizedBox(width: 8),
         Expanded(
-          flex: 2,
+          flex: 3,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -1793,30 +2077,32 @@ class _ReturnLotRow extends StatelessWidget {
               ),
               const SizedBox(height: 4),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
                 decoration: BoxDecoration(
                   color: AppColors.background,
                   border: Border.all(color: const Color(0xFFDDE6F2)),
-                  borderRadius: BorderRadius.circular(4),
+                  borderRadius: BorderRadius.circular(6),
                 ),
                 child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    SizedBox(
-                      width: 52,
-                      height: 32,
-                      child: TextField(
-                        keyboardType: const TextInputType.numberWithOptions(
-                          decimal: true,
-                        ),
-                        textAlign: TextAlign.center,
+                    Expanded(
+                      child: SSQtyField(
+                        value: activeQty.toStringAsFixed(0),
+                        isDecimal: true,
+                        width: double.infinity,
+                        height: 36,
                         enabled: !isReadOnly && onQuantityChanged != null,
-                        style: const TextStyle(fontSize: 14),
+                        onChanged: (val) {
+                          final parsed = double.tryParse(val);
+                          if (parsed != null && onQuantityChanged != null) {
+                            onQuantityChanged!(parsed);
+                          }
+                        },
                         decoration: const InputDecoration(
                           isDense: true,
                           contentPadding: EdgeInsets.symmetric(
                             horizontal: 4,
-                            vertical: 6,
+                            vertical: 8,
                           ),
                           border: InputBorder.none,
                           enabledBorder: InputBorder.none,
@@ -1827,44 +2113,36 @@ class _ReturnLotRow extends StatelessWidget {
                             ),
                           ),
                         ),
-                        onChanged: (val) {
-                          final parsed = double.tryParse(val);
-                          if (parsed != null && onQuantityChanged != null) {
-                            onQuantityChanged!(parsed);
-                          }
-                        },
-                        controller:
-                            TextEditingController(
-                                text: activeQty.toStringAsFixed(0),
-                              )
-                              ..selection = TextSelection.collapsed(
-                                offset: activeQty.toStringAsFixed(0).length,
-                              ),
                       ),
                     ),
-                    if (!isReadOnly)
-                      Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          InkWell(
-                            onTap: onMinus,
-                            child: const Icon(
-                              Icons.remove,
-                              size: 16,
-                              color: Colors.black54,
-                            ),
+                    if (!isReadOnly) ...[
+                      const SizedBox(width: 4),
+                      InkWell(
+                        onTap: onMinus,
+                        borderRadius: BorderRadius.circular(4),
+                        child: const Padding(
+                          padding: EdgeInsets.all(4.0),
+                          child: Icon(
+                            Icons.remove,
+                            size: 18,
+                            color: Colors.black87,
                           ),
-                          const SizedBox(width: 8),
-                          InkWell(
-                            onTap: onPlus,
-                            child: const Icon(
-                              Icons.add,
-                              size: 16,
-                              color: Colors.black54,
-                            ),
-                          ),
-                        ],
+                        ),
                       ),
+                      const SizedBox(width: 2),
+                      InkWell(
+                        onTap: onPlus,
+                        borderRadius: BorderRadius.circular(4),
+                        child: const Padding(
+                          padding: EdgeInsets.all(4.0),
+                          child: Icon(
+                            Icons.add,
+                            size: 18,
+                            color: Colors.black87,
+                          ),
+                        ),
+                      ),
+                    ],
                   ],
                 ),
               ),
@@ -1872,13 +2150,145 @@ class _ReturnLotRow extends StatelessWidget {
           ),
         ),
         if (!isReadOnly) ...[
-          const SizedBox(width: 8),
+          const SizedBox(width: 4),
           IconButton(
             icon: const Icon(Icons.delete_outline, color: Colors.red),
             onPressed: onRemove,
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(),
           ),
         ],
       ],
+    );
+  }
+
+  /// Lot row for a fresh return's transit leg.
+  ///
+  /// The lot picker gets its own line and the four quantities stack beneath it.
+  /// The legacy layout puts the picker and a single stepper side by side, which
+  /// has room for one quantity, not four.
+  Widget _buildSplitLayout() {
+    final displayLots = List<TransferLot>.from(lots);
+    if (lotInput.lot != null &&
+        !displayLots.any((l) => l.lotId == lotInput.lot!.lotId)) {
+      displayLots.add(lotInput.lot!);
+    }
+
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AppColors.background,
+        border: Border.all(color: const Color(0xFFDDE6F2)),
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Text(
+                'Lot Reference',
+                style: TextStyle(color: Colors.black54, fontSize: 12),
+              ),
+              const Spacer(),
+              if (!isReadOnly)
+                InkWell(
+                  onTap: onRemove,
+                  child: const Icon(
+                    Icons.close,
+                    size: 18,
+                    color: Colors.black45,
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          DropdownButtonFormField<int>(
+            isExpanded: true,
+            value: lotInput.lot?.lotId,
+            decoration: const InputDecoration(
+              contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              filled: true,
+              fillColor: Colors.white,
+              border: OutlineInputBorder(
+                borderSide: BorderSide(color: Color(0xFFDDE6F2)),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderSide: BorderSide(color: Color(0xFFDDE6F2)),
+              ),
+            ),
+            items: displayLots
+                .map(
+                  (lot) => DropdownMenuItem(
+                    value: lot.lotId,
+                    child: Text(lot.lotName, overflow: TextOverflow.ellipsis),
+                  ),
+                )
+                .toList(),
+            onChanged: isReadOnly
+                ? null
+                : (value) {
+                    TransferLot? selected;
+                    for (final lot in displayLots) {
+                      if (lot.lotId == value) {
+                        selected = lot;
+                        break;
+                      }
+                    }
+                    onChanged(selected);
+                  },
+          ),
+          if (lotInput.soQty != null && lotInput.soQty! > 0) ...[
+            const SizedBox(height: 6),
+            Text(
+              'SO Qty: ${lotInput.soQty!.toStringAsFixed(0)}',
+              style: const TextStyle(
+                color: Color(0xFF2563EB),
+                fontWeight: FontWeight.bold,
+                fontSize: 10,
+              ),
+            ),
+          ],
+          const SizedBox(height: 8),
+          // Same columns as the line rows, same per-role split.
+          for (final (index, column) in qcColumns.indexed)
+            if (index < 2 ? canEditWarehouseQty : canEditQcQty)
+              _splitField(column.$1, lotInput.ssQty(column.$2), column.$2),
+        ],
+      ),
+    );
+  }
+
+  /// One quantity input on a split lot row. Only called for fields the current
+  /// role owns, so there is no permission argument — visibility is the gate.
+  Widget _splitField(String label, double? value, String field) {
+    final text = (value ?? 0).toStringAsFixed(0);
+    final enabled = !isReadOnly && onLotFieldChanged != null;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              label,
+              style: const TextStyle(color: Colors.black54, fontSize: 12),
+            ),
+          ),
+          SSQtyField(
+            value: text,
+            isDecimal: true,
+            width: 72,
+            height: 34,
+            enabled: enabled,
+            onChanged: (val) {
+              final parsed = double.tryParse(val);
+              if (parsed != null) {
+                onLotFieldChanged?.call(lotInput, field, parsed);
+              }
+            },
+          ),
+        ],
+      ),
     );
   }
 }

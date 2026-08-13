@@ -242,6 +242,12 @@ class ErrorPanel extends StatelessWidget {
 
   final String message;
 
+  /// Providers store `e.toString()` and the API layer throws `Exception(msg)`,
+  /// so a perfectly readable backend sentence reaches the UI prefixed with
+  /// "Exception: ". Strip it here rather than in every call site.
+  String get _display =>
+      message.replaceFirst(RegExp(r'^_?Exception:\s*'), '').trim();
+
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -253,7 +259,7 @@ class ErrorPanel extends StatelessWidget {
         border: Border.all(color: Colors.red.shade200),
         borderRadius: BorderRadius.circular(AppRadii.small),
       ),
-      child: Text(message, style: TextStyle(color: Colors.red.shade800)),
+      child: Text(_display, style: TextStyle(color: Colors.red.shade800)),
     );
   }
 }
@@ -389,59 +395,60 @@ class SmallStepper extends StatefulWidget {
     required this.onMinus,
     required this.onPlus,
     this.onValueInput,
+    this.isDecimal = true,
   });
 
   final String value;
   final VoidCallback onMinus;
   final VoidCallback onPlus;
   final ValueChanged<String>? onValueInput;
+  final bool isDecimal;
 
   @override
   State<SmallStepper> createState() => _SmallStepperState();
 }
 
 class _SmallStepperState extends State<SmallStepper> {
-  bool _isEditing = false;
   late TextEditingController _controller;
   late FocusNode _focusNode;
 
   @override
   void initState() {
     super.initState();
-    _controller = TextEditingController();
+    _controller = TextEditingController(text: widget.value);
     _focusNode = FocusNode();
-    _focusNode.addListener(() {
-      if (!_focusNode.hasFocus && _isEditing) {
-        _commitValue();
-      }
-    });
+    _focusNode.addListener(_onFocusChange);
+  }
+
+  void _onFocusChange() {
+    if (_focusNode.hasFocus) {
+      _controller.selection = TextSelection(
+        baseOffset: 0,
+        extentOffset: _controller.text.length,
+      );
+    } else {
+      _commitValue();
+    }
+  }
+
+  @override
+  void didUpdateWidget(SmallStepper oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.value != widget.value && !_focusNode.hasFocus) {
+      _controller.text = widget.value;
+    }
   }
 
   @override
   void dispose() {
+    _focusNode.removeListener(_onFocusChange);
     _controller.dispose();
     _focusNode.dispose();
     super.dispose();
   }
 
-  void _startEditing() {
-    if (widget.onValueInput == null) return;
-    setState(() {
-      _isEditing = true;
-      _controller.text = widget.value;
-      _controller.selection = TextSelection(
-        baseOffset: 0,
-        extentOffset: widget.value.length,
-      );
-    });
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _focusNode.requestFocus();
-    });
-  }
-
   void _commitValue() {
     final val = _controller.text.trim();
-    setState(() => _isEditing = false);
     if (val.isNotEmpty && val != widget.value) {
       widget.onValueInput?.call(val);
     }
@@ -449,6 +456,7 @@ class _SmallStepperState extends State<SmallStepper> {
 
   @override
   Widget build(BuildContext context) {
+    final bool enabled = widget.onValueInput != null;
     return Container(
       height: 38,
       decoration: BoxDecoration(
@@ -463,56 +471,45 @@ class _SmallStepperState extends State<SmallStepper> {
             icon: const Icon(Icons.remove, size: 18),
             visualDensity: VisualDensity.compact,
           ),
-          GestureDetector(
-            onTap: _isEditing ? null : _startEditing,
-            child: SizedBox(
-              width: 85,
-              child: _isEditing
-                  ? TextField(
-                      controller: _controller,
-                      focusNode: _focusNode,
-                      keyboardType: const TextInputType.numberWithOptions(
-                        decimal: true,
-                      ),
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(
-                        fontWeight: FontWeight.w800,
-                        fontSize: 14,
-                      ),
-                      decoration: const InputDecoration(
-                        isDense: true,
-                        contentPadding: EdgeInsets.symmetric(
-                          horizontal: 4,
-                          vertical: 6,
-                        ),
-                        border: OutlineInputBorder(
-                          borderSide: BorderSide(color: Color(0xFF2563EB)),
-                          borderRadius: BorderRadius.all(Radius.circular(6)),
-                        ),
-                        enabledBorder: OutlineInputBorder(
-                          borderSide: BorderSide(color: Color(0xFF2563EB)),
-                          borderRadius: BorderRadius.all(Radius.circular(6)),
-                        ),
-                        focusedBorder: OutlineInputBorder(
-                          borderSide: BorderSide(
-                            color: Color(0xFF2563EB),
-                            width: 2,
-                          ),
-                          borderRadius: BorderRadius.all(Radius.circular(6)),
-                        ),
-                        filled: true,
-                        fillColor: Colors.white,
-                      ),
-                      onSubmitted: (_) => _commitValue(),
-                    )
-                  : Container(
-                      alignment: Alignment.center,
-                      child: Text(
-                        widget.value,
-                        textAlign: TextAlign.center,
-                        style: const TextStyle(fontWeight: FontWeight.w800),
-                      ),
-                    ),
+          SizedBox(
+            width: 75,
+            child: TextField(
+              controller: _controller,
+              focusNode: _focusNode,
+              enabled: enabled,
+              keyboardType: TextInputType.numberWithOptions(
+                decimal: widget.isDecimal,
+              ),
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                fontWeight: FontWeight.w800,
+                fontSize: 14,
+                color: AppColors.textPrimary,
+              ),
+              decoration: const InputDecoration(
+                isDense: true,
+                contentPadding: EdgeInsets.symmetric(
+                  horizontal: 4,
+                  vertical: 6,
+                ),
+                border: InputBorder.none,
+                enabledBorder: InputBorder.none,
+                focusedBorder: OutlineInputBorder(
+                  borderSide: BorderSide(color: Color(0xFF2563EB), width: 1.5),
+                  borderRadius: BorderRadius.all(Radius.circular(6)),
+                ),
+                filled: true,
+                fillColor: Colors.white,
+              ),
+              onChanged: (val) {
+                if (val.isNotEmpty && val != widget.value) {
+                  widget.onValueInput?.call(val);
+                }
+              },
+              onSubmitted: (_) {
+                _commitValue();
+                _focusNode.unfocus();
+              },
             ),
           ),
           IconButton(
@@ -521,6 +518,129 @@ class _SmallStepperState extends State<SmallStepper> {
             visualDensity: VisualDensity.compact,
           ),
         ],
+      ),
+    );
+  }
+}
+
+class SSQtyField extends StatefulWidget {
+  const SSQtyField({
+    super.key,
+    required this.value,
+    required this.onChanged,
+    this.isDecimal = false,
+    this.width = 72,
+    this.height = 34,
+    this.enabled = true,
+    this.style,
+    this.decoration,
+  });
+
+  final String value;
+  final ValueChanged<String> onChanged;
+  final bool isDecimal;
+  final double width;
+  final double height;
+  final bool enabled;
+  final TextStyle? style;
+  final InputDecoration? decoration;
+
+  @override
+  State<SSQtyField> createState() => _SSQtyFieldState();
+}
+
+class _SSQtyFieldState extends State<SSQtyField> {
+  late TextEditingController _controller;
+  late FocusNode _focusNode;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TextEditingController(text: widget.value);
+    _focusNode = FocusNode();
+    _focusNode.addListener(_onFocusChange);
+  }
+
+  void _onFocusChange() {
+    if (_focusNode.hasFocus) {
+      _controller.selection = TextSelection(
+        baseOffset: 0,
+        extentOffset: _controller.text.length,
+      );
+    } else {
+      _commitValue();
+    }
+  }
+
+  @override
+  void didUpdateWidget(SSQtyField oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.value != widget.value && !_focusNode.hasFocus) {
+      _controller.text = widget.value;
+    }
+  }
+
+  @override
+  void dispose() {
+    _focusNode.removeListener(_onFocusChange);
+    _controller.dispose();
+    _focusNode.dispose();
+    super.dispose();
+  }
+
+  void _commitValue() {
+    final val = _controller.text.trim();
+    if (val != widget.value) {
+      widget.onChanged(val);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: widget.width,
+      height: widget.height,
+      child: TextField(
+        controller: _controller,
+        focusNode: _focusNode,
+        enabled: widget.enabled,
+        keyboardType: TextInputType.numberWithOptions(
+          decimal: widget.isDecimal,
+        ),
+        textAlign: TextAlign.center,
+        style: widget.style ?? const TextStyle(fontSize: 14),
+        decoration: widget.decoration ??
+            const InputDecoration(
+              isDense: true,
+              contentPadding: EdgeInsets.symmetric(
+                horizontal: 4,
+                vertical: 6,
+              ),
+              filled: true,
+              fillColor: Colors.white,
+              border: OutlineInputBorder(
+                borderSide: BorderSide(color: Color(0xFFDDE6F2)),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderSide: BorderSide(color: Color(0xFFDDE6F2)),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderSide: BorderSide(color: AppColors.primary, width: 1.5),
+              ),
+            ),
+        onTap: () {
+          _controller.selection = TextSelection(
+            baseOffset: 0,
+            extentOffset: _controller.text.length,
+          );
+        },
+        onChanged: (val) {
+          widget.onChanged(val);
+        },
+        onSubmitted: (_) {
+          _commitValue();
+          _focusNode.unfocus();
+        },
       ),
     );
   }
@@ -564,6 +684,19 @@ BoxDecoration ssPanelDecoration() {
 
 String ssFormatDate(DateTime date) {
   return '${date.month.toString().padLeft(2, '0')}/${date.day.toString().padLeft(2, '0')}/${date.year}';
+}
+
+String ssFormatDateTime(DateTime? dt) {
+  if (dt == null) return '-';
+  final local = dt.toLocal();
+  final day = local.day.toString().padLeft(2, '0');
+  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  final month = months[local.month - 1];
+  final year = local.year;
+  final hour12 = local.hour % 12 == 0 ? 12 : local.hour % 12;
+  final minute = local.minute.toString().padLeft(2, '0');
+  final period = local.hour >= 12 ? 'PM' : 'AM';
+  return '$day $month $year, $hour12:$minute $period';
 }
 
 void ssShowLocationErrorDialog(BuildContext context, String message) {

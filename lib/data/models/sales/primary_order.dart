@@ -1,8 +1,11 @@
 import 'package:secondary_sales/core/util/parse.dart';
+import 'package:secondary_sales/core/widgets/ss_ui.dart';
+
 class PrimaryOrder {
   final int id;
   final String name;
   final String date;
+  final DateTime? dateTime;
   final String hubName;
   final int hubId;
   final double amount;
@@ -15,6 +18,7 @@ class PrimaryOrder {
     required this.id,
     required this.name,
     required this.date,
+    this.dateTime,
     required this.hubName,
     required this.hubId,
     required this.amount,
@@ -26,10 +30,13 @@ class PrimaryOrder {
 
   factory PrimaryOrder.fromMap(Map<String, dynamic> map) {
     final hub = map['distributor'] ?? map['customer'];
+    final dt = asDateTime(map['date_order']);
+    final formattedDate = dt != null ? ssFormatDateTime(dt) : (map['date_order'] ?? '').toString();
     return PrimaryOrder(
       id: asInt(map['id']),
       name: map['name'] ?? '',
-      date: map['date_order'] ?? '',
+      dateTime: dt,
+      date: formattedDate,
       hubName: hub is Map ? (hub['name'] ?? 'Unknown Hub') : 'Unknown Hub',
       hubId: hub is Map ? asInt(hub['id']) : 0,
       amount: asDouble(map['amount_total']),
@@ -42,5 +49,4 @@ class PrimaryOrder {
       currencySymbol: (map['currency_symbol'] ?? '৳').toString(),
     );
   }
-
 }

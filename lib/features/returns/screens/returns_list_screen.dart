@@ -138,11 +138,16 @@ class _ReturnsListScreenState extends State<ReturnsListScreen> {
     }
   }
 
-  int get _activeCount =>
-      _returns.where((r) => r.state != 'done' && r.state != 'cancel').length;
-  int get _pendingCount => _returns
-      .where((r) => r.state == 'assigned' || r.state == 'waiting')
-      .length;
+  bool _isPendingFilterActive = false;
+
+  int get _pendingCount => _returns.where((r) => r.state != 'done').length;
+
+  List<ReturnScrapSummary> get _displayedReturns {
+    if (_isPendingFilterActive) {
+      return _returns.where((r) => r.state != 'done').toList();
+    }
+    return _returns;
+  }
 
   Color _stateColor(String state) {
     return switch (state) {
@@ -320,73 +325,63 @@ class _ReturnsListScreenState extends State<ReturnsListScreen> {
               ),
               const SizedBox(height: 24),
 
-              // Summary Cards
-              Row(
-                children: [
-                  Expanded(
-                    child: Container(
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: AppColors.primary,
-                        borderRadius: BorderRadius.circular(12),
+              // Summary Card
+              InkWell(
+                onTap: () {
+                  setState(() {
+                    _isPendingFilterActive = !_isPendingFilterActive;
+                  });
+                },
+                borderRadius: BorderRadius.circular(12),
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFEF3C7),
+                    borderRadius: BorderRadius.circular(12),
+                    border: _isPendingFilterActive
+                        ? Border.all(color: const Color(0xFFB45309), width: 2)
+                        : Border.all(color: const Color(0xFFFDE68A)),
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFDE68A),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: const Icon(
+                          Icons.pending_actions_outlined,
+                          color: Color(0xFFB45309),
+                          size: 26,
+                        ),
                       ),
-                      child: Column(
+                      const SizedBox(width: 16),
+                      Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text(
-                            'TOTAL ACTIVE',
-                            style: TextStyle(
-                              color: Colors.white70,
-                              fontSize: 12,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          const SizedBox(height: 8),
                           Text(
-                            '$_activeCount',
+                            '$_pendingCount'.padLeft(2, '0'),
                             style: const TextStyle(
-                              color: Colors.white,
                               fontSize: 24,
                               fontWeight: FontWeight.bold,
+                              color: Color(0xFFB45309),
+                            ),
+                          ),
+                          const Text(
+                            'Pending',
+                            style: TextStyle(
+                              color: Color(0xFFB45309),
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
                             ),
                           ),
                         ],
                       ),
-                    ),
+                    ],
                   ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Container(
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFDEE5FC),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text(
-                            'PENDING REVIEW',
-                            style: TextStyle(
-                              color: AppColors.primary,
-                              fontSize: 12,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            '$_pendingCount',
-                            style: const TextStyle(
-                              color: Colors.black87,
-                              fontSize: 24,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ],
+                ),
               ),
               const SizedBox(height: 24),
 
@@ -395,7 +390,7 @@ class _ReturnsListScreenState extends State<ReturnsListScreen> {
                   padding: EdgeInsets.all(32),
                   child: Center(child: CircularProgressIndicator()),
                 )
-              else if (_returns.isEmpty)
+              else if (_displayedReturns.isEmpty)
                 const EmptyPanel(message: 'No returns found')
               else ...[
                 if (provider.isLoading)
@@ -403,7 +398,7 @@ class _ReturnsListScreenState extends State<ReturnsListScreen> {
                     padding: EdgeInsets.only(bottom: 12),
                     child: LinearProgressIndicator(),
                   ),
-                ..._returns.map((ret) {
+                ..._displayedReturns.map((ret) {
                   final origin = ret.origin?.toString() ?? '-';
                   // In standard odoo origin may look like 'Return from Distributor A'
                   final customerName = origin.replaceAll('Return from ', '');

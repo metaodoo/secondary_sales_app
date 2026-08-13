@@ -3,10 +3,15 @@ part of '../api_service.dart';
 
 /// Employees endpoints for the secondary sales API.
 extension EmployeesApi on ApiService {
-  Future<List<SalesEmployee>> getSubordinateOfficers() async {
+  Future<List<SalesEmployee>> getSubordinateOfficers({
+    int? routeId,
+    int? outletId,
+  }) async {
     final params = <String, dynamic>{
       'page_size': 100,
       'manager_id': _activeEmployeeId,
+      if (routeId != null) 'route_id': routeId,
+      if (outletId != null) 'outlet_id': outletId,
     };
     final result = await _post('${AppConstants.apiPrefix}/employees', params);
     if (result['success'] == true) {

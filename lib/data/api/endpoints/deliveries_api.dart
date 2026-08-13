@@ -57,6 +57,8 @@ extension DeliveriesApi on ApiService {
     String? search,
     String? state,
     String? type,
+    DateTime? dateFrom,
+    DateTime? dateTo,
   }) async {
     final params = <String, dynamic>{
       'employee_id': _activeEmployeeId,
@@ -66,6 +68,14 @@ extension DeliveriesApi on ApiService {
     if (search != null && search.isNotEmpty) params['search'] = search;
     if (state != null && state.isNotEmpty) params['state'] = state;
     if (type != null && type.isNotEmpty) params['type'] = type;
+    if (dateFrom != null) {
+      params['date_from'] =
+          '${dateFrom.year.toString().padLeft(4, '0')}-${dateFrom.month.toString().padLeft(2, '0')}-${dateFrom.day.toString().padLeft(2, '0')}';
+    }
+    if (dateTo != null) {
+      params['date_to'] =
+          '${dateTo.year.toString().padLeft(4, '0')}-${dateTo.month.toString().padLeft(2, '0')}-${dateTo.day.toString().padLeft(2, '0')}';
+    }
 
     final result = await _post(AppConstants.deliveriesEndpoint, params);
     if (result['success'] == true) {

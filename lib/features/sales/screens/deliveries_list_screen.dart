@@ -22,6 +22,8 @@ class _DeliveriesListScreenState extends State<DeliveriesListScreen> {
   String _currentFilter = 'all';
 
   String? _searchQuery;
+  DateTime? _dateFromFilter;
+  DateTime? _dateToFilter;
 
   @override
   void initState() {
@@ -41,6 +43,8 @@ class _DeliveriesListScreenState extends State<DeliveriesListScreen> {
         pageSize: 50,
         search: _searchQuery,
         type: widget.moduleType,
+        dateFrom: _dateFromFilter,
+        dateTo: _dateToFilter,
       );
       setState(() {
         _deliveries = items;
@@ -56,6 +60,32 @@ class _DeliveriesListScreenState extends State<DeliveriesListScreen> {
     }
   }
 
+  Future<void> _pickDateRange() async {
+    final picked = await showDateRangePicker(
+      context: context,
+      initialDateRange: _dateFromFilter != null && _dateToFilter != null
+          ? DateTimeRange(start: _dateFromFilter!, end: _dateToFilter!)
+          : null,
+      firstDate: DateTime(2020),
+      lastDate: DateTime(2035),
+    );
+    if (picked != null) {
+      setState(() {
+        _dateFromFilter = picked.start;
+        _dateToFilter = picked.end;
+      });
+      _fetchDeliveries();
+    }
+  }
+
+  void _clearDateFilter() {
+    setState(() {
+      _dateFromFilter = null;
+      _dateToFilter = null;
+    });
+    _fetchDeliveries();
+  }
+
   int get _pendingCount => _deliveries
       .where(
         (d) =>
@@ -64,23 +94,11 @@ class _DeliveriesListScreenState extends State<DeliveriesListScreen> {
             d.state == 'assigned',
       )
       .length;
-  int get _overdueCount {
-    final now = DateTime.now();
-    return _deliveries
-        .where(
-          (d) =>
-              (d.state == 'waiting' ||
-                  d.state == 'confirmed' ||
-                  d.state == 'assigned') &&
-              d.scheduledDate != null &&
-              d.scheduledDate!.isBefore(now),
-        )
-        .length;
-  }
 
   List<DeliveryItem> get _filteredDeliveries {
+    var list = _deliveries;
     if (_currentFilter == 'pending') {
-      return _deliveries
+      list = list
           .where(
             (d) =>
                 d.state == 'waiting' ||
@@ -88,20 +106,29 @@ class _DeliveriesListScreenState extends State<DeliveriesListScreen> {
                 d.state == 'assigned',
           )
           .toList();
-    } else if (_currentFilter == 'overdue') {
-      final now = DateTime.now();
-      return _deliveries
-          .where(
-            (d) =>
-                (d.state == 'waiting' ||
-                    d.state == 'confirmed' ||
-                    d.state == 'assigned') &&
-                d.scheduledDate != null &&
-                d.scheduledDate!.isBefore(now),
-          )
-          .toList();
     }
-    return _deliveries;
+    if (_dateFromFilter != null && _dateToFilter != null) {
+      final start = DateTime(
+        _dateFromFilter!.year,
+        _dateFromFilter!.month,
+        _dateFromFilter!.day,
+      );
+      final end = DateTime(
+        _dateToFilter!.year,
+        _dateToFilter!.month,
+        _dateToFilter!.day,
+        23,
+        59,
+        59,
+      );
+      list = list.where((d) {
+        final dt = d.scheduledDate ?? d.createdDate;
+        if (dt == null) return false;
+        return dt.isAfter(start.subtract(const Duration(seconds: 1))) &&
+            dt.isBefore(end.add(const Duration(seconds: 1)));
+      }).toList();
+    }
+    return list;
   }
 
   @override
@@ -203,133 +230,154 @@ class _DeliveriesListScreenState extends State<DeliveriesListScreen> {
   }
 
   Widget _buildSearchBar() {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: AppColors.borderSoft),
-      ),
-      child: Row(
-        children: [
-          const Padding(
-            padding: EdgeInsets.symmetric(horizontal: 12.0),
-            child: Icon(Icons.search, color: AppColors.textSecondary),
+    final bool hasDateFilter = _dateFromFilter != null && _dateToFilter != null;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(
+              color: hasDateFilter ? AppColors.primary : AppColors.borderSoft,
+            ),
           ),
-          Expanded(
-            child: TextField(
-              decoration: const InputDecoration(
-                hintText: 'Search delivery reference...',
-                border: InputBorder.none,
-                hintStyle: TextStyle(color: AppColors.textSecondary),
+          child: Row(
+            children: [
+              const Padding(
+                padding: EdgeInsets.symmetric(horizontal: 12.0),
+                child: Icon(Icons.search, color: AppColors.textSecondary),
               ),
-              onSubmitted: (val) {
-                _fetchDeliveries(val);
-              },
-            ),
+              Expanded(
+                child: TextField(
+                  decoration: const InputDecoration(
+                    hintText: 'Search delivery reference...',
+                    border: InputBorder.none,
+                    hintStyle: TextStyle(color: AppColors.textSecondary),
+                  ),
+                  onSubmitted: (val) {
+                    _fetchDeliveries(val);
+                  },
+                ),
+              ),
+              InkWell(
+                onTap: _pickDateRange,
+                borderRadius: const BorderRadius.horizontal(
+                  right: Radius.circular(8),
+                ),
+                child: Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: hasDateFilter ? AppColors.primarySoft : Colors.transparent,
+                    borderRadius: const BorderRadius.horizontal(
+                      right: Radius.circular(8),
+                    ),
+                    border: const Border(
+                      left: BorderSide(color: AppColors.borderSoft),
+                    ),
+                  ),
+                  child: Icon(
+                    Icons.filter_list,
+                    color: hasDateFilter ? AppColors.primary : AppColors.textSecondary,
+                  ),
+                ),
+              ),
+            ],
           ),
+        ),
+        if (hasDateFilter) ...[
+          const SizedBox(height: 8),
           Container(
-            padding: const EdgeInsets.all(12),
-            decoration: const BoxDecoration(
-              border: Border(left: BorderSide(color: AppColors.borderSoft)),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            decoration: BoxDecoration(
+              color: AppColors.primarySoft,
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: AppColors.primaryTint),
             ),
-            child: const Icon(
-              Icons.filter_list,
-              color: AppColors.textSecondary,
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.date_range, size: 14, color: AppColors.primary),
+                const SizedBox(width: 6),
+                Text(
+                  '${ssFormatDate(_dateFromFilter!)} - ${ssFormatDate(_dateToFilter!)}',
+                  style: const TextStyle(
+                    color: AppColors.primary,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 12,
+                  ),
+                ),
+                const SizedBox(width: 6),
+                GestureDetector(
+                  onTap: _clearDateFilter,
+                  child: const Icon(Icons.close, size: 14, color: AppColors.primary),
+                ),
+              ],
             ),
           ),
         ],
-      ),
+      ],
     );
   }
 
   Widget _buildStatsCards() {
-    return Row(
-      children: [
-        Expanded(
-          child: InkWell(
-            onTap: () {
-              setState(() {
-                _currentFilter = _currentFilter == 'pending'
-                    ? 'all'
-                    : 'pending';
-              });
-            },
-            child: Container(
-              padding: const EdgeInsets.all(16),
+    final isPendingSelected = _currentFilter == 'pending';
+    return InkWell(
+      onTap: () {
+        setState(() {
+          _currentFilter = isPendingSelected ? 'all' : 'pending';
+        });
+      },
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: const Color(0xFFFEF3C7),
+          borderRadius: BorderRadius.circular(12),
+          border: isPendingSelected
+              ? Border.all(color: const Color(0xFFB45309), width: 2)
+              : Border.all(color: const Color(0xFFFDE68A)),
+        ),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: const Color(0xFFFEF3C7),
-                borderRadius: BorderRadius.circular(12),
-                border: _currentFilter == 'pending'
-                    ? Border.all(color: const Color(0xFFB45309), width: 2)
-                    : null,
+                color: const Color(0xFFFDE68A),
+                borderRadius: BorderRadius.circular(10),
               ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Icon(
-                    Icons.local_shipping_outlined,
+              child: const Icon(
+                Icons.local_shipping_outlined,
+                color: Color(0xFFB45309),
+                size: 26,
+              ),
+            ),
+            const SizedBox(width: 16),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  _pendingCount.toString().padLeft(2, '0'),
+                  style: const TextStyle(
+                    fontSize: 24,
+                    fontWeight: FontWeight.bold,
                     color: Color(0xFFB45309),
                   ),
-                  const SizedBox(height: 12),
-                  Text(
-                    _pendingCount.toString().padLeft(2, '0'),
-                    style: const TextStyle(
-                      fontSize: 24,
-                      fontWeight: FontWeight.bold,
-                      color: Color(0xFFB45309),
-                    ),
+                ),
+                const Text(
+                  'Pending Delivery',
+                  style: TextStyle(
+                    color: Color(0xFFB45309),
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
                   ),
-                  const Text(
-                    'Pending Delivery',
-                    style: TextStyle(color: Color(0xFFB45309), fontSize: 12),
-                  ),
-                ],
-              ),
+                ),
+              ],
             ),
-          ),
+          ],
         ),
-        const SizedBox(width: 16),
-        Expanded(
-          child: InkWell(
-            onTap: () {
-              setState(() {
-                _currentFilter = _currentFilter == 'overdue'
-                    ? 'all'
-                    : 'overdue';
-              });
-            },
-            child: Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: const Color(0xFFFEE2E2),
-                borderRadius: BorderRadius.circular(12),
-                border: _currentFilter == 'overdue'
-                    ? Border.all(color: const Color(0xFFB91C1C), width: 2)
-                    : null,
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Icon(Icons.timer_outlined, color: Color(0xFFB91C1C)),
-                  const SizedBox(height: 12),
-                  Text(
-                    _overdueCount.toString().padLeft(2, '0'),
-                    style: const TextStyle(
-                      fontSize: 24,
-                      fontWeight: FontWeight.bold,
-                      color: Color(0xFFB91C1C),
-                    ),
-                  ),
-                  const Text(
-                    'Overdue Delivery',
-                    style: TextStyle(color: Color(0xFFB91C1C), fontSize: 12),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ],
+      ),
     );
   }
 

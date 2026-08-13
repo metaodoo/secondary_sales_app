@@ -237,11 +237,13 @@ class _OrderStatusPanel extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 14),
-          Text('Created: ${_formatServerDate(asDateTime(order.dateOrder))}'),
-          const SizedBox(height: 8),
-          Text(
-            'Expected Delivery: ${_formatServerDate(asDateTime(order.expectedDeliveryDate))}',
-          ),
+          Text('Created: ${order.dateOrder}'),
+          if (order.expectedDeliveryDate != null) ...[
+            const SizedBox(height: 8),
+            Text(
+              'Expected Delivery: ${_formatServerDate(asDateTime(order.expectedDeliveryDate))}',
+            ),
+          ],
         ],
       ),
     );
@@ -325,12 +327,6 @@ class _OrderLinesPanel extends StatelessWidget {
                         value: formatQty(line.deliveredQty),
                         color: const Color(0xFFECFDF3),
                         valueColor: const Color(0xFF16A34A),
-                      ),
-                      _QtyRow(
-                        label: 'Balance Qty',
-                        value: formatQty(line.balanceQty),
-                        color: const Color(0xFFFFF7ED),
-                        valueColor: const Color(0xFFEA580C),
                       ),
                     ],
                   ),

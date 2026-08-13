@@ -179,7 +179,7 @@ class _VanLoadFormScreenState extends State<VanLoadFormScreen> {
           sku: t['sku'] ?? '',
           tracking: t['tracking'] ?? 'none',
           uomName: t['uom_name'] ?? 'Unit',
-          targetQty: (t['daily_target_qty'] ?? 0.0).toDouble(),
+          targetQty: (t['daily_target_qty'] ?? t['target_qty'] ?? 0.0).toDouble(),
           availableStock: avail,
           scrapStock: scrap,
           damagedQualityStock: damagedQualityStock,
@@ -189,6 +189,12 @@ class _VanLoadFormScreenState extends State<VanLoadFormScreen> {
           damagedQualityUnloadQty: damagedQualityUnload,
         ));
       }
+
+      items.sort((a, b) {
+        final targetCmp = b.targetQty.compareTo(a.targetQty);
+        if (targetCmp != 0) return targetCmp;
+        return a.productName.compareTo(b.productName);
+      });
 
       if (mounted) {
         setState(() {
@@ -775,35 +781,17 @@ class _VanLoadFormScreenState extends State<VanLoadFormScreen> {
                                                     ),
                                                   ),
                                                   const SizedBox(height: 6),
-                                                  SizedBox(
+                                                  SSQtyField(
+                                                    value: item.freshUnloadQty > 0 ? item.freshUnloadQty.toStringAsFixed(0) : '',
+                                                    isDecimal: true,
+                                                    width: double.infinity,
                                                     height: 42,
-                                                    child: TextField(
-                                                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                                                      decoration: InputDecoration(
-                                                        hintText: 'Enter qty',
-                                                        hintStyle: const TextStyle(color: AppColors.textSecondary, fontSize: 14),
-                                                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 0),
-                                                        border: OutlineInputBorder(
-                                                          borderRadius: BorderRadius.circular(8),
-                                                          borderSide: const BorderSide(color: Color(0xFFDDE6F2)),
-                                                        ),
-                                                        enabledBorder: OutlineInputBorder(
-                                                          borderRadius: BorderRadius.circular(8),
-                                                          borderSide: const BorderSide(color: Color(0xFFDDE6F2)),
-                                                        ),
-                                                      ),
-                                                      onChanged: (val) {
-                                                        final qty = double.tryParse(val) ?? 0;
-                                                        setState(() {
-                                                          item.freshUnloadQty = qty;
-                                                        });
-                                                      },
-                                                      controller: TextEditingController(
-                                                        text: item.freshUnloadQty > 0 ? item.freshUnloadQty.toStringAsFixed(0) : '',
-                                                      )..selection = TextSelection.collapsed(
-                                                          offset: item.freshUnloadQty > 0 ? item.freshUnloadQty.toStringAsFixed(0).length : 0,
-                                                        ),
-                                                    ),
+                                                    onChanged: (val) {
+                                                      final qty = double.tryParse(val) ?? 0;
+                                                      setState(() {
+                                                        item.freshUnloadQty = qty;
+                                                      });
+                                                    },
                                                   ),
                                                 ],
                                               ),
@@ -822,35 +810,17 @@ class _VanLoadFormScreenState extends State<VanLoadFormScreen> {
                                                     ),
                                                   ),
                                                   const SizedBox(height: 6),
-                                                  SizedBox(
+                                                  SSQtyField(
+                                                    value: item.scrapUnloadQty > 0 ? item.scrapUnloadQty.toStringAsFixed(0) : '',
+                                                    isDecimal: true,
+                                                    width: double.infinity,
                                                     height: 42,
-                                                    child: TextField(
-                                                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                                                      decoration: InputDecoration(
-                                                        hintText: 'Enter qty',
-                                                        hintStyle: const TextStyle(color: AppColors.textSecondary, fontSize: 14),
-                                                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 0),
-                                                        border: OutlineInputBorder(
-                                                          borderRadius: BorderRadius.circular(8),
-                                                          borderSide: const BorderSide(color: Color(0xFFDDE6F2)),
-                                                        ),
-                                                        enabledBorder: OutlineInputBorder(
-                                                          borderRadius: BorderRadius.circular(8),
-                                                          borderSide: const BorderSide(color: Color(0xFFDDE6F2)),
-                                                        ),
-                                                      ),
-                                                      onChanged: (val) {
-                                                        final qty = double.tryParse(val) ?? 0;
-                                                        setState(() {
-                                                          item.scrapUnloadQty = qty;
-                                                        });
-                                                      },
-                                                      controller: TextEditingController(
-                                                        text: item.scrapUnloadQty > 0 ? item.scrapUnloadQty.toStringAsFixed(0) : '',
-                                                      )..selection = TextSelection.collapsed(
-                                                          offset: item.scrapUnloadQty > 0 ? item.scrapUnloadQty.toStringAsFixed(0).length : 0,
-                                                        ),
-                                                    ),
+                                                    onChanged: (val) {
+                                                      final qty = double.tryParse(val) ?? 0;
+                                                      setState(() {
+                                                        item.scrapUnloadQty = qty;
+                                                      });
+                                                    },
                                                   ),
                                                 ],
                                               ),

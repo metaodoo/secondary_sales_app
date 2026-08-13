@@ -132,99 +132,26 @@ class OrderLineCard extends StatelessWidget {
           const SizedBox(height: 16),
           Row(
             children: [
-              // Minus button
-              Container(
-                width: 38,
-                height: 38,
-                decoration: BoxDecoration(
-                  border: Border.all(color: AppColors.borderSoft),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: IconButton(
-                  padding: EdgeInsets.zero,
-                  icon: const Icon(
-                    Icons.remove,
-                    size: 18,
-                    color: AppColors.textSecondary,
-                  ),
-                  onPressed: () {
-                    if (line.quantity > 1) {
-                      line.quantity--;
-                      onChanged();
-                    }
-                  },
-                ),
-              ),
-              const SizedBox(width: 8),
-              // Qty input field
-              SizedBox(
-                width: 85,
-                height: 38,
-                child: TextField(
-                  keyboardType: const TextInputType.numberWithOptions(
-                    decimal: false,
-                  ),
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 15,
-                    color: AppColors.textPrimary,
-                  ),
-                  decoration: InputDecoration(
-                    contentPadding: const EdgeInsets.symmetric(
-                      horizontal: 4,
-                      vertical: 0,
-                    ),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(8),
-                      borderSide: const BorderSide(color: AppColors.borderSoft),
-                    ),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(8),
-                      borderSide: const BorderSide(color: AppColors.borderSoft),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(8),
-                      borderSide: const BorderSide(
-                        color: AppColors.primary,
-                        width: 2,
-                      ),
-                    ),
-                  ),
-                  onChanged: (val) {
-                    final parsed = int.tryParse(val);
-                    if (parsed != null && parsed > 0) {
-                      line.quantity = parsed;
-                      onChanged();
-                    }
-                  },
-                  controller: TextEditingController(text: '${line.quantity}')
-                    ..selection = TextSelection.collapsed(
-                      offset: '${line.quantity}'.length,
-                    ),
-                ),
-              ),
-              const SizedBox(width: 8),
-              // Plus button
-              Container(
-                width: 38,
-                height: 38,
-                decoration: BoxDecoration(
-                  border: Border.all(color: AppColors.borderSoft),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: IconButton(
-                  padding: EdgeInsets.zero,
-                  icon: const Icon(
-                    Icons.add,
-                    size: 18,
-                    color: AppColors.textSecondary,
-                  ),
-                  onPressed: () {
-                    line.quantity++;
+              SmallStepper(
+                value: '${line.quantity}',
+                isDecimal: false,
+                onMinus: () {
+                  if (line.quantity > 1) {
+                    line.quantity--;
                     onChanged();
-                  },
-                ),
+                  }
+                },
+                onPlus: () {
+                  line.quantity++;
+                  onChanged();
+                },
+                onValueInput: (val) {
+                  final parsed = int.tryParse(val);
+                  if (parsed != null && parsed > 0) {
+                    line.quantity = parsed;
+                    onChanged();
+                  }
+                },
               ),
               const Spacer(),
               Column(

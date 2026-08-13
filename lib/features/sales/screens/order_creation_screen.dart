@@ -682,71 +682,19 @@ class _OrderCreationScreenState extends State<OrderCreationScreen> {
           style: const TextStyle(fontSize: 11, color: AppColors.textSecondary),
         ),
         const SizedBox(height: 6),
-        Container(
-          height: 40,
-          decoration: BoxDecoration(
-            color: const Color(0xFFF4F6F9),
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              IconButton(
-                onPressed: value > 0 ? () => onChanged(value - 1) : null,
-                icon: const Icon(Icons.remove, size: 16),
-                color: AppColors.textSecondary,
-                padding: EdgeInsets.zero,
-                constraints: const BoxConstraints(minWidth: 32),
-              ),
-              SizedBox(
-                width: 80,
-                height: 32,
-                child: TextField(
-                  keyboardType: const TextInputType.numberWithOptions(
-                    decimal: false,
-                  ),
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.bold,
-                    color: AppColors.textPrimary,
-                  ),
-                  decoration: const InputDecoration(
-                    isDense: true,
-                    contentPadding: EdgeInsets.symmetric(
-                      horizontal: 4,
-                      vertical: 6,
-                    ),
-                    border: InputBorder.none,
-                    enabledBorder: InputBorder.none,
-                    focusedBorder: UnderlineInputBorder(
-                      borderSide: BorderSide(
-                        color: AppColors.primary,
-                        width: 2,
-                      ),
-                    ),
-                  ),
-                  onChanged: (val) {
-                    final parsed = int.tryParse(val);
-                    if (parsed != null && parsed >= 0) {
-                      onChanged(parsed);
-                    }
-                  },
-                  controller: TextEditingController(text: value.toString())
-                    ..selection = TextSelection.collapsed(
-                      offset: value.toString().length,
-                    ),
-                ),
-              ),
-              IconButton(
-                onPressed: () => onChanged(value + 1),
-                icon: const Icon(Icons.add, size: 16),
-                color: AppColors.textSecondary,
-                padding: EdgeInsets.zero,
-                constraints: const BoxConstraints(minWidth: 32),
-              ),
-            ],
-          ),
+        SmallStepper(
+          value: '$value',
+          isDecimal: false,
+          onMinus: () {
+            if (value > 0) onChanged(value - 1);
+          },
+          onPlus: () => onChanged(value + 1),
+          onValueInput: (val) {
+            final parsed = int.tryParse(val);
+            if (parsed != null && parsed >= 0) {
+              onChanged(parsed);
+            }
+          },
         ),
       ],
     );

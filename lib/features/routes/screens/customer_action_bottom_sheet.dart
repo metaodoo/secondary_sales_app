@@ -234,6 +234,7 @@ class _CustomerActionBottomSheetState extends State<CustomerActionBottomSheet> {
                           builder: (_) => NewJointVisitScreen(
                             outletId: widget.outletId,
                             outletName: widget.customerName,
+                            routeId: routeProv.activeRoute?.id,
                             currentVisitId: routeProv.currentVisitId,
                           ),
                         ),

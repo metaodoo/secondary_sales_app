@@ -5,7 +5,6 @@ import 'package:provider/provider.dart';
 import 'package:secondary_sales/data/models/contacts/distribution_hub.dart';
 import 'package:secondary_sales/data/models/sales/order_line_entry.dart';
 import 'package:secondary_sales/data/models/sales/product.dart';
-import 'package:secondary_sales/features/auth/auth_provider.dart';
 import 'package:secondary_sales/features/sales/primary_sale_provider.dart';
 import 'package:secondary_sales/features/sales/screens/product_selection_screen.dart';
 import 'package:secondary_sales/core/widgets/order_form_widgets.dart';
