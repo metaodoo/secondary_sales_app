@@ -606,7 +606,7 @@ class _AttendanceHero extends StatelessWidget {
       bg = AppColors.successSoft;
       fg = const Color(0xFF166534);
       icon = Icons.check_circle;
-      title = 'Checked in';
+      title = 'Logged in';
       subtitle = summary?.checkInTime != null
           ? 'Since ${summary!.checkInTime} · tap for history'
           : 'On shift · tap for history';
@@ -614,10 +614,10 @@ class _AttendanceHero extends StatelessWidget {
       bg = AppColors.warningSoft;
       fg = const Color(0xFF92400E);
       icon = Icons.schedule;
-      title = known ? "You're not checked in" : 'Attendance';
+      title = known ? "Logged out" : 'Attendance';
       subtitle = known
           ? 'One tap · selfie & location'
-          : 'Check in / out and view history';
+          : 'Log in / out and view history';
     }
 
     return Material(
@@ -779,7 +779,7 @@ class _CheckButton extends StatelessWidget {
                   ),
                 )
               : Text(
-                  checkedIn ? 'Check Out' : 'Check In',
+                  checkedIn ? 'Log Out' : 'Log In',
                   style: TextStyle(
                     color: labelColor,
                     fontWeight: FontWeight.bold,

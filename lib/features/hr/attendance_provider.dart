@@ -208,7 +208,7 @@ class AttendanceProvider extends ChangeNotifier {
     if (_employeeId == 0) return false;
     _isActionLoading = true;
     _errorMessage = null;
-    _loadingMessage = action == 'check_in' ? 'Opening camera for selfie...' : 'Processing check-out...';
+    _loadingMessage = action == 'check_in' ? 'Opening camera for selfie...' : 'Processing log-out...';
     notifyListeners();
 
     try {
@@ -225,7 +225,7 @@ class AttendanceProvider extends ChangeNotifier {
           );
 
           if (photo == null) {
-            _errorMessage = 'Selfie photo is required for attendance check-in.';
+            _errorMessage = 'Selfie photo is required for attendance log-in.';
             _isActionLoading = false;
             _loadingMessage = '';
             notifyListeners();

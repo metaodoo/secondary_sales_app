@@ -22,17 +22,17 @@ StatusBadgeData getPrimaryOrderStatusBadge(String state, String deliveryStatus) 
   final d = deliveryStatus.toLowerCase();
 
   // If a delivery validation has occurred, show delivery state
-  if (d == 'full') {
+  if (d == 'full' || d == 'delivered' || d == 'fully_delivered' || s == 'done') {
     return const StatusBadgeData(
-      label: 'Delivery Fully Done',
-      bgColor: Color(0xFFDCFCE7),
-      textColor: Color(0xFF16A34A),
+      label: 'Delivered',
+      bgColor: Color(0xFFDCFCE7), // Soft Green
+      textColor: Color(0xFF15803D), // Dark Green
     );
-  } else if (d == 'partial') {
+  } else if (d == 'partial' || d == 'partially_delivered' || d == 'delivery_partial') {
     return const StatusBadgeData(
-      label: 'Delivery Partially Done',
-      bgColor: Color(0xFFFEF3C7),
-      textColor: Color(0xFFD97706),
+      label: 'Partial Delivery',
+      bgColor: Color(0xFFDBEAFE), // Soft Blue
+      textColor: Color(0xFF1D4ED8), // Dark Blue
     );
   }
 
@@ -43,17 +43,17 @@ StatusBadgeData getPrimaryOrderStatusBadge(String state, String deliveryStatus) 
       bgColor: AppColors.borderMuted,
       textColor: AppColors.textSecondary,
     );
-  } else if (s == 'cancel') {
+  } else if (s == 'cancel' || s == 'cancelled') {
     return const StatusBadgeData(
       label: 'Cancelled',
       bgColor: Color(0xFFFEE2E2),
       textColor: Color(0xFFEF4444),
     );
-  } else if (s == 'sale' || s == 'done') {
+  } else if (s == 'sale' || s == 'confirmed' || s == 'pending') {
     return const StatusBadgeData(
-      label: 'Confirmed',
-      bgColor: Color(0xFFDCFCE7),
-      textColor: Color(0xFF16A34A),
+      label: 'Pending',
+      bgColor: Color(0xFFFFEDD5), // Soft Orange
+      textColor: Color(0xFFC2410C), // Dark Orange
     );
   }
 

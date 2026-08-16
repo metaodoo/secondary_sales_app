@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import 'package:secondary_sales/data/models/contacts/distribution_hub.dart';
 import 'package:secondary_sales/features/sales/primary_sale_provider.dart';
 import 'package:secondary_sales/core/widgets/ss_ui.dart';
+import 'package:secondary_sales/core/util/dialog_helper.dart';
 
 class CreateDistributorScreen extends StatefulWidget {
   const CreateDistributorScreen({super.key, this.distributor});
@@ -88,11 +89,9 @@ class _CreateDistributorScreenState extends State<CreateDistributorScreen> {
       );
       Navigator.pop(context, true);
     } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(provider.error ?? 'Failed to save dealer'),
-          backgroundColor: Colors.red,
-        ),
+      await showValidationErrorDialog(
+        context,
+        provider.error ?? 'Failed to save dealer',
       );
     }
   }

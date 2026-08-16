@@ -7,6 +7,7 @@ extension CatalogApi on ApiService {
     String? search,
     String? saleType,
     int? partnerId,
+    int? categoryId,
     bool? inStockOnly,
     String? sortBy,
   }) async {
@@ -21,6 +22,9 @@ extension CatalogApi on ApiService {
     }
     if (partnerId != null) {
       params['partner_id'] = partnerId;
+    }
+    if (categoryId != null) {
+      params['category_id'] = categoryId;
     }
     if (inStockOnly == true) {
       params['in_stock_only'] = true;
@@ -46,10 +50,20 @@ extension CatalogApi on ApiService {
     );
   }
 
+  Future<List<ProductCategory>> getProductCategories() async {
+    final result = await _post('${AppConstants.apiPrefix}/products/categories', {});
+    if (result['success'] == true) {
+      final List<dynamic> data = result['categories'] ?? result['data'] ?? [];
+      return data.map((json) => ProductCategory.fromMap(json)).toList();
+    }
+    return [];
+  }
+
   Future<List<Product>> getProducts({
     String? search,
     String? saleType,
     int? partnerId,
+    int? categoryId,
     bool? inStockOnly,
     String? sortBy,
   }) async {
@@ -57,6 +71,7 @@ extension CatalogApi on ApiService {
       search: search,
       saleType: saleType,
       partnerId: partnerId,
+      categoryId: categoryId,
       inStockOnly: inStockOnly,
       sortBy: sortBy,
     );

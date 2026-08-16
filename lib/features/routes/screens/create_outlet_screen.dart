@@ -7,6 +7,7 @@ import 'package:secondary_sales/features/routes/route_provider.dart';
 import 'package:secondary_sales/core/services/location_service.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:secondary_sales/features/my_team/my_team_provider.dart';
+import 'package:secondary_sales/core/util/dialog_helper.dart';
 
 class CreateOutletScreen extends StatefulWidget {
   final int routeId;
@@ -74,7 +75,10 @@ class _CreateOutletScreenState extends State<CreateOutletScreen> {
       if (!mounted) return;
 
       // Reverse geocode coordinate to physical address via Barikoi
-      final myTeamProvider = Provider.of<MyTeamProvider>(context, listen: false);
+      final myTeamProvider = Provider.of<MyTeamProvider>(
+        context,
+        listen: false,
+      );
       final resolvedAddress = await myTeamProvider.reverseGeocode(
         latitude: position.latitude,
         longitude: position.longitude,
@@ -89,9 +93,9 @@ class _CreateOutletScreenState extends State<CreateOutletScreen> {
     } catch (e) {
       setState(() => _isResolvingAddress = false);
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: ${e.toString()}')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error: ${e.toString()}')));
       }
     }
   }
@@ -102,7 +106,9 @@ class _CreateOutletScreenState extends State<CreateOutletScreen> {
     if (_capturedPhoto == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('You must capture a live photo of the outlet using the camera.'),
+          content: Text(
+            'You must capture a live photo of the outlet using the camera.',
+          ),
           backgroundColor: Colors.red,
         ),
       );
@@ -139,16 +145,15 @@ class _CreateOutletScreenState extends State<CreateOutletScreen> {
         );
         Navigator.pop(context, true);
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(provider.error ?? 'Failed to create outlet')),
+        await showValidationErrorDialog(
+          context,
+          provider.error ?? 'Failed to create outlet',
         );
       }
     } catch (e) {
       setState(() => _isSaving = false);
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(e.toString().replaceAll('Exception: ', ''))),
-        );
+        await showValidationErrorDialog(context, e.toString());
       }
     }
   }
@@ -232,8 +237,8 @@ class _CreateOutletScreenState extends State<CreateOutletScreen> {
                           color: AppColors.borderMuted.withOpacity(0.3),
                           borderRadius: BorderRadius.circular(12),
                           border: Border.all(
-                            color: _capturedPhoto == null 
-                                ? AppColors.borderSoft 
+                            color: _capturedPhoto == null
+                                ? AppColors.borderSoft
                                 : AppColors.primaryStrong.withOpacity(0.5),
                             width: 1.5,
                           ),
@@ -284,7 +289,8 @@ class _CreateOutletScreenState extends State<CreateOutletScreen> {
                                       left: 12,
                                       right: 12,
                                       child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
                                         children: [
                                           Row(
                                             children: [
@@ -306,7 +312,9 @@ class _CreateOutletScreenState extends State<CreateOutletScreen> {
                                           ),
                                           if (_isResolvingAddress)
                                             const Padding(
-                                              padding: EdgeInsets.only(top: 4.0),
+                                              padding: EdgeInsets.only(
+                                                top: 4.0,
+                                              ),
                                               child: Text(
                                                 'Resolving address details...',
                                                 style: TextStyle(
@@ -329,7 +337,9 @@ class _CreateOutletScreenState extends State<CreateOutletScreen> {
                                         ),
                                         decoration: BoxDecoration(
                                           color: Colors.black.withOpacity(0.6),
-                                          borderRadius: BorderRadius.circular(20),
+                                          borderRadius: BorderRadius.circular(
+                                            20,
+                                          ),
                                         ),
                                         child: const Row(
                                           mainAxisSize: MainAxisSize.min,

@@ -9,6 +9,7 @@ import 'package:secondary_sales/features/visits/screens/route_sessions_screen.da
 import 'package:secondary_sales/features/auth/auth_provider.dart';
 import 'package:secondary_sales/core/access/access_resources.dart';
 import 'package:secondary_sales/core/widgets/ss_ui.dart';
+import 'package:secondary_sales/core/util/dialog_helper.dart';
 
 class RouteDetailScreen extends StatefulWidget {
   final int routeId;
@@ -548,12 +549,14 @@ class _AddOutletBottomSheetState extends State<_AddOutletBottomSheet>
           ),
         );
         Navigator.pop(context);
+      } else if (mounted) {
+        final err =
+            context.read<RouteProvider>().error ?? 'Failed to assign outlet';
+        await showValidationErrorDialog(context, err);
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text(e.toString())));
+        await showValidationErrorDialog(context, e.toString());
       }
     } finally {
       if (mounted) setState(() => _isSaving = false);
@@ -598,12 +601,14 @@ class _AddOutletBottomSheetState extends State<_AddOutletBottomSheet>
           ),
         );
         Navigator.pop(context);
+      } else if (mounted) {
+        final err =
+            context.read<RouteProvider>().error ?? 'Failed to create outlet';
+        await showValidationErrorDialog(context, err);
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text(e.toString())));
+        await showValidationErrorDialog(context, e.toString());
       }
     } finally {
       if (mounted) setState(() => _isSaving = false);

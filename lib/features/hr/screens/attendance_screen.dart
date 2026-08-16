@@ -171,7 +171,7 @@ class _AttendanceScreenContentState extends State<_AttendanceScreenContent>
           unselectedLabelColor: AppColors.textSecondary,
           labelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
           tabs: const [
-            Tab(text: 'Check In/Out'),
+            Tab(text: 'Log In/Out'),
             Tab(text: 'Records'),
           ],
         ),
@@ -226,6 +226,12 @@ class _AttendanceScreenContentState extends State<_AttendanceScreenContent>
                           backgroundColor: AppColors.successSoft,
                           radius: 20,
                           child: Icon(Icons.check, color: Colors.green, size: 24),
+                        )
+                      else
+                        const CircleAvatar(
+                          backgroundColor: AppColors.warningSoft,
+                          radius: 20,
+                          child: Icon(Icons.logout, color: Colors.orange, size: 20),
                         ),
                     ],
                   ),
@@ -234,8 +240,8 @@ class _AttendanceScreenContentState extends State<_AttendanceScreenContent>
                     alignment: Alignment.centerLeft,
                     child: Text(
                       isCheckedIn
-                          ? "You are checked in!"
-                          : "Not checked in yet",
+                          ? "You are logged in!"
+                          : "You are logged out",
                       style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
                     ),
                   ),
@@ -245,7 +251,7 @@ class _AttendanceScreenContentState extends State<_AttendanceScreenContent>
                     child: Text(
                       isCheckedIn
                           ? "Have a great day at work."
-                          : "Click below to register your attendance.",
+                          : "Click below to log in for attendance.",
                       style: const TextStyle(color: AppColors.textSecondary, fontSize: 14),
                     ),
                   ),
@@ -285,7 +291,7 @@ class _AttendanceScreenContentState extends State<_AttendanceScreenContent>
                                 ],
                               ],
                             )
-                          : Text(isCheckedIn ? 'Check Out' : 'Check In', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                          : Text(isCheckedIn ? 'Log Out' : 'Log In', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
                     ),
                   ),
                   const Divider(height: 32),
@@ -387,7 +393,7 @@ class _AttendanceScreenContentState extends State<_AttendanceScreenContent>
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text('Checked In', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                      const Text('Logged In', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
                       const SizedBox(height: 2),
                       Text(checkInAddress, style: const TextStyle(color: AppColors.textSecondary, fontSize: 12)),
                     ],
@@ -408,7 +414,7 @@ class _AttendanceScreenContentState extends State<_AttendanceScreenContent>
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text('Checked Out', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                      const Text('Logged Out', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
                       const SizedBox(height: 2),
                       Text(checkOutAddress, style: const TextStyle(color: AppColors.textSecondary, fontSize: 12)),
                     ],
@@ -567,13 +573,13 @@ class _AttendanceScreenContentState extends State<_AttendanceScreenContent>
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                   decoration: BoxDecoration(
-                    color: isCurrentlyCheckedIn ? AppColors.primarySoft : AppColors.successSoft,
+                    color: isCurrentlyCheckedIn ? AppColors.primarySoft : AppColors.warningSoft,
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Text(
-                    isCurrentlyCheckedIn ? 'Checked In' : 'Present',
+                    isCurrentlyCheckedIn ? 'Logged In' : 'Logged Out',
                     style: TextStyle(
-                      color: isCurrentlyCheckedIn ? AppColors.primary : Colors.green,
+                      color: isCurrentlyCheckedIn ? AppColors.primary : Colors.orange.shade800,
                       fontWeight: FontWeight.bold,
                       fontSize: 12,
                     ),
@@ -588,7 +594,7 @@ class _AttendanceScreenContentState extends State<_AttendanceScreenContent>
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text('CHECK IN', style: TextStyle(color: AppColors.textSecondary, fontSize: 11, fontWeight: FontWeight.bold)),
+                      const Text('LOG IN', style: TextStyle(color: AppColors.textSecondary, fontSize: 11, fontWeight: FontWeight.bold)),
                       const SizedBox(height: 4),
                       Text(checkIn, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: AppColors.textPrimary)),
                     ],
@@ -598,7 +604,7 @@ class _AttendanceScreenContentState extends State<_AttendanceScreenContent>
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text('CHECK OUT', style: TextStyle(color: AppColors.textSecondary, fontSize: 11, fontWeight: FontWeight.bold)),
+                      const Text('LOG OUT', style: TextStyle(color: AppColors.textSecondary, fontSize: 11, fontWeight: FontWeight.bold)),
                       const SizedBox(height: 4),
                       Text(checkOut, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: AppColors.textPrimary)),
                     ],

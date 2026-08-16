@@ -142,6 +142,8 @@ class _OrderCreationScreenState extends State<OrderCreationScreen> {
         );
         if (existingIndex >= 0) {
           lines[existingIndex].orderQty += entry.quantity;
+          lines[existingIndex].damagedExpiredQty += entry.damagedQty;
+          lines[existingIndex].damageQualityQty += entry.qualityQty;
         } else {
           lines.add(
             OrderLineModel(
@@ -151,6 +153,8 @@ class _OrderCreationScreenState extends State<OrderCreationScreen> {
               dbStock: entry.product.distributorStock?.toInt() ?? 0,
               vanStock: entry.product.stock?.toInt() ?? 0,
               orderQty: entry.quantity,
+              damagedExpiredQty: entry.damagedQty,
+              damageQualityQty: entry.qualityQty,
             ),
           );
         }

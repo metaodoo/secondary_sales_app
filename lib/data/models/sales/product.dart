@@ -9,6 +9,8 @@ class Product {
   final double? stock;
   final double? distributorStock;
   final String? nearestExpiry;
+  final int? categoryId;
+  final String? categoryName;
 
   Product({
     required this.id,
@@ -19,9 +21,12 @@ class Product {
     this.stock,
     this.distributorStock,
     this.nearestExpiry,
+    this.categoryId,
+    this.categoryName,
   });
 
   factory Product.fromMap(Map<String, dynamic> map) {
+    final categ = map['category'] ?? map['categ'];
     return Product(
       id: asInt(map['id']),
       name: map['name'] ?? '',
@@ -31,6 +36,8 @@ class Product {
       stock: _nullableDouble(map['qty_available'] ?? map['stock']),
       distributorStock: _nullableDouble(map['distributor_qty_available']),
       nearestExpiry: map['nearest_expiry'],
+      categoryId: asInt(map['category_id'] ?? map['categ_id'] ?? (categ is Map ? categ['id'] : null)),
+      categoryName: map['category_name']?.toString() ?? (categ is Map ? categ['name']?.toString() : null),
     );
   }
 

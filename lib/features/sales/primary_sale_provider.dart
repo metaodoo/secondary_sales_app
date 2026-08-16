@@ -7,12 +7,15 @@ import 'package:secondary_sales/data/models/sales/delivery_prepare.dart';
 import 'package:secondary_sales/data/models/inventory/warehouse.dart';
 import 'package:secondary_sales/data/api/api_service.dart';
 
+import 'package:secondary_sales/data/models/sales/product_category.dart';
+
 class PrimarySaleProvider with ChangeNotifier {
   final ApiService _apiService = ApiService.instance;
   ApiService get apiService => _apiService;
 
   List<DistributionHub> _hubs = [];
   List<Product> _products = [];
+  List<ProductCategory> _categories = [];
   int _totalProductCount = 0;
   List<PrimaryOrder> _recentOrders = [];
   DistributionHub? _selectedDistributor;
@@ -25,6 +28,7 @@ class PrimarySaleProvider with ChangeNotifier {
 
   List<DistributionHub> get hubs => _hubs;
   List<Product> get products => _products;
+  List<ProductCategory> get categories => _categories;
   int get totalProductCount => _totalProductCount;
   List<PrimaryOrder> get recentOrders => _recentOrders;
   DistributionHub? get selectedDistributor => _selectedDistributor;
@@ -214,10 +218,18 @@ class PrimarySaleProvider with ChangeNotifier {
     }
   }
 
+  Future<void> fetchProductCategories() async {
+    try {
+      _categories = await _apiService.getProductCategories();
+      notifyListeners();
+    } catch (_) {}
+  }
+
   Future<void> searchProducts(
     String query, {
     String? saleType,
     int? partnerId,
+    int? categoryId,
     bool? inStockOnly,
     String? sortBy,
   }) async {
@@ -229,6 +241,7 @@ class PrimarySaleProvider with ChangeNotifier {
         search: query,
         saleType: saleType,
         partnerId: partnerId,
+        categoryId: categoryId,
         inStockOnly: inStockOnly,
         sortBy: sortBy,
       );

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:secondary_sales/core/theme/app_theme.dart';
 import 'package:provider/provider.dart';
 import 'package:secondary_sales/features/routes/route_provider.dart';
+import 'package:secondary_sales/core/util/dialog_helper.dart';
 
 class EditOutletScreen extends StatefulWidget {
   final Map<String, dynamic> outlet;
@@ -52,26 +53,34 @@ class _EditOutletScreenState extends State<EditOutletScreen> {
 
     final provider = Provider.of<RouteProvider>(context, listen: false);
 
-    final updatedOutlet = await provider.updateOutlet(
-      widget.outlet['id'] as int,
-      name: _nameController.text.trim(),
-      mobile: _phoneController.text.trim(),
-      street: _addressController.text.trim(),
-    );
-
-    setState(() => _isSaving = false);
-
-    if (!mounted) return;
-
-    if (updatedOutlet != null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Outlet updated successfully')),
+    try {
+      final updatedOutlet = await provider.updateOutlet(
+        widget.outlet['id'] as int,
+        name: _nameController.text.trim(),
+        mobile: _phoneController.text.trim(),
+        street: _addressController.text.trim(),
       );
-      Navigator.pop(context, true);
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(provider.error ?? 'Failed to update outlet')),
-      );
+
+      setState(() => _isSaving = false);
+
+      if (!mounted) return;
+
+      if (updatedOutlet != null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Outlet updated successfully')),
+        );
+        Navigator.pop(context, true);
+      } else {
+        await showValidationErrorDialog(
+          context,
+          provider.error ?? 'Failed to update outlet',
+        );
+      }
+    } catch (e) {
+      setState(() => _isSaving = false);
+      if (mounted) {
+        await showValidationErrorDialog(context, e.toString());
+      }
     }
   }
 

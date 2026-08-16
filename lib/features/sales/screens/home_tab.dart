@@ -51,11 +51,17 @@ class HomeTab extends StatelessWidget {
         return 'Draft';
       case 'sale':
       case 'confirmed':
-        return 'Confirmed';
+      case 'pending':
+        return 'Pending';
       case 'delivery_partial':
-        return 'Delivery Partially Done';
+      case 'partial':
+      case 'partially_delivered':
+        return 'Partial Delivery';
       case 'delivery_full':
-        return 'Delivery Fully Done';
+      case 'full':
+      case 'delivered':
+      case 'done':
+        return 'Delivered';
       case 'cancel':
       case 'cancelled':
         return 'Cancelled';
@@ -202,14 +208,14 @@ class HomeTab extends StatelessWidget {
                       itemBuilder: (context) => const [
                         PopupMenuItem(value: 'all', child: Text('All Status')),
                         PopupMenuItem(value: 'draft', child: Text('Draft')),
-                        PopupMenuItem(value: 'sale', child: Text('Confirmed')),
+                        PopupMenuItem(value: 'sale', child: Text('Pending')),
                         PopupMenuItem(
                           value: 'delivery_partial',
-                          child: Text('Delivery Partially Done'),
+                          child: Text('Partial Delivery'),
                         ),
                         PopupMenuItem(
                           value: 'delivery_full',
-                          child: Text('Delivery Fully Done'),
+                          child: Text('Delivered'),
                         ),
                         PopupMenuItem(
                           value: 'cancel',
