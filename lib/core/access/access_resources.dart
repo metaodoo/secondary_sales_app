@@ -165,12 +165,16 @@ class AppAction {
   // Primary return delivery.
   static const returnCreate = 'action.primary_sale.returns.create';
   static const returnsSave = 'action.primary_sale.returns.save';
+  static const returnsSendToSalesOperation =
+      'action.primary_sale.returns.send_to_sales_operation';
   static const returnsCancel = 'action.primary_sale.returns.cancel';
   static const returnsValidate = 'action.primary_sale.returns.validate';
 
   // Primary QC return delivery.
   static const qcReturnCreate = 'action.primary_sale.qc_returns.create';
   static const qcReturnsSave = 'action.primary_sale.qc_returns.save';
+  static const qcReturnsSendToSalesOperation =
+      'action.primary_sale.qc_returns.send_to_sales_operation';
   static const qcReturnsCancel = 'action.primary_sale.qc_returns.cancel';
   static const qcReturnsValidate = 'action.primary_sale.qc_returns.validate';
 
@@ -184,6 +188,8 @@ class AppAction {
   // Primary return scrap.
   static const scrapCreate = 'action.primary_sale.scraps.create';
   static const scrapsSave = 'action.primary_sale.scraps.save';
+  static const scrapsSendToSalesOperation =
+      'action.primary_sale.scraps.send_to_sales_operation';
   static const scrapsCancel = 'action.primary_sale.scraps.cancel';
   static const scrapsValidate = 'action.primary_sale.scraps.validate';
 
@@ -227,6 +233,9 @@ class AppAction {
 
   static String returnSaveFor(String moduleType) =>
       moduleType == 'secondary' ? secondaryReturnsSave : returnsSave;
+
+  static String returnSendToSalesOperationFor(String moduleType) =>
+      returnsSendToSalesOperation;
 
   static String returnCancelFor(String moduleType) =>
       moduleType == 'secondary' ? secondaryReturnsCancel : returnsCancel;
@@ -876,6 +885,13 @@ const List<AccessResource> accessCatalog = [
     legacyKeys: ['action.returns.save'],
   ),
   AccessResource(
+    AppAction.returnsSendToSalesOperation,
+    'action',
+    'primary_sale',
+    'Primary Sales › Fresh Returns › Send to Sales Operation (button)',
+    _ps,
+  ),
+  AccessResource(
     AppAction.returnsCancel,
     'action',
     'primary_sale',
@@ -905,6 +921,13 @@ const List<AccessResource> accessCatalog = [
     'action',
     'primary_sale',
     'Primary Sales › Quality Returns › Save (button)',
+    _ps,
+  ),
+  AccessResource(
+    AppAction.qcReturnsSendToSalesOperation,
+    'action',
+    'primary_sale',
+    'Primary Sales › Quality Returns › Send to Sales Operation (button)',
     _ps,
   ),
   AccessResource(
@@ -972,6 +995,13 @@ const List<AccessResource> accessCatalog = [
     'Primary Sales › Damaged Returns › Save (button)',
     _ps,
     legacyKeys: ['action.scraps.save'],
+  ),
+  AccessResource(
+    AppAction.scrapsSendToSalesOperation,
+    'action',
+    'primary_sale',
+    'Primary Sales › Damaged Returns › Send to Sales Operation (button)',
+    _ps,
   ),
   AccessResource(
     AppAction.scrapsCancel,

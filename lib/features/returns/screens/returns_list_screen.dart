@@ -43,10 +43,14 @@ class _ReturnsListScreenState extends State<ReturnsListScreen> {
   final ScrollController _scrollController = ScrollController();
   Timer? _searchDebounce;
   String _state = 'all';
+  String? _returnReciptStatus;
   List<ReturnScrapSummary> _returns = [];
   int _page = 1;
   bool _hasMore = true;
   bool _isLoadingMore = false;
+
+  bool get _isPrimary =>
+      widget.moduleType.toLowerCase() == 'primary' || widget.moduleType.isEmpty;
 
   @override
   void dispose() {
@@ -86,6 +90,7 @@ class _ReturnsListScreenState extends State<ReturnsListScreen> {
       pageSize: _pageSize,
       search: _searchController.text,
       state: _state,
+      returnReciptStatus: _returnReciptStatus,
       type: widget.moduleType,
       endpoint: widget.endpoint,
     );
@@ -134,7 +139,7 @@ class _ReturnsListScreenState extends State<ReturnsListScreen> {
       ),
     );
     if (mounted) {
-      _fetchReturns();
+      _fetchReturns(reset: true);
     }
   }
 
@@ -149,10 +154,22 @@ class _ReturnsListScreenState extends State<ReturnsListScreen> {
     return _returns;
   }
 
-  Color _stateColor(String state) {
+  Color _stateColor(String state, String? returnReciptStatus) {
+    if (state == 'done') return const Color(0xFF10B981);
+    if (state == 'cancel') return Colors.red;
+    if (state == 'draft') return AppColors.textSecondary;
+
+    if (_isPrimary &&
+        (state == 'assigned' ||
+            state == 'waiting' ||
+            state == 'confirmed' ||
+            state == 'ready')) {
+      if (returnReciptStatus == 'sales_operation_receipt') {
+        return const Color(0xFF1D4ED8); // Blue 700
+      }
+      return const Color(0xFFD97706); // Amber 600
+    }
     return switch (state) {
-      'done' => const Color(0xFF10B981),
-      'cancel' => Colors.red,
       'assigned' => const Color(0xFFF59E0B),
       'waiting' => const Color(0xFFF59E0B),
       'confirmed' => const Color(0xFFF59E0B),
@@ -160,10 +177,22 @@ class _ReturnsListScreenState extends State<ReturnsListScreen> {
     };
   }
 
-  Color _stateBgColor(String state) {
+  Color _stateBgColor(String state, String? returnReciptStatus) {
+    if (state == 'done') return const Color(0xFFD1FAE5);
+    if (state == 'cancel') return const Color(0xFFFEE2E2);
+    if (state == 'draft') return AppColors.borderMuted;
+
+    if (_isPrimary &&
+        (state == 'assigned' ||
+            state == 'waiting' ||
+            state == 'confirmed' ||
+            state == 'ready')) {
+      if (returnReciptStatus == 'sales_operation_receipt') {
+        return const Color(0xFFDBEAFE); // Blue 100
+      }
+      return const Color(0xFFFEF3C7); // Amber 100
+    }
     return switch (state) {
-      'done' => const Color(0xFFD1FAE5),
-      'cancel' => const Color(0xFFFEE2E2),
       'assigned' => const Color(0xFFFEF3C7),
       'waiting' => const Color(0xFFFEF3C7),
       'confirmed' => const Color(0xFFFEF3C7),
@@ -171,19 +200,32 @@ class _ReturnsListScreenState extends State<ReturnsListScreen> {
     };
   }
 
-  String _stateLabel(String state) {
+  String _stateLabel(String state, String? returnReciptStatus) {
+    if (state == 'done') return 'DELIVERED';
+    if (state == 'cancel') return 'CANCELLED';
+    if (state == 'draft') return 'DRAFT';
+
+    if (_isPrimary &&
+        (state == 'assigned' ||
+            state == 'waiting' ||
+            state == 'confirmed' ||
+            state == 'ready')) {
+      if (returnReciptStatus == 'sales_operation_receipt') {
+        return 'SALES OPERATION RECEIPT';
+      }
+      return 'WAREHOUSE RECEIPT';
+    }
     return switch (state) {
-      'done' => 'DONE',
-      'cancel' => 'CANCELLED',
       'assigned' => 'READY',
       'waiting' => 'WAITING',
       'confirmed' => 'CONFIRMED',
-      'draft' => 'DRAFT',
       _ => state.toUpperCase(),
     };
   }
 
   void _showFilterDialog() {
+    final currentFilterValue = _returnReciptStatus ?? _state;
+
     showModalBottomSheet(
       context: context,
       shape: const RoundedRectangleBorder(
@@ -198,28 +240,63 @@ class _ReturnsListScreenState extends State<ReturnsListScreen> {
             children: [
               Text(
                 'Filter ${widget.title}',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 16),
               DropdownButtonFormField<String>(
-                value: _state,
+                value: currentFilterValue,
                 decoration: ssInputDecoration('Status', Icons.filter_list),
-                items: const [
-                  DropdownMenuItem(value: 'all', child: Text('All Status')),
-                  DropdownMenuItem(value: 'draft', child: Text('Draft')),
-                  DropdownMenuItem(
-                    value: 'assigned',
-                    child: Text('Pending (Ready)'),
-                  ),
-                  DropdownMenuItem(
-                    value: 'done',
-                    child: Text('Processed (Done)'),
-                  ),
-                  DropdownMenuItem(value: 'cancel', child: Text('Cancelled')),
-                ],
+                items: _isPrimary
+                    ? const [
+                        DropdownMenuItem(value: 'all', child: Text('All Status')),
+                        DropdownMenuItem(value: 'draft', child: Text('Draft')),
+                        DropdownMenuItem(
+                          value: 'warehouse_receipt',
+                          child: Text('Warehouse Receipt'),
+                        ),
+                        DropdownMenuItem(
+                          value: 'sales_operation_receipt',
+                          child: Text('Sales Operation Receipt'),
+                        ),
+                        DropdownMenuItem(
+                          value: 'done',
+                          child: Text('Delivered'),
+                        ),
+                        DropdownMenuItem(
+                          value: 'cancel',
+                          child: Text('Cancelled'),
+                        ),
+                      ]
+                    : const [
+                        DropdownMenuItem(value: 'all', child: Text('All Status')),
+                        DropdownMenuItem(value: 'draft', child: Text('Draft')),
+                        DropdownMenuItem(
+                          value: 'assigned',
+                          child: Text('Pending (Ready)'),
+                        ),
+                        DropdownMenuItem(
+                          value: 'done',
+                          child: Text('Processed (Done)'),
+                        ),
+                        DropdownMenuItem(
+                          value: 'cancel',
+                          child: Text('Cancelled'),
+                        ),
+                      ],
                 onChanged: (value) {
                   if (value != null) {
-                    setState(() => _state = value);
+                    if (value == 'warehouse_receipt' ||
+                        value == 'sales_operation_receipt') {
+                      setState(() {
+                        _state = 'all';
+                        _returnReciptStatus = value;
+                      });
+                    } else {
+                      setState(() {
+                        _state = value;
+                        _returnReciptStatus = null;
+                      });
+                    }
                     _fetchReturns(reset: true);
                     Navigator.pop(context);
                   }
@@ -449,13 +526,13 @@ class _ReturnsListScreenState extends State<ReturnsListScreen> {
                                   vertical: 4,
                                 ),
                                 decoration: BoxDecoration(
-                                  color: _stateBgColor(ret.state),
+                                  color: _stateBgColor(ret.state, ret.returnReciptStatus),
                                   borderRadius: BorderRadius.circular(12),
                                 ),
                                 child: Text(
-                                  _stateLabel(ret.state),
+                                  _stateLabel(ret.state, ret.returnReciptStatus),
                                   style: TextStyle(
-                                    color: _stateColor(ret.state),
+                                    color: _stateColor(ret.state, ret.returnReciptStatus),
                                     fontSize: 10,
                                     fontWeight: FontWeight.bold,
                                   ),

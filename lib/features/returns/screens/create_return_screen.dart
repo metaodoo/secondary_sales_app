@@ -635,11 +635,16 @@ class _CreateReturnScreenState extends State<CreateReturnScreen> {
     }).toList();
   }
 
-  Future<void> _createReturn() async {
-    final distributorId = _prepareData?['distributor']?['id'] as int?;
-    if (distributorId == null) return;
+  Future<void> _createReturn({bool sendToSalesOperation = false}) async {
+    final auth = context.read<AuthProvider>();
+    final distributorId = _prepareData?['distributor_id'] ??
+        (_prepareData?['distributor'] is Map
+            ? _prepareData!['distributor']['id']
+            : null);
 
-    if (_lines.isEmpty) {
+    final linesData = _buildLinesPayload(auth);
+
+    if (linesData.isEmpty) {
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(const SnackBar(content: Text('Add at least one product')));
@@ -668,15 +673,6 @@ class _CreateReturnScreenState extends State<CreateReturnScreen> {
       }
     }
 
-    final auth = context.read<AuthProvider>();
-    final linesData = _buildLinesPayload(auth);
-    if (linesData.isEmpty) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Add at least one product')));
-      return;
-    }
-
     // Mandatory Photo Evidence Validation for Primary Sales Return
     if ((widget.moduleType.toLowerCase() == 'primary' ||
             widget.moduleType.isEmpty) &&
@@ -702,12 +698,13 @@ class _CreateReturnScreenState extends State<CreateReturnScreen> {
         type: widget.moduleType,
         challanNumber: _challanNumberController.text,
         damageType: _selectedDamageType,
+        sendToSalesOperation: sendToSalesOperation,
         endpoint: widget.endpoint,
       );
     } else {
       result = await context.read<ReturnProvider>().createReturnDelivery(
         lines: linesData,
-        distributorId: distributorId,
+        distributorId: distributorId is int ? distributorId : null,
         type: widget.moduleType,
         challanNumber: _challanNumberController.text,
         damageType: _selectedDamageType,
@@ -723,7 +720,7 @@ class _CreateReturnScreenState extends State<CreateReturnScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            error ?? 'Failed to create ${widget.title.toLowerCase()}',
+            error ?? 'Failed to process ${widget.title.toLowerCase()}',
           ),
           backgroundColor: Colors.red,
         ),
@@ -733,7 +730,7 @@ class _CreateReturnScreenState extends State<CreateReturnScreen> {
 
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text('${widget.title} created successfully!'),
+        content: Text('${widget.title} processed successfully!'),
         backgroundColor: Colors.green,
       ),
     );
@@ -1486,7 +1483,7 @@ class _CreateReturnScreenState extends State<CreateReturnScreen> {
                               child: ElevatedButton(
                                 onPressed: provider.isLoading
                                     ? null
-                                    : _createReturn,
+                                    : () => _createReturn(sendToSalesOperation: false),
                                 style: ElevatedButton.styleFrom(
                                   backgroundColor: AppColors.primary,
                                   foregroundColor: Colors.white,
@@ -1504,9 +1501,37 @@ class _CreateReturnScreenState extends State<CreateReturnScreen> {
                               ),
                             ),
                           ],
-                          if (auth.canValidateReturnFor(widget.moduleType)) ...[
+                          if (auth.canSendToSalesOperationFor(widget.moduleType)) ...[
                             if (auth.canCancelReturnFor(widget.moduleType) ||
                                 auth.canSaveReturnFor(widget.moduleType))
+                              const SizedBox(width: 8),
+                            Expanded(
+                              flex: 2,
+                              child: ElevatedButton(
+                                onPressed: provider.isLoading
+                                    ? null
+                                    : () => _createReturn(sendToSalesOperation: true),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.orange.shade700,
+                                  foregroundColor: Colors.white,
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 14,
+                                  ),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                ),
+                                child: const Text(
+                                  'Send to Sales Operation',
+                                  style: TextStyle(fontWeight: FontWeight.bold),
+                                ),
+                              ),
+                            ),
+                          ],
+                          if (auth.canValidateReturnFor(widget.moduleType)) ...[
+                            if (auth.canCancelReturnFor(widget.moduleType) ||
+                                auth.canSaveReturnFor(widget.moduleType) ||
+                                auth.canSendToSalesOperationFor(widget.moduleType))
                               const SizedBox(width: 8),
                             Expanded(
                               flex: 2,

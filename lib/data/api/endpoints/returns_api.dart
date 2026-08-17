@@ -8,6 +8,7 @@ extension ReturnsApi on ApiService {
     int pageSize = 20,
     String? search,
     String? state,
+    String? returnReciptStatus,
     int? distributorId,
     String? type,
     String endpoint = AppConstants.returnsEndpoint,
@@ -19,6 +20,9 @@ extension ReturnsApi on ApiService {
     };
     if (search != null && search.isNotEmpty) params['search'] = search;
     if (state != null && state != 'all') params['state'] = state;
+    if (returnReciptStatus != null && returnReciptStatus != 'all') {
+      params['return_recipt_status'] = returnReciptStatus;
+    }
     if (distributorId != null) params['distributor_id'] = distributorId;
     if (type != null && type.isNotEmpty) params['type'] = type;
 
@@ -149,11 +153,13 @@ extension ReturnsApi on ApiService {
     String? type,
     String? challanNumber,
     String? damageType,
+    bool sendToSalesOperation = false,
     String endpoint = AppConstants.returnsEndpoint,
   }) async {
     final params = <String, dynamic>{
       'employee_id': _activeEmployeeId,
       'lines': lines,
+      'send_to_sales_operation': sendToSalesOperation,
     };
     if (type != null && type.isNotEmpty) params['type'] = type;
     if (challanNumber != null && challanNumber.isNotEmpty) {

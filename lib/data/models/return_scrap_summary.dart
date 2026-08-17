@@ -8,6 +8,7 @@ class ReturnScrapSummary {
     required this.id,
     required this.name,
     required this.state,
+    this.returnReciptStatus,
     this.origin,
     this.scheduledDate,
     this.returnBookNumber,
@@ -17,6 +18,7 @@ class ReturnScrapSummary {
   final int id;
   final String name;
   final String state;
+  final String? returnReciptStatus;
   final String? origin;
   final DateTime? scheduledDate;
   final String? returnBookNumber;
@@ -27,6 +29,7 @@ class ReturnScrapSummary {
       id: asInt(map['id']),
       name: asNullableString(map['name']) ?? '',
       state: asNullableString(map['state']) ?? '',
+      returnReciptStatus: asNullableString(map['return_recipt_status']),
       origin: asNullableString(map['origin']),
       scheduledDate: asDateTime(map['scheduled_date']),
       returnBookNumber: asNullableString(map['return_book_number']),

@@ -24,6 +24,7 @@ class ReturnProvider with ChangeNotifier {
     int pageSize = 20,
     String? search,
     String? state,
+    String? returnReciptStatus,
     int? distributorId,
     String? type,
     String endpoint = AppConstants.returnsEndpoint,
@@ -38,6 +39,7 @@ class ReturnProvider with ChangeNotifier {
         pageSize: pageSize,
         search: search,
         state: state,
+        returnReciptStatus: returnReciptStatus,
         distributorId: distributorId,
         type: type,
         endpoint: endpoint,
@@ -177,6 +179,7 @@ class ReturnProvider with ChangeNotifier {
     String? type,
     String? challanNumber,
     String? damageType,
+    bool sendToSalesOperation = false,
     String endpoint = AppConstants.returnsEndpoint,
   }) async {
     _loadingCount++;
@@ -190,6 +193,7 @@ class ReturnProvider with ChangeNotifier {
         type: type,
         challanNumber: challanNumber,
         damageType: damageType,
+        sendToSalesOperation: sendToSalesOperation,
         endpoint: endpoint,
       );
     } catch (e) {

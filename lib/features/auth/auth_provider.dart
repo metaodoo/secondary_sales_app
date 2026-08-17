@@ -7,6 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:secondary_sales/core/access/access_control.dart';
 import 'package:secondary_sales/core/access/access_resources.dart';
+import 'package:secondary_sales/core/app_navigator.dart';
 import 'package:secondary_sales/core/constants.dart';
 import 'package:secondary_sales/core/services/push_notification_service.dart';
 import 'package:secondary_sales/data/models/auth/mobile_auth_session.dart';
@@ -25,6 +26,15 @@ class AuthProvider with ChangeNotifier {
   bool _isLoading = false;
   bool _tokenRefreshFailed = false;
   String? _error;
+
+  /// In-flight [refreshSession] call, shared by every concurrent caller.
+  ///
+  /// The access token is short-lived, so a screen that fires several requests
+  /// at once gets several simultaneous 401s, each invoking the expiry hook.
+  /// The server rotates the refresh token on every call, so without this the
+  /// first refresh wins and the rest present an already-rotated token -- which
+  /// used to read as a dead session and silently log the user out.
+  Future<bool>? _refreshInFlight;
 
   MobileAuthSession? get session => _session;
   MobileAuthUser? get user => _session?.user;
@@ -135,6 +145,10 @@ class AuthProvider with ChangeNotifier {
     AppAction.returnSaveFor(moduleType),
     canEditSoQty || canEditWarehouseQty || canEditEffectiveQty,
   );
+  bool canSendToSalesOperationFor(String moduleType) => _enforcedOr(
+    AppAction.returnSendToSalesOperationFor(moduleType),
+    canEditWarehouseQty,
+  );
   bool canCancelReturnFor(String moduleType) => _enforcedOr(
     AppAction.returnCancelFor(moduleType),
     canEditSoQty || canEditWarehouseQty,
@@ -153,6 +167,7 @@ class AuthProvider with ChangeNotifier {
       _enforcedOr(AppAction.scrapValidateFor(moduleType), canEditWarehouseQty);
 
   bool get canSaveReturn => canSaveReturnFor('primary');
+  bool get canSendToSalesOperation => canSendToSalesOperationFor('primary');
   bool get canCancelReturn => canCancelReturnFor('primary');
   bool get canValidateReturn => canValidateReturnFor('primary');
   bool get canSaveScrap => canSaveScrapFor('primary');
@@ -287,13 +302,43 @@ class AuthProvider with ChangeNotifier {
     }
   }
 
-  Future<bool> refreshSession() async {
+  Future<bool> refreshSession() {
+    // Coalesce concurrent callers onto one rotation. Cleared in the same turn
+    // the future completes so the next expiry starts a fresh attempt.
+    final inFlight = _refreshInFlight;
+    if (inFlight != null) return inFlight;
+
+    final started = _refreshSession();
+    _refreshInFlight = started;
+    return started.whenComplete(() {
+      if (identical(_refreshInFlight, started)) _refreshInFlight = null;
+    });
+  }
+
+  Future<bool> _refreshSession() async {
     final current = _session;
-    if (current == null || current.refreshToken.isEmpty) return false;
+    if (current == null) return false;
 
     try {
+      // Prefer the persisted token over the in-memory one: the background
+      // location isolate refreshes independently and writes the rotated token
+      // to prefs, which leaves this isolate's copy stale (and, past the
+      // server's grace window, dead). Falls back to memory if prefs is
+      // unreadable, so a storage hiccup degrades to the old behaviour rather
+      // than dropping the session.
+      var refreshToken = current.refreshToken;
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.reload();
+        final stored = prefs.getString(AppConstants.refreshTokenKey);
+        if (stored != null && stored.isNotEmpty) refreshToken = stored;
+      } catch (_) {
+        // Keep the in-memory token.
+      }
+      if (refreshToken.isEmpty) return false;
+
       _authService.updateSessionId(current.sessionId);
-      final tokens = await _authService.refresh(current.refreshToken);
+      final tokens = await _authService.refresh(refreshToken);
       final refreshed = current.copyWith(
         accessToken: tokens.accessToken,
         refreshToken: tokens.refreshToken,
@@ -419,6 +464,10 @@ class AuthProvider with ChangeNotifier {
     _tokenRefreshFailed = false;
     _odooSessionId = sessionId;
     _error = null;
+    // Pushed routes outlive the session (AuthGate is the MaterialApp home), so
+    // without this an involuntary logout leaves the user on a screen that still
+    // looks signed in while every request fails for want of an employee id.
+    resetToRootRoute();
     notifyListeners();
 
     final prefs = await SharedPreferences.getInstance();

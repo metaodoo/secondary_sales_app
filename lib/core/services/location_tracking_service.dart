@@ -340,6 +340,10 @@ Future<void> _primeApiFromPrefs(SharedPreferences prefs) async {
   ApiService.instance.updateEmployeeId(employeeId);
 
   ApiService.onTokenExpired = () async {
+    // Re-read from disk: the UI isolate rotates the refresh token too, and
+    // SharedPreferences caches per isolate, so the value captured at prime
+    // time can be a token the server has already superseded.
+    await prefs.reload();
     final refreshToken = prefs.getString(AppConstants.refreshTokenKey);
     if (refreshToken == null || refreshToken.isEmpty) return null;
     try {

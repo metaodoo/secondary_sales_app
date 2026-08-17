@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:secondary_sales/core/app_navigator.dart';
 import 'package:secondary_sales/core/constants.dart';
 import 'package:secondary_sales/core/theme/app_theme.dart';
 import 'package:secondary_sales/features/auth/auth_provider.dart';
@@ -23,7 +24,7 @@ import 'package:secondary_sales/core/services/push_notification_service.dart';
 import 'package:secondary_sales/core/services/location_tracking_service.dart';
 import 'package:secondary_sales/core/services/app_update_service.dart';
 
-final GlobalKey<NavigatorState> appNavigatorKey = GlobalKey<NavigatorState>();
+export 'package:secondary_sales/core/app_navigator.dart' show appNavigatorKey;
 
 /// Brings the background location service in line with the SERVER's attendance
 /// state at launch, rather than trusting the persisted local flag (which can be
