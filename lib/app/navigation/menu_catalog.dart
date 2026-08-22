@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'package:secondary_sales/app/navigation/app_shell_config.dart';
 import 'package:secondary_sales/core/access/access_resources.dart';
+import 'package:secondary_sales/core/constants.dart';
 import 'package:secondary_sales/features/auth/auth_provider.dart';
 
 import 'package:secondary_sales/features/contacts/screens/outlets_list_screen.dart';
@@ -15,6 +16,11 @@ import 'package:secondary_sales/features/hr/screens/attendance_screen.dart';
 import 'package:secondary_sales/features/hr/screens/leave_dashboard_screen.dart';
 import 'package:secondary_sales/features/hr/screens/expense_dashboard_screen.dart';
 import 'package:secondary_sales/features/hr/screens/location_buffer_screen.dart';
+
+import 'package:secondary_sales/features/contacts/screens/dealers_tab.dart';
+import 'package:secondary_sales/features/routes/screens/officer_route_selection_screen.dart';
+import 'package:secondary_sales/features/van_loading/screens/van_operations_list_screen.dart';
+import 'package:secondary_sales/features/settings/screens/settings_tab.dart';
 
 /// Single source of truth for every top-level place the app can navigate to.
 ///
@@ -99,6 +105,7 @@ List<MenuSection> buildMenuSections(String moduleType) {
           label: 'Dealers',
           icon: Icons.storefront_outlined,
           shellIndex: AppShellIndex.dealers,
+          builder: (_) => const DealersTab(),
           visibleWhen: (a) => a.canAccessDealers,
         ),
       ]),
@@ -112,16 +119,43 @@ List<MenuSection> buildMenuSections(String moduleType) {
           builder: (_) => const DeliveriesListScreen(moduleType: 'primary'),
         ),
         MenuDestination(
-          label: 'Return Delivery',
+          label: 'Fresh Return',
           icon: Icons.assignment_return_outlined,
           screenKey: AppScreen.returnsList,
-          builder: (_) => const ReturnsListScreen(moduleType: 'primary'),
+          builder: (_) => const ReturnsListScreen(
+            moduleType: 'primary',
+            title: 'Fresh Returns',
+            createLabel: 'New Fresh Return',
+            createScreenTitle: 'Fresh Return',
+            productSelectionTitle: 'Select Fresh Return Products',
+            endpoint: AppConstants.returnsEndpoint,
+          ),
         ),
         MenuDestination(
-          label: 'Return Scrap',
+          label: 'QC Return',
+          icon: Icons.verified_outlined,
+          screenKey: AppScreen.qcReturnsList,
+          builder: (_) => const ReturnsListScreen(
+            moduleType: 'primary',
+            title: 'QC Returns',
+            createLabel: 'New QC Return',
+            createScreenTitle: 'QC Return',
+            productSelectionTitle: 'Select QC Return Products',
+            endpoint: AppConstants.qcReturnsEndpoint,
+            createActionKey: AppAction.qcReturnCreate,
+          ),
+        ),
+        MenuDestination(
+          label: 'Damaged Return',
           icon: Icons.recycling_outlined,
           screenKey: AppScreen.scrapsList,
-          builder: (_) => const ScrapsListScreen(moduleType: 'primary'),
+          builder: (_) => const ScrapsListScreen(
+            moduleType: 'primary',
+            title: 'Damaged Returns',
+            createLabel: 'New Damaged Return',
+            createScreenTitle: 'Damaged Return',
+            productSelectionTitle: 'Select Damaged Return Products',
+          ),
         ),
       ]),
     );
@@ -149,6 +183,7 @@ List<MenuSection> buildMenuSections(String moduleType) {
           label: 'Routes',
           icon: Icons.alt_route_outlined,
           shellIndex: AppShellIndex.routes,
+          builder: (_) => const OfficerRouteSelectionScreen(),
           visibleWhen: (a) => a.canView(AppScreen.routesList),
         ),
       ]),
@@ -159,12 +194,14 @@ List<MenuSection> buildMenuSections(String moduleType) {
           label: 'Van Load',
           icon: Icons.local_shipping_outlined,
           shellIndex: AppShellIndex.vanLoad,
+          builder: (_) => const VanOperationsListScreen(operationType: 'load'),
           visibleWhen: (a) => a.canView(AppScreen.vanOperationsList),
         ),
         MenuDestination(
           label: 'Van Unload',
           icon: Icons.unarchive_outlined,
           shellIndex: AppShellIndex.vanUnload,
+          builder: (_) => const VanOperationsListScreen(operationType: 'unload'),
           visibleWhen: (a) => a.canView(AppScreen.vanOperationsList),
         ),
         MenuDestination(
@@ -228,16 +265,6 @@ List<MenuSection> buildMenuSections(String moduleType) {
         label: 'Location Buffer',
         icon: Icons.storage_outlined,
         builder: (_) => const LocationBufferScreen(),
-      ),
-    ]),
-  );
-
-  sections.add(
-    MenuSection('Account', [
-      MenuDestination(
-        label: 'Settings',
-        icon: Icons.settings_outlined,
-        shellIndex: AppShellIndex.profile,
       ),
     ]),
   );

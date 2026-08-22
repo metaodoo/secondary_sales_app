@@ -194,6 +194,8 @@ class _ExpenseDashboardContentState extends State<_ExpenseDashboardContent> with
         centerTitle: true,
         bottom: TabBar(
           controller: _tabController,
+          isScrollable: true,
+          tabAlignment: TabAlignment.start,
           indicatorColor: AppColors.primary,
           labelColor: AppColors.primary,
           unselectedLabelColor: AppColors.textSecondary,
@@ -203,7 +205,7 @@ class _ExpenseDashboardContentState extends State<_ExpenseDashboardContent> with
         actions: [
           Padding(
             padding: const EdgeInsets.only(right: 16),
-            child: const ProfileAvatar(),
+            child: ProfileAvatar(),
           ),
         ],
       ),

@@ -40,7 +40,6 @@ class _ExpenseCreateSheetState extends State<ExpenseCreateSheet> {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<ExpenseProvider>().fetchCategories();
-      context.read<ExpenseProvider>().fetchDrafts();
     });
   }
 
@@ -369,8 +368,6 @@ class _ExpenseItemDialogState extends State<_ExpenseItemDialog> {
   final _amountController = TextEditingController();
   final _descController = TextEditingController();
   
-  bool _isNewItem = true;
-  Map<String, dynamic>? _selectedDraft;
   Map<String, dynamic>? _selectedCategory;
   DateTime _selectedDate = DateTime.now();
 
@@ -390,86 +387,6 @@ class _ExpenseItemDialogState extends State<_ExpenseItemDialog> {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                // Selection type toggler
-                Row(
-                  children: [
-                    Expanded(
-                      child: ChoiceChip(
-                        label: const Center(child: Text('Create New')),
-                        selected: _isNewItem,
-                        onSelected: (val) {
-                          setState(() {
-                            _isNewItem = true;
-                            _selectedDraft = null;
-                            _titleController.clear();
-                            _amountController.clear();
-                            _descController.clear();
-                            _selectedCategory = null;
-                          });
-                        },
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: ChoiceChip(
-                        label: const Center(child: Text('Select Expense')),
-                        selected: !_isNewItem,
-                        onSelected: (val) {
-                          setState(() {
-                            _isNewItem = false;
-                            _selectedDraft = null;
-                            _titleController.clear();
-                            _amountController.clear();
-                            _descController.clear();
-                            _selectedCategory = null;
-                          });
-                        },
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 16),
-
-                if (!_isNewItem) ...[
-                  // Drafts dropdown
-                  DropdownButtonFormField<Map<String, dynamic>>(
-                    isExpanded: true,
-                    decoration: InputDecoration(
-                      labelText: 'Select Expense',
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 12),
-                    ),
-                    value: _selectedDraft,
-                    items: provider.drafts.map((draft) {
-                      return DropdownMenuItem<Map<String, dynamic>>(
-                        value: draft,
-                        child: Text('${draft['title']} (৳${draft['amount']})'),
-                      );
-                    }).toList(),
-                    onChanged: (val) {
-                      setState(() {
-                        _selectedDraft = val;
-                        if (val != null) {
-                          _titleController.text = val['title'] ?? '';
-                          _amountController.text = val['amount']?.toString() ?? '';
-                          _descController.text = val['description'] ?? '';
-                          _selectedDate = DateTime.tryParse(val['date'] ?? '') ?? DateTime.now();
-                          final catId = val['category_id'];
-                          if (catId != null) {
-                            try {
-                              _selectedCategory = provider.categories.firstWhere((c) => c['id'] == catId);
-                            } catch (_) {
-                              _selectedCategory = null;
-                            }
-                          }
-                        }
-                      });
-                    },
-                    validator: (val) => val == null ? 'Draft selection is required.' : null,
-                  ),
-                  const SizedBox(height: 16),
-                ],
-
                 // Category Product dropdown
                 DropdownButtonFormField<Map<String, dynamic>>(
                   isExpanded: true,
@@ -478,7 +395,7 @@ class _ExpenseItemDialogState extends State<_ExpenseItemDialog> {
                     border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
                     contentPadding: const EdgeInsets.symmetric(horizontal: 12),
                   ),
-                  value: _selectedCategory,
+                  initialValue: _selectedCategory,
                   items: provider.categories.map((cat) {
                     return DropdownMenuItem<Map<String, dynamic>>(
                       value: cat,
@@ -588,10 +505,6 @@ class _ExpenseItemDialogState extends State<_ExpenseItemDialog> {
                 'date': _selectedDate.toLocal().toString().split(' ')[0],
                 'description': _descController.text.trim(),
               };
-
-              if (!_isNewItem && _selectedDraft != null) {
-                item['id'] = _selectedDraft!['id'];
-              }
 
               widget.onSave(item);
               Navigator.pop(context);

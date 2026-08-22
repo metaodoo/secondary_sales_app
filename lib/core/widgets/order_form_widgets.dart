@@ -23,7 +23,7 @@ class SelectedDistributorCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  hub.name,
+                  hub.displayNameWithCode,
                   style: const TextStyle(fontWeight: FontWeight.w800),
                 ),
                 const SizedBox(height: 6),
@@ -394,6 +394,97 @@ class _AmountRow extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// The "not in the van, settle it on the bill" switch.
+///
+/// Appears only when a line actually carries a return, because that is the only
+/// time the choice exists. It states the consequence rather than the mechanism:
+/// a rep does not care which stock documents get written, they care whether the
+/// goods ride out on the van and whether the customer's bill moves.
+class AdjustReturnToggle extends StatelessWidget {
+  const AdjustReturnToggle({
+    required this.value,
+    required this.vanStock,
+    required this.onChanged,
+  });
+
+  final bool value;
+  final int vanStock;
+  final ValueChanged<bool> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    // The requirement's actual trigger is "product not available in Van". When
+    // that is true and the rep has not flipped the switch, say so -- it is the
+    // one moment the app knows more than they do.
+    final bool suggest = !value && vanStock <= 0;
+    final Color accent = value ? AppColors.primary : AppColors.textSecondary;
+
+    return InkWell(
+      onTap: () => onChanged(!value),
+      borderRadius: const BorderRadius.vertical(bottom: Radius.circular(15)),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.fromLTRB(14, 10, 8, 12),
+        decoration: BoxDecoration(
+          color: value
+              ? AppColors.primary.withValues(alpha: 0.06)
+              : (suggest ? Colors.amber.withValues(alpha: 0.10) : Colors.transparent),
+          border: const Border(
+            top: BorderSide(color: AppColors.borderSoft),
+          ),
+          borderRadius: const BorderRadius.vertical(bottom: Radius.circular(15)),
+        ),
+        child: Row(
+          children: [
+            Icon(
+              value ? Icons.receipt_long : Icons.swap_horiz,
+              size: 18,
+              color: accent,
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Adjust Return',
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                      color: value ? AppColors.primary : AppColors.textPrimary,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    value
+                        ? 'Taken back without delivery · adjusted on the bill'
+                        : (suggest
+                            ? 'No van stock — turn on to take this return'
+                            : 'Exchanged from van stock'),
+                    style: TextStyle(
+                      fontSize: 11,
+                      height: 1.25,
+                      color: suggest
+                          ? Colors.amber.shade900
+                          : AppColors.textSecondary,
+                      fontWeight: suggest ? FontWeight.w600 : FontWeight.w400,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Switch.adaptive(
+              value: value,
+              onChanged: onChanged,
+              activeTrackColor: AppColors.primary,
+            ),
+          ],
+        ),
       ),
     );
   }

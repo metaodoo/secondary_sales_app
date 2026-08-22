@@ -9,6 +9,7 @@ extension ScrapsApi on ApiService {
     String state = 'all',
     String? search,
     String? type,
+    String? returnReciptStatus,
   }) async {
     final params = <String, dynamic>{
       'employee_id': _activeEmployeeId,
@@ -21,6 +22,9 @@ extension ScrapsApi on ApiService {
     }
     if (type != null && type.isNotEmpty) {
       params['type'] = type;
+    }
+    if (returnReciptStatus != null && returnReciptStatus.isNotEmpty) {
+      params['return_recipt_status'] = returnReciptStatus;
     }
 
     final result = await _post(AppConstants.scrapsEndpoint, params);
@@ -140,6 +144,7 @@ extension ScrapsApi on ApiService {
     required List<Map<String, dynamic>> lines,
     String? type,
     String? damageType,
+    bool sendToSalesOperation = false,
   }) async {
     final params = <String, dynamic>{
       'employee_id': _activeEmployeeId,
@@ -148,6 +153,9 @@ extension ScrapsApi on ApiService {
     if (type != null && type.isNotEmpty) params['type'] = type;
     if (damageType != null && damageType.isNotEmpty) {
       params['damage_type'] = damageType;
+    }
+    if (sendToSalesOperation) {
+      params['send_to_sales_operation'] = true;
     }
 
     final result = await _post(

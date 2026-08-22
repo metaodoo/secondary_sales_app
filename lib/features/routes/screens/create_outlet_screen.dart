@@ -8,6 +8,7 @@ import 'package:secondary_sales/core/services/location_service.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:secondary_sales/features/my_team/my_team_provider.dart';
 import 'package:secondary_sales/core/util/dialog_helper.dart';
+import 'package:secondary_sales/core/widgets/ss_ui.dart';
 
 class CreateOutletScreen extends StatefulWidget {
   final int routeId;
@@ -177,13 +178,10 @@ class _CreateOutletScreenState extends State<CreateOutletScreen> {
             fontSize: 20,
           ),
         ),
-        actions: const [
+        actions: [
           Padding(
-            padding: EdgeInsets.only(right: 16.0),
-            child: CircleAvatar(
-              backgroundColor: AppColors.borderSoft,
-              child: Icon(Icons.person_outline, color: AppColors.textPrimary),
-            ),
+            padding: const EdgeInsets.only(right: 16.0),
+            child: ProfileAvatar(),
           ),
         ],
       ),

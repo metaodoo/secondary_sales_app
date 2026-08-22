@@ -17,6 +17,7 @@ import 'package:secondary_sales/features/my_team/screens/my_team_screen.dart';
 import 'package:secondary_sales/features/notifications/notification_provider.dart';
 import 'package:secondary_sales/features/notifications/widgets/notification_bell.dart';
 import 'package:secondary_sales/features/settings/screens/settings_tab.dart';
+import 'package:secondary_sales/features/dashboard/module_launcher.dart';
 
 /// Post-login landing dashboard.
 ///
@@ -368,15 +369,10 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
 
     _scheduleModuleVisibilityCheck();
 
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
-      floatingActionButton: moduleItems.isEmpty
-          ? null
-          : _FloatingModuleLauncher(
-              visible: _showModuleShortcut,
-              onTap: () => _showModulePicker(moduleItems),
-            ),
+    return Stack(
+      children: [
+        Scaffold(
+          backgroundColor: AppColors.background,
       appBar: AppBar(
         automaticallyImplyLeading: false,
         leading: Navigator.of(context).canPop()
@@ -431,7 +427,7 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
                 ),
               ),
               Text(
-                firstName,
+                userName ?? 'User',
                 style: const TextStyle(
                   color: AppColors.textPrimary,
                   fontWeight: FontWeight.bold,
@@ -558,7 +554,11 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
           ),
         ),
       ),
-    );
+    ),
+    if (moduleItems.isNotEmpty)
+      ModuleLauncherFab(visible: _showModuleShortcut),
+  ],
+);
   }
 }
 
@@ -1647,58 +1647,6 @@ class _ModulesGrid extends StatelessWidget {
             ),
           )
           .toList(growable: false),
-    );
-  }
-}
-
-class _FloatingModuleLauncher extends StatelessWidget {
-  const _FloatingModuleLauncher({required this.visible, required this.onTap});
-
-  final bool visible;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return IgnorePointer(
-      ignoring: !visible,
-      child: AnimatedSlide(
-        duration: const Duration(milliseconds: 180),
-        curve: Curves.easeOut,
-        offset: visible ? Offset.zero : const Offset(0, 1.2),
-        child: AnimatedOpacity(
-          duration: const Duration(milliseconds: 180),
-          opacity: visible ? 1 : 0,
-          child: Material(
-            color: AppColors.primaryStrong,
-            borderRadius: BorderRadius.circular(999),
-            elevation: 8,
-            child: InkWell(
-              onTap: onTap,
-              borderRadius: BorderRadius.circular(999),
-              child: const Padding(
-                padding: EdgeInsets.symmetric(horizontal: 18, vertical: 14),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(Icons.apps_rounded, color: Colors.white, size: 20),
-                    SizedBox(width: 10),
-                    Text(
-                      'Open module',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w800,
-                        fontSize: 14,
-                      ),
-                    ),
-                    SizedBox(width: 6),
-                    Icon(Icons.keyboard_arrow_up_rounded, color: Colors.white),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        ),
-      ),
     );
   }
 }

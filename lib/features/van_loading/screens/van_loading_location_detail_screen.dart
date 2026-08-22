@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:secondary_sales/core/util/parse.dart';
 import 'package:secondary_sales/core/theme/app_theme.dart';
 import 'package:provider/provider.dart';
 
@@ -40,10 +41,7 @@ class _VanLoadingLocationDetailScreenState
   }
 
   String _nameOf(Map<String, dynamic>? value) {
-    final name = value?['name'];
-    return name == null || name.toString().trim().isEmpty
-        ? '-'
-        : name.toString();
+    return formatLocationName(value);
   }
 
   @override

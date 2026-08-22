@@ -203,6 +203,9 @@ class _CreateSalesOfficerScreenState extends State<CreateSalesOfficerScreen> {
                 onPressed: () => Navigator.pop(context),
                 icon: const Icon(Icons.arrow_back, color: Colors.white),
               ),
+              trailing: ProfileAvatar(
+                borderColor: Colors.white.withValues(alpha: 0.6),
+              ),
             ),
             Expanded(
               child: Form(

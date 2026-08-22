@@ -161,7 +161,7 @@ class _AttendanceScreenContentState extends State<_AttendanceScreenContent>
         actions: [
           Padding(
             padding: const EdgeInsets.only(right: 16),
-            child: const ProfileAvatar(),
+            child: ProfileAvatar(),
           ),
         ],
         bottom: TabBar(

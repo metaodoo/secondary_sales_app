@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import 'package:secondary_sales/data/models/sales/order_line_entry.dart';
 import 'package:secondary_sales/features/sales/primary_sale_provider.dart';
 import 'package:secondary_sales/features/sales/screens/create_primary_sale_screen.dart';
+import 'package:secondary_sales/features/sales/screens/product_selection_screen.dart';
 import 'package:secondary_sales/core/widgets/dashboard_cards.dart';
 import 'package:secondary_sales/core/widgets/ss_ui.dart';
 
@@ -31,17 +33,16 @@ class OrderTab extends StatelessWidget {
           BlueHeader(
             title: 'New Order',
             subtitle: 'Create sales order',
-            leading: onOpenMenu != null
-                ? IconButton(
-                    onPressed: onOpenMenu,
-                    icon: const Icon(Icons.menu, color: Colors.white),
-                  )
-                : onBack != null
+            leading: onBack != null
                 ? IconButton(
                     onPressed: onBack,
                     icon: const Icon(Icons.arrow_back, color: Colors.white),
                   )
                 : null,
+            trailing: ProfileAvatar(
+              onTap: onOpenMenu,
+              borderColor: Colors.white.withValues(alpha: 0.6),
+            ),
           ),
           Expanded(
             child: RefreshIndicator(
@@ -81,7 +82,11 @@ class OrderTab extends StatelessWidget {
                           Navigator.push(
                             context,
                             MaterialPageRoute(
-                              builder: (_) => CreatePrimarySaleScreen(hub: hub),
+                              builder: (_) => ProductSelectionScreen(
+                                saleType: 'primary',
+                                partnerId: hub.id,
+                                hub: hub,
+                              ),
                             ),
                           );
                         },

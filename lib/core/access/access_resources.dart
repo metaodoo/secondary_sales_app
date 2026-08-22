@@ -252,6 +252,9 @@ class AppAction {
   static String scrapCancelFor(String moduleType) =>
       moduleType == 'secondary' ? secondaryScrapsCancel : scrapsCancel;
 
+  static String scrapSendToSalesOperationFor(String moduleType) =>
+      moduleType == 'secondary' ? '' : scrapsSendToSalesOperation;
+
   static String scrapValidateFor(String moduleType) =>
       moduleType == 'secondary' ? secondaryScrapsValidate : scrapsValidate;
 }

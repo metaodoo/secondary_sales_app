@@ -8,6 +8,7 @@ import 'package:secondary_sales/data/models/sales/order_line_entry.dart';
 import 'package:secondary_sales/features/sales/primary_sale_provider.dart';
 import 'package:secondary_sales/features/sales/screens/product_selection_screen.dart';
 import 'package:secondary_sales/core/widgets/ss_ui.dart';
+import 'package:secondary_sales/core/widgets/order_form_widgets.dart';
 
 class OrderLineModel {
   final int productId;
@@ -18,6 +19,7 @@ class OrderLineModel {
   int orderQty;
   int damagedExpiredQty;
   int damageQualityQty;
+  bool adjustWithBill;
 
   OrderLineModel({
     required this.productId,
@@ -28,27 +30,40 @@ class OrderLineModel {
     this.orderQty = 0,
     this.damagedExpiredQty = 0,
     this.damageQualityQty = 0,
+    this.adjustWithBill = false,
   });
 
-  double get lineTotal => unitPrice * orderQty;
+  /// Quantity actually charged for. A bill-adjusted return is settled against
+  /// the bill rather than swapped for fresh stock, so the returned units come
+  /// off what the customer pays -- and a returns-only line goes negative.
+  /// Mirrors `sale.order.line._ss_billable_qty` on the server.
+  int get billableQty => adjustWithBill
+      ? orderQty - (damagedExpiredQty + damageQualityQty)
+      : orderQty;
+
+  double get lineTotal => unitPrice * billableQty;
 }
 
 class OrderCreationScreen extends StatefulWidget {
   final int outletId;
   final String customerName;
+  final String? outletCode;
   final int? mediumId;
   final int? routeId;
   final int? visitId;
   final int? editOrderId;
+  final List<OrderLineEntry>? initialLines;
 
   const OrderCreationScreen({
     super.key,
     required this.outletId,
     required this.customerName,
+    this.outletCode,
     this.mediumId,
     this.routeId,
     this.visitId,
     this.editOrderId,
+    this.initialLines,
   });
 
   @override
@@ -63,6 +78,23 @@ class _OrderCreationScreenState extends State<OrderCreationScreen> {
   @override
   void initState() {
     super.initState();
+    if (widget.initialLines != null && widget.initialLines!.isNotEmpty) {
+      for (final entry in widget.initialLines!) {
+        lines.add(
+          OrderLineModel(
+            productId: entry.product.id,
+            productName: entry.product.name,
+            unitPrice: entry.product.price,
+            dbStock: entry.product.distributorStock?.toInt() ?? 0,
+            vanStock: entry.product.stock?.toInt() ?? 0,
+            orderQty: entry.quantity,
+            damagedExpiredQty: entry.damagedQty,
+            damageQualityQty: entry.qualityQty,
+            adjustWithBill: entry.adjustWithBill,
+          ),
+        );
+      }
+    }
     if (widget.editOrderId != null) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         _loadOrderDetails();
@@ -144,6 +176,10 @@ class _OrderCreationScreenState extends State<OrderCreationScreen> {
           lines[existingIndex].orderQty += entry.quantity;
           lines[existingIndex].damagedExpiredQty += entry.damagedQty;
           lines[existingIndex].damageQualityQty += entry.qualityQty;
+          // Merging into an existing line: if either side needs the bill
+          // adjustment, the merged line does.
+          lines[existingIndex].adjustWithBill =
+              lines[existingIndex].adjustWithBill || entry.adjustWithBill;
         } else {
           lines.add(
             OrderLineModel(
@@ -155,6 +191,7 @@ class _OrderCreationScreenState extends State<OrderCreationScreen> {
               orderQty: entry.quantity,
               damagedExpiredQty: entry.damagedQty,
               damageQualityQty: entry.qualityQty,
+              adjustWithBill: entry.adjustWithBill,
             ),
           );
         }
@@ -183,6 +220,7 @@ class _OrderCreationScreenState extends State<OrderCreationScreen> {
               'order_qty': l.orderQty,
               'damaged_expired_qty': l.damagedExpiredQty,
               'damage_quality_qty': l.damageQualityQty,
+              'ss_adjust_with_bill': l.adjustWithBill,
               'price_unit': l.unitPrice,
             },
           )
@@ -328,6 +366,18 @@ class _OrderCreationScreenState extends State<OrderCreationScreen> {
                                           color: AppColors.textPrimary,
                                         ),
                                       ),
+                                      if (widget.outletCode != null &&
+                                          widget.outletCode!.trim().isNotEmpty) ...[
+                                        const SizedBox(height: 2),
+                                        Text(
+                                          'Code: ${widget.outletCode!.trim()}',
+                                          style: const TextStyle(
+                                            fontSize: 13,
+                                            fontWeight: FontWeight.w600,
+                                            color: AppColors.primary,
+                                          ),
+                                        ),
+                                      ],
                                       const SizedBox(height: 4),
                                       Text(
                                         'Client ID: #${widget.outletId} • Selected Outlet',
@@ -628,6 +678,18 @@ class _OrderCreationScreenState extends State<OrderCreationScreen> {
               const Expanded(child: SizedBox()),
             ],
           ),
+
+          // Mirrors the toggle in product selection so the rep can see and
+          // change the decision at review time, not only while picking.
+          if (line.damagedExpiredQty > 0 || line.damageQualityQty > 0) ...[
+            const SizedBox(height: 8),
+            AdjustReturnToggle(
+              value: line.adjustWithBill,
+              vanStock: line.vanStock,
+              onChanged: (val) =>
+                  setState(() => line.adjustWithBill = val),
+            ),
+          ],
 
           const SizedBox(height: 16),
 

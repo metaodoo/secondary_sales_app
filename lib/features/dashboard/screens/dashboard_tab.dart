@@ -51,17 +51,8 @@ class DashboardTab extends StatelessWidget {
         backgroundColor: AppColors.surface,
         elevation: 0,
         scrolledUnderElevation: 0,
-        leading: onOpenMenu != null
+        leading: onBackToModules != null
             ? IconButton(
-                tooltip: 'Menu',
-                icon: const Icon(
-                  Icons.menu,
-                  color: AppColors.textPrimary,
-                  size: 28,
-                ),
-                onPressed: onOpenMenu,
-              )
-            : IconButton(
                 tooltip: 'Back to modules',
                 icon: const Icon(
                   Icons.arrow_back,
@@ -69,7 +60,8 @@ class DashboardTab extends StatelessWidget {
                   size: 28,
                 ),
                 onPressed: onBackToModules,
-              ),
+              )
+            : null,
         title: Text(
           moduleType == 'primary' ? 'Primary Sales' : 'Secondary Sales',
           style: const TextStyle(
@@ -83,7 +75,7 @@ class DashboardTab extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.only(right: 16),
             child: ProfileAvatar(
-              onTap: () => onModuleSelected(AppShellIndex.profile),
+              onTap: onOpenMenu,
             ),
           ),
         ],
@@ -100,7 +92,7 @@ class DashboardTab extends StatelessWidget {
             children: [
               const SizedBox(height: 16),
               Text(
-                'Welcome back, $firstName',
+                'Welcome back, ${userName ?? 'User'}',
                 textAlign: TextAlign.center,
                 style: const TextStyle(
                   color: AppColors.textPrimary,

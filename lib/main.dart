@@ -269,7 +269,7 @@ class _MyAppState extends State<MyApp> {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Secondary Sales',
+      title: 'Sales Force Management',
       navigatorKey: appNavigatorKey,
       debugShowCheckedModeBanner: false,
       theme: buildAppTheme(),

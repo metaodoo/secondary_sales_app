@@ -32,12 +32,7 @@ class SettingsTab extends StatelessWidget {
         backgroundColor: Colors.white,
         elevation: 0,
         scrolledUnderElevation: 0,
-        leading: onOpenMenu != null
-            ? IconButton(
-                icon: const Icon(Icons.menu, color: AppColors.textPrimary),
-                onPressed: onOpenMenu,
-              )
-            : onBack != null
+        leading: onBack != null
             ? IconButton(
                 icon: const Icon(
                   Icons.arrow_back,
@@ -55,6 +50,12 @@ class SettingsTab extends StatelessWidget {
           ),
         ),
         centerTitle: true,
+        actions: [
+          Padding(
+            padding: const EdgeInsets.only(right: 16),
+            child: ProfileAvatar(onTap: onOpenMenu),
+          ),
+        ],
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(1),
           child: Container(color: AppColors.borderMuted, height: 1),

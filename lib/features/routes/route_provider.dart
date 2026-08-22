@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:secondary_sales/data/models/routes/route.dart';
 import 'package:secondary_sales/data/models/routes/visit_reason.dart';
 import 'package:secondary_sales/data/api/api_service.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:secondary_sales/core/services/location_service.dart';
 
 class RouteProvider with ChangeNotifier {
@@ -296,7 +297,14 @@ class RouteProvider with ChangeNotifier {
     }
   }
 
-  Future<void> checkIn(int employeeId, int outletId) async {
+  Future<void> checkIn(
+    int employeeId,
+    int outletId, {
+    int? routeId,
+    String? image1920,
+    Position? position,
+  }) async {
+    if (_loadingCount > 0) return;
     _loadingCount++;
     _error = null;
     notifyListeners();
@@ -304,15 +312,18 @@ class RouteProvider with ChangeNotifier {
       // Geofenced action: require a fresh fix so a stale cached position from a
       // previous outlet can neither fail the geofence you are standing in nor
       // pass one you are nowhere near.
-      final position = await LocationService.getCurrentPosition(
-        requireFresh: true,
-        timeLimit: const Duration(seconds: 15),
-      );
+      final pos = position ??
+          await LocationService.getCurrentPosition(
+            requireFresh: true,
+            timeLimit: const Duration(seconds: 15),
+          );
       final res = await _apiService.createVisit(
         employeeId,
         outletId,
-        latitude: position.latitude,
-        longitude: position.longitude,
+        routeId: routeId ?? _activeRoute?.id,
+        image1920: image1920,
+        latitude: pos.latitude,
+        longitude: pos.longitude,
       );
       _checkedInOutletId = outletId;
       _currentVisitId = res['id'];
@@ -335,6 +346,7 @@ class RouteProvider with ChangeNotifier {
 
   Future<void> checkOut({int? visitReasonId, String? reasonNotes, double? saleAmount}) async {
     if (_currentVisitId == null) return;
+    if (_loadingCount > 0) return;
     _loadingCount++;
     _error = null;
     notifyListeners();

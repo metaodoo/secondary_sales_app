@@ -7,6 +7,9 @@ import 'package:secondary_sales/core/theme/app_theme.dart';
 import 'package:secondary_sales/core/widgets/ss_ui.dart';
 import 'package:secondary_sales/features/auth/auth_provider.dart';
 
+import 'package:secondary_sales/app/navigation/app_shell.dart';
+import 'package:secondary_sales/features/settings/screens/settings_tab.dart';
+
 /// Global navigation drawer, rendered from [visibleMenuSections].
 ///
 /// A destination that is a shell tab is switched via [onSelectTab] (the shell's
@@ -32,10 +35,10 @@ class AppDrawer extends StatelessWidget {
 
   void _open(BuildContext context, MenuDestination dest) {
     Navigator.of(context).pop(); // close the drawer first
-    if (dest.isTab) {
-      onSelectTab(dest.shellIndex!);
-    } else if (dest.builder != null) {
+    if (dest.builder != null) {
       Navigator.of(context).push(MaterialPageRoute(builder: dest.builder!));
+    } else if (dest.isTab && dest.shellIndex != null) {
+      onSelectTab(dest.shellIndex!);
     }
   }
 
@@ -50,10 +53,6 @@ class AppDrawer extends StatelessWidget {
         children: [
           _DrawerHeader(
             moduleType: moduleType,
-            onTap: () {
-              Navigator.of(context).pop();
-              onSelectTab(AppShellIndex.profile);
-            },
           ),
           Expanded(
             child: ListView(
@@ -73,10 +72,10 @@ class AppDrawer extends StatelessWidget {
               ],
             ),
           ),
-          if (onExitModule != null) ...[
-            const Divider(height: 1, color: AppColors.borderMuted),
+          const Divider(height: 1, color: AppColors.borderMuted),
+          if (onExitModule != null)
             Padding(
-              padding: const EdgeInsets.symmetric(vertical: 6),
+              padding: const EdgeInsets.only(top: 6),
               child: _MenuTile(
                 icon: Icons.swap_horiz_rounded,
                 label: 'Switch Module',
@@ -86,7 +85,19 @@ class AppDrawer extends StatelessWidget {
                 },
               ),
             ),
-          ],
+          Padding(
+            padding: const EdgeInsets.only(top: 2, bottom: 12),
+            child: _MenuTile(
+              icon: Icons.logout_rounded,
+              label: 'Logout',
+              iconColor: Colors.red.shade600,
+              textColor: Colors.red.shade700,
+              onTap: () async {
+                Navigator.of(context).pop();
+                await context.read<AuthProvider>().logout();
+              },
+            ),
+          ),
         ],
       ),
     );
@@ -94,10 +105,9 @@ class AppDrawer extends StatelessWidget {
 }
 
 class _DrawerHeader extends StatelessWidget {
-  const _DrawerHeader({required this.moduleType, required this.onTap});
+  const _DrawerHeader({required this.moduleType});
 
   final String moduleType;
-  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
@@ -109,80 +119,85 @@ class _DrawerHeader extends StatelessWidget {
         moduleType == 'primary' ? 'Primary Sales' : 'Secondary Sales';
     final subtitle = [if (role.isNotEmpty) role, moduleLabel].join(' · ');
 
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        child: Container(
-          width: double.infinity,
-          padding: EdgeInsets.fromLTRB(
-            20,
-            MediaQuery.of(context).padding.top + 22,
-            16,
-            22,
+    return InkWell(
+      onTap: () {
+        Navigator.of(context).pop();
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (ctx) => SettingsTab(onBack: () => Navigator.of(ctx).pop()),
           ),
-          decoration: const BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [AppColors.primary, AppColors.primaryStrong],
+        );
+      },
+      child: Container(
+        width: double.infinity,
+        padding: EdgeInsets.fromLTRB(
+          20,
+          MediaQuery.of(context).padding.top + 22,
+          16,
+          22,
+        ),
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [AppColors.primary, AppColors.primaryStrong],
+          ),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 52,
+              height: 52,
+              alignment: Alignment.center,
+              decoration: const BoxDecoration(
+                shape: BoxShape.circle,
+                color: Colors.white,
+              ),
+              child: Text(
+                _initialsOf(name),
+                style: const TextStyle(
+                  color: AppColors.primaryStrong,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 20,
+                ),
+              ),
             ),
-          ),
-          child: Row(
-            children: [
-              Container(
-                width: 52,
-                height: 52,
-                alignment: Alignment.center,
-                decoration: const BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: Colors.white,
-                ),
-                child: Text(
-                  _initialsOf(name),
-                  style: const TextStyle(
-                    color: AppColors.primaryStrong,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 20,
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 18,
+                    ),
                   ),
-                ),
-              ),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      name,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 18,
-                      ),
+                  const SizedBox(height: 3),
+                  Text(
+                    subtitle,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: Colors.white.withValues(alpha: 0.85),
+                      fontSize: 13,
+                      fontWeight: FontWeight.w500,
                     ),
-                    const SizedBox(height: 3),
-                    Text(
-                      subtitle,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        color: Colors.white.withValues(alpha: 0.85),
-                        fontSize: 13,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ],
-                ),
+                  ),
+                ],
               ),
-              Icon(
-                Icons.chevron_right,
-                color: Colors.white.withValues(alpha: 0.8),
-              ),
-            ],
-          ),
+            ),
+            const Icon(
+              Icons.chevron_right,
+              color: Colors.white70,
+              size: 22,
+            ),
+          ],
         ),
       ),
     );
@@ -216,17 +231,22 @@ class _MenuTile extends StatelessWidget {
     required this.icon,
     required this.label,
     this.selected = false,
+    this.iconColor,
+    this.textColor,
     required this.onTap,
   });
 
   final IconData icon;
   final String label;
   final bool selected;
+  final Color? iconColor;
+  final Color? textColor;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    final accent = selected ? AppColors.primary : AppColors.textSecondary;
+    final accent = iconColor ?? (selected ? AppColors.primary : AppColors.textSecondary);
+    final textStyleColor = textColor ?? (selected ? AppColors.primary : AppColors.textPrimary);
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
       child: Material(
@@ -245,9 +265,7 @@ class _MenuTile extends StatelessWidget {
                   child: Text(
                     label,
                     style: TextStyle(
-                      color: selected
-                          ? AppColors.primary
-                          : AppColors.textPrimary,
+                      color: textStyleColor,
                       fontSize: 15,
                       fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
                     ),

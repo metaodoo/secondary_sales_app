@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:secondary_sales/core/widgets/ss_ui.dart';
 import 'package:secondary_sales/core/theme/app_theme.dart';
 import 'package:provider/provider.dart';
 import 'package:secondary_sales/features/routes/route_provider.dart';
@@ -103,6 +104,12 @@ class _EditOutletScreenState extends State<EditOutletScreen> {
             fontSize: 20,
           ),
         ),
+        actions: const [
+          Padding(
+            padding: EdgeInsets.only(right: 16),
+            child: ProfileAvatar(),
+          ),
+        ],
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(20),

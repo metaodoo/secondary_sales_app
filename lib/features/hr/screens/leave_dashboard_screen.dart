@@ -159,18 +159,17 @@ class _LeaveDashboardContentState extends State<_LeaveDashboardContent> with Sin
         actions: [
           Padding(
             padding: const EdgeInsets.only(right: 16),
-            child: const ProfileAvatar(),
+            child: ProfileAvatar(),
           ),
         ],
         bottom: TabBar(
           controller: _tabController,
-          isScrollable: false,
+          isScrollable: true,
+          tabAlignment: TabAlignment.start,
           labelColor: AppColors.primary,
           unselectedLabelColor: AppColors.textSecondary,
           indicatorColor: AppColors.primary,
           tabs: _tabLabels.map((label) {
-            // For Pending, we could add a badge here if we had a separate count API, 
-            // but for now we just show the label.
             return Tab(text: label);
           }).toList(),
         ),

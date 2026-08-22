@@ -68,25 +68,17 @@ class _DealersTabState extends State<DealersTab> {
             BlueHeader(
               title: 'Dealers',
               subtitle: 'Distributor management',
-              leading: widget.onOpenMenu != null
-                  ? IconButton(
-                      tooltip: 'Menu',
-                      onPressed: widget.onOpenMenu,
-                      icon: const Icon(Icons.menu, color: Colors.white),
-                    )
-                  : widget.onBack != null
+              leading: widget.onBack != null
                   ? IconButton(
                       tooltip: 'Back',
                       onPressed: widget.onBack,
                       icon: const Icon(Icons.arrow_back, color: Colors.white),
                     )
                   : null,
-              trailing: widget.onProfileTap != null
-                  ? ProfileAvatar(
-                      onTap: widget.onProfileTap!,
-                      borderColor: Colors.white.withValues(alpha: 0.6),
-                    )
-                  : null,
+              trailing: ProfileAvatar(
+                onTap: widget.onOpenMenu,
+                borderColor: Colors.white.withValues(alpha: 0.6),
+              ),
             ),
             Expanded(
               child: RefreshIndicator(

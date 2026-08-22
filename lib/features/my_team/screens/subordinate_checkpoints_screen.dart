@@ -251,6 +251,10 @@ class _SubordinateCheckpointsScreenState
             icon: const Icon(Icons.calendar_today, color: AppColors.primaryStrong),
             onPressed: () => _selectDate(context),
           ),
+          const Padding(
+            padding: EdgeInsets.only(right: 16),
+            child: ProfileAvatar(),
+          ),
         ],
         backgroundColor: Colors.white,
         elevation: 0,

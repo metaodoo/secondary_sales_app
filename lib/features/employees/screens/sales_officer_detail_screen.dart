@@ -78,12 +78,19 @@ class _SalesOfficerDetailScreenState extends State<SalesOfficerDetailScreen> {
                 onPressed: () => Navigator.pop(context, true),
                 icon: const Icon(Icons.arrow_back, color: Colors.white),
               ),
-              trailing: _employee != null
-                  ? IconButton(
+              trailing: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (_employee != null)
+                    IconButton(
                       onPressed: _editEmployee,
                       icon: const Icon(Icons.edit, color: Colors.white),
-                    )
-                  : null,
+                    ),
+                  ProfileAvatar(
+                    borderColor: Colors.white.withValues(alpha: 0.6),
+                  ),
+                ],
+              ),
             ),
             Expanded(child: _buildBody()),
           ],

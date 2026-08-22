@@ -159,7 +159,7 @@ class _DeliveriesListScreenState extends State<DeliveriesListScreen> {
         actions: [
           Padding(
             padding: const EdgeInsets.only(right: 16),
-            child: const ProfileAvatar(),
+            child: ProfileAvatar(),
           ),
         ],
         bottom: PreferredSize(

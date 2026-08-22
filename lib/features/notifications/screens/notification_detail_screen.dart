@@ -7,6 +7,8 @@ import 'package:secondary_sales/features/notifications/notification_router.dart'
 
 /// Full view of a single notification, with a button to open the record it
 /// references (when the app has a screen for that record's model).
+import 'package:secondary_sales/core/widgets/ss_ui.dart';
+
 class NotificationDetailScreen extends StatelessWidget {
   const NotificationDetailScreen({super.key, required this.notification});
 
@@ -30,6 +32,12 @@ class NotificationDetailScreen extends StatelessWidget {
             fontWeight: FontWeight.bold,
           ),
         ),
+        actions: const [
+          Padding(
+            padding: EdgeInsets.only(right: 16),
+            child: ProfileAvatar(),
+          ),
+        ],
       ),
       body: SafeArea(
         child: SingleChildScrollView(

@@ -104,6 +104,12 @@ class _RouteDetailScreenState extends State<RouteDetailScreen> {
             color: AppColors.textPrimary,
           ),
         ),
+        actions: const [
+          Padding(
+            padding: EdgeInsets.only(right: 16),
+            child: ProfileAvatar(),
+          ),
+        ],
         backgroundColor: Colors.white,
         elevation: 0,
         iconTheme: const IconThemeData(color: AppColors.textPrimary),

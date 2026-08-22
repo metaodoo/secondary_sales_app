@@ -93,17 +93,8 @@ class HomeTab extends StatelessWidget {
         backgroundColor: AppColors.surface,
         elevation: 0,
         scrolledUnderElevation: 0,
-        leading: onOpenMenu != null
+        leading: onBack != null
             ? IconButton(
-                tooltip: 'Menu',
-                icon: const Icon(
-                  Icons.menu,
-                  color: AppColors.textPrimary,
-                  size: 28,
-                ),
-                onPressed: onOpenMenu,
-              )
-            : IconButton(
                 tooltip: 'Back',
                 icon: const Icon(
                   Icons.arrow_back,
@@ -111,7 +102,8 @@ class HomeTab extends StatelessWidget {
                   size: 28,
                 ),
                 onPressed: onBack,
-              ),
+              )
+            : null,
         title: const Text(
           'Sales Orders',
           style: TextStyle(
@@ -124,7 +116,7 @@ class HomeTab extends StatelessWidget {
         actions: [
           Padding(
             padding: const EdgeInsets.only(right: 16),
-            child: ProfileAvatar(onTap: onProfileTap),
+            child: ProfileAvatar(onTap: onOpenMenu),
           ),
         ],
         bottom: PreferredSize(

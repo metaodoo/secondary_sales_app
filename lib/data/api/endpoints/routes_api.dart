@@ -9,6 +9,7 @@ extension RoutesApi on ApiService {
     String? visitType,
     int? routeId,
     String? search,
+    String? scope,
     DateTime? dateFrom,
     DateTime? dateTo,
   }) async {
@@ -19,6 +20,7 @@ extension RoutesApi on ApiService {
     };
     if (visitType != null && visitType != 'all') params['visit_type'] = visitType;
     if (routeId != null) params['route_id'] = routeId;
+    if (scope != null && scope.isNotEmpty) params['scope'] = scope;
     final q = search?.trim();
     if (q != null && q.isNotEmpty) params['search'] = q;
     if (dateFrom != null) {

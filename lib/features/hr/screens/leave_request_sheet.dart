@@ -45,6 +45,21 @@ class _LeaveRequestSheetState extends State<LeaveRequestSheet> {
     }
   }
 
+  bool get _isSickLeave {
+    final type = _selectedLeaveType;
+    if (type == null) return false;
+    return type['is_sick_leave'] == true;
+  }
+
+  int get _durationDays {
+    if (_startDate == null || _endDate == null) return 0;
+    return _endDate!.difference(_startDate!).inDays + 1;
+  }
+
+  bool get _requiresAttachment {
+    return _isSickLeave && _durationDays > 2;
+  }
+
   void _onLeaveTypeChanged(int? newTypeId) {
     setState(() {
       _selectedLeaveTypeId = newTypeId;
@@ -79,6 +94,16 @@ class _LeaveRequestSheetState extends State<LeaveRequestSheet> {
         _startDate == null ||
         _endDate == null ||
         _reasonController.text.trim().isEmpty) {
+      return;
+    }
+
+    if (_requiresAttachment && (_attachmentBase64 == null || _attachmentBase64!.isEmpty)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('For Sick Leave of more than 2 days, attaching a photo or document is mandatory.'),
+          backgroundColor: Colors.red,
+        ),
+      );
       return;
     }
 
@@ -207,8 +232,6 @@ class _LeaveRequestSheetState extends State<LeaveRequestSheet> {
   @override
   Widget build(BuildContext context) {
     final provider = context.watch<LeaveProvider>();
-    final selectedType = _selectedLeaveType;
-    final selectedPolicy = (selectedType != null ? (selectedType['date_policy'] ?? 'any') : 'any').toString();
     
     return Container(
       decoration: const BoxDecoration(
@@ -312,20 +335,6 @@ class _LeaveRequestSheetState extends State<LeaveRequestSheet> {
                   }).toList(),
                   onChanged: provider.isSubmitting ? null : _onLeaveTypeChanged,
                 ),
-              if (selectedType != null) ...[
-                const SizedBox(height: 6),
-                Padding(
-                  padding: const EdgeInsets.only(left: 4),
-                  child: Text(
-                    selectedPolicy == 'past_today'
-                        ? 'ℹ️ Can apply for previous days or today only (no future dates).'
-                        : selectedPolicy == 'today_only'
-                            ? 'ℹ️ Can apply for today only.'
-                            : 'ℹ️ Can apply for any date (past, today, or future).',
-                    style: const TextStyle(fontSize: 12, color: AppColors.primary, fontWeight: FontWeight.w500),
-                  ),
-                ),
-              ],
               const SizedBox(height: 16),
 
               const Text('Duration', style: TextStyle(fontWeight: FontWeight.bold)),
@@ -410,8 +419,43 @@ class _LeaveRequestSheetState extends State<LeaveRequestSheet> {
               ),
               const SizedBox(height: 16),
 
+              if (_requiresAttachment) ...[
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFEF3C7),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: const Color(0xFFF59E0B)),
+                  ),
+                  child: const Row(
+                    children: [
+                      Icon(Icons.info_outline, color: Color(0xFFD97706), size: 20),
+                      SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          'For Sick Leave of more than 2 days, attaching a photo or document is mandatory.',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: Color(0xFF92400E),
+                            height: 1.3,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 12),
+              ],
+
               // Attachment UI
-              const Text('Attachment (Optional)', style: TextStyle(fontWeight: FontWeight.bold)),
+              Text(
+                _requiresAttachment ? 'Attachment (Mandatory) *' : 'Attachment (Optional)',
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: _requiresAttachment ? Colors.red.shade700 : null,
+                ),
+              ),
               const SizedBox(height: 8),
               InkWell(
                 onTap: provider.isSubmitting ? null : _pickAttachment,
@@ -419,7 +463,12 @@ class _LeaveRequestSheetState extends State<LeaveRequestSheet> {
                 child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                   decoration: BoxDecoration(
-                    border: Border.all(color: AppColors.borderSoft),
+                    border: Border.all(
+                      color: (_validationTriggered && _requiresAttachment && (_attachmentBase64 == null || _attachmentBase64!.isEmpty))
+                          ? Colors.red
+                          : AppColors.borderSoft,
+                      width: (_validationTriggered && _requiresAttachment && (_attachmentBase64 == null || _attachmentBase64!.isEmpty)) ? 1.5 : 1.0,
+                    ),
                     borderRadius: BorderRadius.circular(8),
                     color: AppColors.background,
                   ),

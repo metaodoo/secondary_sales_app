@@ -184,20 +184,20 @@ class _AppShellState extends State<AppShell> {
         showSecondarySalesModule: canAccessSecondary,
         moduleType: widget.moduleType,
         onBackToModules: _exitModule,
-        onOpenMenu: () => _scaffoldKey.currentState?.openDrawer(),
+        onOpenMenu: () => _scaffoldKey.currentState?.openEndDrawer(),
         onModuleSelected: (index) {
           _setIndex(index);
         },
       ),
       () => DealersTab(
-        onProfileTap: () => _setIndex(5),
+        onProfileTap: () => _scaffoldKey.currentState?.openEndDrawer(),
         onBack: _goBack,
-        onOpenMenu: () => _scaffoldKey.currentState?.openDrawer(),
+        onOpenMenu: () => _scaffoldKey.currentState?.openEndDrawer(),
       ),
       () => OfficerRouteSelectionScreen(
-        onProfileTap: () => _setIndex(5),
+        onProfileTap: () => _scaffoldKey.currentState?.openEndDrawer(),
         onBack: _goBack,
-        onOpenMenu: () => _scaffoldKey.currentState?.openDrawer(),
+        onOpenMenu: () => _scaffoldKey.currentState?.openEndDrawer(),
       ),
       () => HomeTab(
         orderSearchController: _orderSearchController,
@@ -211,9 +211,9 @@ class _AppShellState extends State<AppShell> {
         },
         onDateTap: _pickDate,
         onNewOrderTap: () => _setIndex(4),
-        onProfileTap: () => _setIndex(5),
+        onProfileTap: () => _scaffoldKey.currentState?.openEndDrawer(),
         onBack: _goBack,
-        onOpenMenu: () => _scaffoldKey.currentState?.openDrawer(),
+        onOpenMenu: () => _scaffoldKey.currentState?.openEndDrawer(),
         onClearDate: () {
           setState(() {
             _dateFromFilter = null;
@@ -240,48 +240,74 @@ class _AppShellState extends State<AppShell> {
         searchController: _distributorSearchController,
         onSearchChanged: _onDistributorSearchChanged,
         onBack: _goBack,
-        onOpenMenu: () => _scaffoldKey.currentState?.openDrawer(),
+        onOpenMenu: () => _scaffoldKey.currentState?.openEndDrawer(),
       ),
       () => SettingsTab(
         onBack: _goBack,
-        onOpenMenu: () => _scaffoldKey.currentState?.openDrawer(),
+        onOpenMenu: () => _scaffoldKey.currentState?.openEndDrawer(),
       ),
       () => const VanOperationsListScreen(operationType: 'load'),
       () => const VanOperationsListScreen(operationType: 'unload'),
     ];
 
-    return PopScope(
-      // Only the Dashboard lets the system back exit the module; every other
-      // destination intercepts back and returns to the Dashboard in one step.
-      canPop: _currentIndex == AppShellIndex.dashboard,
-      onPopInvokedWithResult: (didPop, result) {
-        if (!didPop) {
-          _setIndex(AppShellIndex.dashboard);
-        }
-      },
-      child: Scaffold(
-        key: _scaffoldKey,
-        backgroundColor: AppColors.background,
-        floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
-        floatingActionButton: _tabsWithOwnFab.contains(currentIndex)
-            ? null
-            : const ModuleLauncherFab(),
-        drawer: AppDrawer(
-          moduleType: widget.moduleType,
-          currentShellIndex: currentIndex,
-          onSelectTab: _setIndex,
-          onExitModule: _exitModule,
-        ),
-        body: IndexedStack(
-          index: currentIndex,
-          children: List<Widget>.generate(
-            tabBuilders.length,
-            (i) => _activatedTabs.contains(i)
-                ? tabBuilders[i]()
-                : const SizedBox.shrink(),
-          ),
+    return AppShellNavigation(
+      setIndex: _setIndex,
+      moduleType: widget.moduleType,
+      child: PopScope(
+        // Only the Dashboard lets the system back exit the module; every other
+        // destination intercepts back and returns to the Dashboard in one step.
+        canPop: _currentIndex == AppShellIndex.dashboard,
+        onPopInvokedWithResult: (didPop, result) {
+          if (!didPop) {
+            _setIndex(AppShellIndex.dashboard);
+          }
+        },
+        child: Stack(
+          children: [
+            Scaffold(
+              key: _scaffoldKey,
+              backgroundColor: AppColors.background,
+              endDrawer: AppDrawer(
+                moduleType: widget.moduleType,
+                currentShellIndex: currentIndex,
+                onSelectTab: _setIndex,
+                onExitModule: _exitModule,
+              ),
+              body: IndexedStack(
+                index: currentIndex,
+                children: List<Widget>.generate(
+                  tabBuilders.length,
+                  (i) => _activatedTabs.contains(i)
+                      ? tabBuilders[i]()
+                      : const SizedBox.shrink(),
+                ),
+              ),
+            ),
+            if (!_tabsWithOwnFab.contains(currentIndex))
+              const ModuleLauncherFab(),
+          ],
         ),
       ),
     );
   }
+}
+
+class AppShellNavigation extends InheritedWidget {
+  const AppShellNavigation({
+    super.key,
+    required this.setIndex,
+    required this.moduleType,
+    required super.child,
+  });
+
+  final void Function(int index) setIndex;
+  final String moduleType;
+
+  static AppShellNavigation? of(BuildContext context) {
+    return context.dependOnInheritedWidgetOfExactType<AppShellNavigation>();
+  }
+
+  @override
+  bool updateShouldNotify(AppShellNavigation oldWidget) =>
+      moduleType != oldWidget.moduleType;
 }

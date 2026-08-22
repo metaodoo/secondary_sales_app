@@ -31,29 +31,20 @@ class OfficerRouteSelectionScreen extends StatelessWidget {
         backgroundColor: Colors.white,
         elevation: 0,
         scrolledUnderElevation: 0,
-        leading: onOpenMenu != null
-            ? IconButton(
-                icon: const Icon(
-                  Icons.menu,
-                  color: AppColors.textPrimary,
-                  size: 28,
-                ),
-                onPressed: onOpenMenu,
-              )
-            : IconButton(
-                icon: const Icon(
-                  Icons.arrow_back,
-                  color: AppColors.textPrimary,
-                  size: 28,
-                ),
-                onPressed:
-                    onBack ??
-                    () {
-                      if (Navigator.canPop(context)) {
-                        Navigator.pop(context);
-                      }
-                    },
-              ),
+        leading: IconButton(
+          icon: const Icon(
+            Icons.arrow_back,
+            color: AppColors.textPrimary,
+            size: 28,
+          ),
+          onPressed:
+              onBack ??
+              () {
+                if (Navigator.canPop(context)) {
+                  Navigator.pop(context);
+                }
+              },
+        ),
         title: const Text(
           'Routes',
           style: TextStyle(
@@ -64,11 +55,10 @@ class OfficerRouteSelectionScreen extends StatelessWidget {
         ),
         centerTitle: true,
         actions: [
-          if (onProfileTap != null)
-            Padding(
-              padding: const EdgeInsets.only(right: 16),
-              child: ProfileAvatar(onTap: onProfileTap!),
-            ),
+          Padding(
+            padding: const EdgeInsets.only(right: 16),
+            child: ProfileAvatar(onTap: onOpenMenu),
+          ),
         ],
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(1),

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:secondary_sales/core/widgets/ss_ui.dart';
 import 'package:secondary_sales/core/theme/app_theme.dart';
 import 'package:provider/provider.dart';
 import 'package:secondary_sales/data/api/api_service.dart';
@@ -123,6 +124,12 @@ class _NewJointVisitScreenState extends State<NewJointVisitScreen> {
             fontWeight: FontWeight.bold,
           ),
         ),
+        actions: const [
+          Padding(
+            padding: EdgeInsets.only(right: 16),
+            child: ProfileAvatar(),
+          ),
+        ],
         iconTheme: const IconThemeData(color: AppColors.textPrimary),
       ),
       body: SingleChildScrollView(

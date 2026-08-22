@@ -2,26 +2,34 @@ import 'dart:async';
 import 'package:secondary_sales/core/theme/app_theme.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'dart:convert';
+import 'package:image_picker/image_picker.dart';
+import 'package:secondary_sales/core/services/location_service.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import 'package:secondary_sales/features/routes/route_provider.dart';
 import 'package:secondary_sales/features/routes/screens/outlet_visit_history_screen.dart';
 import 'package:secondary_sales/features/routes/screens/new_joint_visit_screen.dart';
 import 'package:secondary_sales/core/access/access_resources.dart';
+import 'package:secondary_sales/data/models/sales/order_line_entry.dart';
 import 'package:secondary_sales/features/sales/screens/order_creation_screen.dart';
 import 'package:secondary_sales/features/sales/screens/out_of_geo_fence_screen.dart';
+import 'package:secondary_sales/features/sales/screens/product_selection_screen.dart';
 import 'package:secondary_sales/features/sales/screens/secondary_orders_list_screen.dart';
+import 'package:secondary_sales/data/api/api_service.dart';
 import 'package:secondary_sales/features/auth/auth_provider.dart';
 
 class CustomerActionBottomSheet extends StatefulWidget {
   final String customerName;
   final int outletId;
+  final String? customerCode;
   final String? phone;
   final String? mobile;
   const CustomerActionBottomSheet({
     super.key,
     required this.customerName,
     required this.outletId,
+    this.customerCode,
     this.phone,
     this.mobile,
   });
@@ -150,6 +158,18 @@ class _CustomerActionBottomSheetState extends State<CustomerActionBottomSheet> {
                         fontWeight: FontWeight.bold,
                       ),
                     ),
+                    if (widget.customerCode != null &&
+                        widget.customerCode!.trim().isNotEmpty) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        'Code: ${widget.customerCode!.trim()}',
+                        style: const TextStyle(
+                          color: AppColors.primary,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
                   ],
                 ),
               ),
@@ -209,53 +229,10 @@ class _CustomerActionBottomSheetState extends State<CustomerActionBottomSheet> {
               ),
             ],
           ),
-          const SizedBox(height: 12),
-          if (context.watch<AuthProvider>().canView(AppScreen.newJointVisit))
-            Row(
-              children: [
-                Expanded(
-                  child: _buildActionBtn(
-                    Icons.handshake_outlined,
-                    'Joint\nVisit',
-                    onTap: () async {
-                      if (!isCheckedIn) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text(
-                              "Please check in first to start a joint visit.",
-                            ),
-                          ),
-                        );
-                        return;
-                      }
-                      final result = await Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => NewJointVisitScreen(
-                            outletId: widget.outletId,
-                            outletName: widget.customerName,
-                            routeId: routeProv.activeRoute?.id,
-                            currentVisitId: routeProv.currentVisitId,
-                          ),
-                        ),
-                      );
-                      if (!context.mounted) return;
-                      if (result == true) {
-                        Navigator.pop(context); // close bottom sheet
-                      }
-                    },
-                  ),
-                ),
-                const SizedBox(width: 12),
-                const Expanded(child: SizedBox()),
-                const SizedBox(width: 12),
-                const Expanded(child: SizedBox()),
-              ],
-            ),
           const SizedBox(height: 32),
 
           ElevatedButton(
-            onPressed: () {
+            onPressed: () async {
               final authProv = context.read<AuthProvider>();
               final canSkipCheckin =
                   authProv
@@ -270,28 +247,40 @@ class _CustomerActionBottomSheetState extends State<CustomerActionBottomSheet> {
                 Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (_) => OrderCreationScreen(
-                      outletId: widget.outletId,
+                    builder: (_) => ProductSelectionScreen(
+                      saleType: 'secondary',
+                      partnerId: widget.outletId,
                       customerName: widget.customerName,
-                      mediumId: null, // Blank/Null medium for physical visit
+                      customerCode: widget.customerCode,
+                      mediumId: null,
                       routeId: routeProv.activeRoute?.id,
                       visitId: routeProv.currentVisitId,
                     ),
                   ),
                 );
               } else if (canSkipCheckin) {
-                Navigator.pop(context); // Close bottom sheet
-                Navigator.push(
+                final nav = Navigator.of(context);
+                final selectedMediumId = await ssShowOrderMediumDialog(
                   context,
-                  MaterialPageRoute(
-                    builder: (_) => OutOfGeoFenceScreen(
-                      outletId: widget.outletId,
-                      customerName: widget.customerName,
-                      routeId: routeProv.activeRoute?.id,
-                      visitId: routeProv.currentVisitId,
-                    ),
-                  ),
+                  customerName: widget.customerName,
+                  customerCode: widget.customerCode,
                 );
+                if (selectedMediumId != null) {
+                  nav.pop(); // Close bottom sheet
+                  nav.push(
+                    MaterialPageRoute(
+                      builder: (_) => ProductSelectionScreen(
+                        saleType: 'secondary',
+                        partnerId: widget.outletId,
+                        customerName: widget.customerName,
+                        customerCode: widget.customerCode,
+                        mediumId: selectedMediumId,
+                        routeId: routeProv.activeRoute?.id,
+                        visitId: routeProv.currentVisitId,
+                      ),
+                    ),
+                  );
+                }
               } else {
                 showDialog(
                   context: context,
@@ -316,9 +305,39 @@ class _CustomerActionBottomSheetState extends State<CustomerActionBottomSheet> {
                                   if (mounted)
                                     setState(() => _isCheckingIn = true);
                                   try {
+                                    final position = await LocationService.getCurrentPosition(
+                                      requireFresh: true,
+                                      timeLimit: const Duration(seconds: 15),
+                                    );
+
+                                    String? imageB64;
+                                    if (authProv.canView(AppScreen.newJointVisit)) {
+                                      final ImagePicker picker = ImagePicker();
+                                      final XFile? photo = await picker.pickImage(
+                                        source: ImageSource.camera,
+                                        imageQuality: 70,
+                                        maxWidth: 1024,
+                                        maxHeight: 1024,
+                                      );
+                                      if (photo == null) {
+                                        if (context.mounted) {
+                                          ScaffoldMessenger.of(context).showSnackBar(
+                                            const SnackBar(
+                                              content: Text('A check-in photo is required for joint visits.'),
+                                            ),
+                                          );
+                                        }
+                                        return;
+                                      }
+                                      final bytes = await photo.readAsBytes();
+                                      imageB64 = base64Encode(bytes);
+                                    }
+
                                     await routeProv.checkIn(
                                       employeeId,
                                       widget.outletId,
+                                      position: position,
+                                      image1920: imageB64,
                                     );
                                     if (context.mounted) {
                                       ScaffoldMessenger.of(
@@ -439,4 +458,173 @@ class _CustomerActionBottomSheetState extends State<CustomerActionBottomSheet> {
       ),
     );
   }
+}
+
+Future<int?> ssShowOrderMediumDialog(
+  BuildContext context, {
+  required String customerName,
+  String? customerCode,
+}) async {
+  return showDialog<int>(
+    context: context,
+    builder: (ctx) {
+      int? selectedId;
+      return StatefulBuilder(
+        builder: (context, setDialogState) {
+          return Dialog(
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: Container(
+              constraints: const BoxConstraints(maxWidth: 420),
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: const BoxDecoration(
+                          color: Color(0xFFEDF0FF),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(
+                          Icons.phonelink_ring_rounded,
+                          color: AppColors.primaryStrong,
+                          size: 24,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'Select Order Medium',
+                              style: TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                                color: AppColors.textPrimary,
+                              ),
+                            ),
+                            Text(
+                              customerCode != null && customerCode.trim().isNotEmpty
+                                  ? '$customerName (${customerCode.trim()})'
+                                  : customerName,
+                              style: const TextStyle(
+                                fontSize: 13,
+                                color: AppColors.textSecondary,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ],
+                        ),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.close, color: AppColors.textSecondary),
+                        onPressed: () => Navigator.pop(ctx, null),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  const Text(
+                    'You are creating an order without check-in. Please select how this order was received:',
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: AppColors.textSecondary,
+                      height: 1.4,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  FutureBuilder<List<Map<String, dynamic>>>(
+                    future: ApiService.instance.getMediums(),
+                    builder: (context, snapshot) {
+                      if (snapshot.connectionState == ConnectionState.waiting) {
+                        return const Padding(
+                          padding: EdgeInsets.symmetric(vertical: 24),
+                          child: Center(child: CircularProgressIndicator()),
+                        );
+                      }
+                      final mediums = snapshot.data ?? [];
+                      if (mediums.isEmpty) {
+                        return const Padding(
+                          padding: EdgeInsets.symmetric(vertical: 16),
+                          child: Text('No order mediums available.'),
+                        );
+                      }
+                      if (selectedId == null && mediums.isNotEmpty) {
+                        selectedId = mediums.first['id'] as int?;
+                      }
+                      return Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: mediums.map((m) {
+                          final id = m['id'] as int;
+                          final name = m['name'] as String? ?? 'Medium';
+                          final isSelected = selectedId == id;
+                          return InkWell(
+                            onTap: () {
+                              setDialogState(() {
+                                selectedId = id;
+                              });
+                            },
+                            borderRadius: BorderRadius.circular(10),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                              decoration: BoxDecoration(
+                                color: isSelected ? AppColors.primaryStrong : Colors.grey.shade100,
+                                borderRadius: BorderRadius.circular(10),
+                                border: Border.all(
+                                  color: isSelected ? AppColors.primaryStrong : Colors.grey.shade300,
+                                ),
+                              ),
+                              child: Text(
+                                name,
+                                style: TextStyle(
+                                  color: isSelected ? Colors.white : AppColors.textPrimary,
+                                  fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                                  fontSize: 13,
+                                ),
+                              ),
+                            ),
+                          );
+                        }).toList(),
+                      );
+                    },
+                  ),
+                  const SizedBox(height: 24),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 46,
+                    child: ElevatedButton(
+                      onPressed: selectedId == null
+                          ? null
+                          : () => Navigator.pop(ctx, selectedId),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primaryStrong,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                      ),
+                      child: const Text(
+                        'Proceed to Order',
+                        style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      );
+    },
+  );
 }

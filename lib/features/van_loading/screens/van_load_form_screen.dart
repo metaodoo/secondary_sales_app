@@ -418,6 +418,10 @@ class _VanLoadFormScreenState extends State<VanLoadFormScreen> {
               icon: const Icon(Icons.sync, color: AppColors.primaryStrong),
               onPressed: _fetchTargets,
             ),
+          const Padding(
+            padding: EdgeInsets.only(right: 16),
+            child: ProfileAvatar(),
+          ),
         ],
       ),
       body: SafeArea(

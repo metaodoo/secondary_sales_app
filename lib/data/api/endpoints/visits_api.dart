@@ -20,6 +20,8 @@ extension VisitsApi on ApiService {
     int employeeId,
     int outletId, {
     String visitType = 'standard',
+    int? routeId,
+    String? image1920,
     double? latitude,
     double? longitude,
   }) async {
@@ -29,6 +31,8 @@ extension VisitsApi on ApiService {
       'visit_type': visitType,
       'check_in_time': DateTime.now().toUtc().toIso8601String(),
     };
+    if (routeId != null) params['route_id'] = routeId;
+    if (image1920 != null && image1920.isNotEmpty) params['image_1920'] = image1920;
     if (latitude != null) params['latitude'] = latitude;
     if (longitude != null) params['longitude'] = longitude;
 

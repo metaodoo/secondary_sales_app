@@ -15,10 +15,12 @@ class CreatePrimarySaleScreen extends StatefulWidget {
     super.key,
     required this.hub,
     this.editOrderId,
+    this.initialLines,
   });
 
   final DistributionHub hub;
   final int? editOrderId;
+  final List<OrderLineEntry>? initialLines;
 
   @override
   State<CreatePrimarySaleScreen> createState() =>
@@ -34,6 +36,9 @@ class _CreatePrimarySaleScreenState extends State<CreatePrimarySaleScreen> {
   void initState() {
     super.initState();
     _hub = widget.hub;
+    if (widget.initialLines != null && widget.initialLines!.isNotEmpty) {
+      _lines.addAll(widget.initialLines!);
+    }
     if (widget.editOrderId != null) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         _loadOrderDetails();
@@ -263,7 +268,7 @@ class _CreatePrimarySaleScreenState extends State<CreatePrimarySaleScreen> {
                             border: Border.all(color: AppColors.primaryTint),
                           ),
                           child: Text(
-                            _hub.name,
+                            _hub.displayNameWithCode,
                             style: const TextStyle(
                               color: AppColors.textPrimary,
                               fontWeight: FontWeight.w500,

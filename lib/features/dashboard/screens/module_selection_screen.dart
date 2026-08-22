@@ -35,20 +35,10 @@ class ModuleSelectionScreen extends StatelessWidget {
         centerTitle: true,
         backgroundColor: Colors.white,
         elevation: 0,
-        actions: [
+        actions: const [
           Padding(
-            padding: const EdgeInsets.only(right: 16),
-            child: ProfileAvatar(
-              onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) =>
-                        SettingsTab(onBack: () => Navigator.of(context).pop()),
-                  ),
-                );
-              },
-            ),
+            padding: EdgeInsets.only(right: 16),
+            child: ProfileAvatar(),
           ),
         ],
       ),

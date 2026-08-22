@@ -79,6 +79,10 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
               );
             },
           ),
+          const Padding(
+            padding: EdgeInsets.only(right: 16),
+            child: ProfileAvatar(),
+          ),
         ],
       ),
       body: Consumer<NotificationProvider>(

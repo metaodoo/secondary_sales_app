@@ -1,4 +1,7 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:secondary_sales/core/access/access_resources.dart';
 import 'package:secondary_sales/core/theme/app_theme.dart';
 import 'package:provider/provider.dart';
 import 'package:secondary_sales/features/routes/route_provider.dart';
@@ -8,6 +11,8 @@ import 'package:secondary_sales/data/models/routes/route.dart';
 import 'package:secondary_sales/features/routes/screens/customer_action_bottom_sheet.dart';
 import 'package:secondary_sales/features/routes/screens/create_outlet_screen.dart';
 import 'package:secondary_sales/features/auth/auth_provider.dart';
+import 'package:geolocator/geolocator.dart';
+import 'package:secondary_sales/core/services/location_service.dart';
 import 'package:secondary_sales/core/widgets/ss_ui.dart';
 
 class OfficerCustomerSelectionScreen extends StatefulWidget {
@@ -28,6 +33,8 @@ class _OfficerCustomerSelectionScreenState
     extends State<OfficerCustomerSelectionScreen> {
   int? selectedOutletId;
   String? selectedOutletName;
+  int? _checkingInOutletId;
+  int? _checkingOutOutletId;
   late Future<RouteModel?> _routeFuture;
 
   @override
@@ -42,6 +49,7 @@ class _OfficerCustomerSelectionScreenState
   void _openActionModalFor(
     int outletId,
     String outletName, {
+    String? outletCode,
     String? phone,
     String? mobile,
   }) {
@@ -52,6 +60,7 @@ class _OfficerCustomerSelectionScreenState
       builder: (context) => CustomerActionBottomSheet(
         customerName: outletName,
         outletId: outletId,
+        customerCode: outletCode,
         phone: phone,
         mobile: mobile,
       ),
@@ -87,6 +96,12 @@ class _OfficerCustomerSelectionScreenState
             fontSize: 20,
           ),
         ),
+        actions: const [
+          Padding(
+            padding: EdgeInsets.only(right: 16),
+            child: ProfileAvatar(),
+          ),
+        ],
       ),
       body: FutureBuilder<RouteModel?>(
         future: _routeFuture,
@@ -244,6 +259,18 @@ class _OfficerCustomerSelectionScreenState
                                             color: AppColors.textPrimary,
                                           ),
                                         ),
+                                        if (outlet.code != null &&
+                                            outlet.code!.trim().isNotEmpty) ...[
+                                          const SizedBox(height: 2),
+                                          Text(
+                                            'Code: ${outlet.code!.trim()}',
+                                            style: const TextStyle(
+                                              color: AppColors.primary,
+                                              fontWeight: FontWeight.w600,
+                                              fontSize: 12,
+                                            ),
+                                          ),
+                                        ],
                                         const SizedBox(height: 4),
                                         Text(
                                           outlet.street ??
@@ -310,75 +337,76 @@ class _OfficerCustomerSelectionScreenState
                                   const SizedBox(width: 12),
                                   if (isCheckedIn) ...[
                                     ElevatedButton.icon(
-                                      onPressed: () async {
-                                        final bool?
-                                        confirm = await showDialog<bool>(
-                                          context: context,
-                                          builder: (ctx) => AlertDialog(
-                                            title: const Text(
-                                              'Confirm Check Out',
-                                            ),
-                                            content: Text(
-                                              'Are you sure you want to check out from ${outlet.name}?',
-                                            ),
-                                            actions: [
-                                              TextButton(
-                                                onPressed: () =>
-                                                    Navigator.pop(ctx, false),
-                                                child: const Text('Cancel'),
-                                              ),
-                                              ElevatedButton(
-                                                onPressed: () =>
-                                                    Navigator.pop(ctx, true),
-                                                style: ElevatedButton.styleFrom(
-                                                  backgroundColor: const Color(
-                                                    0xFFDC2626,
-                                                  ),
-                                                ),
-                                                child: const Text('Check Out'),
-                                              ),
-                                            ],
-                                          ),
-                                        );
-                                        if (confirm == true) {
-                                          // A visit that produced no order has
-                                          // to be explained; the server rejects
-                                          // the check-out otherwise.
-                                          VisitReasonSelection? selection;
-                                          if (routeProv.requiresVisitReason) {
-                                            if (!context.mounted) return;
-                                            selection =
-                                                await VisitReasonDialog.show(
-                                                  context,
-                                                );
-                                            if (selection == null) return;
-                                          }
-                                          try {
-                                            await routeProv.checkOut(
-                                              visitReasonId:
-                                                  selection?.reasonId,
-                                              reasonNotes: selection?.notes,
-                                              saleAmount: selection?.saleAmount,
-                                            );
-                                          } catch (e) {
-                                            if (context.mounted) {
-                                              ScaffoldMessenger.of(
-                                                context,
-                                              ).showSnackBar(
-                                                SnackBar(
-                                                  content: Text(
-                                                    'Check-out failed: ${e.toString().replaceAll('Exception: ', '')}',
-                                                  ),
-                                                ),
-                                              );
-                                            }
-                                          }
-                                        }
-                                      },
-                                      icon: const Icon(
-                                        Icons.logout_rounded,
-                                        size: 14,
-                                      ),
+                                      onPressed: _checkingOutOutletId != null
+                                           ? null
+                                           : () async {
+                                               final confirm = await showDialog<bool>(
+                                                 context: context,
+                                                 builder: (ctx) => AlertDialog(
+                                                   title: const Text('Check Out'),
+                                                   content: Text('Are you sure you want to check out from ${outlet.name}?'),
+                                                   actions: [
+                                                     TextButton(
+                                                       onPressed: () => Navigator.pop(ctx, false),
+                                                       child: const Text('Cancel'),
+                                                     ),
+                                                     ElevatedButton(
+                                                       onPressed: () => Navigator.pop(ctx, true),
+                                                       child: const Text('Check Out'),
+                                                     ),
+                                                   ],
+                                                 ),
+                                               );
+                                               if (confirm == true) {
+                                                 VisitReasonSelection? selection;
+                                                 if (routeProv.requiresVisitReason) {
+                                                   if (!context.mounted) return;
+                                                   selection =
+                                                       await VisitReasonDialog.show(
+                                                         context,
+                                                       );
+                                                   if (selection == null) return;
+                                                 }
+                                                 setState(() => _checkingOutOutletId = outlet.id);
+                                                 try {
+                                                   await routeProv.checkOut(
+                                                     visitReasonId:
+                                                         selection?.reasonId,
+                                                     reasonNotes: selection?.notes,
+                                                     saleAmount: selection?.saleAmount,
+                                                   );
+                                                 } catch (e) {
+                                                   if (context.mounted) {
+                                                     ScaffoldMessenger.of(
+                                                       context,
+                                                     ).showSnackBar(
+                                                       SnackBar(
+                                                         content: Text(
+                                                           'Check-out failed: ${e.toString().replaceAll('Exception: ', '')}',
+                                                         ),
+                                                       ),
+                                                     );
+                                                   }
+                                                 } finally {
+                                                   if (mounted) {
+                                                     setState(() => _checkingOutOutletId = null);
+                                                   }
+                                                 }
+                                               }
+                                             },
+                                      icon: _checkingOutOutletId == outlet.id
+                                           ? const SizedBox(
+                                               width: 14,
+                                               height: 14,
+                                               child: CircularProgressIndicator(
+                                                 strokeWidth: 2,
+                                                 color: Colors.white,
+                                               ),
+                                             )
+                                           : const Icon(
+                                               Icons.logout_rounded,
+                                               size: 14,
+                                             ),
                                       label: const Text(
                                         'Check Out',
                                         style: TextStyle(
@@ -408,48 +436,115 @@ class _OfficerCustomerSelectionScreenState
                                     ),
                                   ] else ...[
                                     ElevatedButton.icon(
-                                      onPressed: () async {
-                                        if (employeeId == null) return;
-                                        if (routeProv.checkedInOutletId !=
-                                            null) {
-                                          ScaffoldMessenger.of(
-                                            context,
-                                          ).showSnackBar(
-                                            const SnackBar(
-                                              content: Text(
-                                                'Please check out from current outlet first',
-                                              ),
-                                            ),
-                                          );
-                                          return;
-                                        }
-                                        try {
-                                          await routeProv.checkIn(
-                                            employeeId,
-                                            outlet.id,
-                                          );
-                                          if (context.mounted) {
-                                            _openActionModalFor(
-                                              outlet.id,
-                                              outlet.name,
-                                            );
-                                          }
-                                        } catch (e) {
-                                          if (context.mounted) {
-                                            ssShowLocationErrorDialog(
-                                              context,
-                                              e.toString().replaceAll(
-                                                'Exception: ',
-                                                '',
-                                              ),
-                                            );
-                                          }
-                                        }
-                                      },
-                                      icon: const Icon(
-                                        Icons.location_on_rounded,
-                                        size: 14,
-                                      ),
+                                       onPressed: _checkingInOutletId != null
+                                           ? null
+                                           : () async {
+                                               if (employeeId == null) return;
+                                               if (routeProv.checkedInOutletId != null &&
+                                                   routeProv.checkedInOutletId != outlet.id) {
+                                                 ScaffoldMessenger.of(
+                                                   context,
+                                                 ).showSnackBar(
+                                                   const SnackBar(
+                                                     content: Text(
+                                                       'Please check out from current outlet first',
+                                                     ),
+                                                   ),
+                                                 );
+                                                 return;
+                                               }
+                                               setState(() => _checkingInOutletId = outlet.id);
+                                               try {
+                                                  // 1. Acquire GPS position FIRST
+                                                  final position = await LocationService.getCurrentPosition(
+                                                    requireFresh: true,
+                                                    timeLimit: const Duration(seconds: 15),
+                                                  );
+
+                                                  // 2. Validate Geofence FIRST before letting user take a photo
+                                                  if (outlet.partnerLatitude != null &&
+                                                      outlet.partnerLongitude != null &&
+                                                      outlet.partnerLatitude != 0.0 &&
+                                                      outlet.partnerLongitude != 0.0) {
+                                                    final double distanceMeters = Geolocator.distanceBetween(
+                                                      position.latitude,
+                                                      position.longitude,
+                                                      outlet.partnerLatitude!,
+                                                      outlet.partnerLongitude!,
+                                                    );
+                                                    final double allowedRadius = outlet.outletRadius ?? 50.0;
+                                                    if (distanceMeters > allowedRadius) {
+                                                      throw Exception(
+                                                        'You are ${distanceMeters.round()}m away from "${outlet.name}". Allowed radius is ${allowedRadius.round()}m.',
+                                                      );
+                                                    }
+                                                  }
+
+                                                  String? imageB64;
+                                                  if (auth.canView(AppScreen.newJointVisit)) {
+                                                    final ImagePicker picker = ImagePicker();
+                                                    final XFile? photo = await picker.pickImage(
+                                                      source: ImageSource.camera,
+                                                      imageQuality: 70,
+                                                      maxWidth: 1024,
+                                                      maxHeight: 1024,
+                                                    );
+                                                    if (photo == null) {
+                                                      if (context.mounted) {
+                                                        ScaffoldMessenger.of(context).showSnackBar(
+                                                          const SnackBar(
+                                                            content: Text('A check-in photo is required for joint visits.'),
+                                                          ),
+                                                        );
+                                                      }
+                                                      return;
+                                                    }
+                                                    final bytes = await photo.readAsBytes();
+                                                    imageB64 = base64Encode(bytes);
+                                                  }
+
+                                                 await routeProv.checkIn(
+                                                   employeeId,
+                                                   outlet.id,
+                                                   position: position,
+                                                   image1920: imageB64,
+                                                 );
+                                                 if (context.mounted) {
+                                                    _openActionModalFor(
+                                                      outlet.id,
+                                                      outlet.name,
+                                                      outletCode: outlet.code,
+                                                    );
+                                                 }
+                                               } catch (e) {
+                                                 if (context.mounted) {
+                                                   ssShowLocationErrorDialog(
+                                                     context,
+                                                     e.toString().replaceAll(
+                                                       'Exception: ',
+                                                       '',
+                                                     ),
+                                                   );
+                                                 }
+                                               } finally {
+                                                 if (mounted) {
+                                                   setState(() => _checkingInOutletId = null);
+                                                 }
+                                               }
+                                             },
+                                      icon: _checkingInOutletId == outlet.id
+                                           ? const SizedBox(
+                                               width: 14,
+                                               height: 14,
+                                               child: CircularProgressIndicator(
+                                                 strokeWidth: 2,
+                                                 color: Colors.white,
+                                               ),
+                                             )
+                                           : const Icon(
+                                               Icons.location_on_rounded,
+                                               size: 14,
+                                             ),
                                       label: const Text(
                                         'Check In',
                                         style: TextStyle(

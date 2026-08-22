@@ -341,7 +341,7 @@ class _ReturnsListScreenState extends State<ReturnsListScreen> {
         actions: [
           Padding(
             padding: const EdgeInsets.only(right: 16),
-            child: const ProfileAvatar(),
+            child: ProfileAvatar(),
           ),
         ],
         bottom: PreferredSize(
@@ -363,7 +363,7 @@ class _ReturnsListScreenState extends State<ReturnsListScreen> {
               TextField(
                 controller: _searchController,
                 decoration: InputDecoration(
-                  hintText: 'Search reference or customer',
+                  hintText: 'Search reference, page, or customer',
                   hintStyle: const TextStyle(
                     color: AppColors.textSecondary,
                     fontSize: 15,

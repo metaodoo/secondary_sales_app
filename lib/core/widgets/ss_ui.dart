@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
-import 'package:secondary_sales/features/auth/auth_provider.dart';
 import 'package:secondary_sales/core/theme/app_theme.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:secondary_sales/features/settings/screens/settings_tab.dart';
+
+import 'package:secondary_sales/app/navigation/app_drawer.dart';
+import 'package:secondary_sales/app/navigation/app_shell.dart';
 
 String initialsFromName(String? rawName, {String fallback = 'U'}) {
   final trimmed = rawName?.trim() ?? '';
@@ -35,31 +36,74 @@ String firstNameFromName(String? rawName, {String fallback = 'User'}) {
   return parts.first;
 }
 
+void openAppMenu(BuildContext context, {String? moduleType}) {
+  final shellNav = AppShellNavigation.of(context);
+  final activeModuleType = shellNav?.moduleType ?? moduleType ?? 'secondary';
+
+  try {
+    final scaffold = Scaffold.maybeOf(context);
+    if (scaffold != null && scaffold.hasEndDrawer) {
+      scaffold.openEndDrawer();
+      return;
+    }
+  } catch (_) {}
+
+  showGeneralDialog(
+    context: context,
+    barrierDismissible: true,
+    barrierLabel: 'Menu',
+    barrierColor: Colors.black54,
+    transitionDuration: const Duration(milliseconds: 250),
+    pageBuilder: (ctx, anim1, anim2) {
+      return Align(
+        alignment: Alignment.centerRight,
+        child: Material(
+          type: MaterialType.transparency,
+          child: SizedBox(
+            width: MediaQuery.of(ctx).size.width * 0.78,
+            child: AppDrawer(
+              moduleType: activeModuleType,
+              currentShellIndex: 0,
+              onSelectTab: (idx) {
+                shellNav?.setIndex(idx);
+              },
+              onExitModule: () {
+                Navigator.of(ctx).pop();
+              },
+            ),
+          ),
+        ),
+      );
+    },
+    transitionBuilder: (ctx, anim1, anim2, child) {
+      return SlideTransition(
+        position: Tween<Offset>(
+          begin: const Offset(1, 0),
+          end: Offset.zero,
+        ).animate(CurvedAnimation(parent: anim1, curve: Curves.easeOutCubic)),
+        child: child,
+      );
+    },
+  );
+}
+
 class ProfileAvatar extends StatelessWidget {
-  const ProfileAvatar({super.key, this.onTap, this.borderColor});
+  const ProfileAvatar({super.key, this.onTap, this.borderColor, this.moduleType});
 
   final VoidCallback? onTap;
   final Color? borderColor;
+  final String? moduleType;
 
   @override
   Widget build(BuildContext context) {
-    final auth = context.watch<AuthProvider>();
-    final user = auth.user;
-    final userName = user?.employeeName ?? user?.name ?? 'User';
-    final initials = initialsFromName(userName);
-
     return GestureDetector(
-      onTap:
-          onTap ??
-          () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) =>
-                    SettingsTab(onBack: () => Navigator.pop(context)),
-              ),
-            );
-          },
+      onTap: () {
+        if (onTap != null) {
+          onTap!();
+          return;
+        }
+        openAppMenu(context, moduleType: moduleType ?? 'secondary');
+      },
       child: Container(
         width: 38,
         height: 38,
@@ -71,14 +115,11 @@ class ProfileAvatar extends StatelessWidget {
             width: 1.5,
           ),
         ),
-        child: Center(
-          child: Text(
-            initials,
-            style: const TextStyle(
-              color: AppColors.primary,
-              fontWeight: FontWeight.bold,
-              fontSize: 14,
-            ),
+        child: const Center(
+          child: Icon(
+            Icons.menu,
+            color: AppColors.primary,
+            size: 20,
           ),
         ),
       ),

@@ -122,7 +122,7 @@ class _MyTeamScreenState extends State<MyTeamScreen> {
         actions: [
           Padding(
             padding: const EdgeInsets.only(right: 16),
-            child: const ProfileAvatar(),
+            child: ProfileAvatar(),
           ),
         ],
       ),

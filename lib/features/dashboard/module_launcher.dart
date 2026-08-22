@@ -173,47 +173,94 @@ Future<void> showModuleLauncherSheet(BuildContext context) {
 /// Pill-shaped floating button that opens the module launcher sheet. Pass
 /// [visible] to animate it in/out (e.g. tied to scroll on the home screen); it
 /// defaults to always visible for use inside a shell.
-class ModuleLauncherFab extends StatelessWidget {
+Offset? _globalFabOffset;
+
+class ModuleLauncherFab extends StatefulWidget {
   const ModuleLauncherFab({super.key, this.visible = true});
 
   final bool visible;
 
   @override
+  State<ModuleLauncherFab> createState() => _ModuleLauncherFabState();
+}
+
+class _ModuleLauncherFabState extends State<ModuleLauncherFab> {
+  bool _isDragging = false;
+
+  @override
   Widget build(BuildContext context) {
-    return IgnorePointer(
-      ignoring: !visible,
-      child: AnimatedSlide(
-        duration: const Duration(milliseconds: 180),
-        curve: Curves.easeOut,
-        offset: visible ? Offset.zero : const Offset(0, 1.2),
+    final screenSize = MediaQuery.of(context).size;
+    final padding = MediaQuery.of(context).padding;
+    const buttonSize = 48.0;
+
+    // Default position: top left corner
+    final defaultOffset = Offset(
+      16,
+      padding.top + 60,
+    );
+
+    final currentPosition = _globalFabOffset ?? defaultOffset;
+
+    return AnimatedPositioned(
+      duration: _isDragging ? Duration.zero : const Duration(milliseconds: 250),
+      curve: Curves.easeOutCubic,
+      left: currentPosition.dx,
+      top: currentPosition.dy,
+      child: IgnorePointer(
+        ignoring: !widget.visible,
         child: AnimatedOpacity(
           duration: const Duration(milliseconds: 180),
-          opacity: visible ? 1 : 0,
-          child: Material(
-            color: AppColors.primaryStrong,
-            borderRadius: BorderRadius.circular(999),
-            elevation: 8,
-            child: InkWell(
-              onTap: () => showModuleLauncherSheet(context),
-              borderRadius: BorderRadius.circular(999),
-              child: const Padding(
-                padding: EdgeInsets.symmetric(horizontal: 18, vertical: 14),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(Icons.apps_rounded, color: Colors.white, size: 20),
-                    SizedBox(width: 10),
-                    Text(
-                      'Open module',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w800,
-                        fontSize: 14,
-                      ),
+          opacity: widget.visible ? 1 : 0,
+          child: GestureDetector(
+            onPanStart: (_) {
+              setState(() {
+                _isDragging = true;
+              });
+            },
+            onPanUpdate: (details) {
+              final pos = _globalFabOffset ?? defaultOffset;
+              final newX = (pos.dx + details.delta.dx).clamp(
+                12.0,
+                screenSize.width - buttonSize - 12.0,
+              );
+              final newY = (pos.dy + details.delta.dy).clamp(
+                padding.top + 10.0,
+                screenSize.height - padding.bottom - buttonSize - 20.0,
+              );
+              setState(() {
+                _globalFabOffset = Offset(newX, newY);
+              });
+            },
+            onPanEnd: (_) {
+              final pos = _globalFabOffset ?? defaultOffset;
+              final middleX = screenSize.width / 2;
+              // Magnetic snap to nearest edge (left or right)
+              final targetX = pos.dx < middleX ? 16.0 : (screenSize.width - buttonSize - 16.0);
+
+              setState(() {
+                _isDragging = false;
+                _globalFabOffset = Offset(targetX, pos.dy);
+              });
+            },
+            child: AnimatedScale(
+              scale: _isDragging ? 1.08 : 1.0,
+              duration: const Duration(milliseconds: 150),
+              curve: Curves.easeOut,
+              child: Material(
+                color: AppColors.primaryStrong,
+                shape: const CircleBorder(),
+                elevation: _isDragging ? 10 : 6,
+                child: InkWell(
+                  onTap: () => showModuleLauncherSheet(context),
+                  customBorder: const CircleBorder(),
+                  child: const Padding(
+                    padding: EdgeInsets.all(12),
+                    child: Icon(
+                      Icons.apps_rounded,
+                      color: Colors.white,
+                      size: 24,
                     ),
-                    SizedBox(width: 6),
-                    Icon(Icons.keyboard_arrow_up_rounded, color: Colors.white),
-                  ],
+                  ),
                 ),
               ),
             ),

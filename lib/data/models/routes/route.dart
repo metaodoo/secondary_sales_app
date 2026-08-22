@@ -71,6 +71,7 @@ class RouteOutlet {
   final int lineId;
   final int id;
   final String name;
+  final String? code;
   final int sequence;
   final double expectedVisitTime;
   final String? phone;
@@ -82,11 +83,15 @@ class RouteOutlet {
   final String? zip;
   final String? vat;
   final bool active;
+  final double? partnerLatitude;
+  final double? partnerLongitude;
+  final double? outletRadius;
 
   RouteOutlet({
     required this.lineId,
     required this.id,
     required this.name,
+    this.code,
     required this.sequence,
     required this.expectedVisitTime,
     this.phone,
@@ -98,13 +103,24 @@ class RouteOutlet {
     this.zip,
     this.vat,
     required this.active,
+    this.partnerLatitude,
+    this.partnerLongitude,
+    this.outletRadius,
   });
+
+  String get displayNameWithCode {
+    if (code != null && code!.trim().isNotEmpty) {
+      return '$name (${code!.trim()})';
+    }
+    return name;
+  }
 
   factory RouteOutlet.fromMap(Map<String, dynamic> map) {
     return RouteOutlet(
       lineId: asInt(map['line_id'] ?? map['lineId']),
       id: asInt(map['id']),
       name: map['name'] ?? '',
+      code: map['code'] ?? map['ss_code'],
       sequence: asInt(map['sequence']),
       expectedVisitTime: asDouble(
         map['expected_visit_time'] ?? map['expectedVisitTime'],
@@ -118,6 +134,9 @@ class RouteOutlet {
       zip: map['zip'],
       vat: map['vat'],
       active: map['active'] != false,
+      partnerLatitude: map['partner_latitude'] != null ? asDouble(map['partner_latitude']) : null,
+      partnerLongitude: map['partner_longitude'] != null ? asDouble(map['partner_longitude']) : null,
+      outletRadius: map['outlet_radius'] != null ? asDouble(map['outlet_radius']) : null,
     );
   }
 

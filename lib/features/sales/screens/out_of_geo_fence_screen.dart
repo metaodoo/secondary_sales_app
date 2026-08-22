@@ -3,12 +3,15 @@ import 'package:provider/provider.dart';
 import 'package:secondary_sales/core/theme/app_theme.dart';
 import 'package:secondary_sales/data/api/api_service.dart';
 import 'package:secondary_sales/features/auth/auth_provider.dart';
+import 'package:secondary_sales/data/models/sales/order_line_entry.dart';
 import 'package:secondary_sales/features/sales/screens/order_creation_screen.dart';
+import 'package:secondary_sales/features/sales/screens/product_selection_screen.dart';
 import 'package:secondary_sales/core/widgets/ss_ui.dart';
 
 class OutOfGeoFenceScreen extends StatefulWidget {
   final int outletId;
   final String customerName;
+  final String? customerCode;
   final int? routeId;
   final int? visitId;
 
@@ -16,6 +19,7 @@ class OutOfGeoFenceScreen extends StatefulWidget {
     super.key,
     required this.outletId,
     required this.customerName,
+    this.customerCode,
     this.routeId,
     this.visitId,
   });
@@ -50,6 +54,9 @@ class _OutOfGeoFenceScreenState extends State<OutOfGeoFenceScreen> {
       if (mounted) {
         setState(() {
           _mediums = mediums;
+          if (mediums.isNotEmpty) {
+            _selectedMediumId = mediums.first['id'] as int?;
+          }
           _isLoading = false;
         });
       }
@@ -196,9 +203,11 @@ class _OutOfGeoFenceScreenState extends State<OutOfGeoFenceScreen> {
                         Navigator.pushReplacement(
                           context,
                           MaterialPageRoute(
-                            builder: (_) => OrderCreationScreen(
-                              outletId: widget.outletId,
+                            builder: (_) => ProductSelectionScreen(
+                              saleType: 'secondary',
+                              partnerId: widget.outletId,
                               customerName: widget.customerName,
+                              customerCode: widget.customerCode,
                               mediumId: _selectedMediumId,
                               routeId: widget.routeId,
                               visitId: widget.visitId,
@@ -219,7 +228,7 @@ class _OutOfGeoFenceScreenState extends State<OutOfGeoFenceScreen> {
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: const [
                     Text(
-                      'Create Order',
+                      'Proceed to Order',
                       style: TextStyle(
                         color: Colors.white,
                         fontSize: 16,

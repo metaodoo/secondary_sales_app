@@ -179,17 +179,7 @@ class _VanOperationsListScreenState extends State<VanOperationsListScreen> {
         backgroundColor: AppColors.surface,
         elevation: 0,
         scrolledUnderElevation: 0,
-        leading: widget.onOpenMenu != null
-            ? IconButton(
-                tooltip: 'Menu',
-                icon: const Icon(
-                  Icons.menu,
-                  color: AppColors.textPrimary,
-                  size: 28,
-                ),
-                onPressed: widget.onOpenMenu,
-              )
-            : widget.onBack != null
+        leading: widget.onBack != null
             ? IconButton(
                 tooltip: 'Back',
                 icon: const Icon(
@@ -199,10 +189,7 @@ class _VanOperationsListScreenState extends State<VanOperationsListScreen> {
                 ),
                 onPressed: widget.onBack,
               )
-            : IconButton(
-                icon: const Icon(Icons.menu, color: AppColors.textPrimary),
-                onPressed: () => Scaffold.of(context).openDrawer(),
-              ),
+            : null,
         title: Text(
           isLoad ? 'Van Load' : 'Van Unload',
           style: const TextStyle(
@@ -213,11 +200,10 @@ class _VanOperationsListScreenState extends State<VanOperationsListScreen> {
         ),
         centerTitle: true,
         actions: [
-          if (widget.onProfileTap != null)
-            Padding(
-              padding: const EdgeInsets.only(right: 16),
-              child: ProfileAvatar(onTap: widget.onProfileTap!),
-            ),
+          Padding(
+            padding: const EdgeInsets.only(right: 16),
+            child: ProfileAvatar(onTap: widget.onOpenMenu),
+          ),
         ],
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(1),

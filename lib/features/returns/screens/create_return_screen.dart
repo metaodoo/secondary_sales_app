@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:secondary_sales/core/util/parse.dart';
 import 'package:secondary_sales/core/constants.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:secondary_sales/core/theme/app_theme.dart';
@@ -730,7 +731,7 @@ class _CreateReturnScreenState extends State<CreateReturnScreen> {
 
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text('${widget.title} processed successfully!'),
+        content: Text('${widget.title} saved successfully!'),
         backgroundColor: Colors.green,
       ),
     );
@@ -799,10 +800,7 @@ class _CreateReturnScreenState extends State<CreateReturnScreen> {
   }
 
   String _nameOf(dynamic value) {
-    if (value is Map<String, dynamic>) {
-      return value['name']?.toString() ?? '-';
-    }
-    return value?.toString() ?? '-';
+    return formatLocationName(value);
   }
 
   @override
@@ -1438,8 +1436,8 @@ class _CreateReturnScreenState extends State<CreateReturnScreen> {
                         height: 50,
                         child: ElevatedButton.icon(
                           onPressed: provider.isLoading ? null : _createReturn,
-                          icon: const Icon(Icons.inventory),
-                          label: const Text('Process Return'),
+                          icon: const Icon(Icons.save),
+                          label: const Text('Save'),
                           style: ElevatedButton.styleFrom(
                             backgroundColor: AppColors.primary,
                             foregroundColor: Colors.white,

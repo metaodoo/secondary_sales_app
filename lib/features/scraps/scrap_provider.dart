@@ -24,6 +24,7 @@ class ScrapProvider with ChangeNotifier {
     String state = 'all',
     String? search,
     String? type,
+    String? returnReciptStatus,
   }) async {
     _loadingCount++;
     _error = null;
@@ -36,6 +37,7 @@ class ScrapProvider with ChangeNotifier {
         state: state,
         search: search,
         type: type,
+        returnReciptStatus: returnReciptStatus,
       );
       final data = List<Map<String, dynamic>>.from(response['data'] ?? []);
       return data.map(ReturnScrapSummary.fromMap).toList();
@@ -155,6 +157,7 @@ class ScrapProvider with ChangeNotifier {
     required List<Map<String, dynamic>> lines,
     String? type,
     String? damageType,
+    bool sendToSalesOperation = false,
   }) async {
     _loadingCount++;
     _error = null;
@@ -166,6 +169,7 @@ class ScrapProvider with ChangeNotifier {
         lines: lines,
         type: type,
         damageType: damageType,
+        sendToSalesOperation: sendToSalesOperation,
       );
     } catch (e) {
       _error = e.toString();

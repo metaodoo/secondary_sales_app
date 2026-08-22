@@ -28,6 +28,13 @@ class DistributionHub {
     this.vat,
   });
 
+  String get displayNameWithCode {
+    if (code != null && code!.toString().trim().isNotEmpty) {
+      return '$name (${code!.trim()})';
+    }
+    return name;
+  }
+
   factory DistributionHub.fromMap(Map<String, dynamic> map) {
     return DistributionHub(
       id: asInt(map['id']),

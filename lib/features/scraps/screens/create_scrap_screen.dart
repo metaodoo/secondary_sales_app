@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:secondary_sales/core/util/parse.dart';
 import 'package:secondary_sales/core/constants.dart';
 import 'package:secondary_sales/core/theme/app_theme.dart';
 import 'package:provider/provider.dart';
@@ -10,6 +11,7 @@ import 'package:secondary_sales/data/models/inventory/virtual_transfer.dart';
 import 'package:secondary_sales/features/auth/auth_provider.dart';
 import 'package:secondary_sales/features/scraps/scrap_provider.dart';
 import 'package:secondary_sales/features/scraps/screens/scrap_product_selection_screen.dart';
+
 import 'package:secondary_sales/core/widgets/ss_ui.dart';
 import 'package:secondary_sales/core/widgets/stock_excess_dialog.dart';
 
@@ -590,7 +592,7 @@ class _CreateScrapScreenState extends State<CreateScrapScreen> {
     }).toList();
   }
 
-  Future<void> _createScrap() async {
+  Future<void> _createScrap({bool sendToSalesOperation = false}) async {
     final distributorId = _prepareData?['distributor']?['id'] as int?;
     if (distributorId == null) return;
 
@@ -656,6 +658,7 @@ class _CreateScrapScreenState extends State<CreateScrapScreen> {
         lines: linesData,
         type: widget.moduleType,
         damageType: _selectedDamageType,
+        sendToSalesOperation: sendToSalesOperation,
       );
     } else {
       result = await context.read<ScrapProvider>().createScrapDelivery(
@@ -748,10 +751,7 @@ class _CreateScrapScreenState extends State<CreateScrapScreen> {
   }
 
   String _nameOf(dynamic value) {
-    if (value is Map<String, dynamic>) {
-      return value['name']?.toString() ?? '-';
-    }
-    return value?.toString() ?? '-';
+    return formatLocationName(value);
   }
 
   @override
@@ -773,8 +773,11 @@ class _CreateScrapScreenState extends State<CreateScrapScreen> {
         backgroundColor: Colors.white,
         elevation: 0,
         iconTheme: const IconThemeData(color: Colors.black87),
-        actions: [
-          IconButton(icon: const Icon(Icons.more_vert), onPressed: () {}),
+        actions: const [
+          Padding(
+            padding: EdgeInsets.only(right: 16),
+            child: ProfileAvatar(),
+          ),
         ],
       ),
       body: SafeArea(
@@ -1461,7 +1464,7 @@ class _CreateScrapScreenState extends State<CreateScrapScreen> {
                               child: ElevatedButton(
                                 onPressed: provider.isLoading
                                     ? null
-                                    : _createScrap,
+                                    : () => _createScrap(sendToSalesOperation: false),
                                 style: ElevatedButton.styleFrom(
                                   backgroundColor: AppColors.primary,
                                   foregroundColor: Colors.white,
@@ -1479,9 +1482,37 @@ class _CreateScrapScreenState extends State<CreateScrapScreen> {
                               ),
                             ),
                           ],
-                          if (auth.canValidateScrapFor(widget.moduleType)) ...[
+                          if (auth.canSendToSalesOperationScrapFor(widget.moduleType)) ...[
                             if (auth.canCancelScrapFor(widget.moduleType) ||
                                 auth.canSaveScrapFor(widget.moduleType))
+                              const SizedBox(width: 8),
+                            Expanded(
+                              flex: 2,
+                              child: ElevatedButton(
+                                onPressed: provider.isLoading
+                                    ? null
+                                    : () => _createScrap(sendToSalesOperation: true),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.orange.shade700,
+                                  foregroundColor: Colors.white,
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 14,
+                                  ),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                ),
+                                child: const Text(
+                                  'Send to Sales Operation',
+                                  style: TextStyle(fontWeight: FontWeight.bold),
+                                ),
+                              ),
+                            ),
+                          ],
+                          if (auth.canValidateScrapFor(widget.moduleType)) ...[
+                            if (auth.canCancelScrapFor(widget.moduleType) ||
+                                auth.canSaveScrapFor(widget.moduleType) ||
+                                auth.canSendToSalesOperationScrapFor(widget.moduleType))
                               const SizedBox(width: 8),
                             Expanded(
                               flex: 2,

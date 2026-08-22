@@ -159,6 +159,10 @@ class AuthProvider with ChangeNotifier {
     AppAction.scrapSaveFor(moduleType),
     canEditSoQty || canEditWarehouseQty || canEditEffectiveQty,
   );
+  bool canSendToSalesOperationScrapFor(String moduleType) => _enforcedOr(
+    AppAction.scrapSendToSalesOperationFor(moduleType),
+    canEditWarehouseQty,
+  );
   bool canCancelScrapFor(String moduleType) => _enforcedOr(
     AppAction.scrapCancelFor(moduleType),
     canEditSoQty || canEditWarehouseQty,

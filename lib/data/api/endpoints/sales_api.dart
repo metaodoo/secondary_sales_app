@@ -162,6 +162,7 @@ extension SalesApi on ApiService {
           'product_uom_qty': item['order_qty'],
           'damaged_expired_qty': item['damaged_expired_qty'],
           'damage_quality_qty': item['damage_quality_qty'],
+          'ss_adjust_with_bill': item['ss_adjust_with_bill'] ?? false,
           'price_unit': item['price_unit'],
         };
       }).toList(),
@@ -235,6 +236,7 @@ extension SalesApi on ApiService {
           'product_uom_qty': item['order_qty'],
           'damaged_expired_qty': item['damaged_expired_qty'],
           'damage_quality_qty': item['damage_quality_qty'],
+          'ss_adjust_with_bill': item['ss_adjust_with_bill'] ?? false,
           'price_unit': item['price_unit'],
         };
       }).toList(),

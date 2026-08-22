@@ -102,3 +102,27 @@ Map<String, dynamic>? asMapOrNull(Object? value) {
   if (value == null || value == false) return null;
   return asMap(value);
 }
+
+/// Formats location names to display updated terminology:
+/// - Customer Location -> Salable Product Location
+/// - Scrap Damaged Location / Scrap Damaged -> Non Saleable Product Location
+/// - Scrap Quality Location / Scrap Quality -> Quality Return Product Location
+String formatLocationName(Object? value) {
+  String text = '';
+  if (value is Map<String, dynamic>) {
+    text = value['name']?.toString() ?? '-';
+  } else if (value != null && value != false) {
+    text = value.toString();
+  } else {
+    return '-';
+  }
+
+  if (text.isEmpty || text == '-') return '-';
+
+  return text
+      .replaceAll('Customer Location', 'Salable Product Location')
+      .replaceAll('Scrap Damaged Location', 'Non Saleable Product Location')
+      .replaceAll('Scrap Damaged', 'Non Saleable Product Location')
+      .replaceAll('Scrap Quality Location', 'Quality Return Product Location')
+      .replaceAll('Scrap Quality', 'Quality Return Product Location');
+}
