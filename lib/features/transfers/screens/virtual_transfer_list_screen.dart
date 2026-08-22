@@ -9,6 +9,7 @@ import 'package:secondary_sales/data/models/inventory/virtual_transfer.dart';
 import 'package:secondary_sales/features/transfers/transfer_provider.dart';
 import 'package:secondary_sales/features/transfers/screens/create_virtual_transfer_screen.dart';
 import 'package:secondary_sales/features/transfers/screens/virtual_transfer_detail_screen.dart';
+import 'package:secondary_sales/core/util/dialog_helper.dart';
 import 'package:secondary_sales/core/widgets/ss_ui.dart';
 import 'package:secondary_sales/core/access/permission_gate.dart';
 import 'package:secondary_sales/core/access/access_resources.dart';
@@ -52,6 +53,9 @@ class _VirtualTransferListScreenState extends State<VirtualTransferListScreen> {
   }
 
   Future<void> _openCreateTransfer() async {
+    final allowed = await checkAttendanceRestriction(context, actionName: 'Van Load');
+    if (!allowed || !mounted) return;
+
     await Navigator.push(
       context,
       MaterialPageRoute(builder: (_) => const CreateVirtualTransferScreen()),

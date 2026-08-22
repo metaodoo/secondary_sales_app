@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:secondary_sales/core/access/access_resources.dart';
+import 'package:secondary_sales/core/access/permission_gate.dart';
 import 'package:secondary_sales/core/theme/app_theme.dart';
 import 'package:provider/provider.dart';
 import 'package:secondary_sales/features/routes/route_provider.dart';
@@ -37,6 +38,9 @@ class _OfficerCustomerSelectionScreenState
   int? _checkingOutOutletId;
   late Future<RouteModel?> _routeFuture;
 
+  final TextEditingController _searchController = TextEditingController();
+  String _searchQuery = '';
+
   @override
   void initState() {
     super.initState();
@@ -44,6 +48,12 @@ class _OfficerCustomerSelectionScreenState
       context,
       listen: false,
     ).fetchRouteDetail(widget.routeId);
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
   }
 
   void _openActionModalFor(
@@ -98,39 +108,71 @@ class _OfficerCustomerSelectionScreenState
         ),
         actions: const [
           Padding(
-            padding: EdgeInsets.only(right: 16),
-            child: ProfileAvatar(),
+            padding: EdgeInsets.only(right: 20.0),
+            child: CircleAvatar(
+              backgroundColor: AppColors.primarySoft,
+              child: Icon(Icons.map, color: AppColors.primary),
+            ),
           ),
         ],
       ),
-      body: FutureBuilder<RouteModel?>(
-        future: _routeFuture,
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          }
-          if (snapshot.hasError) {
-            return Center(child: Text('Error: ${snapshot.error}'));
-          }
+      floatingActionButton: PermissionGate(
+        resourceKey: AppAction.outletCreate,
+        child: SsCreateFab(
+          label: 'New Outlet',
+          onPressed: () async {
+            final result = await Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => CreateOutletScreen(
+                  routeId: widget.routeId,
+                  routeName: widget.routeName,
+                  distributorName: 'Unassigned',
+                ),
+              ),
+            );
+            if (result == true && context.mounted) {
+              setState(() {
+                _routeFuture = Provider.of<RouteProvider>(
+                  context,
+                  listen: false,
+                ).fetchRouteDetail(widget.routeId);
+              });
+            }
+          },
+        ),
+      ),
+      body: Consumer<RouteProvider>(
+        builder: (context, routeProvider, child) {
+          return FutureBuilder<RouteModel?>(
+            future: _routeFuture,
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return const Center(child: CircularProgressIndicator());
+              }
 
-          final routeModel = snapshot.data;
-
-          return Consumer<RouteProvider>(
-            builder: (context, routeProvider, child) {
-              if (routeProvider.error != null) {
+              if (snapshot.hasError) {
                 return Center(
-                  child: Padding(
-                    padding: const EdgeInsets.all(20.0),
-                    child: Text(
-                      'Backend Error: ${routeProvider.error}',
-                      style: const TextStyle(color: Colors.red),
-                      textAlign: TextAlign.center,
-                    ),
-                  ),
+                  child: Text('Error loading route: ${snapshot.error}'),
                 );
               }
 
-              final outlets = routeModel?.outlets ?? [];
+              final routeDetail = snapshot.data;
+              final outlets = routeDetail?.outlets ?? [];
+              final filteredOutlets = outlets.where((outlet) {
+                if (_searchQuery.isEmpty) return true;
+                final code = (outlet.code ?? '').toLowerCase();
+                final name = outlet.name.toLowerCase();
+                final phone = (outlet.phone ?? '').toLowerCase();
+                final mobile = (outlet.mobile ?? '').toLowerCase();
+                final ownerName = (outlet.ownerName ?? '').toLowerCase();
+
+                return code.contains(_searchQuery) ||
+                    name.contains(_searchQuery) ||
+                    phone.contains(_searchQuery) ||
+                    mobile.contains(_searchQuery) ||
+                    ownerName.contains(_searchQuery);
+              }).toList();
 
               return Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -138,8 +180,14 @@ class _OfficerCustomerSelectionScreenState
                   Padding(
                     padding: const EdgeInsets.all(20.0),
                     child: TextField(
+                      controller: _searchController,
+                      onChanged: (val) {
+                        setState(() {
+                          _searchQuery = val.trim().toLowerCase();
+                        });
+                      },
                       decoration: InputDecoration(
-                        hintText: 'Find an outlet...',
+                        hintText: 'Search by Code, Name, Phone, Owner...',
                         hintStyle: const TextStyle(
                           color: AppColors.textSecondary,
                         ),
@@ -147,6 +195,17 @@ class _OfficerCustomerSelectionScreenState
                           Icons.search,
                           color: AppColors.textSecondary,
                         ),
+                        suffixIcon: _searchQuery.isNotEmpty
+                            ? IconButton(
+                                icon: const Icon(Icons.clear, size: 20),
+                                onPressed: () {
+                                  _searchController.clear();
+                                  setState(() {
+                                    _searchQuery = '';
+                                  });
+                                },
+                              )
+                            : null,
                         filled: true,
                         fillColor: Colors.white,
                         contentPadding: const EdgeInsets.symmetric(
@@ -167,11 +226,13 @@ class _OfficerCustomerSelectionScreenState
                       ),
                     ),
                   ),
-                  const Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 20.0),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 20.0),
                     child: Text(
-                      'AVAILABLE OUTLETS',
-                      style: TextStyle(
+                      _searchQuery.isEmpty
+                          ? 'AVAILABLE OUTLETS (${outlets.length})'
+                          : 'FOUND OUTLETS (${filteredOutlets.length})',
+                      style: const TextStyle(
                         color: AppColors.textSecondary,
                         fontWeight: FontWeight.bold,
                         fontSize: 11,
@@ -180,22 +241,29 @@ class _OfficerCustomerSelectionScreenState
                     ),
                   ),
                   const SizedBox(height: 12),
-                  if (outlets.isEmpty)
-                    const Expanded(
+                  if (filteredOutlets.isEmpty)
+                    Expanded(
                       child: Center(
                         child: Text(
-                          'No outlets assigned to this route.',
-                          style: TextStyle(color: AppColors.textSecondary),
+                          _searchQuery.isEmpty
+                              ? 'No outlets assigned to this route.'
+                              : 'No outlets match "$_searchQuery".',
+                          style: const TextStyle(color: AppColors.textSecondary),
                         ),
                       ),
                     )
                   else
                     Expanded(
                       child: ListView.builder(
-                        padding: const EdgeInsets.symmetric(horizontal: 20),
-                        itemCount: outlets.length,
+                        padding: const EdgeInsets.fromLTRB(
+                          20,
+                          0,
+                          20,
+                          kSsFabScrollPadding,
+                        ),
+                        itemCount: filteredOutlets.length,
                         itemBuilder: (context, index) {
-                          final outlet = outlets[index];
+                          final outlet = filteredOutlets[index];
                           final routeProv = routeProvider;
                           final auth = Provider.of<AuthProvider>(
                             context,
@@ -263,10 +331,35 @@ class _OfficerCustomerSelectionScreenState
                                             outlet.code!.trim().isNotEmpty) ...[
                                           const SizedBox(height: 2),
                                           Text(
-                                            'Code: ${outlet.code!.trim()}',
+                                            'SS Code: ${outlet.code!.trim()}',
                                             style: const TextStyle(
                                               color: AppColors.primary,
                                               fontWeight: FontWeight.w600,
+                                              fontSize: 12,
+                                            ),
+                                          ),
+                                        ],
+                                        if (outlet.ownerName != null &&
+                                            outlet.ownerName!.trim().isNotEmpty) ...[
+                                          const SizedBox(height: 2),
+                                          Text(
+                                            'Owner: ${outlet.ownerName!.trim()}',
+                                            style: const TextStyle(
+                                              color: AppColors.textSecondary,
+                                              fontWeight: FontWeight.w500,
+                                              fontSize: 12,
+                                            ),
+                                          ),
+                                        ],
+                                        if ((outlet.mobile != null &&
+                                                outlet.mobile!.trim().isNotEmpty) ||
+                                            (outlet.phone != null &&
+                                                outlet.phone!.trim().isNotEmpty)) ...[
+                                          const SizedBox(height: 2),
+                                          Text(
+                                            'Phone: ${outlet.mobile ?? outlet.phone}',
+                                            style: const TextStyle(
+                                              color: AppColors.textSecondary,
                                               fontSize: 12,
                                             ),
                                           ),
@@ -597,7 +690,7 @@ class _OfficerCustomerSelectionScreenState
                                   routeId: widget.routeId,
                                   routeName: widget.routeName,
                                   distributorName:
-                                      routeModel?.distributorName ??
+                                      routeDetail?.distributorName ??
                                       'Unassigned',
                                 ),
                               ),

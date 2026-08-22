@@ -6,6 +6,8 @@ import 'package:secondary_sales/data/api/api_service.dart';
 import 'package:secondary_sales/features/auth/auth_provider.dart';
 import 'package:secondary_sales/data/models/employees/sales_employee.dart';
 
+import 'package:secondary_sales/core/util/dialog_helper.dart';
+
 class NewJointVisitScreen extends StatefulWidget {
   final int outletId;
   final String outletName;
@@ -59,6 +61,9 @@ class _NewJointVisitScreenState extends State<NewJointVisitScreen> {
   }
 
   Future<void> _startJointVisit() async {
+    final allowed = await checkAttendanceRestriction(context, actionName: 'Joint Visit');
+    if (!allowed || !mounted) return;
+
     if (_selectedOfficer == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please select a Sales Officer')),
@@ -97,9 +102,13 @@ class _NewJointVisitScreenState extends State<NewJointVisitScreen> {
         context,
       ).showSnackBar(const SnackBar(content: Text('Joint visit started!')));
     } catch (e) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Error: $e')));
+      if (mounted) {
+        showValidationErrorDialog(
+          context,
+          e.toString(),
+          title: 'Joint Visit Error',
+        );
+      }
     } finally {
       if (mounted) {
         setState(() {

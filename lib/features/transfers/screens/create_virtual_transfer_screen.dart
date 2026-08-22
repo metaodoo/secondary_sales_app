@@ -272,36 +272,9 @@ class _CreateVirtualTransferScreenState
                             label: 'Source',
                             value: _nameOf(sourceLocation),
                           ),
-                          const SizedBox(height: 8),
-                          const Text(
-                            'Destination',
-                            style: TextStyle(fontWeight: FontWeight.w800),
-                          ),
-                          const SizedBox(height: 8),
-                          DropdownButtonFormField<int>(
-                            initialValue: _selectedDestinationId,
-                            isExpanded: true,
-                            decoration: ssInputDecoration(
-                              'Select Van Loading Location',
-                              Icons.inventory_2,
-                            ),
-                            items: destinations.map((location) {
-                              return DropdownMenuItem(
-                                value: location.id,
-                                child: Text(
-                                  location.name,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              );
-                            }).toList(),
-                            onChanged: (value) {
-                              setState(() {
-                                _selectedDestinationId = value;
-                                _lines.clear();
-                                _lotsByProduct.clear();
-                              });
-                            },
+                          _InfoRow(
+                            label: 'Van Name',
+                            value: formatLocationName(selectedDestination?.name),
                           ),
                         ],
                       ),
@@ -411,6 +384,7 @@ class _InfoRow extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           SizedBox(
             width: 92,
@@ -423,6 +397,7 @@ class _InfoRow extends StatelessWidget {
             child: Text(
               value,
               style: const TextStyle(fontWeight: FontWeight.w700),
+              softWrap: true,
             ),
           ),
         ],

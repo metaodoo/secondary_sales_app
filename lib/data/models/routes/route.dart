@@ -72,6 +72,7 @@ class RouteOutlet {
   final int id;
   final String name;
   final String? code;
+  final String? ownerName;
   final int sequence;
   final double expectedVisitTime;
   final String? phone;
@@ -92,6 +93,7 @@ class RouteOutlet {
     required this.id,
     required this.name,
     this.code,
+    this.ownerName,
     required this.sequence,
     required this.expectedVisitTime,
     this.phone,
@@ -121,6 +123,7 @@ class RouteOutlet {
       id: asInt(map['id']),
       name: map['name'] ?? '',
       code: map['code'] ?? map['ss_code'],
+      ownerName: map['owner_name'] ?? map['ownerName'],
       sequence: asInt(map['sequence']),
       expectedVisitTime: asDouble(
         map['expected_visit_time'] ?? map['expectedVisitTime'],

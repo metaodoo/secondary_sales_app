@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:secondary_sales/core/util/parse.dart';
 import 'package:secondary_sales/core/theme/app_theme.dart';
 import 'package:secondary_sales/core/widgets/ss_ui.dart';
 
@@ -445,46 +446,30 @@ class _VanLoadFormScreenState extends State<VanLoadFormScreen> {
                         ),
                         const SizedBox(height: 8),
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                          width: double.infinity,
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                           decoration: BoxDecoration(
                             color: const Color(0xFFF3F6FA),
                             borderRadius: BorderRadius.circular(12),
                             border: Border.all(color: const Color(0xFFDDE6F2)),
                           ),
-                          child: DropdownButtonHideUnderline(
-                            child: DropdownButton<int>(
-                              value: _selectedDestinationId,
-                              isExpanded: true,
-                              icon: const Icon(Icons.keyboard_arrow_down, color: AppColors.primary),
-                              items: destinations.map((location) {
-                                final displayName = location.name.split('/').last;
-                                return DropdownMenuItem(
-                                  value: location.id,
-                                  child: Row(
-                                    children: [
-                                      const Icon(Icons.local_shipping_outlined, color: AppColors.primary, size: 20),
-                                      const SizedBox(width: 12),
-                                      Expanded(
-                                        child: Text(
-                                          displayName,
-                                          overflow: TextOverflow.ellipsis,
-                                          style: const TextStyle(
-                                            fontWeight: FontWeight.w600,
-                                            color: AppColors.textPrimary,
-                                          ),
-                                        ),
-                                      ),
-                                    ],
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Icon(Icons.local_shipping_outlined, color: AppColors.primary, size: 20),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Text(
+                                  formatLocationName(selectedDestination?.name),
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w500,
+                                    color: AppColors.textPrimary,
+                                    fontSize: 14,
                                   ),
-                                );
-                              }).toList(),
-                              onChanged: widget.existingTransfer != null ? null : (value) {
-                                setState(() {
-                                  _selectedDestinationId = value;
-                                });
-                                _fetchTargets();
-                              },
-                            ),
+                                  softWrap: true,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                         const SizedBox(height: 16),
@@ -507,6 +492,7 @@ class _VanLoadFormScreenState extends State<VanLoadFormScreen> {
                             border: Border.all(color: const Color(0xFFDDE6F2)),
                           ),
                           child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               const Icon(Icons.location_on_outlined, color: AppColors.primary, size: 20),
                               const SizedBox(width: 12),
@@ -518,6 +504,7 @@ class _VanLoadFormScreenState extends State<VanLoadFormScreen> {
                                     color: AppColors.textPrimary,
                                     fontSize: 14,
                                   ),
+                                  softWrap: true,
                                 ),
                               ),
                             ],

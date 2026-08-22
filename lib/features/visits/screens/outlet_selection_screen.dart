@@ -5,6 +5,7 @@ import 'package:secondary_sales/features/auth/auth_provider.dart';
 import 'package:secondary_sales/data/api/api_service.dart';
 import 'package:secondary_sales/core/services/location_service.dart';
 import 'package:secondary_sales/core/widgets/ss_ui.dart';
+import 'package:secondary_sales/core/util/dialog_helper.dart';
 
 class OutletSelectionScreen extends StatefulWidget {
   final int routeId;
@@ -26,7 +27,16 @@ class _OutletSelectionScreenState extends State<OutletSelectionScreen> {
   List<Map<String, dynamic>> _outlets = [];
   String? _error;
 
+  final TextEditingController _searchController = TextEditingController();
+  String _searchQuery = '';
+
   bool _isInit = false;
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
 
   @override
   void didChangeDependencies() {
@@ -62,6 +72,9 @@ class _OutletSelectionScreenState extends State<OutletSelectionScreen> {
   }
 
   Future<void> _checkIn(int outletId) async {
+    final allowed = await checkAttendanceRestriction(context, actionName: 'Outlet Check-In');
+    if (!allowed || !mounted) return;
+
     setState(() => _isLoading = true);
     try {
       final position = await LocationService.getCurrentPosition();
@@ -196,6 +209,21 @@ class _OutletSelectionScreenState extends State<OutletSelectionScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final filteredOutlets = _outlets.where((outlet) {
+      if (_searchQuery.isEmpty) return true;
+      final code = (outlet['ss_code'] ?? outlet['code'] ?? '').toString().toLowerCase();
+      final name = (outlet['name'] ?? '').toString().toLowerCase();
+      final phone = (outlet['phone'] ?? '').toString().toLowerCase();
+      final mobile = (outlet['mobile'] ?? '').toString().toLowerCase();
+      final ownerName = (outlet['owner_name'] ?? outlet['ownerName'] ?? '').toString().toLowerCase();
+
+      return code.contains(_searchQuery) ||
+          name.contains(_searchQuery) ||
+          phone.contains(_searchQuery) ||
+          mobile.contains(_searchQuery) ||
+          ownerName.contains(_searchQuery);
+    }).toList();
+
     return Scaffold(
       backgroundColor: AppColors.background,
       body: Column(
@@ -208,6 +236,33 @@ class _OutletSelectionScreenState extends State<OutletSelectionScreen> {
               onPressed: () => Navigator.pop(context),
             ),
           ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+            child: TextField(
+              controller: _searchController,
+              onChanged: (val) {
+                setState(() {
+                  _searchQuery = val.trim().toLowerCase();
+                });
+              },
+              decoration: ssInputDecoration(
+                'Search by Code, Name, Phone, Owner...',
+                Icons.search,
+              ).copyWith(
+                suffixIcon: _searchQuery.isNotEmpty
+                    ? IconButton(
+                        icon: const Icon(Icons.clear, size: 20),
+                        onPressed: () {
+                          _searchController.clear();
+                          setState(() {
+                            _searchQuery = '';
+                          });
+                        },
+                      )
+                    : null,
+              ),
+            ),
+          ),
           if (_isLoading)
             const Expanded(child: Center(child: CircularProgressIndicator()))
           else if (_error != null)
@@ -218,15 +273,24 @@ class _OutletSelectionScreenState extends State<OutletSelectionScreen> {
             )
           else ...[
             Expanded(
-              child: _outlets.isEmpty
-                  ? const Center(
-                      child: Text('No outlets found for this route.'),
+              child: filteredOutlets.isEmpty
+                  ? Center(
+                      child: Text(
+                        _searchQuery.isEmpty
+                            ? 'No outlets found for this route.'
+                            : 'No outlets match "$_searchQuery".',
+                        style: const TextStyle(color: AppColors.textSecondary),
+                      ),
                     )
                   : ListView.builder(
                       padding: const EdgeInsets.all(16),
-                      itemCount: _outlets.length,
+                      itemCount: filteredOutlets.length,
                       itemBuilder: (context, index) {
-                        final outlet = _outlets[index];
+                        final outlet = filteredOutlets[index];
+                        final code = outlet['ss_code'] ?? outlet['code'];
+                        final owner = outlet['owner_name'] ?? outlet['ownerName'];
+                        final phone = outlet['mobile'] ?? outlet['phone'];
+
                         return Card(
                           margin: const EdgeInsets.only(bottom: 12),
                           shape: RoundedRectangleBorder(
@@ -240,8 +304,51 @@ class _OutletSelectionScreenState extends State<OutletSelectionScreen> {
                                 color: AppColors.primaryStrong,
                               ),
                             ),
-                            title: Text(outlet['name'] ?? ''),
-                            subtitle: Text(outlet['street'] ?? 'No address'),
+                            title: Text(
+                              outlet['name'] ?? '',
+                              style: const TextStyle(fontWeight: FontWeight.bold),
+                            ),
+                            subtitle: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                if (code != null && code.toString().trim().isNotEmpty) ...[
+                                  Text(
+                                    'SS Code: ${code.toString().trim()}',
+                                    style: const TextStyle(
+                                      color: AppColors.primary,
+                                      fontWeight: FontWeight.w600,
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                                ],
+                                if (owner != null && owner.toString().trim().isNotEmpty) ...[
+                                  Text(
+                                    'Owner: ${owner.toString().trim()}',
+                                    style: const TextStyle(
+                                      color: AppColors.textSecondary,
+                                      fontWeight: FontWeight.w500,
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                                ],
+                                if (phone != null && phone.toString().trim().isNotEmpty) ...[
+                                  Text(
+                                    'Phone: ${phone.toString().trim()}',
+                                    style: const TextStyle(
+                                      color: AppColors.textSecondary,
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                                ],
+                                Text(
+                                  outlet['street'] ?? 'No address',
+                                  style: const TextStyle(
+                                    color: AppColors.textSecondary,
+                                    fontSize: 12,
+                                  ),
+                                ),
+                              ],
+                            ),
                             trailing: const Icon(Icons.more_vert),
                             onTap: () => _showActionDialog(outlet),
                           ),

@@ -18,6 +18,7 @@ import 'package:secondary_sales/features/notifications/notification_provider.dar
 import 'package:secondary_sales/features/notifications/widgets/notification_bell.dart';
 import 'package:secondary_sales/features/settings/screens/settings_tab.dart';
 import 'package:secondary_sales/features/dashboard/module_launcher.dart';
+import 'package:secondary_sales/core/util/dialog_helper.dart';
 
 /// Post-login landing dashboard.
 ///
@@ -84,12 +85,10 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
     if (ok) {
       await _fetchDashboard();
     } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            _attendance.errorMessage ?? 'Could not update attendance.',
-          ),
-        ),
+      showValidationErrorDialog(
+        context,
+        _attendance.errorMessage ?? 'Could not update attendance.',
+        title: 'Attendance Error',
       );
     }
   }
@@ -135,89 +134,6 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
     if (_showModuleShortcut != shouldShow) {
       setState(() => _showModuleShortcut = shouldShow);
     }
-  }
-
-  Future<void> _showModulePicker(List<_ModuleItem> items) {
-    return showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (sheetContext) {
-        final maxHeight = MediaQuery.sizeOf(sheetContext).height * 0.78;
-
-        return SafeArea(
-          top: false,
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
-            child: ConstrainedBox(
-              constraints: BoxConstraints(maxHeight: maxHeight),
-              child: Container(
-                padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
-                decoration: BoxDecoration(
-                  color: AppColors.surface,
-                  borderRadius: BorderRadius.circular(28),
-                  boxShadow: const [
-                    BoxShadow(
-                      color: Color(0x220F172A),
-                      blurRadius: 24,
-                      offset: Offset(0, 10),
-                    ),
-                  ],
-                ),
-                child: SingleChildScrollView(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Center(
-                        child: Container(
-                          width: 44,
-                          height: 5,
-                          decoration: BoxDecoration(
-                            color: AppColors.borderSoft,
-                            borderRadius: BorderRadius.circular(999),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      const Text(
-                        'Open module',
-                        style: TextStyle(
-                          color: AppColors.textPrimary,
-                          fontWeight: FontWeight.w800,
-                          fontSize: 18,
-                        ),
-                      ),
-                      const SizedBox(height: 6),
-                      const Text(
-                        'Jump straight into the part of the app you need.',
-                        style: TextStyle(
-                          color: AppColors.textSecondary,
-                          fontSize: 13,
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      for (var i = 0; i < items.length; i++) ...[
-                        _ModulePickerTile(
-                          item: items[i],
-                          onTap: () {
-                            Navigator.of(sheetContext).pop();
-                            WidgetsBinding.instance.addPostFrameCallback((_) {
-                              if (mounted) items[i].onTap();
-                            });
-                          },
-                        ),
-                        if (i != items.length - 1) const SizedBox(height: 10),
-                      ],
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          ),
-        );
-      },
-    );
   }
 
   Future<void> _selectPreset(String preset) async {
@@ -295,7 +211,6 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
 
     final user = auth.user;
     final userName = user?.employeeName ?? user?.name;
-    final firstName = firstNameFromName(userName);
 
     final canAccessPrimary = auth.canAccessPrimarySales;
     final canAccessSecondary = auth.canAccessSecondarySales;
@@ -1647,53 +1562,6 @@ class _ModulesGrid extends StatelessWidget {
             ),
           )
           .toList(growable: false),
-    );
-  }
-}
-
-class _ModulePickerTile extends StatelessWidget {
-  const _ModulePickerTile({required this.item, required this.onTap});
-
-  final _ModuleItem item;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: item.color.withValues(alpha: 0.08),
-      borderRadius: BorderRadius.circular(18),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(18),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-          child: Row(
-            children: [
-              Container(
-                width: 42,
-                height: 42,
-                decoration: BoxDecoration(
-                  color: item.color.withValues(alpha: 0.14),
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(item.icon, color: item.color),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Text(
-                  item.title,
-                  style: const TextStyle(
-                    color: AppColors.textPrimary,
-                    fontWeight: FontWeight.w800,
-                    fontSize: 15,
-                  ),
-                ),
-              ),
-              const Icon(Icons.chevron_right, color: AppColors.textSecondary),
-            ],
-          ),
-        ),
-      ),
     );
   }
 }

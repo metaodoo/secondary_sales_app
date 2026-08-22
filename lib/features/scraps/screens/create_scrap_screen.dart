@@ -401,6 +401,7 @@ class _CreateScrapScreenState extends State<CreateScrapScreen> {
       } else {
         final next = lotInput.quantity + delta;
         lotInput.quantity = next.clamp(0, double.infinity).toDouble();
+
       }
     });
   }

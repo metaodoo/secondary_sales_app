@@ -9,15 +9,12 @@ import 'package:url_launcher/url_launcher.dart';
 
 import 'package:secondary_sales/features/routes/route_provider.dart';
 import 'package:secondary_sales/features/routes/screens/outlet_visit_history_screen.dart';
-import 'package:secondary_sales/features/routes/screens/new_joint_visit_screen.dart';
 import 'package:secondary_sales/core/access/access_resources.dart';
-import 'package:secondary_sales/data/models/sales/order_line_entry.dart';
-import 'package:secondary_sales/features/sales/screens/order_creation_screen.dart';
-import 'package:secondary_sales/features/sales/screens/out_of_geo_fence_screen.dart';
 import 'package:secondary_sales/features/sales/screens/product_selection_screen.dart';
 import 'package:secondary_sales/features/sales/screens/secondary_orders_list_screen.dart';
 import 'package:secondary_sales/data/api/api_service.dart';
 import 'package:secondary_sales/features/auth/auth_provider.dart';
+import 'package:secondary_sales/core/util/dialog_helper.dart';
 
 class CustomerActionBottomSheet extends StatefulWidget {
   final String customerName;
@@ -233,6 +230,9 @@ class _CustomerActionBottomSheetState extends State<CustomerActionBottomSheet> {
 
           ElevatedButton(
             onPressed: () async {
+              final allowed = await checkAttendanceRestriction(context, actionName: 'Order Entry / Outlet Visit');
+              if (!allowed || !context.mounted) return;
+
               final authProv = context.read<AuthProvider>();
               final canSkipCheckin =
                   authProv
@@ -302,8 +302,9 @@ class _CustomerActionBottomSheetState extends State<CustomerActionBottomSheet> {
                                 final employeeId =
                                     authProv.session?.user.employeeId;
                                 if (employeeId != null) {
-                                  if (mounted)
+                                  if (mounted) {
                                     setState(() => _isCheckingIn = true);
+                                  }
                                   try {
                                     final position = await LocationService.getCurrentPosition(
                                       requireFresh: true,
@@ -321,10 +322,10 @@ class _CustomerActionBottomSheetState extends State<CustomerActionBottomSheet> {
                                       );
                                       if (photo == null) {
                                         if (context.mounted) {
-                                          ScaffoldMessenger.of(context).showSnackBar(
-                                            const SnackBar(
-                                              content: Text('A check-in photo is required for joint visits.'),
-                                            ),
+                                          showValidationErrorDialog(
+                                            context,
+                                            'A check-in photo is required for joint visits.',
+                                            title: 'Check-in Error',
                                           );
                                         }
                                         return;
@@ -352,17 +353,16 @@ class _CustomerActionBottomSheetState extends State<CustomerActionBottomSheet> {
                                     }
                                   } catch (e) {
                                     if (context.mounted) {
-                                      ScaffoldMessenger.of(
+                                      showValidationErrorDialog(
                                         context,
-                                      ).showSnackBar(
-                                        SnackBar(
-                                          content: Text('Check-in failed: $e'),
-                                        ),
+                                        e.toString(),
+                                        title: 'Check-in Error',
                                       );
                                     }
                                   } finally {
-                                    if (mounted)
+                                    if (mounted) {
                                       setState(() => _isCheckingIn = false);
+                                    }
                                   }
                                 }
                               },
