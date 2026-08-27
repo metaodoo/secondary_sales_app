@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:secondary_sales/core/theme/app_theme.dart';
 import 'package:secondary_sales/features/hr/expense_provider.dart';
+import 'package:secondary_sales/features/hr/screens/expense_create_sheet.dart';
 
 class ExpenseDetailsSheet extends StatefulWidget {
   final Map<String, dynamic> sheetSummary;
@@ -50,21 +51,26 @@ class _ExpenseDetailsSheetState extends State<ExpenseDetailsSheet> {
   }
 
   Color _getStatusColor(String? status) {
-    switch (status) {
+    switch (status?.toLowerCase()) {
       case 'approve':
       case 'approved':
       case 'post':
       case 'done':
+      case 'validate':
         return Colors.green;
       case 'submit':
       case 'submitted':
-        return Colors.blue;
+      case 'confirm':
+      case 'to approve':
+        return Colors.amber[800]!;
       case 'cancel':
       case 'refused':
+      case 'refuse':
+      case 'rejected':
         return Colors.red;
       case 'draft':
       default:
-        return Colors.grey;
+        return Colors.grey[700]!;
     }
   }
 
@@ -364,6 +370,31 @@ class _ExpenseDetailsSheetState extends State<ExpenseDetailsSheet> {
                         ),
                       ),
                     ],
+                  ),
+                ),
+              ] else if ((provider.selectedSheetDetails?['can_edit'] == true || widget.sheetSummary['can_edit'] == true || (['draft', 'submit'].contains(status) && provider.activeTab == 'own'))) ...[
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
+                  child: SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton.icon(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primary,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                      icon: const Icon(Icons.edit, size: 18),
+                      label: const Text('Edit Expense Report', style: TextStyle(fontWeight: FontWeight.bold)),
+                      onPressed: () {
+                        Navigator.pop(context);
+                        ExpenseCreateSheet.show(
+                          context,
+                          provider,
+                          sheetToEdit: details ?? widget.sheetSummary,
+                        );
+                      },
+                    ),
                   ),
                 ),
               ],

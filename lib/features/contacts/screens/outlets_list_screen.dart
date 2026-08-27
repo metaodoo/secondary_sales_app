@@ -145,7 +145,7 @@ class _OutletsListScreenState extends State<OutletsListScreen> {
         actions: [
           Padding(
             padding: const EdgeInsets.only(right: 16),
-            child: ProfileAvatar(),
+            child: ProfileAvatar(currentDestinationLabel: 'Outlets'),
           ),
         ],
         bottom: PreferredSize(

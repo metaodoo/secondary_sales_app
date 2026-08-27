@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:secondary_sales/core/theme/app_theme.dart';
 import 'package:secondary_sales/features/hr/leave_provider.dart';
+import 'package:secondary_sales/features/hr/screens/leave_request_sheet.dart';
 
 class LeaveDetailsSheet extends StatelessWidget {
   final Map<String, dynamic> leave;
@@ -24,6 +25,7 @@ class LeaveDetailsSheet extends StatelessWidget {
   Widget build(BuildContext context) {
     final provider = context.watch<LeaveProvider>();
     final bool canApprove = leave['can_approve'] ?? false;
+    final bool canEdit = leave['can_edit'] ?? (leave['is_my_request'] == true && ['draft', 'confirm'].contains(leave['status']));
     final String status = leave['status'] ?? '';
     
     // Status Badge Logic
@@ -180,35 +182,19 @@ class LeaveDetailsSheet extends StatelessWidget {
                   child: Text(provider.errorMessage!, style: const TextStyle(color: Colors.red)),
                 ),
 
-              // Action Buttons
+              // Action Buttons (Matching Expense Details Sheet 1:1)
               if (canApprove)
                 Padding(
                   padding: const EdgeInsets.all(16.0),
                   child: Row(
                     children: [
                       Expanded(
-                        child: ElevatedButton(
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: AppColors.successSoft,
-                            foregroundColor: Colors.green,
-                            padding: const EdgeInsets.symmetric(vertical: 16),
-                          ),
-                          onPressed: provider.isActionLoading ? null : () async {
-                            final success = await provider.submitLeaveAction(leave['leave_id'], 'approve');
-                            if (success && context.mounted) Navigator.pop(context);
-                          },
-                          child: provider.isActionLoading
-                              ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.green, strokeWidth: 2))
-                              : const Text('Accept'),
-                        ),
-                      ),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: ElevatedButton(
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: AppColors.dangerSoft,
+                        child: OutlinedButton(
+                          style: OutlinedButton.styleFrom(
+                            side: const BorderSide(color: Colors.red),
                             foregroundColor: Colors.red,
                             padding: const EdgeInsets.symmetric(vertical: 16),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                           ),
                           onPressed: provider.isActionLoading ? null : () async {
                             final success = await provider.submitLeaveAction(leave['leave_id'], 'reject');
@@ -216,14 +202,54 @@ class LeaveDetailsSheet extends StatelessWidget {
                           },
                           child: provider.isActionLoading
                               ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.red, strokeWidth: 2))
-                              : const Text('Reject'),
+                              : const Text('Reject', style: TextStyle(fontWeight: FontWeight.bold)),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: ElevatedButton(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.green,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 16),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          ),
+                          onPressed: provider.isActionLoading ? null : () async {
+                            final success = await provider.submitLeaveAction(leave['leave_id'], 'approve');
+                            if (success && context.mounted) Navigator.pop(context);
+                          },
+                          child: provider.isActionLoading
+                              ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                              : const Text('Approve', style: TextStyle(fontWeight: FontWeight.bold)),
                         ),
                       ),
                     ],
                   ),
                 ),
+
+              if (canEdit && !canApprove)
+                Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton.icon(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primary,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                      icon: const Icon(Icons.edit, size: 18),
+                      label: const Text('Edit Leave Request', style: TextStyle(fontWeight: FontWeight.bold)),
+                      onPressed: () {
+                        Navigator.pop(context);
+                        LeaveRequestSheet.show(context, provider, leaveToEdit: leave);
+                      },
+                    ),
+                  ),
+                ),
                 
-               if (!canApprove)
+               if (!canApprove && !canEdit)
                   const SizedBox(height: 16),
             ],
           ),

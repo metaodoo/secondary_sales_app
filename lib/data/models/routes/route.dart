@@ -87,6 +87,10 @@ class RouteOutlet {
   final double? partnerLatitude;
   final double? partnerLongitude;
   final double? outletRadius;
+  final int? outletClassId;
+  final String? outletClassName;
+  final int? outletTypeId;
+  final String? outletTypeName;
 
   RouteOutlet({
     required this.lineId,
@@ -108,6 +112,10 @@ class RouteOutlet {
     this.partnerLatitude,
     this.partnerLongitude,
     this.outletRadius,
+    this.outletClassId,
+    this.outletClassName,
+    this.outletTypeId,
+    this.outletTypeName,
   });
 
   String get displayNameWithCode {
@@ -118,6 +126,9 @@ class RouteOutlet {
   }
 
   factory RouteOutlet.fromMap(Map<String, dynamic> map) {
+    final rawClass = map['outlet_class'];
+    final rawType = map['outlet_type'];
+
     return RouteOutlet(
       lineId: asInt(map['line_id'] ?? map['lineId']),
       id: asInt(map['id']),
@@ -140,6 +151,14 @@ class RouteOutlet {
       partnerLatitude: map['partner_latitude'] != null ? asDouble(map['partner_latitude']) : null,
       partnerLongitude: map['partner_longitude'] != null ? asDouble(map['partner_longitude']) : null,
       outletRadius: map['outlet_radius'] != null ? asDouble(map['outlet_radius']) : null,
+      outletClassId: map['outlet_class_id'] != null
+          ? asInt(map['outlet_class_id'])
+          : (rawClass is Map ? asInt(rawClass['id']) : null),
+      outletClassName: rawClass is Map ? rawClass['name']?.toString() : null,
+      outletTypeId: map['outlet_type_id'] != null
+          ? asInt(map['outlet_type_id'])
+          : (rawType is Map ? asInt(rawType['id']) : null),
+      outletTypeName: rawType is Map ? rawType['name']?.toString() : null,
     );
   }
 

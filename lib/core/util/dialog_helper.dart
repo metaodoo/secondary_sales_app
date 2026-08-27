@@ -107,6 +107,12 @@ Future<bool> checkAttendanceRestriction(
     return true;
   }
 
+  // Refresh status from server in case local state was not loaded yet
+  await attendanceProv.refresh();
+  if (attendanceProv.isCheckedIn) {
+    return true;
+  }
+
   if (!context.mounted) return false;
 
   await showDialog<void>(

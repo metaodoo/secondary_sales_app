@@ -36,9 +36,14 @@ String firstNameFromName(String? rawName, {String fallback = 'User'}) {
   return parts.first;
 }
 
-void openAppMenu(BuildContext context, {String? moduleType}) {
+void openAppMenu(
+  BuildContext context, {
+  String? moduleType,
+  String? currentDestinationLabel,
+}) {
   final shellNav = AppShellNavigation.of(context);
   final activeModuleType = shellNav?.moduleType ?? moduleType ?? 'secondary';
+  final activeLabel = currentDestinationLabel ?? ModalRoute.of(context)?.settings.name;
 
   try {
     final scaffold = Scaffold.maybeOf(context);
@@ -63,7 +68,8 @@ void openAppMenu(BuildContext context, {String? moduleType}) {
             width: MediaQuery.of(ctx).size.width * 0.78,
             child: AppDrawer(
               moduleType: activeModuleType,
-              currentShellIndex: 0,
+              currentShellIndex: shellNav?.currentIndex ?? 0,
+              currentDestinationLabel: activeLabel,
               onSelectTab: (idx) {
                 shellNav?.setIndex(idx);
               },
@@ -88,11 +94,18 @@ void openAppMenu(BuildContext context, {String? moduleType}) {
 }
 
 class ProfileAvatar extends StatelessWidget {
-  const ProfileAvatar({super.key, this.onTap, this.borderColor, this.moduleType});
+  const ProfileAvatar({
+    super.key,
+    this.onTap,
+    this.borderColor,
+    this.moduleType,
+    this.currentDestinationLabel,
+  });
 
   final VoidCallback? onTap;
   final Color? borderColor;
   final String? moduleType;
+  final String? currentDestinationLabel;
 
   @override
   Widget build(BuildContext context) {
@@ -102,7 +115,11 @@ class ProfileAvatar extends StatelessWidget {
           onTap!();
           return;
         }
-        openAppMenu(context, moduleType: moduleType ?? 'secondary');
+        openAppMenu(
+          context,
+          moduleType: moduleType ?? 'secondary',
+          currentDestinationLabel: currentDestinationLabel,
+        );
       },
       child: Container(
         width: 38,

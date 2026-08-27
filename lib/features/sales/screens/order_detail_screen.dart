@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:typed_data';
 import 'package:secondary_sales/core/theme/app_theme.dart';
 import 'package:flutter/material.dart';
 import 'package:secondary_sales/core/util/parse.dart';
@@ -28,31 +29,65 @@ class OrderDetailScreen extends StatefulWidget {
 }
 
 class _OrderDetailScreenState extends State<OrderDetailScreen> {
+  bool _isDownloading = false;
+  bool _isSharingWhatsApp = false;
+
+  Uint8List? _cachedPdfBytes;
+  String? _cachedPdfFilename;
+
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<PrimarySaleProvider>().fetchOrderDetail(
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      await context.read<PrimarySaleProvider>().fetchOrderDetail(
         widget.orderId,
         saleType: widget.saleType,
       );
+      if (mounted) {
+        _prefetchPdf();
+      }
     });
   }
 
-  Future<void> _printOrder() async {
+  Future<void> _prefetchPdf() async {
+    if (_cachedPdfBytes != null) return;
+    try {
+      final provider = context.read<PrimarySaleProvider>();
+      final result = await provider.printOrder(
+        widget.orderId,
+        saleType: widget.saleType,
+      );
+      if (!mounted || result == null) return;
+
+      final String? fileContent = result['file_content'];
+      final String filename = result['filename'] ?? 'order_${widget.orderId}.pdf';
+      if (fileContent != null && fileContent.isNotEmpty) {
+        _cachedPdfBytes = base64Decode(fileContent);
+        _cachedPdfFilename = filename;
+      }
+    } catch (_) {
+      // Ignore background pre-fetch error; fallback to manual fetch when tapped
+    }
+  }
+
+  Future<({Uint8List bytes, String filename})?> _getOrFetchPdf() async {
+    if (_cachedPdfBytes != null && _cachedPdfFilename != null) {
+      return (bytes: _cachedPdfBytes!, filename: _cachedPdfFilename!);
+    }
+
     final provider = context.read<PrimarySaleProvider>();
     final result = await provider.printOrder(
       widget.orderId,
       saleType: widget.saleType,
     );
-    if (!mounted) return;
+    if (!mounted) return null;
 
     if (result == null) {
       final error = provider.error;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(error ?? 'Could not print order.')),
+        SnackBar(content: Text(error ?? 'Could not fetch order PDF.')),
       );
-      return;
+      return null;
     }
 
     final String? fileContent = result['file_content'];
@@ -62,20 +97,56 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('No PDF content returned from server.')),
       );
-      return;
+      return null;
     }
 
+    final bytes = base64Decode(fileContent);
+    _cachedPdfBytes = bytes;
+    _cachedPdfFilename = filename;
+    return (bytes: bytes, filename: filename);
+  }
+
+  Future<void> _shareWhatsApp() async {
+    if (_isDownloading || _isSharingWhatsApp) return;
+    setState(() => _isSharingWhatsApp = true);
+
     try {
-      final bytes = base64Decode(fileContent);
+      final pdfData = await _getOrFetchPdf();
+      if (!mounted || pdfData == null) return;
+
+      await Printing.sharePdf(
+        bytes: pdfData.bytes,
+        filename: pdfData.filename,
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Failed to share PDF: $e')));
+    } finally {
+      if (mounted) setState(() => _isSharingWhatsApp = false);
+    }
+  }
+
+  Future<void> _printOrder() async {
+    if (_isDownloading || _isSharingWhatsApp) return;
+    setState(() => _isDownloading = true);
+
+    try {
+      final pdfData = await _getOrFetchPdf();
+      if (!mounted || pdfData == null) return;
+
       await Printing.layoutPdf(
-        onLayout: (format) async => bytes,
-        name: filename,
+        onLayout: (format) async => pdfData.bytes,
+        name: pdfData.filename,
       );
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: Text('Failed to process PDF: $e')));
+    } finally {
+      if (mounted) setState(() => _isDownloading = false);
     }
   }
 
@@ -158,37 +229,84 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                             _openDeliveryValidation(order, picking),
                       ),
                       const SizedBox(height: 16),
-                      SizedBox(
-                        height: 50,
-                        child: OutlinedButton.icon(
-                          onPressed: provider.isLoading ? null : _printOrder,
-                          icon: provider.isLoading
-                              ? const SizedBox(
-                                  width: 20,
-                                  height: 20,
-                                  child: CircularProgressIndicator(
-                                    color: Color(0xFF2563EB),
-                                    strokeWidth: 2,
+                      Row(
+                        children: [
+                          Expanded(
+                            child: SizedBox(
+                              height: 50,
+                              child: ElevatedButton.icon(
+                                onPressed: (_isDownloading || _isSharingWhatsApp)
+                                    ? null
+                                    : _shareWhatsApp,
+                                icon: _isSharingWhatsApp
+                                    ? const SizedBox(
+                                        width: 18,
+                                        height: 18,
+                                        child: CircularProgressIndicator(
+                                          color: Colors.white,
+                                          strokeWidth: 2,
+                                        ),
+                                      )
+                                    : const Icon(Icons.share, size: 18),
+                                label: Text(
+                                  _isSharingWhatsApp
+                                      ? 'Sharing...'
+                                      : 'Share WhatsApp',
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w800,
+                                    fontSize: 13,
                                   ),
-                                )
-                              : const Icon(Icons.print_outlined),
-                          label: Text(
-                            provider.isLoading
-                                ? 'Downloading...'
-                                : 'Print Order',
-                            style: const TextStyle(fontWeight: FontWeight.w800),
-                          ),
-                          style: OutlinedButton.styleFrom(
-                            foregroundColor: const Color(0xFF2563EB),
-                            side: const BorderSide(
-                              color: Color(0xFF2563EB),
-                              width: 1.5,
-                            ),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(9),
+                                ),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: const Color(0xFF25D366),
+                                  foregroundColor: Colors.white,
+                                  elevation: 0,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(9),
+                                  ),
+                                ),
+                              ),
                             ),
                           ),
-                        ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: SizedBox(
+                              height: 50,
+                              child: OutlinedButton.icon(
+                                onPressed: (_isDownloading || _isSharingWhatsApp)
+                                    ? null
+                                    : _printOrder,
+                                icon: _isDownloading
+                                    ? const SizedBox(
+                                        width: 18,
+                                        height: 18,
+                                        child: CircularProgressIndicator(
+                                          color: Color(0xFF2563EB),
+                                          strokeWidth: 2,
+                                        ),
+                                      )
+                                    : const Icon(Icons.file_download_outlined, size: 18),
+                                label: Text(
+                                  _isDownloading ? 'Downloading...' : 'Download PDF',
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w800,
+                                    fontSize: 13,
+                                  ),
+                                ),
+                                style: OutlinedButton.styleFrom(
+                                  foregroundColor: const Color(0xFF2563EB),
+                                  side: const BorderSide(
+                                    color: Color(0xFF2563EB),
+                                    width: 1.5,
+                                  ),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(9),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                     ],
                   ],

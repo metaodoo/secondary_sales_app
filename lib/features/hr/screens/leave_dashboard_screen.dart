@@ -30,9 +30,17 @@ class _LeaveDashboardContent extends StatefulWidget {
 
 class _LeaveDashboardContentState extends State<_LeaveDashboardContent> with SingleTickerProviderStateMixin {
   late TabController _tabController;
-  final List<String> _tabs = ['own', 'pending', 'approved', 'rejected', 'all'];
-  final List<String> _tabLabels = ['Own', 'Pending', 'Approved', 'Rejected', 'All'];
+  final List<String> _tabs = ['own', 'pending'];
+  final List<String> _tabLabels = ['My Leaves', 'Team Approvals'];
   final TextEditingController _searchController = TextEditingController();
+
+  final Map<String, String?> _statusFilters = {
+    'All': null,
+    'Pending': 'pending',
+    'Approved': 'approved',
+    'Rejected': 'rejected',
+  };
+  String _selectedStatusLabel = 'All';
 
   @override
   void initState() {
@@ -40,7 +48,11 @@ class _LeaveDashboardContentState extends State<_LeaveDashboardContent> with Sin
     _tabController = TabController(length: _tabs.length, vsync: this);
     _tabController.addListener(() {
       if (!_tabController.indexIsChanging) {
-        context.read<LeaveProvider>().setActiveTab(_tabs[_tabController.index]);
+        final tab = _tabs[_tabController.index];
+        setState(() {
+          _selectedStatusLabel = 'All';
+        });
+        context.read<LeaveProvider>().setActiveTab(tab);
       }
     });
   }
@@ -127,6 +139,10 @@ class _LeaveDashboardContentState extends State<_LeaveDashboardContent> with Sin
       });
     }
 
+    final int totalRequests = provider.leaveList.length;
+    final int pendingRequests = provider.leaveList.where((item) => item['status'] == 'confirm').length;
+    final int approvedRequests = provider.leaveList.where((item) => item['status'] == 'validate').length;
+
     return Scaffold(
       floatingActionButton: PermissionGate(
         resourceKey: AppAction.leaveCreate,
@@ -159,13 +175,12 @@ class _LeaveDashboardContentState extends State<_LeaveDashboardContent> with Sin
         actions: [
           Padding(
             padding: const EdgeInsets.only(right: 16),
-            child: ProfileAvatar(),
+            child: ProfileAvatar(currentDestinationLabel: 'Leave Request'),
           ),
         ],
         bottom: TabBar(
           controller: _tabController,
-          isScrollable: true,
-          tabAlignment: TabAlignment.start,
+          isScrollable: false,
           labelColor: AppColors.primary,
           unselectedLabelColor: AppColors.textSecondary,
           indicatorColor: AppColors.primary,
@@ -176,15 +191,40 @@ class _LeaveDashboardContentState extends State<_LeaveDashboardContent> with Sin
       ),
       body: Column(
         children: [
-          // Premium Filter Bar
+          // Stat cards header (Matching Expense Dashboard 1:1)
           Padding(
-            padding: const EdgeInsets.fromLTRB(16.0, 16.0, 16.0, 8.0),
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+            child: Row(
+              children: [
+                _buildStatCard(
+                  'Total',
+                  '$totalRequests',
+                  Colors.indigo,
+                ),
+                const SizedBox(width: 8),
+                _buildStatCard(
+                  'Pending',
+                  '$pendingRequests',
+                  Colors.amber[800]!,
+                ),
+                const SizedBox(width: 8),
+                _buildStatCard(
+                  'Approved',
+                  '$approvedRequests',
+                  Colors.green,
+                ),
+              ],
+            ),
+          ),
+          // Filter Bar
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16.0, 4.0, 16.0, 8.0),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Row(
                   children: [
-                    // Unified Search Field
+                    // Search Field
                     Expanded(
                       child: Container(
                         decoration: BoxDecoration(
@@ -216,7 +256,7 @@ class _LeaveDashboardContentState extends State<_LeaveDashboardContent> with Sin
                       ),
                     ),
                     const SizedBox(width: 12),
-                    // Beautiful Filter Trigger Button
+                    // Date Filter Trigger Button
                     Container(
                       decoration: BoxDecoration(
                         color: (provider.dateFrom != null)
@@ -242,7 +282,42 @@ class _LeaveDashboardContentState extends State<_LeaveDashboardContent> with Sin
                     ),
                   ],
                 ),
-                // Active Filters Chips (e.g. Selected Date Range)
+                const SizedBox(height: 12),
+                // Status Filter Chips
+                SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    children: _statusFilters.keys.map((label) {
+                      final isSelected = _selectedStatusLabel == label;
+                      return Padding(
+                        padding: const EdgeInsets.only(right: 8.0),
+                        child: FilterChip(
+                          selected: isSelected,
+                          label: Text(label),
+                          labelStyle: TextStyle(
+                            color: isSelected ? Colors.white : AppColors.textPrimary,
+                            fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                            fontSize: 12,
+                          ),
+                          selectedColor: AppColors.primary,
+                          backgroundColor: Colors.white,
+                          side: BorderSide(
+                            color: isSelected ? AppColors.primary : AppColors.borderSoft,
+                          ),
+                          onSelected: (selected) {
+                            if (selected) {
+                              setState(() {
+                                _selectedStatusLabel = label;
+                              });
+                              provider.setStatusFilter(_statusFilters[label]);
+                            }
+                          },
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                ),
+                // Active Filters Chips (Date Range)
                 if (provider.dateFrom != null && provider.dateTo != null) ...[
                   const SizedBox(height: 8),
                   Wrap(
@@ -299,6 +374,39 @@ class _LeaveDashboardContentState extends State<_LeaveDashboardContent> with Sin
     );
   }
 
+  Widget _buildStatCard(String title, String value, Color color) {
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 8),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: color.withOpacity(0.2), width: 1),
+          boxShadow: [
+            BoxShadow(
+              color: color.withOpacity(0.04),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Column(
+          children: [
+            Text(
+              title,
+              style: const TextStyle(fontSize: 12, color: AppColors.textSecondary, fontWeight: FontWeight.w600),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              value,
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: color),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildEmptyState() {
     return Column(
       mainAxisAlignment: MainAxisAlignment.center,
@@ -324,10 +432,10 @@ class _LeaveDashboardContentState extends State<_LeaveDashboardContent> with Sin
     final String status = leave['status'] ?? '';
     
     // Status Badge Color Logic
-    Color badgeColor = Colors.grey;
+    Color badgeColor = Colors.grey[700]!;
     String badgeText = status.toUpperCase();
     if (status == 'confirm') {
-      badgeColor = Colors.orange;
+      badgeColor = Colors.amber[800]!;
       badgeText = 'TO APPROVE';
     } else if (status == 'validate') {
       badgeColor = Colors.green;
@@ -336,16 +444,17 @@ class _LeaveDashboardContentState extends State<_LeaveDashboardContent> with Sin
       badgeColor = Colors.red;
       badgeText = 'REJECTED';
     }
+    final Color badgeBgColor = badgeColor.withOpacity(0.1);
 
     return Card(
-      elevation: 0,
+      margin: const EdgeInsets.only(bottom: 12),
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(16),
         side: const BorderSide(color: AppColors.borderSoft),
       ),
       child: InkWell(
         onTap: () => _showLeaveDetails(context, leave),
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(16),
         child: Padding(
           padding: const EdgeInsets.all(16.0),
           child: Column(
@@ -353,93 +462,89 @@ class _LeaveDashboardContentState extends State<_LeaveDashboardContent> with Sin
             children: [
               // Header row
               Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
+                crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
-                  if (!isMyRequest) ...[
-                    CircleAvatar(
-                      backgroundColor: AppColors.dangerSoft,
-                      child: Text(
-                        leave['employee_name']?.substring(0, 2).toUpperCase() ?? '??',
-                        style: const TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                  ],
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          isMyRequest ? "My Leave Request" : (leave['employee_name'] ?? ''),
-                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                          isMyRequest ? (leave['leave_type'] ?? "Leave Request") : (leave['employee_name'] ?? ''),
+                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: AppColors.textPrimary),
                         ),
-                        if (!isMyRequest)
+                        if (!isMyRequest) ...[
+                          const SizedBox(height: 2),
                           Text(
                             leave['department'] ?? '',
-                            style: const TextStyle(color: Colors.grey, fontSize: 13),
+                            style: const TextStyle(color: AppColors.primaryStrong, fontSize: 12, fontWeight: FontWeight.w600),
                           ),
+                        ],
                       ],
                     ),
                   ),
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                     decoration: BoxDecoration(
-                      color: badgeColor.withOpacity(0.1),
+                      color: badgeBgColor,
                       borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: badgeColor.withOpacity(0.5)),
                     ),
                     child: Text(
                       badgeText,
-                      style: TextStyle(color: badgeColor, fontSize: 10, fontWeight: FontWeight.bold),
+                      style: TextStyle(color: badgeColor, fontSize: 11, fontWeight: FontWeight.bold),
                     ),
                   ),
                 ],
               ),
-              const SizedBox(height: 16),
-              // Leave Details
+              const SizedBox(height: 8),
+              if (isMyRequest) ...[
+                Text(
+                  leave['leave_type'] ?? 'Leave',
+                  style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13, color: AppColors.textPrimary),
+                ),
+                const SizedBox(height: 4),
+              ],
               Text(
-                leave['leave_type'] ?? 'Leave',
-                style: const TextStyle(fontWeight: FontWeight.bold),
+                '${leave['date_from']} to ${leave['date_to']} • (${leave['duration'] ?? '1 day'})',
+                style: const TextStyle(color: AppColors.textSecondary, fontSize: 12),
               ),
-              const SizedBox(height: 4),
-              Text(
-                '${leave['date_from']} to ${leave['date_to']}',
-                style: const TextStyle(color: Colors.grey, fontSize: 13),
-              ),
-              const SizedBox(height: 16),
-              // Footer
+              if (leave['reason'] != null && leave['reason'].toString().isNotEmpty) ...[
+                const Divider(height: 20),
+                Text(
+                  leave['reason'],
+                  style: const TextStyle(color: AppColors.textSecondary, fontSize: 12, height: 1.4),
+                ),
+              ],
+              const SizedBox(height: 8),
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Text(
-                    'Requested: ${leave['applied_on']}',
-                    style: const TextStyle(color: Colors.grey, fontSize: 12),
+                    'Applied: ${leave['applied_on']}',
+                    style: const TextStyle(color: AppColors.textSecondary, fontSize: 11),
                   ),
                   if (canApprove)
                     Row(
                       children: [
-                        TextButton.icon(
-                          onPressed: () => provider.submitLeaveAction(leave['leave_id'], 'reject'),
-                          icon: const Icon(Icons.close, size: 16),
-                          label: const Text('Reject'),
-                          style: TextButton.styleFrom(
-                            foregroundColor: Colors.white,
-                            backgroundColor: Colors.red,
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 0),
-                            minimumSize: const Size(0, 32),
+                        OutlinedButton.icon(
+                          style: OutlinedButton.styleFrom(
+                            side: const BorderSide(color: Colors.red),
+                            foregroundColor: Colors.red,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                           ),
+                          icon: const Icon(Icons.close, size: 16),
+                          label: const Text('Reject', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                          onPressed: () => provider.submitLeaveAction(leave['leave_id'], 'reject'),
                         ),
                         const SizedBox(width: 8),
-                        TextButton.icon(
-                          onPressed: () => provider.submitLeaveAction(leave['leave_id'], 'approve'),
-                          icon: const Icon(Icons.check, size: 16),
-                          label: const Text('Accept'),
-                          style: TextButton.styleFrom(
-                            foregroundColor: Colors.white,
+                        ElevatedButton.icon(
+                          style: ElevatedButton.styleFrom(
                             backgroundColor: Colors.green,
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 0),
-                            minimumSize: const Size(0, 32),
+                            foregroundColor: Colors.white,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                           ),
+                          icon: const Icon(Icons.check, size: 16),
+                          label: const Text('Approve', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                          onPressed: () => provider.submitLeaveAction(leave['leave_id'], 'approve'),
                         ),
                       ],
                     ),

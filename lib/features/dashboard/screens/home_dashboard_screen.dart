@@ -43,25 +43,16 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
   bool _showModuleShortcut = true;
   bool _moduleVisibilityCheckScheduled = false;
 
-  /// Action-only attendance provider: reused purely for the hero's one-tap
-  /// check-in/out (GPS + geofence live in [AttendanceProvider.performAction]).
-  /// The hero's displayed state comes from the dashboard summary, so this never
-  /// needs its own status/history load — hence `autoLoad: false`.
-  late final AttendanceProvider _attendance;
-
   @override
   void initState() {
     super.initState();
-    _attendance = AttendanceProvider(
-      context.read<AuthProvider>(),
-      autoLoad: false,
-    );
     _scrollController.addListener(_updateModuleShortcutVisibility);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       _scheduleModuleVisibilityCheck();
       _fetchDashboard();
       context.read<NotificationProvider>().refreshUnreadCount();
+      context.read<AttendanceProvider>().refresh();
     });
   }
 
@@ -70,7 +61,6 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
     _scrollController
       ..removeListener(_updateModuleShortcutVisibility)
       ..dispose();
-    _attendance.dispose();
     super.dispose();
   }
 
@@ -78,7 +68,8 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
   /// geofenced action, then refreshes the summary so the hero reflects the new
   /// state. Surfaces geofence / permission failures as a snackbar.
   Future<void> _toggleAttendance(bool currentlyCheckedIn) async {
-    final ok = await _attendance.performAction(
+    final attendance = context.read<AttendanceProvider>();
+    final ok = await attendance.performAction(
       currentlyCheckedIn ? 'check_out' : 'check_in',
     );
     if (!mounted) return;
@@ -87,7 +78,7 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
     } else {
       showValidationErrorDialog(
         context,
-        _attendance.errorMessage ?? 'Could not update attendance.',
+        attendance.errorMessage ?? 'Could not update attendance.',
         title: 'Attendance Error',
       );
     }
@@ -361,12 +352,11 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
               const SizedBox(height: 20),
 
               if (canAccessAttendance) ...[
-                ListenableBuilder(
-                  listenable: _attendance,
-                  builder: (context, _) => _AttendanceHero(
+                Consumer<AttendanceProvider>(
+                  builder: (context, attendance, _) => _AttendanceHero(
                     summary: summary,
-                    busy: _attendance.isActionLoading,
-                    loadingMessage: _attendance.loadingMessage,
+                    busy: attendance.isActionLoading,
+                    loadingMessage: attendance.loadingMessage,
                     onToggle: () =>
                         _toggleAttendance(summary?.isCheckedIn ?? false),
                     onOpen: () => _open(const AttendanceScreen()),

@@ -253,6 +253,7 @@ class _AppShellState extends State<AppShell> {
     return AppShellNavigation(
       setIndex: _setIndex,
       moduleType: widget.moduleType,
+      currentIndex: currentIndex,
       child: PopScope(
         // Only the Dashboard lets the system back exit the module; every other
         // destination intercepts back and returns to the Dashboard in one step.
@@ -297,11 +298,13 @@ class AppShellNavigation extends InheritedWidget {
     super.key,
     required this.setIndex,
     required this.moduleType,
+    required this.currentIndex,
     required super.child,
   });
 
   final void Function(int index) setIndex;
   final String moduleType;
+  final int currentIndex;
 
   static AppShellNavigation? of(BuildContext context) {
     return context.dependOnInheritedWidgetOfExactType<AppShellNavigation>();
@@ -309,5 +312,5 @@ class AppShellNavigation extends InheritedWidget {
 
   @override
   bool updateShouldNotify(AppShellNavigation oldWidget) =>
-      moduleType != oldWidget.moduleType;
+      moduleType != oldWidget.moduleType || currentIndex != oldWidget.currentIndex;
 }

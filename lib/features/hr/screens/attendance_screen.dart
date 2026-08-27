@@ -13,12 +13,7 @@ class AttendanceScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ChangeNotifierProvider(
-      create: (context) => AttendanceProvider(
-        context.read<AuthProvider>(),
-      ),
-      child: const _AttendanceScreenContent(),
-    );
+    return const _AttendanceScreenContent();
   }
 }
 
@@ -45,6 +40,11 @@ class _AttendanceScreenContentState extends State<_AttendanceScreenContent>
         setState(() {
           _currentTime = DateTime.now();
         });
+      }
+    });
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        context.read<AttendanceProvider>().refresh();
       }
     });
   }
@@ -161,7 +161,7 @@ class _AttendanceScreenContentState extends State<_AttendanceScreenContent>
         actions: [
           Padding(
             padding: const EdgeInsets.only(right: 16),
-            child: ProfileAvatar(),
+            child: ProfileAvatar(currentDestinationLabel: 'Attendance'),
           ),
         ],
         bottom: TabBar(

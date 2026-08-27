@@ -69,7 +69,7 @@ class _VisitsListScreenState extends State<VisitsListScreen> {
           actions: const [
             Padding(
               padding: EdgeInsets.only(right: 16),
-              child: ProfileAvatar(),
+              child: ProfileAvatar(currentDestinationLabel: 'Visit History'),
             ),
           ],
           bottom: TabBar(

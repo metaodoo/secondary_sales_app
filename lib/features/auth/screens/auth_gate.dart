@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:secondary_sales/core/theme/app_theme.dart';
+import 'package:secondary_sales/core/services/location_tracking_service.dart';
 import 'package:secondary_sales/core/services/push_notification_service.dart';
 import 'package:provider/provider.dart';
 
@@ -33,6 +34,10 @@ class AuthGate extends StatelessWidget {
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       PushNotificationService.openPendingNotificationIfAny();
+      // Asked once, on the first authenticated launch, alongside the push
+      // permission that PushNotificationService.initialize() requests at
+      // startup. Returns immediately on every launch after the first.
+      LocationTrackingService.requestPermissionsOnce();
     });
 
     return authenticatedChild;

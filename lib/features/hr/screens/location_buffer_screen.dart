@@ -33,7 +33,7 @@ class _LocationBufferScreenState extends State<LocationBufferScreen> {
   void initState() {
     super.initState();
     _load();
-    _autoRefresh = Timer.periodic(const Duration(seconds: 5), (_) => _load());
+    _autoRefresh = Timer.periodic(const Duration(seconds: 30), (_) => _load());
   }
 
   @override

@@ -210,6 +210,7 @@ class _OutletSelectionScreenState extends State<OutletSelectionScreen> {
   @override
   Widget build(BuildContext context) {
     final filteredOutlets = _outlets.where((outlet) {
+      if (outlet['active'] == false) return false;
       if (_searchQuery.isEmpty) return true;
       final code = (outlet['ss_code'] ?? outlet['code'] ?? '').toString().toLowerCase();
       final name = (outlet['name'] ?? '').toString().toLowerCase();

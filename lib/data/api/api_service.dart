@@ -9,6 +9,8 @@ import 'package:secondary_sales/core/constants.dart';
 import 'package:secondary_sales/data/models/sales/product.dart';
 import 'package:secondary_sales/data/models/sales/product_category.dart';
 import 'package:secondary_sales/data/models/contacts/distribution_hub.dart';
+import 'package:secondary_sales/data/models/contacts/outlet_class.dart';
+import 'package:secondary_sales/data/models/contacts/outlet_type.dart';
 import 'package:secondary_sales/data/models/employees/sales_employee.dart';
 import 'package:secondary_sales/data/models/sales/primary_order.dart';
 import 'package:secondary_sales/data/models/sales/sale_order_detail.dart';

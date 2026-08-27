@@ -270,13 +270,12 @@ class AttendanceProvider extends ChangeNotifier {
       );
 
       if (response['success'] == true) {
-        // On check-in, secure the permissions the background tracking service
-        // needs ("Allow all the time" location, notifications) and prompt for a
-        // battery-optimization exemption so it survives the app being closed.
-        if (action == 'check_in') {
-          await LocationTrackingService.ensurePermissions();
-          await LocationTrackingService.requestBatteryExemption();
-        }
+        // Permissions are asked for once, at first launch after login -- see
+        // LocationTrackingService.requestPermissionsOnce. Prompting here meant
+        // every single check-in re-requested "Allow all the time", which on
+        // Android 11+ cannot be granted from a dialog and so bounced the user
+        // into the Settings app. Tracking degrades gracefully without the
+        // optional grants, so nothing is asked at this point.
         // Reload everything on success ( _loadStatus starts/stops tracking).
         await _loadStatus();
         await _loadHistory();

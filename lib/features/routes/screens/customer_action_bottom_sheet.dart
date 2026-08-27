@@ -206,7 +206,7 @@ class _CustomerActionBottomSheetState extends State<CustomerActionBottomSheet> {
                   onTap: _makeCall,
                 ),
               ),
-              const SizedBox(width: 12),
+              const SizedBox(width: 8),
               Expanded(
                 child: _buildActionBtn(
                   Icons.history,
@@ -221,6 +221,60 @@ class _CustomerActionBottomSheetState extends State<CustomerActionBottomSheet> {
                         ),
                       ),
                     );
+                  },
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: _buildActionBtn(
+                  Icons.archive_outlined,
+                  'Archive',
+                  iconColor: const Color(0xFFDC2626),
+                  onTap: () async {
+                    final confirm = await showDialog<bool>(
+                      context: context,
+                      builder: (ctx) => AlertDialog(
+                        title: const Text('Archive Outlet'),
+                        content: Text('Are you sure you want to archive "${widget.customerName}"?'),
+                        actions: [
+                          TextButton(
+                            onPressed: () => Navigator.pop(ctx, false),
+                            child: const Text('Cancel'),
+                          ),
+                          ElevatedButton(
+                            onPressed: () => Navigator.pop(ctx, true),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFFDC2626),
+                              foregroundColor: Colors.white,
+                            ),
+                            child: const Text('Archive'),
+                          ),
+                        ],
+                      ),
+                    );
+
+                    if (confirm != true || !context.mounted) return;
+
+                    final routeProv = context.read<RouteProvider>();
+                    final success = await routeProv.archiveOutlet(
+                      widget.outletId,
+                      activeRouteId: routeProv.activeRoute?.id,
+                    );
+
+                    if (!context.mounted) return;
+
+                    if (success) {
+                      Navigator.pop(context);
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('Outlet "${widget.customerName}" archived successfully.')),
+                      );
+                    } else {
+                      showValidationErrorDialog(
+                        context,
+                        routeProv.error ?? 'Failed to archive outlet.',
+                        title: 'Archive Failed',
+                      );
+                    }
                   },
                 ),
               ),
@@ -430,11 +484,16 @@ class _CustomerActionBottomSheetState extends State<CustomerActionBottomSheet> {
     );
   }
 
-  Widget _buildActionBtn(IconData icon, String label, {VoidCallback? onTap}) {
+  Widget _buildActionBtn(
+    IconData icon,
+    String label, {
+    Color? iconColor,
+    VoidCallback? onTap,
+  }) {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 8),
+        padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 4),
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(12),
@@ -442,14 +501,14 @@ class _CustomerActionBottomSheetState extends State<CustomerActionBottomSheet> {
         ),
         child: Column(
           children: [
-            Icon(icon, color: AppColors.primaryStrong, size: 24),
+            Icon(icon, color: iconColor ?? AppColors.primaryStrong, size: 24),
             const SizedBox(height: 12),
             Text(
               label,
               textAlign: TextAlign.center,
               style: const TextStyle(
                 color: AppColors.textPrimary,
-                fontSize: 12,
+                fontSize: 11,
                 fontWeight: FontWeight.w500,
               ),
             ),

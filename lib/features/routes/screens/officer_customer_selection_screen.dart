@@ -2,7 +2,6 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:secondary_sales/core/access/access_resources.dart';
-import 'package:secondary_sales/core/access/permission_gate.dart';
 import 'package:secondary_sales/core/theme/app_theme.dart';
 import 'package:provider/provider.dart';
 import 'package:secondary_sales/features/routes/route_provider.dart';
@@ -56,14 +55,23 @@ class _OfficerCustomerSelectionScreenState
     super.dispose();
   }
 
-  void _openActionModalFor(
+  void _refreshRoute() {
+    setState(() {
+      _routeFuture = Provider.of<RouteProvider>(
+        context,
+        listen: false,
+      ).fetchRouteDetail(widget.routeId);
+    });
+  }
+
+  Future<void> _openActionModalFor(
     int outletId,
     String outletName, {
     String? outletCode,
     String? phone,
     String? mobile,
-  }) {
-    showModalBottomSheet(
+  }) async {
+    await showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
@@ -75,6 +83,9 @@ class _OfficerCustomerSelectionScreenState
         mobile: mobile,
       ),
     );
+    if (mounted) {
+      _refreshRoute();
+    }
   }
 
   String _formatTime(DateTime dt) {
@@ -116,32 +127,6 @@ class _OfficerCustomerSelectionScreenState
           ),
         ],
       ),
-      floatingActionButton: PermissionGate(
-        resourceKey: AppAction.outletCreate,
-        child: SsCreateFab(
-          label: 'New Outlet',
-          onPressed: () async {
-            final result = await Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) => CreateOutletScreen(
-                  routeId: widget.routeId,
-                  routeName: widget.routeName,
-                  distributorName: 'Unassigned',
-                ),
-              ),
-            );
-            if (result == true && context.mounted) {
-              setState(() {
-                _routeFuture = Provider.of<RouteProvider>(
-                  context,
-                  listen: false,
-                ).fetchRouteDetail(widget.routeId);
-              });
-            }
-          },
-        ),
-      ),
       body: Consumer<RouteProvider>(
         builder: (context, routeProvider, child) {
           return FutureBuilder<RouteModel?>(
@@ -158,7 +143,9 @@ class _OfficerCustomerSelectionScreenState
               }
 
               final routeDetail = snapshot.data;
-              final outlets = routeDetail?.outlets ?? [];
+              final outlets = (routeDetail?.outlets ?? [])
+                  .where((outlet) => outlet.active)
+                  .toList();
               final filteredOutlets = outlets.where((outlet) {
                 if (_searchQuery.isEmpty) return true;
                 final code = (outlet.code ?? '').toLowerCase();

@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:secondary_sales/data/models/routes/route.dart';
 import 'package:secondary_sales/data/models/routes/visit_reason.dart';
+import 'package:secondary_sales/data/models/contacts/outlet_class.dart';
+import 'package:secondary_sales/data/models/contacts/outlet_type.dart';
 import 'package:secondary_sales/data/api/api_service.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:secondary_sales/core/services/location_service.dart';
@@ -10,6 +12,8 @@ class RouteProvider with ChangeNotifier {
 
   List<RouteModel> _routes = [];
   List<VisitReason> _visitReasons = [];
+  List<OutletClass> _outletClasses = [];
+  List<OutletType> _outletTypes = [];
   RouteModel? _activeRoute;
   int _loadingCount = 0;
   String? _error;
@@ -22,6 +26,8 @@ class RouteProvider with ChangeNotifier {
 
   List<RouteModel> get routes => _routes;
   List<VisitReason> get visitReasons => _visitReasons;
+  List<OutletClass> get outletClasses => _outletClasses;
+  List<OutletType> get outletTypes => _outletTypes;
   RouteModel? get activeRoute => _activeRoute;
   bool get isLoading => _loadingCount > 0;
   String? get error => _error;
@@ -39,6 +45,28 @@ class RouteProvider with ChangeNotifier {
     } catch (e) {
       _error = e.toString();
       return _visitReasons;
+    }
+  }
+
+  Future<List<OutletClass>> fetchOutletClasses() async {
+    try {
+      _outletClasses = await _apiService.getOutletClasses();
+      notifyListeners();
+      return _outletClasses;
+    } catch (e) {
+      _error = e.toString();
+      return _outletClasses;
+    }
+  }
+
+  Future<List<OutletType>> fetchOutletTypes() async {
+    try {
+      _outletTypes = await _apiService.getOutletTypes();
+      notifyListeners();
+      return _outletTypes;
+    } catch (e) {
+      _error = e.toString();
+      return _outletTypes;
     }
   }
 
@@ -192,6 +220,8 @@ class RouteProvider with ChangeNotifier {
     double? partnerLongitude,
     String? outletOwnerName,
     String? image1920,
+    int? outletClassId,
+    int? outletTypeId,
   }) async {
     _loadingCount++;
     _error = null;
@@ -213,6 +243,8 @@ class RouteProvider with ChangeNotifier {
         partnerLongitude: partnerLongitude,
         outletOwnerName: outletOwnerName,
         image1920: image1920,
+        outletClassId: outletClassId,
+        outletTypeId: outletTypeId,
       );
 
       final newOutlet = RouteOutlet.fromMap(result);
@@ -249,6 +281,8 @@ class RouteProvider with ChangeNotifier {
     String? email,
     String? street,
     String? city,
+    int? outletClassId,
+    int? outletTypeId,
   }) async {
     _loadingCount++;
     _error = null;
@@ -262,11 +296,52 @@ class RouteProvider with ChangeNotifier {
         email: email,
         street: street,
         city: city,
+        outletClassId: outletClassId,
+        outletTypeId: outletTypeId,
       );
       return updated;
     } catch (e) {
       _error = e.toString();
       return null;
+    } finally {
+      if (_loadingCount > 0) _loadingCount--;
+      notifyListeners();
+    }
+  }
+
+  Future<bool> archiveOutlet(int outletId, {int? activeRouteId}) async {
+    _loadingCount++;
+    _error = null;
+    notifyListeners();
+
+    try {
+      final success = await _apiService.archiveOutlet(outletId);
+      if (success) {
+        if (_activeRoute != null) {
+          final updatedOutlets =
+              _activeRoute!.outlets.where((o) => o.id != outletId).toList();
+          final newCount =
+              _activeRoute!.outletCount > 0 ? _activeRoute!.outletCount - 1 : 0;
+          _activeRoute = RouteModel(
+            id: _activeRoute!.id,
+            name: _activeRoute!.name,
+            active: _activeRoute!.active,
+            distributorId: _activeRoute!.distributorId,
+            distributorName: _activeRoute!.distributorName,
+            employees: _activeRoute!.employees,
+            outlets: updatedOutlets,
+            outletCount: newCount,
+          );
+        }
+        final routeIdToFetch = activeRouteId ?? _activeRoute?.id;
+        if (routeIdToFetch != null) {
+          await fetchRouteDetail(routeIdToFetch);
+        }
+      }
+      return success;
+    } catch (e) {
+      _error = e.toString();
+      return false;
     } finally {
       if (_loadingCount > 0) _loadingCount--;
       notifyListeners();

@@ -20,7 +20,8 @@ class LeaveProvider extends ChangeNotifier {
   String? _requestError;
 
   // Filter state
-  String _activeTab = 'own'; // own, pending, approved, rejected, all
+  String _activeTab = 'own'; // own, pending
+  String? _statusFilter; // all, pending, approved, rejected
   String? _searchQuery;
   String? _dateFrom;
   String? _dateTo;
@@ -36,6 +37,7 @@ class LeaveProvider extends ChangeNotifier {
   String? get actionError => _actionError;
   String? get requestError => _requestError;
   String get activeTab => _activeTab;
+  String? get statusFilter => _statusFilter;
   String? get dateFrom => _dateFrom;
   String? get dateTo => _dateTo;
   LeaveProvider(this._authProvider) {
@@ -77,6 +79,13 @@ class LeaveProvider extends ChangeNotifier {
   void setActiveTab(String tab) {
     if (_activeTab == tab) return;
     _activeTab = tab;
+    _statusFilter = null;
+    notifyListeners();
+    fetchLeaveList();
+  }
+
+  void setStatusFilter(String? status) {
+    _statusFilter = status;
     notifyListeners();
     fetchLeaveList();
   }
@@ -123,6 +132,7 @@ class LeaveProvider extends ChangeNotifier {
       final response = await _apiService.getLeaveList(
         employeeId: _employeeId,
         tabFilter: _activeTab,
+        statusFilter: _statusFilter,
         searchQuery: _searchQuery,
         dateFrom: _dateFrom,
         dateTo: _dateTo,
@@ -208,6 +218,50 @@ class LeaveProvider extends ChangeNotifier {
         return true;
       } else {
         _requestError = response['message'] ?? 'Failed to submit request.';
+        return false;
+      }
+    } catch (e) {
+      _requestError = e.toString().replaceAll('Exception: ', '');
+      return false;
+    } finally {
+      _isSubmitting = false;
+      notifyListeners();
+    }
+  }
+
+  Future<bool> updateLeaveRequest({
+    required int leaveId,
+    int? leaveTypeId,
+    String? dateFrom,
+    String? dateTo,
+    String? reason,
+    String? attachment,
+    String? attachmentName,
+  }) async {
+    if (_employeeId == 0) return false;
+    _isSubmitting = true;
+    _errorMessage = null;
+    _requestError = null;
+    notifyListeners();
+
+    try {
+      final response = await _apiService.updateLeaveRequest(
+        employeeId: _employeeId,
+        leaveId: leaveId,
+        leaveTypeId: leaveTypeId,
+        dateFrom: dateFrom,
+        dateTo: dateTo,
+        reason: reason,
+        attachment: attachment,
+        attachmentName: attachmentName,
+      );
+
+      if (response['success'] == true) {
+        await fetchLeaveList();
+        await fetchLeaveTypes();
+        return true;
+      } else {
+        _requestError = response['message'] ?? 'Failed to update leave request.';
         return false;
       }
     } catch (e) {

@@ -22,12 +22,14 @@ class AppDrawer extends StatelessWidget {
     required this.moduleType,
     required this.currentShellIndex,
     required this.onSelectTab,
+    this.currentDestinationLabel,
     this.onExitModule,
   });
 
   final String moduleType;
   final int currentShellIndex;
   final ValueChanged<int> onSelectTab;
+  final String? currentDestinationLabel;
 
   /// Returns to the module picker. Surfaced in the drawer footer so the
   /// capability the Dashboard back-arrow used to provide is preserved.
@@ -35,17 +37,40 @@ class AppDrawer extends StatelessWidget {
 
   void _open(BuildContext context, MenuDestination dest) {
     Navigator.of(context).pop(); // close the drawer first
-    if (dest.builder != null) {
-      Navigator.of(context).push(MaterialPageRoute(builder: dest.builder!));
+
+    // Always pop all pushed standalone screens back to the root shell
+    Navigator.of(context).popUntil((route) => route.isFirst);
+
+    if (dest.shellIndex == AppShellIndex.dashboard || dest.label.toLowerCase() == 'dashboard') {
+      onSelectTab(AppShellIndex.dashboard);
+    } else if (dest.builder != null) {
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: dest.builder!,
+          settings: RouteSettings(name: dest.label),
+        ),
+      );
     } else if (dest.isTab && dest.shellIndex != null) {
       onSelectTab(dest.shellIndex!);
     }
+  }
+
+  bool _isDestinationSelected(MenuDestination dest, String? activeLabel, int shellIndex) {
+    if (activeLabel != null && activeLabel.isNotEmpty && activeLabel.toLowerCase() != 'dashboard') {
+      final normActive = activeLabel.toLowerCase().replaceAll(RegExp(r'\s+'), '');
+      final normLabel = dest.label.toLowerCase().replaceAll(RegExp(r'\s+'), '');
+      if (normLabel == normActive) return true;
+      if (normActive.contains(normLabel) || normLabel.contains(normActive)) return true;
+    }
+    return dest.isTab && dest.shellIndex == shellIndex;
   }
 
   @override
   Widget build(BuildContext context) {
     final auth = context.watch<AuthProvider>();
     final sections = visibleMenuSections(moduleType, auth);
+    final routeName = ModalRoute.of(context)?.settings.name;
+    final activeLabel = currentDestinationLabel ?? routeName;
 
     return Drawer(
       backgroundColor: AppColors.surface,
@@ -64,7 +89,7 @@ class AppDrawer extends StatelessWidget {
                     _MenuTile(
                       icon: dest.icon,
                       label: dest.label,
-                      selected: dest.isTab && dest.shellIndex == currentShellIndex,
+                      selected: _isDestinationSelected(dest, activeLabel, currentShellIndex),
                       onTap: () => _open(context, dest),
                     ),
                   const SizedBox(height: 6),

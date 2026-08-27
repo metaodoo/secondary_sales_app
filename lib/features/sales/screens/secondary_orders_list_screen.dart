@@ -221,7 +221,7 @@ class _SecondaryOrdersListScreenState extends State<SecondaryOrdersListScreen> {
         actions: [
           Padding(
             padding: const EdgeInsets.only(right: 16),
-            child: ProfileAvatar(),
+            child: ProfileAvatar(currentDestinationLabel: 'Sales'),
           ),
         ],
         bottom: PreferredSize(

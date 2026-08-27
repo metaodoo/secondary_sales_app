@@ -101,6 +101,24 @@ extension ContactsApi on ApiService {
     throw Exception(result['message'] ?? 'Failed to create distributor');
   }
 
+  Future<List<OutletClass>> getOutletClasses() async {
+    final result = await _post('${AppConstants.apiPrefix}/contacts/outlet_classes', {});
+    if (result['success'] == true) {
+      final List<dynamic> data = result['data'] ?? [];
+      return data.map((json) => OutletClass.fromMap(json)).toList();
+    }
+    throw Exception(result['message'] ?? 'Failed to load outlet classes');
+  }
+
+  Future<List<OutletType>> getOutletTypes() async {
+    final result = await _post('${AppConstants.apiPrefix}/contacts/outlet_types', {});
+    if (result['success'] == true) {
+      final List<dynamic> data = result['data'] ?? [];
+      return data.map((json) => OutletType.fromMap(json)).toList();
+    }
+    throw Exception(result['message'] ?? 'Failed to load outlet types');
+  }
+
   Future<Map<String, dynamic>> createOutlet({
     required String name,
     String? mobile,
@@ -112,6 +130,8 @@ extension ContactsApi on ApiService {
     String? zip,
     String? vat,
     int? routeId,
+    int? outletClassId,
+    int? outletTypeId,
     double? partnerLatitude,
     double? partnerLongitude,
   }) async {
@@ -128,6 +148,8 @@ extension ContactsApi on ApiService {
       if (zip != null && zip.trim().isNotEmpty) 'zip': zip.trim(),
       if (vat != null && vat.trim().isNotEmpty) 'vat': vat.trim(),
       if (routeId != null) 'route_id': routeId,
+      if (outletClassId != null) 'outlet_class_id': outletClassId,
+      if (outletTypeId != null) 'outlet_type_id': outletTypeId,
       if (partnerLatitude != null) 'partner_latitude': partnerLatitude,
       if (partnerLongitude != null) 'partner_longitude': partnerLongitude,
     };
@@ -150,6 +172,8 @@ extension ContactsApi on ApiService {
     String? city,
     String? zip,
     String? vat,
+    int? outletClassId,
+    int? outletTypeId,
   }) async {
     final params = <String, dynamic>{
       'customer_type': 'outlet',
@@ -163,6 +187,8 @@ extension ContactsApi on ApiService {
       if (city != null && city.trim().isNotEmpty) 'city': city.trim(),
       if (zip != null && zip.trim().isNotEmpty) 'zip': zip.trim(),
       if (vat != null && vat.trim().isNotEmpty) 'vat': vat.trim(),
+      if (outletClassId != null) 'outlet_class_id': outletClassId,
+      if (outletTypeId != null) 'outlet_type_id': outletTypeId,
     };
 
     final result = await _post(
@@ -209,5 +235,15 @@ extension ContactsApi on ApiService {
       return DistributionHub.fromMap(result['data'] ?? <String, dynamic>{});
     }
     throw Exception(result['message'] ?? 'Failed to update distributor');
+  }
+
+  Future<bool> archiveOutlet(int id) async {
+    final result = await _post('${AppConstants.apiPrefix}/contacts/$id/archive', {
+      'customer_type': 'outlet',
+    });
+    if (result['success'] == true) {
+      return true;
+    }
+    throw Exception(result['message'] ?? 'Failed to archive outlet');
   }
 }

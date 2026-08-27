@@ -33,6 +33,24 @@ extension ExpenseApi on ApiService {
     });
   }
 
+  Future<Map<String, dynamic>> updateExpenseSheet({
+    required int sheetId,
+    String? title,
+    String? description,
+    required List<Map<String, dynamic>> expenses,
+    String? attachment,
+    String? attachmentName,
+  }) async {
+    return _post('/api/v1/hr/expense/sheet/update', {
+      'sheet_id': sheetId,
+      if (title != null) 'title': title,
+      if (description != null) 'description': description,
+      'expenses': expenses,
+      if (attachment != null) 'attachment': attachment,
+      if (attachmentName != null) 'attachment_name': attachmentName,
+    });
+  }
+
   Future<Map<String, dynamic>> submitExpenseSheet({
     required int employeeId,
     String? title,

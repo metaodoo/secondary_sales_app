@@ -27,9 +27,32 @@ extension LeaveApi on ApiService {
     });
   }
 
+  Future<Map<String, dynamic>> updateLeaveRequest({
+    required int employeeId,
+    required int leaveId,
+    int? leaveTypeId,
+    String? dateFrom,
+    String? dateTo,
+    String? reason,
+    String? attachment,
+    String? attachmentName,
+  }) async {
+    return _post('/api/v1/hr/leave/update', {
+      'employee_id': employeeId,
+      'leave_id': leaveId,
+      if (leaveTypeId != null) 'leave_type_id': leaveTypeId,
+      if (dateFrom != null) 'date_from': dateFrom,
+      if (dateTo != null) 'date_to': dateTo,
+      if (reason != null) 'reason': reason,
+      if (attachment != null) 'attachment': attachment,
+      if (attachmentName != null) 'attachment_name': attachmentName,
+    });
+  }
+
   Future<Map<String, dynamic>> getLeaveList({
     required int employeeId,
     required String tabFilter,
+    String? statusFilter,
     String? dateFrom,
     String? dateTo,
     String? searchQuery,
@@ -37,6 +60,7 @@ extension LeaveApi on ApiService {
     return _post('/api/v1/hr/leave/list', {
       'employee_id': employeeId,
       'tab_filter': tabFilter,
+      'status': statusFilter,
       'date_from': dateFrom,
       'date_to': dateTo,
       'search_query': searchQuery,

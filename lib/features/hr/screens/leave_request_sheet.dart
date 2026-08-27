@@ -7,16 +7,18 @@ import 'package:secondary_sales/core/theme/app_theme.dart';
 import 'package:secondary_sales/features/hr/leave_provider.dart';
 
 class LeaveRequestSheet extends StatefulWidget {
-  const LeaveRequestSheet({super.key});
+  final Map<String, dynamic>? leaveToEdit;
 
-  static void show(BuildContext context, LeaveProvider provider) {
+  const LeaveRequestSheet({super.key, this.leaveToEdit});
+
+  static void show(BuildContext context, LeaveProvider provider, {Map<String, dynamic>? leaveToEdit}) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (_) => ChangeNotifierProvider.value(
         value: provider,
-        child: const LeaveRequestSheet(),
+        child: LeaveRequestSheet(leaveToEdit: leaveToEdit),
       ),
     );
   }
@@ -34,6 +36,24 @@ class _LeaveRequestSheetState extends State<LeaveRequestSheet> {
   String? _attachmentName;
   String? _attachmentBase64;
   bool _validationTriggered = false;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.leaveToEdit != null) {
+      final leave = widget.leaveToEdit!;
+      _selectedLeaveTypeId = leave['leave_type_id'];
+      if (leave['date_from'] != null) {
+        _startDate = DateTime.tryParse(leave['date_from']);
+      }
+      if (leave['date_to'] != null) {
+        _endDate = DateTime.tryParse(leave['date_to']);
+      }
+      if (leave['reason'] != null) {
+        _reasonController.text = leave['reason'];
+      }
+    }
+  }
 
   Map<String, dynamic>? get _selectedLeaveType {
     if (_selectedLeaveTypeId == null) return null;
@@ -58,6 +78,20 @@ class _LeaveRequestSheetState extends State<LeaveRequestSheet> {
 
   bool get _requiresAttachment {
     return _isSickLeave && _durationDays > 2;
+  }
+
+  bool get _requiresAdvanceNotice {
+    final type = _selectedLeaveType;
+    if (type == null) return false;
+    return type['requires_advance_notice'] == true;
+  }
+
+  int get _advanceNoticeDays {
+    final type = _selectedLeaveType;
+    if (type == null) return 7;
+    final val = type['advance_notice_days'];
+    if (val is int) return val;
+    return int.tryParse(val?.toString() ?? '') ?? 7;
   }
 
   void _onLeaveTypeChanged(int? newTypeId) {
@@ -97,7 +131,7 @@ class _LeaveRequestSheetState extends State<LeaveRequestSheet> {
       return;
     }
 
-    if (_requiresAttachment && (_attachmentBase64 == null || _attachmentBase64!.isEmpty)) {
+    if (_requiresAttachment && (_attachmentBase64 == null || _attachmentBase64!.isEmpty) && widget.leaveToEdit == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('For Sick Leave of more than 2 days, attaching a photo or document is mandatory.'),
@@ -107,18 +141,51 @@ class _LeaveRequestSheetState extends State<LeaveRequestSheet> {
       return;
     }
 
-    final success = await provider.submitLeaveRequest(
-      leaveTypeId: _selectedLeaveTypeId!,
-      dateFrom: _startDate!.toString().split(' ')[0],
-      dateTo: _endDate!.toString().split(' ')[0],
-      reason: _reasonController.text.trim(),
-      attachment: _attachmentBase64,
-      attachmentName: _attachmentName,
-    );
+    if (_requiresAdvanceNotice && _startDate != null) {
+      final now = DateTime.now();
+      final today = DateTime(now.year, now.month, now.day);
+      final start = DateTime(_startDate!.year, _startDate!.month, _startDate!.day);
+      final noticeDays = start.difference(today).inDays;
+      if (noticeDays < _advanceNoticeDays) {
+        final leaveTypeName = _selectedLeaveType?['name'] ?? 'This leave type';
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('$leaveTypeName must be requested at least $_advanceNoticeDays days in advance.'),
+            backgroundColor: Colors.red,
+          ),
+        );
+        return;
+      }
+    }
+
+    final bool isEditing = widget.leaveToEdit != null;
+    final bool success = isEditing
+        ? await provider.updateLeaveRequest(
+            leaveId: widget.leaveToEdit!['leave_id'],
+            leaveTypeId: _selectedLeaveTypeId,
+            dateFrom: _startDate!.toString().split(' ')[0],
+            dateTo: _endDate!.toString().split(' ')[0],
+            reason: _reasonController.text.trim(),
+            attachment: _attachmentBase64,
+            attachmentName: _attachmentName,
+          )
+        : await provider.submitLeaveRequest(
+            leaveTypeId: _selectedLeaveTypeId!,
+            dateFrom: _startDate!.toString().split(' ')[0],
+            dateTo: _endDate!.toString().split(' ')[0],
+            reason: _reasonController.text.trim(),
+            attachment: _attachmentBase64,
+            attachmentName: _attachmentName,
+          );
 
     if (success && mounted) {
       Navigator.pop(context);
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Leave request submitted successfully'), backgroundColor: Colors.green));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(isEditing ? 'Leave request updated successfully' : 'Leave request submitted successfully'),
+          backgroundColor: Colors.green,
+        ),
+      );
     } else if (mounted) {
       showDialog(
         context: context,

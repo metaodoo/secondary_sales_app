@@ -254,6 +254,49 @@ class ExpenseProvider extends ChangeNotifier {
     }
   }
 
+  Future<bool> updateSheet({
+    required int sheetId,
+    String? title,
+    String? description,
+    required List<Map<String, dynamic>> expenses,
+    String? attachment,
+    String? attachmentName,
+  }) async {
+    if (_employeeId == 0) return false;
+    _isSubmitting = true;
+    _errorMessage = null;
+    _requestError = null;
+    notifyListeners();
+
+    try {
+      final response = await _apiService.updateExpenseSheet(
+        sheetId: sheetId,
+        title: title,
+        description: description,
+        expenses: expenses,
+        attachment: attachment,
+        attachmentName: attachmentName,
+      );
+
+      if (response['success'] == true) {
+        await fetchSheetList(tab: 'own');
+        if (_selectedSheetDetails != null && _selectedSheetDetails!['id'] == sheetId) {
+          await fetchSheetDetails(sheetId);
+        }
+        return true;
+      } else {
+        _requestError = response['message'] ?? 'Failed to update expense report.';
+        return false;
+      }
+    } catch (e) {
+      _requestError = e.toString().replaceAll('Exception: ', '');
+      return false;
+    } finally {
+      _isSubmitting = false;
+      notifyListeners();
+    }
+  }
+
   Future<bool> approveSheet(int sheetId) async {
     _isActionLoading = true;
     _actionError = null;

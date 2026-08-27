@@ -64,22 +64,27 @@ class _ExpenseDashboardContentState extends State<_ExpenseDashboardContent> with
     super.dispose();
   }
 
-  Color _getStatusColor(String status) {
-    switch (status) {
+  Color _getStatusColor(String? status) {
+    switch (status?.toLowerCase()) {
       case 'approve':
       case 'approved':
       case 'post':
       case 'done':
+      case 'validate':
         return Colors.green;
       case 'submit':
       case 'submitted':
-        return Colors.blue;
+      case 'confirm':
+      case 'to approve':
+        return Colors.amber[800]!;
       case 'cancel':
       case 'refused':
+      case 'refuse':
+      case 'rejected':
         return Colors.red;
       case 'draft':
       default:
-        return Colors.grey;
+        return Colors.grey[700]!;
     }
   }
 
@@ -194,8 +199,7 @@ class _ExpenseDashboardContentState extends State<_ExpenseDashboardContent> with
         centerTitle: true,
         bottom: TabBar(
           controller: _tabController,
-          isScrollable: true,
-          tabAlignment: TabAlignment.start,
+          isScrollable: false,
           indicatorColor: AppColors.primary,
           labelColor: AppColors.primary,
           unselectedLabelColor: AppColors.textSecondary,
@@ -205,7 +209,7 @@ class _ExpenseDashboardContentState extends State<_ExpenseDashboardContent> with
         actions: [
           Padding(
             padding: const EdgeInsets.only(right: 16),
-            child: ProfileAvatar(),
+            child: ProfileAvatar(currentDestinationLabel: 'Expense'),
           ),
         ],
       ),
@@ -251,65 +255,43 @@ class _ExpenseDashboardContentState extends State<_ExpenseDashboardContent> with
               ),
             ),
 
-            // Status filter dropdown (for both tabs)
+            // Status filter chips (Matching Leave Request Dashboard 1:1)
             Padding(
-                padding: const EdgeInsets.fromLTRB(16, 4, 16, 4),
-                child: Container(
-                  height: 48,
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: AppColors.borderSoft),
-                  ),
-                  child: DropdownButtonHideUnderline(
-                    child: DropdownButton<String>(
-                      value: _selectedStatusLabel,
-                      isExpanded: true,
-                      icon: const Icon(Icons.keyboard_arrow_down, color: AppColors.textSecondary),
-                      style: const TextStyle(
-                        color: AppColors.textPrimary,
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
+              padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 4.0),
+              child: SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(
+                  children: _statusFilters.keys.map((label) {
+                    final isSelected = _selectedStatusLabel == label;
+                    return Padding(
+                      padding: const EdgeInsets.only(right: 8.0),
+                      child: FilterChip(
+                        selected: isSelected,
+                        label: Text(label),
+                        labelStyle: TextStyle(
+                          color: isSelected ? Colors.white : AppColors.textPrimary,
+                          fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                          fontSize: 12,
+                        ),
+                        selectedColor: AppColors.primary,
+                        backgroundColor: Colors.white,
+                        side: BorderSide(
+                          color: isSelected ? AppColors.primary : AppColors.borderSoft,
+                        ),
+                        onSelected: (selected) {
+                          if (selected) {
+                            setState(() {
+                              _selectedStatusLabel = label;
+                            });
+                            provider.setStateFilter(_statusFilters[label]);
+                          }
+                        },
                       ),
-                      onChanged: (val) {
-                        if (val != null) {
-                          setState(() {
-                            _selectedStatusLabel = val;
-                          });
-                          provider.setStateFilter(_statusFilters[val]);
-                        }
-                      },
-                      items: _statusFilters.keys.map((String label) {
-                        return DropdownMenuItem<String>(
-                          value: label,
-                          child: Row(
-                            children: [
-                              Icon(
-                                Icons.circle,
-                                size: 8,
-                                color: label == 'All'
-                                    ? Colors.grey
-                                    : label == 'Draft'
-                                        ? Colors.grey
-                                        : label == 'To Approve'
-                                            ? Colors.blue
-                                            : label == 'Approved'
-                                                ? Colors.green
-                                                : label == 'Paid'
-                                                    ? Colors.teal
-                                                    : Colors.red,
-                              ),
-                              const SizedBox(width: 10),
-                              Text(label),
-                            ],
-                          ),
-                        );
-                      }).toList(),
-                    ),
-                  ),
+                    );
+                  }).toList(),
                 ),
               ),
+            ),
 
             // Search & Filter Row (same as leave request)
             Padding(

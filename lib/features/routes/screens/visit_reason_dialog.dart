@@ -71,7 +71,9 @@ class _VisitReasonDialogState extends State<VisitReasonDialog> {
   void _confirm() {
     if (_selectedReason == null) return;
     double? saleAmount;
-    final canEnterSaleAmount = context.read<AuthProvider>().canDo(AppAction.visitSaleAmount);
+    final auth = context.read<AuthProvider>();
+    final canEnterSaleAmount = auth.canDo(AppAction.visitSaleAmount) &&
+        auth.canView(AppScreen.newJointVisit);
     if (_selectedReason!.isSale && canEnterSaleAmount) {
       final text = _saleAmountController.text.trim();
       if (text.isNotEmpty) {
@@ -134,7 +136,7 @@ class _VisitReasonDialogState extends State<VisitReasonDialog> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Check-In Visit Reason',
+                      'Check-Out Visit Reason',
                       style: TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.bold,
@@ -143,7 +145,7 @@ class _VisitReasonDialogState extends State<VisitReasonDialog> {
                     ),
                     SizedBox(height: 2),
                     Text(
-                      'Select a reason to proceed with location check-in',
+                      'Select a reason to complete visit check-out',
                       style: TextStyle(
                         fontSize: 12,
                         color: AppColors.textSecondary,
@@ -281,7 +283,8 @@ class _VisitReasonDialogState extends State<VisitReasonDialog> {
               },
             ),
             if (_selectedReason?.isSale == true &&
-                context.watch<AuthProvider>().canDo(AppAction.visitSaleAmount)) ...[
+                context.watch<AuthProvider>().canDo(AppAction.visitSaleAmount) &&
+                context.watch<AuthProvider>().canView(AppScreen.newJointVisit)) ...[
               const SizedBox(height: 16),
               const Text(
                 'Sale Amount (৳)',
@@ -358,12 +361,12 @@ class _VisitReasonDialogState extends State<VisitReasonDialog> {
             child: ElevatedButton.icon(
               onPressed: _selectedReason != null ? _confirm : null,
               icon: const Icon(
-                Icons.location_on_rounded,
+                Icons.logout_rounded,
                 color: Colors.white,
                 size: 20,
               ),
               label: const Text(
-                'Confirm & Check In',
+                'Confirm & Check Out',
                 style: TextStyle(
                   color: Colors.white,
                   fontWeight: FontWeight.bold,

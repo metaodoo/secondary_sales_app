@@ -8,17 +8,18 @@ import 'package:secondary_sales/features/hr/expense_provider.dart';
 
 class ExpenseCreateSheet extends StatefulWidget {
   final ExpenseProvider provider;
+  final Map<String, dynamic>? sheetToEdit;
 
-  const ExpenseCreateSheet({super.key, required this.provider});
+  const ExpenseCreateSheet({super.key, required this.provider, this.sheetToEdit});
 
-  static void show(BuildContext context, ExpenseProvider provider) {
+  static void show(BuildContext context, ExpenseProvider provider, {Map<String, dynamic>? sheetToEdit}) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (ctx) => ChangeNotifierProvider.value(
         value: provider,
-        child: ExpenseCreateSheet(provider: provider),
+        child: ExpenseCreateSheet(provider: provider, sheetToEdit: sheetToEdit),
       ),
     );
   }
@@ -41,6 +42,27 @@ class _ExpenseCreateSheetState extends State<ExpenseCreateSheet> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<ExpenseProvider>().fetchCategories();
     });
+
+    if (widget.sheetToEdit != null) {
+      final sheet = widget.sheetToEdit!;
+      if (sheet['description'] != null) {
+        _descController.text = sheet['description'];
+      }
+      final List? expenses = sheet['expenses'];
+      if (expenses != null && expenses.isNotEmpty) {
+        for (var item in expenses) {
+          _expenseItems.add({
+            'id': item['id'],
+            'title': item['title'] ?? item['category'] ?? '',
+            'category_id': item['category_id'],
+            'category_name': item['category'] ?? '',
+            'amount': (item['amount'] as num?)?.toDouble() ?? 0.0,
+            'date': item['date'] ?? DateTime.now().toString().split(' ')[0],
+            'description': item['description'] ?? '',
+          });
+        }
+      }
+    }
   }
 
   @override
@@ -116,18 +138,31 @@ class _ExpenseCreateSheetState extends State<ExpenseCreateSheet> {
       return;
     }
 
-    final success = await provider.createAndSubmitSheet(
-      title: null,
-      description: _descController.text.trim().isEmpty ? null : _descController.text.trim(),
-      expenses: _expenseItems,
-      attachment: _attachmentBase64,
-      attachmentName: _attachmentName,
-    );
+    final bool isEditing = widget.sheetToEdit != null;
+    final bool success = isEditing
+        ? await provider.updateSheet(
+            sheetId: widget.sheetToEdit!['id'],
+            title: null,
+            description: _descController.text.trim(),
+            expenses: _expenseItems,
+            attachment: _attachmentBase64,
+            attachmentName: _attachmentName,
+          )
+        : await provider.createAndSubmitSheet(
+            title: null,
+            description: _descController.text.trim(),
+            expenses: _expenseItems,
+            attachment: _attachmentBase64,
+            attachmentName: _attachmentName,
+          );
 
     if (success && mounted) {
       Navigator.pop(context);
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Expense report created and submitted successfully.'), backgroundColor: Colors.green),
+        SnackBar(
+          content: Text(isEditing ? 'Expense report updated successfully.' : 'Expense report created and submitted successfully.'),
+          backgroundColor: Colors.green,
+        ),
       );
     } else if (mounted && provider.requestError != null) {
       ScaffoldMessenger.of(context).showSnackBar(
