@@ -138,14 +138,26 @@ class _ScrapsListScreenState extends State<ScrapsListScreen> {
 
   bool _isPendingFilterActive = false;
 
-  int get _pendingCount => _scraps.where((r) => r.state != 'done').length;
+  /// A cancelled return is finished, not outstanding, so it belongs in neither
+  /// the pending count nor the pending filter.
+  static bool _isPending(ReturnScrapSummary item) =>
+      item.state != 'done' && item.state != 'cancel';
+
+  int get _pendingCount => _scraps.where(_isPending).length;
 
   List<ReturnScrapSummary> get _displayedScraps {
     if (_isPendingFilterActive) {
-      return _scraps.where((r) => r.state != 'done').toList();
+      return _scraps.where(_isPending).toList();
     }
     return _scraps;
   }
+
+  /// Whether a row is a transit leg, i.e. the auto-created second half of a
+  /// return, which is the only picking the warehouse / sales-operation receipt
+  /// statuses apply to. The sales officer's own initial transfer carries no
+  /// receipt status and shows its native Odoo state instead.
+  static bool _hasReceiptStatus(String? returnReciptStatus) =>
+      returnReciptStatus != null && returnReciptStatus.isNotEmpty;
 
   Color _stateColor(String state, String? returnReciptStatus) {
     if (state == 'done') return const Color(0xFF10B981);
@@ -153,6 +165,7 @@ class _ScrapsListScreenState extends State<ScrapsListScreen> {
     if (state == 'draft') return AppColors.textSecondary;
 
     if (_isPrimary &&
+        _hasReceiptStatus(returnReciptStatus) &&
         (state == 'assigned' ||
             state == 'waiting' ||
             state == 'confirmed' ||
@@ -176,6 +189,7 @@ class _ScrapsListScreenState extends State<ScrapsListScreen> {
     if (state == 'draft') return AppColors.borderMuted;
 
     if (_isPrimary &&
+        _hasReceiptStatus(returnReciptStatus) &&
         (state == 'assigned' ||
             state == 'waiting' ||
             state == 'confirmed' ||
@@ -199,6 +213,7 @@ class _ScrapsListScreenState extends State<ScrapsListScreen> {
     if (state == 'draft') return 'DRAFT';
 
     if (_isPrimary &&
+        _hasReceiptStatus(returnReciptStatus) &&
         (state == 'assigned' ||
             state == 'waiting' ||
             state == 'confirmed' ||
@@ -218,6 +233,11 @@ class _ScrapsListScreenState extends State<ScrapsListScreen> {
 
   void _showFilterDialog() {
     final currentFilterValue = _returnReciptStatus ?? _state;
+    // The list is partitioned by role: users with "view all returns" see only
+    // the auto-created transit legs, everyone else sees only the sales
+    // officer's initial transfers. Only the former have a receipt status to
+    // filter on -- the latter filter by native Odoo state.
+    final showsTransitLegs = context.read<AuthProvider>().canViewAllReturns;
 
     showModalBottomSheet(
       context: context,
@@ -239,7 +259,7 @@ class _ScrapsListScreenState extends State<ScrapsListScreen> {
               DropdownButtonFormField<String>(
                 value: currentFilterValue,
                 decoration: ssInputDecoration('Status', Icons.filter_list),
-                items: _isPrimary
+                items: _isPrimary && showsTransitLegs
                     ? const [
                         DropdownMenuItem(value: 'all', child: Text('All Status')),
                         DropdownMenuItem(value: 'draft', child: Text('Draft')),
@@ -250,6 +270,29 @@ class _ScrapsListScreenState extends State<ScrapsListScreen> {
                         DropdownMenuItem(
                           value: 'sales_operation_receipt',
                           child: Text('Sales Operation Receipt'),
+                        ),
+                        DropdownMenuItem(
+                          value: 'done',
+                          child: Text('Delivered'),
+                        ),
+                        DropdownMenuItem(
+                          value: 'cancel',
+                          child: Text('Cancelled'),
+                        ),
+                      ]
+                    : _isPrimary
+                    // The initial transfer filters by native Odoo state.
+                    // Labels match the badges the rows themselves show.
+                    ? const [
+                        DropdownMenuItem(value: 'all', child: Text('All Status')),
+                        DropdownMenuItem(value: 'draft', child: Text('Draft')),
+                        DropdownMenuItem(
+                          value: 'confirmed',
+                          child: Text('Confirmed'),
+                        ),
+                        DropdownMenuItem(
+                          value: 'assigned',
+                          child: Text('Ready'),
                         ),
                         DropdownMenuItem(
                           value: 'done',
@@ -503,13 +546,24 @@ class _ScrapsListScreenState extends State<ScrapsListScreen> {
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              Text(
-                                '#${ret.name}',
-                                style: const TextStyle(
-                                  color: Color(0xFF0038A8),
-                                  fontWeight: FontWeight.bold,
+                              // Book number and page, not the picking
+                              // reference: the officer identifies a return by
+                              // the page of the paper book it was written on.
+                              //
+                              // Expanded because this and the status badge are
+                              // both long -- "RB/NADB0004/0001/19" beside
+                              // "SALES OPERATION RECEIPT" overflows a bare Row.
+                              Expanded(
+                                child: Text(
+                                  ret.bookReference ?? '-',
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    color: Color(0xFF0038A8),
+                                    fontWeight: FontWeight.bold,
+                                  ),
                                 ),
                               ),
+                              const SizedBox(width: 8),
                               Container(
                                 padding: const EdgeInsets.symmetric(
                                   horizontal: 10,
@@ -539,23 +593,6 @@ class _ScrapsListScreenState extends State<ScrapsListScreen> {
                               color: Colors.black87,
                             ),
                           ),
-                          if (ret.returnBookNumber != null || ret.returnBookPage != null) ...[
-                            const SizedBox(height: 6),
-                            Row(
-                              children: [
-                                const Icon(Icons.menu_book, size: 14, color: AppColors.primary),
-                                const SizedBox(width: 6),
-                                Text(
-                                  '${ret.returnBookNumber ?? '-'} (Pg ${ret.returnBookPage ?? '-'})',
-                                  style: const TextStyle(
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w600,
-                                    color: AppColors.primary,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ],
                           const Padding(
                             padding: EdgeInsets.symmetric(vertical: 12),
                             child: Divider(

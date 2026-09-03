@@ -221,18 +221,86 @@ class _ScrapProductCard extends StatelessWidget {
                   const Icon(Icons.qr_code_2, color: AppColors.textSecondary),
               ],
             ),
-            const SizedBox(height: 6),
+            const SizedBox(height: 4),
             Text(
               '${product.code ?? 'No code'} • ${product.uomName}',
-              style: const TextStyle(color: AppColors.textSecondary),
+              style: const TextStyle(color: AppColors.textSecondary, fontSize: 13),
             ),
-            const SizedBox(height: 6),
-            Text(
-              'Available: ${product.availableQty.toStringAsFixed(0)} ${product.uomName}',
-              style: const TextStyle(color: Color(0xFF16A34A)),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              runSpacing: 6,
+              children: [
+                _StockBadge(
+                  label: 'Fresh',
+                  qty: product.freshQty,
+                  color: const Color(0xFF15803D),
+                  backgroundColor: const Color(0xFFDCFCE7),
+                ),
+                _StockBadge(
+                  label: 'QC',
+                  qty: product.qcQty,
+                  color: const Color(0xFFB45309),
+                  backgroundColor: const Color(0xFFFEF3C7),
+                ),
+                _StockBadge(
+                  label: 'Damage',
+                  qty: product.damageQty,
+                  color: const Color(0xFFB91C1C),
+                  backgroundColor: const Color(0xFFFEE2E2),
+                ),
+              ],
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _StockBadge extends StatelessWidget {
+  const _StockBadge({
+    required this.label,
+    required this.qty,
+    required this.color,
+    required this.backgroundColor,
+  });
+
+  final String label;
+  final double qty;
+  final Color color;
+  final Color backgroundColor;
+
+  @override
+  Widget build(BuildContext context) {
+    final formattedQty =
+        qty % 1 == 0 ? qty.toInt().toString() : qty.toStringAsFixed(1);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: backgroundColor,
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            '$label: ',
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: color,
+            ),
+          ),
+          Text(
+            formattedQty,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w800,
+              color: color,
+            ),
+          ),
+        ],
       ),
     );
   }

@@ -74,13 +74,21 @@ Future<void> showStockExcessValidationDialog(
                           ),
                         ),
                         const SizedBox(height: 4),
-                        Row(
+                        // Wrap, not Row: the figures and the unit name are both
+                        // variable width -- a real UoM ("gram") and a
+                        // four-digit quantity together overflow a Row, which
+                        // cannot give either child less than its natural size.
+                        // Here the badge drops to its own line instead.
+                        Wrap(
+                          alignment: WrapAlignment.spaceBetween,
+                          crossAxisAlignment: WrapCrossAlignment.center,
+                          spacing: 8,
+                          runSpacing: 6,
                           children: [
                             Text(
                               'Entered: ${item.enteredQty.toStringAsFixed(0)} ${item.uomName}  |  Avail: ${item.availableQty.toStringAsFixed(0)} ${item.uomName}',
                               style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
                             ),
-                            const Spacer(),
                             Container(
                               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                               decoration: BoxDecoration(

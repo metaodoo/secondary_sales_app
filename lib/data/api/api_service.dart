@@ -59,6 +59,36 @@ class ApiService {
 
   static Future<String?> Function()? onTokenExpired;
 
+  /// Why the server last rejected our credentials, from the `reason` the API
+  /// sends alongside an `unauthorized` error.
+  ///
+  /// Set immediately before [onTokenExpired] fires, so that if the refresh also
+  /// fails the auth layer can explain the sign-out ("an administrator signed
+  /// you out") instead of dumping the user on the login screen with no reason.
+  /// Cleared on a successful sign-in.
+  static String? lastAuthFailureReason;
+
+  /// Whether a response says our credentials are dead rather than our request
+  /// being wrong.
+  ///
+  /// The backend used to tag a revoked session `validation_error`, so the app
+  /// could only recognise the literal string `token expired` and a
+  /// force-logged-out user stayed signed in, hitting an error snackbar on every
+  /// screen. `unauthorized` is the code both the mobile API boundary and the
+  /// auth controller's 401 now use. The old string stays in the test so this
+  /// still behaves against a server that has not been upgraded.
+  static bool _isAuthFailure(Map<String, dynamic> result) {
+    if (result['success'] != false) return false;
+    if (result['error'] == 'unauthorized') {
+      final data = result['data'];
+      lastAuthFailureReason =
+          data is Map ? data['reason']?.toString() : null;
+      return true;
+    }
+    final message = result['message']?.toString().toLowerCase() ?? '';
+    return message.contains('token expired');
+  }
+
   void updateSessionId(String? sessionId) {
     _sessionId = sessionId;
   }
@@ -134,6 +164,19 @@ class ApiService {
           response.statusCode == 403 ||
           response.body.contains('token expired');
 
+      if (isExpiredError) {
+        // A 401 carries its reason at the top level rather than under `data`.
+        try {
+          final body = json.decode(response.body);
+          if (body is Map && body['reason'] != null) {
+            lastAuthFailureReason = body['reason'].toString();
+          }
+        } catch (_) {
+          // A non-JSON 401 just leaves the reason unset; the generic
+          // sign-out message covers it.
+        }
+      }
+
       if (isExpiredError && !isRetry && onTokenExpired != null) {
         final newToken = await onTokenExpired!();
         if (newToken != null) {
@@ -178,11 +221,7 @@ class ApiService {
 
       final result = decoded['result'];
       if (result is Map<String, dynamic>) {
-        final isTokenExpired =
-            result['success'] == false &&
-            (result['message']?.toString().contains('token expired') == true ||
-                result['message']?.toString().contains('Token expired') ==
-                    true);
+        final isTokenExpired = _isAuthFailure(result);
 
         if (isTokenExpired && !isRetry && onTokenExpired != null) {
           final newToken = await onTokenExpired!();

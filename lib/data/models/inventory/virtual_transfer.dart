@@ -72,6 +72,9 @@ class TransferProduct {
   final String? code;
   final String tracking;
   final double availableQty;
+  final double freshQty;
+  final double qcQty;
+  final double damageQty;
   final Map<String, dynamic>? uom;
 
   TransferProduct({
@@ -80,16 +83,36 @@ class TransferProduct {
     this.code,
     required this.tracking,
     required this.availableQty,
+    this.freshQty = 0.0,
+    this.qcQty = 0.0,
+    this.damageQty = 0.0,
     this.uom,
   });
 
   factory TransferProduct.fromMap(Map<String, dynamic> map) {
+    final stockByLoc = asMapOrNull(map['stock_by_location']);
+    final fresh = map['fresh_qty'] != null
+        ? asDouble(map['fresh_qty'])
+        : asDouble(stockByLoc?['Fresh']);
+    final qc = map['qc_qty'] != null
+        ? asDouble(map['qc_qty'])
+        : asDouble(stockByLoc?['QC']);
+    final damage = map['damage_qty'] != null
+        ? asDouble(map['damage_qty'])
+        : asDouble(stockByLoc?['Damage']);
+    final total = map['available_qty'] != null
+        ? asDouble(map['available_qty'])
+        : (fresh + qc + damage);
+
     return TransferProduct(
       id: asInt(map['id']),
       name: map['name'] ?? '',
       code: map['default_code'],
       tracking: map['tracking'] ?? 'none',
-      availableQty: asDouble(map['available_qty']),
+      availableQty: total,
+      freshQty: fresh,
+      qcQty: qc,
+      damageQty: damage,
       uom: asMapOrNull(map['uom']),
     );
   }

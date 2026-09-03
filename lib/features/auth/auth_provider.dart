@@ -27,6 +27,15 @@ class AuthProvider with ChangeNotifier {
   bool _tokenRefreshFailed = false;
   String? _error;
 
+  /// Why the user was signed out against their will, if they were.
+  ///
+  /// [logout] clears [_error], so without somewhere separate to keep this a
+  /// forced sign-out drops the user on the login screen with no explanation --
+  /// which is worse than the error snackbar it replaced. Survives the logout
+  /// deliberately and is cleared only by a successful sign-in or once the
+  /// login screen has shown it.
+  String? _signedOutReason;
+
   /// In-flight [refreshSession] call, shared by every concurrent caller.
   ///
   /// The access token is short-lived, so a screen that fires several requests
@@ -52,6 +61,19 @@ class AuthProvider with ChangeNotifier {
   /// dropped connection, which is exactly what the network-error branch of
   /// [refreshSession] exists to avoid.
   bool get tokenRefreshFailed => _tokenRefreshFailed;
+
+  /// A human explanation for an involuntary sign-out, for the login screen to
+  /// show. Null when the user signed out themselves or is simply not signed in.
+  String? get signedOutReason => _signedOutReason;
+
+  /// The message shown for each `reason` the API reports.
+  static String _signOutMessageFor(String? reason) => switch (reason) {
+    'session_revoked' =>
+      'An administrator signed you out on this device. Please sign in again.',
+    'signed_in_elsewhere' =>
+      'You were signed out because your account was used on another device.',
+    _ => 'Your session has ended. Please sign in again.',
+  };
   bool get isConnectionConfigured => AppConstants.hasSavedConnection;
   String? get sessionId => _session?.sessionId ?? _odooSessionId;
   String get baseUrl => AppConstants.baseUrl;
@@ -286,6 +308,9 @@ class AuthProvider with ChangeNotifier {
       _session = session;
       _odooSessionId = session.sessionId;
       _tokenRefreshFailed = false;
+      // A fresh sign-in settles whatever ended the last session.
+      _signedOutReason = null;
+      ApiService.lastAuthFailureReason = null;
       _authService.updateSessionId(session.sessionId);
       await _storeSession(session);
       unawaited(
@@ -385,7 +410,14 @@ class AuthProvider with ChangeNotifier {
           ); // server errors (502, 503, 504) are temporary
 
       if (!isNetworkError) {
-        await logout(callServer: false); // logout() notifies.
+        // The refresh was rejected outright, so the session is genuinely dead:
+        // sign out and carry the server's reason to the login screen. The
+        // reason comes from whichever rejection came first -- the original
+        // request's `unauthorized`, or this refresh's own 401.
+        await logout(
+          callServer: false,
+          reason: ApiService.lastAuthFailureReason,
+        ); // logout() notifies.
         return false;
       }
 
@@ -450,7 +482,10 @@ class AuthProvider with ChangeNotifier {
     ApiService.instance.updateEmployeeId(session.user.employeeId);
   }
 
-  Future<void> logout({bool callServer = true}) async {
+  /// Sign out. Pass [reason] for an involuntary sign-out (a revoked or expired
+  /// session) so the login screen can explain what happened; leave it null for
+  /// a sign-out the user asked for.
+  Future<void> logout({bool callServer = true, String? reason}) async {
     final accessToken = _session?.accessToken;
     final sessionId = _session?.sessionId ?? _odooSessionId;
     _authService.updateSessionId(sessionId);
@@ -468,6 +503,7 @@ class AuthProvider with ChangeNotifier {
     _tokenRefreshFailed = false;
     _odooSessionId = sessionId;
     _error = null;
+    _signedOutReason = reason == null ? null : _signOutMessageFor(reason);
     // Pushed routes outlive the session (AuthGate is the MaterialApp home), so
     // without this an involuntary logout leaves the user on a screen that still
     // looks signed in while every request fails for want of an employee id.

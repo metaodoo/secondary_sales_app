@@ -147,7 +147,7 @@ class DashboardTab extends StatelessWidget {
                         ),
                       if (auth.canView(AppScreen.returnsListFor(moduleType)))
                         _buildModuleCard(
-                          title: moduleType == 'primary' ? 'Fresh Return' : 'Return Delivery',
+                          title: moduleType == 'primary' ? 'Saleable Return' : 'Return Delivery',
                           icon: Icons.assignment_return_outlined,
                           iconColor: AppColors.primary,
                           circleColor: AppColors.borderMuted,
@@ -157,10 +157,10 @@ class DashboardTab extends StatelessWidget {
                               MaterialPageRoute(
                                 builder: (_) => ReturnsListScreen(
                                   moduleType: moduleType,
-                                  title: moduleType == 'primary' ? 'Fresh Returns' : 'Returns List',
-                                  createLabel: moduleType == 'primary' ? 'New Fresh Return' : 'New Return',
-                                  createScreenTitle: moduleType == 'primary' ? 'Fresh Return' : 'Returns',
-                                  productSelectionTitle: moduleType == 'primary' ? 'Select Fresh Return Products' : 'Select Return Products',
+                                  title: moduleType == 'primary' ? 'Saleable Returns' : 'Returns List',
+                                  createLabel: moduleType == 'primary' ? 'New Saleable Return' : 'New Return',
+                                  createScreenTitle: moduleType == 'primary' ? 'Saleable Return' : 'Returns',
+                                  productSelectionTitle: moduleType == 'primary' ? 'Select Saleable Return Products' : 'Select Return Products',
                                   endpoint: AppConstants.returnsEndpoint,
                                 ),
                               ),
@@ -192,7 +192,7 @@ class DashboardTab extends StatelessWidget {
                         ),
                       if (auth.canView(AppScreen.scrapsListFor(moduleType)))
                         _buildModuleCard(
-                          title: moduleType == 'primary' ? 'Damaged Return' : 'Return Scrap',
+                          title: moduleType == 'primary' ? 'Non-Saleable Return' : 'Return Scrap',
                           icon: Icons.recycling_outlined,
                           iconColor: AppColors.primary,
                           circleColor: AppColors.borderMuted,
@@ -202,10 +202,10 @@ class DashboardTab extends StatelessWidget {
                               MaterialPageRoute(
                                 builder: (_) => ScrapsListScreen(
                                   moduleType: moduleType,
-                                  title: moduleType == 'primary' ? 'Damaged Returns' : 'Scraps List',
-                                  createLabel: moduleType == 'primary' ? 'New Damaged Return' : 'New Scrap',
-                                  createScreenTitle: moduleType == 'primary' ? 'Damaged Return' : 'Scraps',
-                                  productSelectionTitle: moduleType == 'primary' ? 'Select Damaged Return Products' : 'Select Scrap Products',
+                                  title: moduleType == 'primary' ? 'Non-Saleable Returns' : 'Scraps List',
+                                  createLabel: moduleType == 'primary' ? 'New Non-Saleable Return' : 'New Scrap',
+                                  createScreenTitle: moduleType == 'primary' ? 'Non-Saleable Return' : 'Scraps',
+                                  productSelectionTitle: moduleType == 'primary' ? 'Select Non-Saleable Return Products' : 'Select Scrap Products',
                                 ),
                               ),
                             );

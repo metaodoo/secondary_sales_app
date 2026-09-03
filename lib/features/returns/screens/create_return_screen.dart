@@ -11,6 +11,7 @@ import 'package:provider/provider.dart';
 import 'package:secondary_sales/data/models/inventory/virtual_transfer.dart';
 import 'package:secondary_sales/features/returns/return_provider.dart';
 import 'package:secondary_sales/features/returns/screens/return_product_selection_screen.dart';
+import 'package:secondary_sales/core/widgets/searchable_lot_selector.dart';
 import 'package:secondary_sales/core/widgets/ss_ui.dart';
 import 'package:secondary_sales/features/auth/auth_provider.dart';
 import 'package:secondary_sales/core/widgets/stock_excess_dialog.dart';
@@ -36,15 +37,58 @@ class CreateReturnScreen extends StatefulWidget {
 }
 
 class _CreateReturnScreenState extends State<CreateReturnScreen> {
-  bool get _allowsPrimaryOverstock =>
+  bool get _isPrimaryTier =>
       widget.moduleType.toLowerCase() == 'primary' || widget.moduleType.isEmpty;
 
   final List<VirtualTransferLineEntry> _lines = [];
   final Map<int, List<TransferLot>> _lotsByProduct = {};
+
+  /// What the distributor is holding for each product, summed across its three
+  /// stock locations (fresh + QC + damage), keyed by product id.
+  ///
+  /// This is `available_qty` from `/products`, which the backend already builds
+  /// as that sum. It is the cap a primary return may not exceed. Kept in its
+  /// own map rather than read off `line.product.availableQty` because that
+  /// field means something different depending on how the line arrived: the
+  /// three-location sum on the create path, but only the picking's *own source
+  /// location* when a saved return is reopened (`_serialize_transfer_move`).
+  final Map<int, double> _distributorStock = {};
+
+  /// Whether [_distributorStock] has been loaded at all.
+  ///
+  /// Absence from the map means two different things and they must not be
+  /// confused: before a successful load it means "not known yet", and the entry
+  /// cannot be judged. After one it means the distributor holds *none* of that
+  /// product -- `/products` omits anything at zero across all three locations
+  /// -- which is the case most in need of blocking.
+  bool _distributorStockLoaded = false;
+
+  /// What this picking already had recorded against each product when it was
+  /// opened, so a saved return is never blocked by its own stock movement.
+  ///
+  /// Leg 1 reserves against the distributor location as soon as it is created
+  /// and empties it once validated, so by the time anyone reopens the return,
+  /// `_distributorStock` has already been reduced by the very quantity being
+  /// reviewed. Adding it back is the same correction the non-primary path gets
+  /// server-side as `available_qty + already_used`.
+  final Map<int, double> _recordedOnLoad = {};
+
   bool _isLoadingLots = false;
   Map<String, dynamic>? _prepareData;
   bool _isPreparing = true;
   bool _isReadOnly = false;
+
+  /// Which QC rule this picking carries, as reported by the backend:
+  double _locationQtyForProduct(TransferProduct product) {
+    final endpoint = widget.endpoint.toLowerCase();
+    if (endpoint.contains('qc_returns')) {
+      return product.qcQty;
+    } else if (endpoint.contains('scraps')) {
+      return product.damageQty;
+    } else {
+      return product.freshQty;
+    }
+  }
 
   /// Which QC rule this picking carries, as reported by the backend:
   /// `fresh_split`, `scrap_sum`, or null for a leg the decision does not apply
@@ -278,8 +322,31 @@ class _CreateReturnScreenState extends State<CreateReturnScreen> {
               );
             }
           }
+          // Whatever is already on the record for this product, whichever
+          // column it sits in. Taking the maximum rather than one nominated
+          // column means the cap can only ever be too generous, never too
+          // tight -- a quantity someone already saved is never what blocks
+          // them.
+          final recorded = [
+            entry.quantity,
+            entry.soQty ?? 0.0,
+            entry.qcQty ?? 0.0,
+            entry.wNonsaleableQty ?? 0.0,
+            entry.qcSaleableQty ?? 0.0,
+            entry.qcNonsaleableQty ?? 0.0,
+            entry.wQcQty ?? 0.0,
+            entry.actualQcQty ?? 0.0,
+          ].reduce((a, b) => a > b ? a : b);
+          _recordedOnLoad[product.id] =
+              (_recordedOnLoad[product.id] ?? 0.0) + recorded;
+
           _lines.add(entry);
         }
+      });
+
+      await _loadDistributorStock(details['distributor']?['id'] as int?);
+      if (!mounted) return;
+      setState(() {
         _isPreparing = false;
       });
     } else {
@@ -315,16 +382,20 @@ class _CreateReturnScreenState extends State<CreateReturnScreen> {
           final auth = context.read<AuthProvider>();
           setState(() {
             _lines.clear();
+            _distributorStock.clear();
+            _distributorStockLoaded = true;
             for (final p in products) {
               final product = TransferProduct.fromMap(p);
-              if (product.availableQty > 0) {
+              _distributorStock[product.id] = product.availableQty;
+              final locQty = _locationQtyForProduct(product);
+              if (locQty > 0) {
                 _lines.add(
                   VirtualTransferLineEntry(
                     product: product,
-                    quantity: product.availableQty,
-                    soQty: auth.canEditSoQty ? product.availableQty : null,
+                    quantity: locQty,
+                    soQty: auth.canEditSoQty ? locQty : null,
                     qcQty: auth.canEditWarehouseQty
-                        ? product.availableQty
+                        ? locQty
                         : null,
                   ),
                 );
@@ -339,6 +410,94 @@ class _CreateReturnScreenState extends State<CreateReturnScreen> {
         _isPreparing = false;
       });
     }
+  }
+
+  /// Fill [_distributorStock] from `/products`, which reports each product's
+  /// total across the distributor's three stock locations.
+  ///
+  /// Called on the edit path too, where the picking's own line data cannot
+  /// supply this: a reopened return reports availability at its source
+  /// location alone -- one of the three on leg 1, and transit on leg 2.
+  Future<void> _loadDistributorStock(int? distributorId) async {
+    if (distributorId == null) return;
+    final products = await context.read<ReturnProvider>().fetchReturnProducts(
+      distributorId: distributorId,
+      endpoint: widget.endpoint,
+    );
+    if (!mounted) return;
+    _distributorStock
+      ..clear()
+      ..addEntries(
+        products.map(TransferProduct.fromMap).map(
+          (product) => MapEntry(product.id, product.availableQty),
+        ),
+      );
+    _distributorStockLoaded = true;
+  }
+
+  /// The most this line may carry, or null when the distributor's stock is not
+  /// known yet and the entry cannot be judged.
+  double? _distributorCap(VirtualTransferLineEntry line) {
+    if (!_distributorStockLoaded) return null;
+    // Missing from a loaded map means the distributor holds none of it.
+    final stock = _distributorStock[line.product.id] ?? 0.0;
+    return stock + (_recordedOnLoad[line.product.id] ?? 0.0);
+  }
+
+  /// The SO quantity this line is asking to return -- the only column capped.
+  ///
+  /// `so_qty` is the sales officer's declaration of what came back from the
+  /// market, and it is the only column the server builds leg 1's movement
+  /// from: both `create_delivery` and `update_delivery` read `item["so_qty"]`,
+  /// never `quantity`. The warehouse and sales-operation columns are a later
+  /// count of goods already sitting in transit, so they are not measured
+  /// against what the distributor currently holds.
+  ///
+  /// Mirrors exactly what `_buildLinesPayload` puts in `so_qty`, so the figure
+  /// checked is the figure sent.
+  double _enteredSoQtyFor(VirtualTransferLineEntry line) {
+    return line.product.tracking != 'none'
+        ? _submittedTrackedSoQty(line)
+        : (line.soQty ?? 0.0);
+  }
+
+  /// Gate a primary return on the distributor actually holding what is being
+  /// returned. Shows the excess dialog and answers false when it does not.
+  ///
+  /// Primary returns used to skip this check entirely, on the grounds that
+  /// goods come back from the market and need not still be on hand. The cap is
+  /// the sum of all three of the distributor's locations rather than the one
+  /// bucket being returned, so that reasoning still holds within a distributor
+  /// -- what it no longer allows is returning stock the distributor never had.
+  Future<bool> _withinDistributorStock(AuthProvider auth) async {
+    if (!_isPrimaryTier) return true;
+
+    final excessItems = <StockExcessItem>[];
+    for (final line in _lines) {
+      if (!_lineHasSubmittedQty(line, auth)) continue;
+      final cap = _distributorCap(line);
+      if (cap == null) continue;
+      final entered = _enteredSoQtyFor(line);
+      // Tolerance keeps float noise from tripping an exactly-at-stock entry.
+      if (entered > cap + 0.0001) {
+        excessItems.add(
+          StockExcessItem(
+            productName: line.product.name,
+            enteredQty: entered,
+            availableQty: cap,
+            uomName: line.product.uomName,
+          ),
+        );
+      }
+    }
+    if (excessItems.isEmpty) return true;
+
+    await showStockExcessValidationDialog(
+      context,
+      excessItems: excessItems,
+      title: 'Distributor Stock Exceeded',
+    );
+    return false;
   }
 
   Future<void> _selectProducts() async {
@@ -362,10 +521,25 @@ class _CreateReturnScreenState extends State<CreateReturnScreen> {
       ),
     );
     if (selected == null) return;
+    final auth = context.read<AuthProvider>();
     setState(() {
       _lines
         ..clear()
         ..addAll(selected);
+      for (final line in _lines) {
+        final locQty = _locationQtyForProduct(line.product);
+        if (line.quantity == 0 && locQty > 0) {
+          line.quantity = locQty;
+          if (auth.canEditSoQty) line.soQty = locQty;
+          if (auth.canEditWarehouseQty) line.qcQty = locQty;
+        }
+      }
+      for (final line in _lines) {
+        _distributorStock.putIfAbsent(
+          line.product.id,
+          () => line.product.availableQty,
+        );
+      }
       // Clear lots that are no longer in lines
       final lineProductIds = _lines.map((l) => l.product.id).toSet();
       _lotsByProduct.removeWhere((id, _) => !lineProductIds.contains(id));
@@ -464,7 +638,7 @@ class _CreateReturnScreenState extends State<CreateReturnScreen> {
   }
 
   void _syncSingleLotFromLine(VirtualTransferLineEntry line) {
-    if (!_allowsPrimaryOverstock || line.product.tracking == 'none') {
+    if (!_isPrimaryTier || line.product.tracking == 'none') {
       return;
     }
     if (line.lotLines.length != 1) {
@@ -490,10 +664,10 @@ class _CreateReturnScreenState extends State<CreateReturnScreen> {
   }
 
   double _submittedTrackedLotQty(TransferLotInput lotInput, AuthProvider auth) {
-    if (_allowsPrimaryOverstock && auth.canEditSoQty) {
+    if (_isPrimaryTier && auth.canEditSoQty) {
       return lotInput.soQty ?? lotInput.quantity;
     }
-    if (_allowsPrimaryOverstock && auth.canEditWarehouseQty) {
+    if (_isPrimaryTier && auth.canEditWarehouseQty) {
       return lotInput.qcQty ?? lotInput.quantity;
     }
     return lotInput.quantity;
@@ -653,7 +827,7 @@ class _CreateReturnScreenState extends State<CreateReturnScreen> {
       return;
     }
 
-    if (!_allowsPrimaryOverstock) {
+    if (!_isPrimaryTier) {
       final excessItems = <StockExcessItem>[];
       for (final line in _lines) {
         if (line.quantity > line.product.availableQty) {
@@ -674,6 +848,9 @@ class _CreateReturnScreenState extends State<CreateReturnScreen> {
         return;
       }
     }
+
+    if (!await _withinDistributorStock(auth)) return;
+    if (!mounted) return;
 
     // Mandatory Photo Evidence Validation for Primary Sales Return
     if ((widget.moduleType.toLowerCase() == 'primary' ||
@@ -741,6 +918,13 @@ class _CreateReturnScreenState extends State<CreateReturnScreen> {
 
   Future<void> _runAction(String action) async {
     if (widget.returnId == null) return;
+
+    // Gated before the spinner goes up, so the excess dialog is not raised over
+    // a screen that has already replaced the quantities it is asking about.
+    if (action == 'validate') {
+      if (!await _withinDistributorStock(context.read<AuthProvider>())) return;
+      if (!mounted) return;
+    }
 
     setState(() => _isPreparing = true);
 
@@ -1349,11 +1533,11 @@ class _CreateReturnScreenState extends State<CreateReturnScreen> {
                               canEditEffectiveQty: canEditEffectiveQty,
                               canEditQcQty: canEditQcQty,
                               qcSplit: _qcSplit,
-                              allowOverstock: _allowsPrimaryOverstock,
+                              allowOverstock: _isPrimaryTier,
                               onQuantityChanged: (newQty) {
                                 setState(() {
                                   line.quantity =
-                                      (_allowsPrimaryOverstock
+                                      (_isPrimaryTier
                                               ? newQty.clamp(0, double.infinity)
                                               : newQty.clamp(
                                                   0,
@@ -1368,7 +1552,7 @@ class _CreateReturnScreenState extends State<CreateReturnScreen> {
                               onSoQtyChanged: (newQty) {
                                 setState(() {
                                   line.soQty =
-                                      (_allowsPrimaryOverstock
+                                      (_isPrimaryTier
                                               ? newQty.clamp(0, double.infinity)
                                               : newQty.clamp(
                                                   0,
@@ -1378,7 +1562,7 @@ class _CreateReturnScreenState extends State<CreateReturnScreen> {
                                   // In split mode `quantity` is the backend's to
                                   // derive from qc_saleable_qty; mirroring it
                                   // here would be a lie the app then sends back.
-                                  if (_allowsPrimaryOverstock && !_qcSplit) {
+                                  if (_isPrimaryTier && !_qcSplit) {
                                     line.quantity = line.soQty ?? line.quantity;
                                   }
                                   _syncSingleLotFromLine(line);
@@ -1387,14 +1571,14 @@ class _CreateReturnScreenState extends State<CreateReturnScreen> {
                               onQcQtyChanged: (newQty) {
                                 setState(() {
                                   line.qcQty =
-                                      (_allowsPrimaryOverstock
+                                      (_isPrimaryTier
                                               ? newQty.clamp(0, double.infinity)
                                               : newQty.clamp(
                                                   0,
                                                   line.product.availableQty,
                                                 ))
                                           .toDouble();
-                                  if (_allowsPrimaryOverstock && !_qcSplit) {
+                                  if (_isPrimaryTier && !_qcSplit) {
                                     line.quantity = line.qcQty ?? line.quantity;
                                   }
                                   _syncSingleLotFromLine(line);
@@ -1684,6 +1868,31 @@ class _ReturnLineCard extends StatelessWidget {
                           fontSize: 12,
                         ),
                       ),
+                      const SizedBox(height: 6),
+                      Wrap(
+                        spacing: 6,
+                        runSpacing: 4,
+                        children: [
+                          _StockBadgeSmall(
+                            label: 'Fresh',
+                            qty: line.product.freshQty,
+                            color: const Color(0xFF15803D),
+                            backgroundColor: const Color(0xFFDCFCE7),
+                          ),
+                          _StockBadgeSmall(
+                            label: 'QC',
+                            qty: line.product.qcQty,
+                            color: const Color(0xFFB45309),
+                            backgroundColor: const Color(0xFFFEF3C7),
+                          ),
+                          _StockBadgeSmall(
+                            label: 'Damage',
+                            qty: line.product.damageQty,
+                            color: const Color(0xFFB91C1C),
+                            backgroundColor: const Color(0xFFFEE2E2),
+                          ),
+                        ],
+                      ),
                     ],
                   ),
                 ),
@@ -1751,24 +1960,6 @@ class _ReturnLineCard extends StatelessWidget {
                     ),
                   ),
                   if (!isReadOnly) ...[
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        const Text(
-                          'Available Qty:',
-                          style: TextStyle(color: Colors.black54, fontSize: 12),
-                        ),
-                        Text(
-                          '${line.product.availableQty.toStringAsFixed(0)} ${line.product.uomName}',
-                          style: const TextStyle(
-                            color: Colors.black87,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 14,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
                     SizedBox(
                       width: double.infinity,
                       child: OutlinedButton.icon(
@@ -1813,14 +2004,6 @@ class _ReturnLineCard extends StatelessWidget {
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               child: Column(
                 children: [
-                  _buildQtyRow(
-                    title: 'Available Qty',
-                    value: line.product.availableQty,
-                    isReadOnly: true,
-                    min: 0,
-                    max: line.product.availableQty,
-                    onChanged: null,
-                  ),
                   _buildQtyRow(
                     title: 'SO Qty',
                     value: line.soQty ?? 0,
@@ -2254,271 +2437,36 @@ class _ReturnLotRow extends StatelessWidget {
   }
 }
 
-class SearchableLotSelector extends StatefulWidget {
-  final TransferLot? selectedLot;
-  final List<TransferLot> lots;
-  final ValueChanged<TransferLot?> onChanged;
-  final bool isReadOnly;
-
-  const SearchableLotSelector({
-    super.key,
-    required this.selectedLot,
-    required this.lots,
-    required this.onChanged,
-    this.isReadOnly = false,
+class _StockBadgeSmall extends StatelessWidget {
+  const _StockBadgeSmall({
+    required this.label,
+    required this.qty,
+    required this.color,
+    required this.backgroundColor,
   });
 
-  @override
-  State<SearchableLotSelector> createState() => _SearchableLotSelectorState();
-}
-
-class _SearchableLotSelectorState extends State<SearchableLotSelector> {
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: widget.isReadOnly ? null : () => _showSearchModal(context),
-      borderRadius: BorderRadius.circular(6),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
-        decoration: BoxDecoration(
-          color: widget.isReadOnly ? Colors.grey[100] : Colors.white,
-          border: Border.all(color: const Color(0xFFDDE6F2)),
-          borderRadius: BorderRadius.circular(6),
-        ),
-        child: Row(
-          children: [
-            Expanded(
-              child: Text(
-                widget.selectedLot?.lotName ?? 'Search & Select Lot...',
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: widget.selectedLot != null
-                      ? FontWeight.w600
-                      : FontWeight.normal,
-                  color: widget.selectedLot != null
-                      ? Colors.black87
-                      : AppColors.textSecondary,
-                ),
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-            const Icon(
-              Icons.arrow_drop_down,
-              color: AppColors.textSecondary,
-              size: 20,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  void _showSearchModal(BuildContext context) {
-    showModalBottomSheet<TransferLot>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (ctx) => _LotSearchBottomSheet(
-        lots: widget.lots,
-        currentLot: widget.selectedLot,
-      ),
-    ).then((selected) {
-      if (selected != null && mounted) {
-        widget.onChanged(selected);
-      }
-    });
-  }
-}
-
-class _LotSearchBottomSheet extends StatefulWidget {
-  final List<TransferLot> lots;
-  final TransferLot? currentLot;
-
-  const _LotSearchBottomSheet({
-    required this.lots,
-    this.currentLot,
-  });
-
-  @override
-  State<_LotSearchBottomSheet> createState() => _LotSearchBottomSheetState();
-}
-
-class _LotSearchBottomSheetState extends State<_LotSearchBottomSheet> {
-  final TextEditingController _controller = TextEditingController();
-  Timer? _debounceTimer;
-  List<TransferLot> _filteredLots = [];
-  bool _isSearching = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _filteredLots = List.from(widget.lots);
-  }
-
-  @override
-  void dispose() {
-    _debounceTimer?.cancel();
-    _controller.dispose();
-    super.dispose();
-  }
-
-  void _onSearchChanged(String query) {
-    setState(() => _isSearching = true);
-    _debounceTimer?.cancel();
-    // 300ms Search Debouncing as requested
-    _debounceTimer = Timer(const Duration(milliseconds: 300), () {
-      final q = query.trim().toLowerCase();
-      if (!mounted) return;
-      setState(() {
-        _isSearching = false;
-        if (q.isEmpty) {
-          _filteredLots = List.from(widget.lots);
-        } else {
-          _filteredLots = widget.lots.where((lot) {
-            return lot.lotName.toLowerCase().contains(q);
-          }).toList();
-        }
-      });
-    });
-  }
+  final String label;
+  final double qty;
+  final Color color;
+  final Color backgroundColor;
 
   @override
   Widget build(BuildContext context) {
+    final formattedQty =
+        qty % 1 == 0 ? qty.toInt().toString() : qty.toStringAsFixed(1);
     return Container(
-      constraints: BoxConstraints(
-        maxHeight: MediaQuery.of(context).size.height * 0.75,
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+        color: backgroundColor,
+        borderRadius: BorderRadius.circular(4),
       ),
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      padding: EdgeInsets.only(
-        bottom: MediaQuery.of(context).viewInsets.bottom + 16,
-        top: 16,
-        left: 16,
-        right: 16,
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              const Icon(
-                Icons.qr_code_2_rounded,
-                color: AppColors.primaryStrong,
-                size: 22,
-              ),
-              const SizedBox(width: 8),
-              const Expanded(
-                child: Text(
-                  'Select Lot Number',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                ),
-              ),
-              IconButton(
-                icon: const Icon(Icons.close, color: AppColors.textSecondary),
-                onPressed: () => Navigator.pop(context),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          TextField(
-            controller: _controller,
-            autofocus: true,
-            onChanged: _onSearchChanged,
-            decoration: InputDecoration(
-              hintText: 'Type to filter (e.g. lot00001)...',
-              prefixIcon: const Icon(Icons.search, color: AppColors.primaryStrong),
-              suffixIcon: _controller.text.isNotEmpty
-                  ? IconButton(
-                      icon: const Icon(Icons.clear, size: 18),
-                      onPressed: () {
-                        _controller.clear();
-                        _onSearchChanged('');
-                      },
-                    )
-                  : null,
-              contentPadding: const EdgeInsets.symmetric(
-                horizontal: 14,
-                vertical: 12,
-              ),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(10),
-                borderSide: const BorderSide(color: AppColors.borderSoft),
-              ),
-              focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(10),
-                borderSide: const BorderSide(
-                  color: AppColors.primaryStrong,
-                  width: 1.5,
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(height: 12),
-          if (_isSearching)
-            const Padding(
-              padding: EdgeInsets.all(24),
-              child: Center(child: CircularProgressIndicator()),
-            )
-          else if (_filteredLots.isEmpty)
-            Padding(
-              padding: const EdgeInsets.all(32),
-              child: Center(
-                child: Text(
-                  'No matching lots found for "${_controller.text}"',
-                  style: const TextStyle(
-                    color: AppColors.textSecondary,
-                    fontSize: 13,
-                  ),
-                ),
-              ),
-            )
-          else
-            Expanded(
-              child: ListView.separated(
-                itemCount: _filteredLots.length,
-                separatorBuilder: (_, index) => const Divider(
-                  height: 1,
-                  color: AppColors.borderSoft,
-                ),
-                itemBuilder: (context, index) {
-                  final lot = _filteredLots[index];
-                  final isSelected = widget.currentLot?.lotId == lot.lotId;
-                  return ListTile(
-                    contentPadding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 4,
-                    ),
-                    title: Text(
-                      lot.lotName,
-                      style: TextStyle(
-                        fontWeight:
-                            isSelected ? FontWeight.bold : FontWeight.w500,
-                        color: isSelected
-                            ? AppColors.primaryStrong
-                            : AppColors.textPrimary,
-                        fontSize: 14,
-                      ),
-                    ),
-                    trailing: isSelected
-                        ? const Icon(
-                            Icons.check_circle,
-                            color: AppColors.primaryStrong,
-                            size: 20,
-                          )
-                        : const Icon(
-                            Icons.chevron_right,
-                            color: AppColors.borderSoft,
-                            size: 18,
-                          ),
-                    onTap: () => Navigator.pop(context, lot),
-                  );
-                },
-              ),
-            ),
-        ],
+      child: Text(
+        '$label: $formattedQty',
+        style: TextStyle(
+          fontSize: 11,
+          fontWeight: FontWeight.w700,
+          color: color,
+        ),
       ),
     );
   }

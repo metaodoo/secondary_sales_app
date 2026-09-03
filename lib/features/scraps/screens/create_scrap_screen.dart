@@ -12,6 +12,7 @@ import 'package:secondary_sales/features/auth/auth_provider.dart';
 import 'package:secondary_sales/features/scraps/scrap_provider.dart';
 import 'package:secondary_sales/features/scraps/screens/scrap_product_selection_screen.dart';
 
+import 'package:secondary_sales/core/widgets/searchable_lot_selector.dart';
 import 'package:secondary_sales/core/widgets/ss_ui.dart';
 import 'package:secondary_sales/core/widgets/stock_excess_dialog.dart';
 
@@ -34,11 +35,56 @@ class CreateScrapScreen extends StatefulWidget {
 }
 
 class _CreateScrapScreenState extends State<CreateScrapScreen> {
-  bool get _allowsPrimaryOverstock =>
+  bool get _isPrimaryTier =>
       widget.moduleType.toLowerCase() == 'primary' || widget.moduleType.isEmpty;
+
+  /// The distributor location this screen returns *from*: the damage bucket.
+  ///
+  /// Deliberately not `availableQty`, which is the sum across all three of the
+  /// distributor's locations. Prefilling lines from that sum opened a
+  /// Non-Saleable Return already claiming the distributor's fresh and quality
+  /// stock as well -- 105 on a distributor holding 100 fresh and 5 damaged.
+  ///
+  /// `create_return_screen` makes the same choice per endpoint in its own
+  /// `_locationQtyForProduct` (fresh for `/returns`, quality for
+  /// `/qc_returns`); this screen is always the damage bucket, on both tiers,
+  /// because `get_employee_context` resolves its source from the flavor's
+  /// bucket regardless of primary or secondary.
+  double _locationQtyForProduct(TransferProduct product) => product.damageQty;
 
   final List<VirtualTransferLineEntry> _lines = [];
   final Map<int, List<TransferLot>> _lotsByProduct = {};
+
+  /// What the distributor is holding for each product, summed across its three
+  /// stock locations (fresh + QC + damage), keyed by product id.
+  ///
+  /// This is `available_qty` from `/products`, which the backend already builds
+  /// as that sum. It is the cap a primary return may not exceed. Kept in its
+  /// own map rather than read off `line.product.availableQty` because that
+  /// field means something different depending on how the line arrived: the
+  /// three-location sum on the create path, but only the picking's *own source
+  /// location* when a saved return is reopened (`_serialize_transfer_move`).
+  final Map<int, double> _distributorStock = {};
+
+  /// Whether [_distributorStock] has been loaded at all.
+  ///
+  /// Absence from the map means two different things and they must not be
+  /// confused: before a successful load it means "not known yet", and the entry
+  /// cannot be judged. After one it means the distributor holds *none* of that
+  /// product -- `/products` omits anything at zero across all three locations
+  /// -- which is the case most in need of blocking.
+  bool _distributorStockLoaded = false;
+
+  /// What this picking already had recorded against each product when it was
+  /// opened, so a saved return is never blocked by its own stock movement.
+  ///
+  /// Leg 1 reserves against the distributor location as soon as it is created
+  /// and empties it once validated, so by the time anyone reopens the return,
+  /// `_distributorStock` has already been reduced by the very quantity being
+  /// reviewed. Adding it back is the same correction the non-primary path gets
+  /// server-side as `available_qty + already_used`.
+  final Map<int, double> _recordedOnLoad = {};
+
   bool _isLoadingLots = false;
   Map<String, dynamic>? _prepareData;
   bool _isPreparing = true;
@@ -257,8 +303,31 @@ class _CreateScrapScreenState extends State<CreateScrapScreen> {
                 );
               }
             }
+            // Whatever is already on the record for this product, whichever
+            // column it sits in. Taking the maximum rather than one nominated
+            // column means the cap can only ever be too generous, never too
+            // tight -- a quantity someone already saved is never what blocks
+            // them.
+            final recorded = [
+              entry.quantity,
+              entry.soQty ?? 0.0,
+              entry.qcQty ?? 0.0,
+              entry.wNonsaleableQty ?? 0.0,
+              entry.qcSaleableQty ?? 0.0,
+              entry.qcNonsaleableQty ?? 0.0,
+              entry.wQcQty ?? 0.0,
+              entry.actualQcQty ?? 0.0,
+            ].reduce((a, b) => a > b ? a : b);
+            _recordedOnLoad[product.id] =
+                (_recordedOnLoad[product.id] ?? 0.0) + recorded;
+
             _lines.add(entry);
           }
+        });
+
+        await _loadDistributorStock(details['distributor']?['id'] as int?);
+        if (!mounted) return;
+        setState(() {
           _isPreparing = false;
         });
       }
@@ -290,17 +359,21 @@ class _CreateScrapScreenState extends State<CreateScrapScreen> {
             final auth = context.read<AuthProvider>();
             setState(() {
               _lines.clear();
+              _distributorStock.clear();
+              _distributorStockLoaded = true;
               for (final p in products) {
                 final product = TransferProduct.fromMap(p);
-                if (product.availableQty > 0) {
+                // The cap stays the three-location sum; only the prefill is
+                // bucket-specific. The two answer different questions.
+                _distributorStock[product.id] = product.availableQty;
+                final locQty = _locationQtyForProduct(product);
+                if (locQty > 0) {
                   _lines.add(
                     VirtualTransferLineEntry(
                       product: product,
-                      quantity: product.availableQty,
-                      soQty: auth.canEditSoQty ? product.availableQty : null,
-                      qcQty: auth.canEditWarehouseQty
-                          ? product.availableQty
-                          : null,
+                      quantity: locQty,
+                      soQty: auth.canEditSoQty ? locQty : null,
+                      qcQty: auth.canEditWarehouseQty ? locQty : null,
                     ),
                   );
                 }
@@ -314,6 +387,93 @@ class _CreateScrapScreenState extends State<CreateScrapScreen> {
         });
       }
     }
+  }
+
+  /// Fill [_distributorStock] from `/products`, which reports each product's
+  /// total across the distributor's three stock locations.
+  ///
+  /// Called on the edit path too, where the picking's own line data cannot
+  /// supply this: a reopened return reports availability at its source
+  /// location alone -- one of the three on leg 1, and transit on leg 2.
+  Future<void> _loadDistributorStock(int? distributorId) async {
+    if (distributorId == null) return;
+    final products = await context.read<ScrapProvider>().getScrapProducts(
+      distributorId: distributorId,
+    );
+    if (!mounted || products == null) return;
+    _distributorStock
+      ..clear()
+      ..addEntries(
+        products.map(TransferProduct.fromMap).map(
+          (product) => MapEntry(product.id, product.availableQty),
+        ),
+      );
+    _distributorStockLoaded = true;
+  }
+
+  /// The most this line may carry, or null when the distributor's stock is not
+  /// known yet and the entry cannot be judged.
+  double? _distributorCap(VirtualTransferLineEntry line) {
+    if (!_distributorStockLoaded) return null;
+    // Missing from a loaded map means the distributor holds none of it.
+    final stock = _distributorStock[line.product.id] ?? 0.0;
+    return stock + (_recordedOnLoad[line.product.id] ?? 0.0);
+  }
+
+  /// The SO quantity this line is asking to return -- the only column capped.
+  ///
+  /// `so_qty` is the sales officer's declaration of what came back from the
+  /// market, and it is the only column the server builds leg 1's movement
+  /// from: both `create_delivery` and `update_delivery` read `item["so_qty"]`,
+  /// never `quantity`. The warehouse and sales-operation columns are a later
+  /// count of goods already sitting in transit, so they are not measured
+  /// against what the distributor currently holds.
+  ///
+  /// Mirrors exactly what `_buildLinesPayload` puts in `so_qty`, so the figure
+  /// checked is the figure sent.
+  double _enteredSoQtyFor(VirtualTransferLineEntry line) {
+    return line.product.tracking != 'none'
+        ? _submittedTrackedSoQty(line)
+        : (line.soQty ?? 0.0);
+  }
+
+  /// Gate a primary return on the distributor actually holding what is being
+  /// returned. Shows the excess dialog and answers false when it does not.
+  ///
+  /// Primary returns used to skip this check entirely, on the grounds that
+  /// goods come back from the market and need not still be on hand. The cap is
+  /// the sum of all three of the distributor's locations rather than the one
+  /// bucket being returned, so that reasoning still holds within a distributor
+  /// -- what it no longer allows is returning stock the distributor never had.
+  Future<bool> _withinDistributorStock(AuthProvider auth) async {
+    if (!_isPrimaryTier) return true;
+
+    final excessItems = <StockExcessItem>[];
+    for (final line in _lines) {
+      if (!_lineHasSubmittedQty(line, auth)) continue;
+      final cap = _distributorCap(line);
+      if (cap == null) continue;
+      final entered = _enteredSoQtyFor(line);
+      // Tolerance keeps float noise from tripping an exactly-at-stock entry.
+      if (entered > cap + 0.0001) {
+        excessItems.add(
+          StockExcessItem(
+            productName: line.product.name,
+            enteredQty: entered,
+            availableQty: cap,
+            uomName: line.product.uomName,
+          ),
+        );
+      }
+    }
+    if (excessItems.isEmpty) return true;
+
+    await showStockExcessValidationDialog(
+      context,
+      excessItems: excessItems,
+      title: 'Distributor Stock Exceeded',
+    );
+    return false;
   }
 
   Future<void> _selectProducts() async {
@@ -340,6 +500,12 @@ class _CreateScrapScreenState extends State<CreateScrapScreen> {
       _lines
         ..clear()
         ..addAll(selected);
+      for (final line in _lines) {
+        _distributorStock.putIfAbsent(
+          line.product.id,
+          () => line.product.availableQty,
+        );
+      }
       // Clear lots that are no longer in lines
       final lineProductIds = _lines.map((l) => l.product.id).toSet();
       _lotsByProduct.removeWhere((id, _) => !lineProductIds.contains(id));
@@ -424,7 +590,7 @@ class _CreateScrapScreenState extends State<CreateScrapScreen> {
   }
 
   void _syncSingleLotFromLine(VirtualTransferLineEntry line) {
-    if (!_allowsPrimaryOverstock || line.product.tracking == 'none') {
+    if (!_isPrimaryTier || line.product.tracking == 'none') {
       return;
     }
     if (line.lotLines.length != 1) {
@@ -441,10 +607,10 @@ class _CreateScrapScreenState extends State<CreateScrapScreen> {
   }
 
   double _submittedTrackedLotQty(TransferLotInput lotInput, AuthProvider auth) {
-    if (_allowsPrimaryOverstock && auth.canEditSoQty) {
+    if (_isPrimaryTier && auth.canEditSoQty) {
       return lotInput.soQty ?? lotInput.quantity;
     }
-    if (_allowsPrimaryOverstock && auth.canEditWarehouseQty) {
+    if (_isPrimaryTier && auth.canEditWarehouseQty) {
       return lotInput.qcQty ?? lotInput.quantity;
     }
     return lotInput.quantity;
@@ -604,7 +770,7 @@ class _CreateScrapScreenState extends State<CreateScrapScreen> {
       return;
     }
 
-    if (!_allowsPrimaryOverstock) {
+    if (!_isPrimaryTier) {
       final excessItems = <StockExcessItem>[];
       for (final line in _lines) {
         if (line.quantity > line.product.availableQty) {
@@ -634,6 +800,9 @@ class _CreateScrapScreenState extends State<CreateScrapScreen> {
       ).showSnackBar(const SnackBar(content: Text('Add at least one product')));
       return;
     }
+
+    if (!await _withinDistributorStock(auth)) return;
+    if (!mounted) return;
 
     // Mandatory Photo Evidence Validation for Primary Sales Scrap
     if ((widget.moduleType.toLowerCase() == 'primary' ||
@@ -697,6 +866,13 @@ class _CreateScrapScreenState extends State<CreateScrapScreen> {
 
   Future<void> _runAction(String action) async {
     if (widget.scrapId == null) return;
+
+    // Gated before the spinner goes up, so the excess dialog is not raised over
+    // a screen that has already replaced the quantities it is asking about.
+    if (action == 'validate') {
+      if (!await _withinDistributorStock(context.read<AuthProvider>())) return;
+      if (!mounted) return;
+    }
 
     setState(() => _isPreparing = true);
 
@@ -1300,7 +1476,7 @@ class _CreateScrapScreenState extends State<CreateScrapScreen> {
                               canEditEffectiveQty: canEditEffectiveQty,
                               canEditQcQty: canEditQcQty,
                               scrapSum: _scrapSum,
-                              allowOverstock: _allowsPrimaryOverstock,
+                              allowOverstock: _isPrimaryTier,
                               onWQcQtyChanged: (newQty) {
                                 setState(() {
                                   line.wQcQty = newQty
@@ -1357,14 +1533,14 @@ class _CreateScrapScreenState extends State<CreateScrapScreen> {
                               onSoQtyChanged: (newQty) {
                                 setState(() {
                                   line.soQty =
-                                      (_allowsPrimaryOverstock
+                                      (_isPrimaryTier
                                               ? newQty.clamp(0, double.infinity)
                                               : newQty.clamp(
                                                   0,
                                                   line.product.availableQty,
                                                 ))
                                           .toDouble();
-                                  if (_allowsPrimaryOverstock && !_scrapSum) {
+                                  if (_isPrimaryTier && !_scrapSum) {
                                     line.quantity = line.soQty ?? line.quantity;
                                   }
                                   _syncSingleLotFromLine(line);
@@ -1373,14 +1549,14 @@ class _CreateScrapScreenState extends State<CreateScrapScreen> {
                               onQcQtyChanged: (newQty) {
                                 setState(() {
                                   line.qcQty =
-                                      (_allowsPrimaryOverstock
+                                      (_isPrimaryTier
                                               ? newQty.clamp(0, double.infinity)
                                               : newQty.clamp(
                                                   0,
                                                   line.product.availableQty,
                                                 ))
                                           .toDouble();
-                                  if (_allowsPrimaryOverstock && !_scrapSum) {
+                                  if (_isPrimaryTier && !_scrapSum) {
                                     line.quantity = line.qcQty ?? line.quantity;
                                   }
                                   _syncSingleLotFromLine(line);
@@ -1389,7 +1565,7 @@ class _CreateScrapScreenState extends State<CreateScrapScreen> {
                               onQuantityChanged: (newQty) {
                                 setState(() {
                                   line.quantity =
-                                      (_allowsPrimaryOverstock
+                                      (_isPrimaryTier
                                               ? newQty.clamp(0, double.infinity)
                                               : newQty.clamp(
                                                   0,
@@ -1666,6 +1842,36 @@ class _ScrapLineCard extends StatelessWidget {
                           color: Colors.black54,
                           fontSize: 12,
                         ),
+                      ),
+                      const SizedBox(height: 6),
+                      // What the distributor is holding in each of its three
+                      // stock locations. The same breakdown the fresh and QC
+                      // return cards show -- the return cap is the sum of all
+                      // three regardless of which bucket is being returned, so
+                      // it is as relevant here as it is there.
+                      Wrap(
+                        spacing: 6,
+                        runSpacing: 4,
+                        children: [
+                          _StockBadgeSmall(
+                            label: 'Fresh',
+                            qty: line.product.freshQty,
+                            color: const Color(0xFF15803D),
+                            backgroundColor: const Color(0xFFDCFCE7),
+                          ),
+                          _StockBadgeSmall(
+                            label: 'QC',
+                            qty: line.product.qcQty,
+                            color: const Color(0xFFB45309),
+                            backgroundColor: const Color(0xFFFEF3C7),
+                          ),
+                          _StockBadgeSmall(
+                            label: 'Damage',
+                            qty: line.product.damageQty,
+                            color: const Color(0xFFB91C1C),
+                            backgroundColor: const Color(0xFFFEE2E2),
+                          ),
+                        ],
                       ),
                     ],
                   ),
@@ -2019,45 +2225,11 @@ class _ScrapLotRow extends StatelessWidget {
                 ),
               ],
               const SizedBox(height: 4),
-              DropdownButtonFormField<int>(
-                isExpanded: true,
-                value: lotInput.lot?.lotId,
-                decoration: const InputDecoration(
-                  contentPadding: EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 8,
-                  ),
-                  border: OutlineInputBorder(
-                    borderSide: BorderSide(color: Color(0xFFDDE6F2)),
-                  ),
-                  enabledBorder: OutlineInputBorder(
-                    borderSide: BorderSide(color: Color(0xFFDDE6F2)),
-                  ),
-                ),
-                items: displayLots
-                    .map(
-                      (lot) => DropdownMenuItem(
-                        value: lot.lotId,
-                        child: Text(
-                          lot.lotName,
-                          style: const TextStyle(fontSize: 13),
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                    )
-                    .toList(),
-                onChanged: isReadOnly
-                    ? null
-                    : (val) {
-                        TransferLot? selected;
-                        for (final lot in displayLots) {
-                          if (lot.lotId == val) {
-                            selected = lot;
-                            break;
-                          }
-                        }
-                        onChanged(selected);
-                      },
+              SearchableLotSelector(
+                selectedLot: lotInput.lot,
+                lots: displayLots,
+                isReadOnly: isReadOnly,
+                onChanged: onChanged,
               ),
             ],
           ),
@@ -2200,40 +2372,11 @@ class _ScrapLotRow extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 4),
-          DropdownButtonFormField<int>(
-            isExpanded: true,
-            value: lotInput.lot?.lotId,
-            decoration: const InputDecoration(
-              contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              filled: true,
-              fillColor: Colors.white,
-              border: OutlineInputBorder(
-                borderSide: BorderSide(color: Color(0xFFDDE6F2)),
-              ),
-              enabledBorder: OutlineInputBorder(
-                borderSide: BorderSide(color: Color(0xFFDDE6F2)),
-              ),
-            ),
-            items: displayLots
-                .map(
-                  (lot) => DropdownMenuItem(
-                    value: lot.lotId,
-                    child: Text(lot.lotName, overflow: TextOverflow.ellipsis),
-                  ),
-                )
-                .toList(),
-            onChanged: isReadOnly
-                ? null
-                : (value) {
-                    TransferLot? selected;
-                    for (final lot in displayLots) {
-                      if (lot.lotId == value) {
-                        selected = lot;
-                        break;
-                      }
-                    }
-                    onChanged(selected);
-                  },
+          SearchableLotSelector(
+            selectedLot: lotInput.lot,
+            lots: displayLots,
+            isReadOnly: isReadOnly,
+            onChanged: onChanged,
           ),
           if (lotInput.soQty != null && lotInput.soQty! > 0) ...[
             const SizedBox(height: 6),
@@ -2298,6 +2441,41 @@ class _ScrapLotRow extends StatelessWidget {
             },
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _StockBadgeSmall extends StatelessWidget {
+  const _StockBadgeSmall({
+    required this.label,
+    required this.qty,
+    required this.color,
+    required this.backgroundColor,
+  });
+
+  final String label;
+  final double qty;
+  final Color color;
+  final Color backgroundColor;
+
+  @override
+  Widget build(BuildContext context) {
+    final formattedQty =
+        qty % 1 == 0 ? qty.toInt().toString() : qty.toStringAsFixed(1);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+        color: backgroundColor,
+        borderRadius: BorderRadius.circular(4),
+      ),
+      child: Text(
+        '$label: $formattedQty',
+        style: TextStyle(
+          fontSize: 11,
+          fontWeight: FontWeight.w700,
+          color: color,
+        ),
       ),
     );
   }

@@ -13,6 +13,7 @@ class ReturnScrapSummary {
     this.scheduledDate,
     this.returnBookNumber,
     this.returnBookPage,
+    this.returnBookRef,
   });
 
   final int id;
@@ -24,6 +25,22 @@ class ReturnScrapSummary {
   final String? returnBookNumber;
   final String? returnBookPage;
 
+  /// Book number and page as one reference, e.g. `RB/NADB0004/0001/19`, from
+  /// `return.book.line.display_name`. Null on a return with no book page.
+  final String? returnBookRef;
+
+  /// What the list row shows in place of the picking reference.
+  ///
+  /// Composed locally when the server did not send [returnBookRef], so the app
+  /// still renders correctly against a build that predates that field.
+  String? get bookReference {
+    if (returnBookRef != null && returnBookRef!.isNotEmpty) return returnBookRef;
+    if (returnBookNumber == null && returnBookPage == null) return null;
+    if (returnBookNumber == null) return returnBookPage;
+    if (returnBookPage == null) return returnBookNumber;
+    return '$returnBookNumber/$returnBookPage';
+  }
+
   factory ReturnScrapSummary.fromMap(Map<String, dynamic> map) {
     return ReturnScrapSummary(
       id: asInt(map['id']),
@@ -34,6 +51,7 @@ class ReturnScrapSummary {
       scheduledDate: asDateTime(map['scheduled_date']),
       returnBookNumber: asNullableString(map['return_book_number']),
       returnBookPage: asNullableString(map['return_book_page']),
+      returnBookRef: asNullableString(map['return_book_ref']),
     );
   }
 }
