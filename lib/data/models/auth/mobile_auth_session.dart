@@ -113,6 +113,7 @@ class MobileAuthUser {
     required this.id,
     required this.name,
     this.role,
+    this.businessType = 'gt',
     this.group,
     this.permissions,
     this.employeeId,
@@ -122,6 +123,7 @@ class MobileAuthUser {
   final int id;
   final String name;
   final String? role;
+  final String businessType;
   final MobileAuthGroup? group;
   final MobileAuthPermissions? permissions;
   final int? employeeId;
@@ -136,6 +138,7 @@ class MobileAuthUser {
       id: asIntOrNull(map['id']) ?? 0,
       name: (map['name'] ?? '').toString(),
       role: asNullableString(map['role']),
+      businessType: (map['business_type'] ?? 'gt').toString(),
       group: groupValue is Map
           ? MobileAuthGroup.fromMap(groupValue.cast<String, dynamic>())
           : null,
@@ -156,6 +159,7 @@ class MobileAuthUser {
       'id': id,
       'name': name,
       'role': role,
+      'business_type': businessType,
       'group': group?.toMap(),
       'permissions': permissions?.toMap(),
       'employee_id': employeeId,
@@ -209,22 +213,25 @@ class MobileAuthGroup {
     required this.id,
     required this.code,
     required this.name,
+    this.businessType = 'gt',
   });
 
   final int id;
   final String code;
   final String name;
+  final String businessType;
 
   factory MobileAuthGroup.fromMap(Map<String, dynamic> map) {
     return MobileAuthGroup(
       id: asIntOrNull(map['id']) ?? 0,
       code: (map['code'] ?? '').toString(),
       name: (map['name'] ?? '').toString(),
+      businessType: (map['business_type'] ?? 'gt').toString(),
     );
   }
 
   Map<String, dynamic> toMap() {
-    return {'id': id, 'code': code, 'name': name};
+    return {'id': id, 'code': code, 'name': name, 'business_type': businessType};
   }
 }
 

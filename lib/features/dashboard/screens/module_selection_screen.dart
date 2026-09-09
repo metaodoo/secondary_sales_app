@@ -19,15 +19,17 @@ class ModuleSelectionScreen extends StatelessWidget {
     // Module picker cards are gated by the backend access config (which
     // ss.module records the group is assigned).
     final auth = context.watch<AuthProvider>();
-    final canAccessPrimary = auth.canAccessPrimarySales;
-    final canAccessSecondary = auth.canAccessSecondarySales;
+    final canAccessGtPrimary = auth.canAccessPrimarySales;
+    final canAccessGtSecondary = auth.canAccessSecondarySales;
+    final canAccessMtPrimary = auth.canAccessMtPrimarySales;
+    final canAccessMtSecondary = auth.canAccessMtSecondarySales;
 
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
-        title: const Text(
-          'Sales & Distribution',
-          style: TextStyle(
+        title: Text(
+          auth.isModernTrade ? 'Modern Trade' : 'General Trade',
+          style: const TextStyle(
             color: AppColors.primaryStrong,
             fontWeight: FontWeight.bold,
           ),
@@ -66,12 +68,13 @@ class ModuleSelectionScreen extends StatelessWidget {
               ),
               const SizedBox(height: 48),
 
-              if (canAccessPrimary) ...[
+              // ─── GT - Primary Sales ───────────────
+              if (canAccessGtPrimary) ...[
                 _buildLargeModuleCard(
                   context,
-                  title: 'Primary',
+                  title: 'GT - Primary Sales',
                   description:
-                      'Sales, dealers, delivery, return delivery, and return scrap.',
+                      'Wholesale orders, distributors, deliveries, return deliveries, and scrap.',
                   icon: Icons.factory_outlined,
                   color: AppColors.primaryStrong,
                   onTap: () {
@@ -86,12 +89,13 @@ class ModuleSelectionScreen extends StatelessWidget {
                 const SizedBox(height: 24),
               ],
 
-              if (canAccessSecondary)
+              // ─── GT - Secondary Sales ───────────────
+              if (canAccessGtSecondary) ...[
                 _buildLargeModuleCard(
                   context,
-                  title: 'Secondary',
+                  title: 'GT - Secondary Sales',
                   description:
-                      'Sales, routes, outlets, van loading, delivery, and returns.',
+                      'Retail routes, store outlets, van loading, delivery, and returns.',
                   icon: Icons.storefront_outlined,
                   color: const Color(
                     0xFF10B981,
@@ -105,6 +109,50 @@ class ModuleSelectionScreen extends StatelessWidget {
                     );
                   },
                 ),
+                const SizedBox(height: 24),
+              ],
+
+              // ─── MT - Primary Sales ───────────────
+              if (canAccessMtPrimary) ...[
+                _buildLargeModuleCard(
+                  context,
+                  title: 'MT - Primary Sales',
+                  description:
+                      'Superstore outlets, on-site visit check-in & direct store purchase orders.',
+                  icon: Icons.corporate_fare_outlined,
+                  color: const Color(0xFF0284C7), // Blue color for MT
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const AppShell(moduleType: 'modern_trade'),
+                      ),
+                    );
+                  },
+                ),
+                const SizedBox(height: 24),
+              ],
+
+              // ─── MT - Secondary Sales ───────────────
+              if (canAccessMtSecondary) ...[
+                _buildLargeModuleCard(
+                  context,
+                  title: 'MT - Secondary Sales',
+                  description:
+                      'Daily stock audit (opening, stock in, closing) & secondary sales tracking.',
+                  icon: Icons.inventory_2_outlined,
+                  color: const Color(0xFF7C3AED), // Purple color for MT Secondary
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const AppShell(moduleType: 'mt_secondary'),
+                      ),
+                    );
+                  },
+                ),
+                const SizedBox(height: 24),
+              ],
               if (auth.canView(AppScreen.moduleAttendance)) ...[
                 const SizedBox(height: 24),
                 _buildLargeModuleCard(

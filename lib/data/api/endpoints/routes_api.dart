@@ -130,6 +130,7 @@ extension RoutesApi on ApiService {
     String? city,
     int? sequence,
     double? expectedVisitTime,
+    String? businessType,
     double? partnerLatitude,
     double? partnerLongitude,
     String? outletOwnerName,
@@ -141,6 +142,7 @@ extension RoutesApi on ApiService {
     if (outletId != null) {
       params['outlet_id'] = outletId;
     } else {
+      params['business_type'] = businessType ?? 'gt';
       if (name != null) params['name'] = name;
       if (mobile != null) params['mobile'] = mobile;
       if (phone != null) params['phone'] = phone;

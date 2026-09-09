@@ -18,11 +18,13 @@ class OrderDetailScreen extends StatefulWidget {
     required this.orderId,
     required this.fallbackName,
     this.saleType = 'primary',
+    this.businessType = 'gt',
   });
 
   final int orderId;
   final String fallbackName;
   final String saleType;
+  final String businessType;
 
   @override
   State<OrderDetailScreen> createState() => _OrderDetailScreenState();
@@ -42,6 +44,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
       await context.read<PrimarySaleProvider>().fetchOrderDetail(
         widget.orderId,
         saleType: widget.saleType,
+        businessType: widget.businessType,
       );
       if (mounted) {
         _prefetchPdf();
@@ -154,6 +157,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     SaleOrderDetail order,
     DeliveryOrderSummary picking,
   ) async {
+    final isMt = widget.businessType == 'mt';
     final updated = await Navigator.of(context).push<SaleOrderDetail>(
       MaterialPageRoute(
         builder: (_) => ValidateDeliveryScreen(
@@ -162,7 +166,8 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
           pickingId: picking.id,
           pickingName: picking.name,
           pickingState: picking.state,
-          saleType: widget.saleType,
+          saleType: isMt ? 'primary' : widget.saleType,
+          businessType: widget.businessType,
         ),
       ),
     );

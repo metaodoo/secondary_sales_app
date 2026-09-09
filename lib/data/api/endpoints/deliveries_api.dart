@@ -51,12 +51,17 @@ extension DeliveriesApi on ApiService {
     throw Exception(result['message'] ?? 'Failed to validate delivery');
   }
 
-  Future<List<DeliveryItem>> getDeliveries({
+  Future<DeliveryListResult> getDeliveries({
     int page = 1,
     int pageSize = 20,
     String? search,
     String? state,
     String? type,
+    String? businessType,
+    String? segment,
+    int? outletId,
+    int? zoneId,
+    int? locationId,
     DateTime? dateFrom,
     DateTime? dateTo,
   }) async {
@@ -68,6 +73,15 @@ extension DeliveriesApi on ApiService {
     if (search != null && search.isNotEmpty) params['search'] = search;
     if (state != null && state.isNotEmpty) params['state'] = state;
     if (type != null && type.isNotEmpty) params['type'] = type;
+    if (businessType != null && businessType.isNotEmpty) {
+      params['business_type'] = businessType;
+    }
+    if (segment != null && segment.isNotEmpty) {
+      params['segment'] = segment;
+    }
+    if (outletId != null) params['outlet_id'] = outletId;
+    if (zoneId != null) params['zone_id'] = zoneId;
+    if (locationId != null) params['location_id'] = locationId;
     if (dateFrom != null) {
       params['date_from'] =
           '${dateFrom.year.toString().padLeft(4, '0')}-${dateFrom.month.toString().padLeft(2, '0')}-${dateFrom.day.toString().padLeft(2, '0')}';
@@ -80,7 +94,41 @@ extension DeliveriesApi on ApiService {
     final result = await _post(AppConstants.deliveriesEndpoint, params);
     if (result['success'] == true) {
       final data = result['data'] as List? ?? [];
-      return data.map((e) => DeliveryItem.fromMap(e)).toList();
+      final items = data.map((e) => DeliveryItem.fromMap(e)).toList();
+
+      List<ResZone> zones = [];
+      List<StockLocation> locations = [];
+      List<DeliveryOutletFilter> outlets = [];
+      if (result['filter_options'] is Map) {
+        final fMap = result['filter_options'] as Map;
+        final rawZones = fMap['zones'] as List? ?? [];
+        final rawLocs = fMap['locations'] as List? ?? [];
+        final rawOutlets = fMap['outlets'] as List? ?? [];
+        zones = rawZones
+            .map((z) => ResZone.fromMap(Map<String, dynamic>.from(z as Map)))
+            .toList();
+        locations = rawLocs
+            .map((l) =>
+                StockLocation.fromMap(Map<String, dynamic>.from(l as Map)))
+            .toList();
+        outlets = rawOutlets
+            .map((o) =>
+                DeliveryOutletFilter.fromMap(Map<String, dynamic>.from(o as Map)))
+            .toList();
+      }
+
+      final pagination =
+          result['pagination'] is Map ? result['pagination'] as Map : null;
+      final total =
+          pagination != null ? asInt(pagination['total']) : items.length;
+
+      return DeliveryListResult(
+        items: items,
+        zones: zones,
+        locations: locations,
+        outlets: outlets,
+        total: total,
+      );
     }
     throw Exception(result['message'] ?? 'Failed to fetch deliveries');
   }

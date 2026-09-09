@@ -14,6 +14,9 @@ import 'package:secondary_sales/core/widgets/ss_ui.dart';
 
 import 'package:secondary_sales/features/sales/screens/secondary_orders_list_screen.dart';
 import 'package:secondary_sales/features/routes/screens/visits_list_screen.dart';
+import 'package:secondary_sales/features/modern_trade/screens/mt_outlets_screen.dart';
+import 'package:secondary_sales/features/modern_trade/screens/mt_stock_audit_list_screen.dart';
+import 'package:secondary_sales/features/modern_trade/screens/mt_sec_orders_list_screen.dart';
 
 class DashboardTab extends StatelessWidget {
   const DashboardTab({
@@ -63,7 +66,13 @@ class DashboardTab extends StatelessWidget {
               )
             : null,
         title: Text(
-          moduleType == 'primary' ? 'Primary Sales' : 'Secondary Sales',
+          moduleType == 'primary'
+              ? 'Primary Sales'
+              : (moduleType == 'mt_primary' || moduleType == 'modern_trade'
+                  ? 'MT - Primary Sales'
+                  : (moduleType == 'mt_secondary' || moduleType == 'modern_trade_secondary'
+                      ? 'MT - Secondary Sales'
+                      : 'Secondary Sales')),
           style: const TextStyle(
             color: AppColors.primaryStrong,
             fontWeight: FontWeight.bold,
@@ -111,7 +120,134 @@ class DashboardTab extends StatelessWidget {
               Builder(
                 builder: (context) {
                   final cards = <Widget>[
-                    if (moduleType == 'primary') ...[
+                    if (moduleType == 'mt_secondary' || moduleType == 'modern_trade_secondary') ...[
+                      _buildModuleCard(
+                        title: 'MT Outlets',
+                        icon: Icons.corporate_fare_outlined,
+                        iconColor: Colors.white,
+                        circleColor: const Color(0xFF0284C7),
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => const MtOutletsScreen(),
+                            ),
+                          );
+                        },
+                      ),
+                      if (auth.canView(AppScreen.mtSecStockAuditsList))
+                        _buildModuleCard(
+                          title: 'Stock Audits',
+                          icon: Icons.inventory_2_outlined,
+                          iconColor: Colors.white,
+                          circleColor: const Color(0xFF10B981),
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => const MtStockAuditListScreen(),
+                              ),
+                            );
+                          },
+                        ),
+                      if (auth.canView(AppScreen.mtSecOrdersList))
+                        _buildModuleCard(
+                          title: 'Secondary Orders',
+                          icon: Icons.receipt_long_outlined,
+                          iconColor: Colors.white,
+                          circleColor: AppColors.primaryStrong,
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => const MtSecOrdersListScreen(),
+                              ),
+                            );
+                          },
+                        ),
+                      if (auth.canView(AppScreen.mtVisitsList) || auth.canView(AppScreen.visitsList))
+                        _buildModuleCard(
+                          title: 'Visit History',
+                          icon: Icons.history_edu,
+                          iconColor: AppColors.primary,
+                          circleColor: AppColors.primaryTint,
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => const VisitsListScreen(),
+                              ),
+                            );
+                          },
+                        ),
+                    ] else if (moduleType == 'mt_primary' || moduleType == 'modern_trade') ...[
+                      _buildModuleCard(
+                        title: 'MT Outlets',
+                        icon: Icons.corporate_fare_outlined,
+                        iconColor: Colors.white,
+                        circleColor: const Color(0xFF0284C7),
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => const MtOutletsScreen(),
+                            ),
+                          );
+                        },
+                      ),
+                      if (auth.canView(AppScreen.mtVisitsList) || auth.canView(AppScreen.visitsList))
+                        _buildModuleCard(
+                          title: 'Visit History',
+                          icon: Icons.history_edu,
+                          iconColor: AppColors.primary,
+                          circleColor: AppColors.primaryTint,
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => const VisitsListScreen(),
+                              ),
+                            );
+                          },
+                        ),
+                      if (auth.canView(AppScreen.mtOrdersList) || auth.canView(AppScreen.secondaryOrdersList))
+                        _buildModuleCard(
+                          title: 'Sales Orders',
+                          icon: Icons.receipt_long_outlined,
+                          iconColor: Colors.white,
+                          circleColor: AppColors.primaryStrong,
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => const SecondaryOrdersListScreen(
+                                  businessType: 'mt',
+                                  saleType: 'primary',
+                                  titleOverride: 'MT Sales Orders',
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                      if (auth.canView(AppScreen.mtDeliveriesList) || auth.canView(AppScreen.deliveriesList))
+                        _buildModuleCard(
+                          title: 'Deliveries',
+                          icon: Icons.local_shipping_outlined,
+                          iconColor: Colors.white,
+                          circleColor: const Color(0xFF0D9488),
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => const DeliveriesListScreen(
+                                  moduleType: 'modern_trade',
+                                  businessType: 'mt',
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                    ] else if (moduleType == 'primary') ...[
                       if (showPrimarySalesModule)
                         _buildModuleCard(
                           title: 'Sales',

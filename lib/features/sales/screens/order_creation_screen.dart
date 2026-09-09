@@ -53,6 +53,8 @@ class OrderCreationScreen extends StatefulWidget {
   final int? visitId;
   final int? editOrderId;
   final List<OrderLineEntry>? initialLines;
+  final String businessType;
+  final String saleType;
 
   const OrderCreationScreen({
     super.key,
@@ -64,6 +66,8 @@ class OrderCreationScreen extends StatefulWidget {
     this.visitId,
     this.editOrderId,
     this.initialLines,
+    this.businessType = 'gt',
+    this.saleType = 'secondary',
   });
 
   @override
@@ -150,8 +154,9 @@ class _OrderCreationScreenState extends State<OrderCreationScreen> {
     if (provider.products.isEmpty) {
       await provider.searchProducts(
         '',
-        saleType: 'secondary',
+        saleType: widget.saleType,
         partnerId: widget.outletId,
+        businessType: widget.businessType,
       );
     }
     if (!mounted) return;
@@ -160,8 +165,9 @@ class _OrderCreationScreenState extends State<OrderCreationScreen> {
       context,
       MaterialPageRoute(
         builder: (_) => ProductSelectionScreen(
-          saleType: 'secondary',
+          saleType: widget.saleType,
           partnerId: widget.outletId,
+          businessType: widget.businessType,
         ),
       ),
     );
@@ -213,47 +219,28 @@ class _OrderCreationScreenState extends State<OrderCreationScreen> {
       apiService.updateSessionId(auth.sessionId);
       apiService.updateEmployeeId(auth.employeeId);
 
-      final items = lines
-          .map(
-            (l) => {
-              'product_id': l.productId,
-              'order_qty': l.orderQty,
-              'damaged_expired_qty': l.damagedExpiredQty,
-              'damage_quality_qty': l.damageQualityQty,
-              'ss_adjust_with_bill': l.adjustWithBill,
-              'price_unit': l.unitPrice,
-            },
-          )
-          .toList();
+      // --- Business Type: Modern Trade (MT) ---
+      if (widget.businessType == 'mt') {
+        final items = lines
+            .map(
+              (l) => {
+                'product_id': l.productId,
+                'product_uom_qty': l.orderQty,
+                'price_unit': l.unitPrice,
+              },
+            )
+            .toList();
 
-      if (widget.editOrderId != null) {
-        await apiService.updateSecondarySaleOrder(
-          orderId: widget.editOrderId!,
+        final result = await apiService.createMtSaleOrder(
           outletId: widget.outletId,
-          items: items,
-          mediumId: widget.mediumId,
-          routeId: widget.routeId,
+          orderLines: items,
           visitId: widget.visitId,
+          mediumId: widget.mediumId,
           confirm: true,
         );
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Order updated successfully!')),
-          );
-          Navigator.pop(context);
-        }
-      } else {
-        final result = await apiService.createSecondarySaleOrder(
-          outletId: widget.outletId,
-          items: items,
-          mediumId: widget.mediumId,
-          routeId: widget.routeId,
-          visitId: widget.visitId,
-          confirm: true,
-        );
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Order submitted successfully!')),
+            const SnackBar(content: Text('MT Order submitted successfully!')),
           );
           final orderId = result['id'] as int?;
           if (orderId != null) {
@@ -262,13 +249,75 @@ class _OrderCreationScreenState extends State<OrderCreationScreen> {
               MaterialPageRoute(
                 builder: (_) => OrderDetailScreen(
                   orderId: orderId,
-                  fallbackName: result['name']?.toString() ?? 'Order',
-                  saleType: 'secondary',
+                  fallbackName: result['name']?.toString() ?? 'MT Order',
+                  saleType: 'primary',
+                  businessType: 'mt',
                 ),
               ),
             );
           } else {
-            Navigator.popUntil(context, (route) => route.isFirst);
+            Navigator.pop(context);
+          }
+        }
+      } else {
+        // --- Business Type: General Trade (GT) ---
+        final items = lines
+            .map(
+              (l) => {
+                'product_id': l.productId,
+                'order_qty': l.orderQty,
+                'damaged_expired_qty': l.damagedExpiredQty,
+                'damage_quality_qty': l.damageQualityQty,
+                'ss_adjust_with_bill': l.adjustWithBill,
+                'price_unit': l.unitPrice,
+              },
+            )
+            .toList();
+
+        if (widget.editOrderId != null) {
+          await apiService.updateSecondarySaleOrder(
+            orderId: widget.editOrderId!,
+            outletId: widget.outletId,
+            items: items,
+            mediumId: widget.mediumId,
+            routeId: widget.routeId,
+            visitId: widget.visitId,
+            confirm: true,
+          );
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Order updated successfully!')),
+            );
+            Navigator.pop(context);
+          }
+        } else {
+          final result = await apiService.createSecondarySaleOrder(
+            outletId: widget.outletId,
+            items: items,
+            mediumId: widget.mediumId,
+            routeId: widget.routeId,
+            visitId: widget.visitId,
+            confirm: true,
+          );
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Order submitted successfully!')),
+            );
+            final orderId = result['id'] as int?;
+            if (orderId != null) {
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => OrderDetailScreen(
+                    orderId: orderId,
+                    fallbackName: result['name']?.toString() ?? 'Order',
+                    saleType: 'secondary',
+                  ),
+                ),
+              );
+            } else {
+              Navigator.popUntil(context, (route) => route.isFirst);
+            }
           }
         }
       }
@@ -290,15 +339,14 @@ class _OrderCreationScreenState extends State<OrderCreationScreen> {
   @override
   Widget build(BuildContext context) {
     final isLoadingDetails = widget.editOrderId != null && !_isInitLoaded;
+    final title = widget.editOrderId != null
+        ? 'Edit ${widget.businessType == 'mt' ? 'Modern Trade Sales' : 'Secondary Sales'}'
+        : (widget.businessType == 'mt' ? 'Modern Trade Sales' : 'Secondary Sales');
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8F9FB),
       appBar: AppBar(
-        title: Text(
-          widget.editOrderId != null
-              ? 'Edit Secondary Sales'
-              : 'Secondary Sales',
-        ),
+        title: Text(title),
         centerTitle: true,
         actions: [
           const Padding(
@@ -616,78 +664,97 @@ class _OrderCreationScreenState extends State<OrderCreationScreen> {
               ),
             ],
           ),
-          const SizedBox(height: 12),
-
-          // Stock Badges
-          Row(
-            children: [
-              _buildBadge('DB: ${line.dbStock}'),
-              const SizedBox(width: 8),
-              _buildBadge('Van: ${line.vanStock}'),
-            ],
-          ),
+          if (widget.businessType == 'gt' && widget.saleType == 'secondary') ...[
+            const SizedBox(height: 12),
+            // Stock Badges
+            Row(
+              children: [
+                _buildBadge('DB: ${line.dbStock}'),
+                const SizedBox(width: 8),
+                _buildBadge('Van: ${line.vanStock}'),
+              ],
+            ),
+          ],
 
           const Padding(
             padding: EdgeInsets.symmetric(vertical: 12),
             child: Divider(color: AppColors.borderSoft, height: 1),
           ),
 
-          // Qty Controls
-          Row(
-            children: [
-              Expanded(
-                child: _buildQtyControl(
-                  label: 'Order Qty',
-                  value: line.orderQty,
-                  onChanged: (val) {
-                    setState(() {
-                      line.orderQty = val;
-                    });
-                  },
+          // Qty Controls: Branch by businessType -> saleType
+          if (widget.businessType == 'gt' && widget.saleType == 'secondary') ...[
+            Row(
+              children: [
+                Expanded(
+                  child: _buildQtyControl(
+                    label: 'Order Qty',
+                    value: line.orderQty,
+                    onChanged: (val) {
+                      setState(() {
+                        line.orderQty = val;
+                      });
+                    },
+                  ),
                 ),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: _buildQtyControl(
-                  label: 'Damaged Expire Qty',
-                  value: line.damagedExpiredQty,
-                  onChanged: (val) {
-                    setState(() {
-                      line.damagedExpiredQty = val;
-                    });
-                  },
+                const SizedBox(width: 16),
+                Expanded(
+                  child: _buildQtyControl(
+                    label: 'Damaged Expire Qty',
+                    value: line.damagedExpiredQty,
+                    onChanged: (val) {
+                      setState(() {
+                        line.damagedExpiredQty = val;
+                      });
+                    },
+                  ),
                 ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(
+                  child: _buildQtyControl(
+                    label: 'Damage Quality Qty',
+                    value: line.damageQualityQty,
+                    onChanged: (val) {
+                      setState(() {
+                        line.damageQualityQty = val;
+                      });
+                    },
+                  ),
+                ),
+                const SizedBox(width: 16),
+                const Expanded(child: SizedBox()),
+              ],
+            ),
+            if (line.damagedExpiredQty > 0 || line.damageQualityQty > 0) ...[
+              const SizedBox(height: 8),
+              AdjustReturnToggle(
+                value: line.adjustWithBill,
+                vanStock: line.vanStock,
+                onChanged: (val) =>
+                    setState(() => line.adjustWithBill = val),
               ),
             ],
-          ),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              Expanded(
-                child: _buildQtyControl(
-                  label: 'Damage Quality Qty',
-                  value: line.damageQualityQty,
-                  onChanged: (val) {
-                    setState(() {
-                      line.damageQualityQty = val;
-                    });
-                  },
+          ] else ...[
+            // MT or GT Primary
+            Row(
+              children: [
+                Expanded(
+                  child: _buildQtyControl(
+                    label: 'Order Qty',
+                    value: line.orderQty,
+                    onChanged: (val) {
+                      setState(() {
+                        line.orderQty = val;
+                      });
+                    },
+                  ),
                 ),
-              ),
-              const SizedBox(width: 16),
-              const Expanded(child: SizedBox()),
-            ],
-          ),
-
-          // Mirrors the toggle in product selection so the rep can see and
-          // change the decision at review time, not only while picking.
-          if (line.damagedExpiredQty > 0 || line.damageQualityQty > 0) ...[
-            const SizedBox(height: 8),
-            AdjustReturnToggle(
-              value: line.adjustWithBill,
-              vanStock: line.vanStock,
-              onChanged: (val) =>
-                  setState(() => line.adjustWithBill = val),
+                const SizedBox(width: 16),
+                const Expanded(child: SizedBox()),
+              ],
             ),
           ],
 

@@ -11,6 +11,7 @@ import 'package:secondary_sales/core/access/permission_gate.dart';
 import 'package:secondary_sales/core/access/access_resources.dart';
 import 'package:secondary_sales/core/widgets/ss_ui.dart';
 import 'package:secondary_sales/core/widgets/stock_excess_dialog.dart';
+import 'package:secondary_sales/features/auth/auth_provider.dart';
 
 class ValidateDeliveryScreen extends StatefulWidget {
   const ValidateDeliveryScreen({
@@ -21,6 +22,7 @@ class ValidateDeliveryScreen extends StatefulWidget {
     required this.pickingName,
     required this.pickingState,
     this.saleType = 'primary',
+    this.businessType = 'gt',
   });
 
   final int orderId;
@@ -29,6 +31,7 @@ class ValidateDeliveryScreen extends StatefulWidget {
   final String pickingName;
   final String pickingState;
   final String saleType;
+  final String businessType;
 
   @override
   State<ValidateDeliveryScreen> createState() => _ValidateDeliveryScreenState();
@@ -44,10 +47,20 @@ class _ValidateDeliveryScreenState extends State<ValidateDeliveryScreen> {
   final Map<int, bool> _isReassigning = {};
   final Map<int, String?> _reassignErrors = {};
 
+  bool get _canValidate {
+    if (!mounted) return true;
+    final auth = context.read<AuthProvider>();
+    return auth.canDo(
+      AppAction.deliveryValidateFor(widget.saleType, widget.businessType),
+    );
+  }
+
   bool get isReadOnly =>
       widget.pickingState.toLowerCase() == 'done' ||
-      widget.pickingState.toLowerCase() == 'cancel';
+      widget.pickingState.toLowerCase() == 'cancel' ||
+      !_canValidate;
 
+  bool get _isMt => widget.businessType == 'mt';
   bool get _isSecondary => widget.saleType == 'secondary';
 
   @override
@@ -361,7 +374,7 @@ class _ValidateDeliveryScreenState extends State<ValidateDeliveryScreen> {
       return;
     }
 
-    if (widget.saleType == 'primary') {
+    if (widget.saleType == 'primary' && !_isMt) {
       final order = await context.read<PrimarySaleProvider>().validateDelivery(
         orderId: widget.orderId,
         pickingId: prepare.picking.id,
@@ -721,7 +734,10 @@ class _ValidateDeliveryScreenState extends State<ValidateDeliveryScreen> {
                   width: double.infinity,
                   height: 50,
                   child: PermissionGate(
-                    resourceKey: AppAction.deliveryValidateFor(widget.saleType),
+                    resourceKey: AppAction.deliveryValidateFor(
+                      widget.saleType,
+                      widget.businessType,
+                    ),
                     child: FilledButton(
                       onPressed: provider.isLoading || _prepare == null
                           ? null
@@ -742,7 +758,7 @@ class _ValidateDeliveryScreenState extends State<ValidateDeliveryScreen> {
                               ),
                             )
                           : Text(
-                              widget.saleType == 'primary'
+                              (widget.saleType == 'primary' && !_isMt)
                                   ? 'Save Delivery'
                                   : 'Confirm Delivery',
                               style: const TextStyle(fontWeight: FontWeight.w800),
@@ -1291,7 +1307,7 @@ class _LotAllocationRow extends StatelessWidget {
                         (lot) => DropdownMenuItem<int>(
                           value: lot.lotId,
                           child: Text(
-                            '${lot.lotName} (${formatQty(lot.availableQty)})',
+                            lot.lotName,
                             overflow: TextOverflow.ellipsis,
                           ),
                         ),

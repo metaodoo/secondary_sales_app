@@ -11,6 +11,9 @@ import 'package:secondary_sales/features/sales/screens/secondary_orders_list_scr
 import 'package:secondary_sales/features/returns/screens/returns_list_screen.dart';
 import 'package:secondary_sales/features/scraps/screens/scraps_list_screen.dart';
 import 'package:secondary_sales/features/routes/screens/visits_list_screen.dart';
+import 'package:secondary_sales/features/modern_trade/screens/mt_outlets_screen.dart';
+import 'package:secondary_sales/features/modern_trade/screens/mt_stock_audit_list_screen.dart';
+import 'package:secondary_sales/features/modern_trade/screens/mt_sec_orders_list_screen.dart';
 import 'package:secondary_sales/features/employees/screens/sales_officer_list_screen.dart';
 import 'package:secondary_sales/features/hr/screens/attendance_screen.dart';
 import 'package:secondary_sales/features/hr/screens/leave_dashboard_screen.dart';
@@ -87,7 +90,73 @@ class MenuSection {
 List<MenuSection> buildMenuSections(String moduleType) {
   final sections = <MenuSection>[];
 
-  if (moduleType == 'primary') {
+  if (moduleType == 'modern_trade' || moduleType == 'mt_primary') {
+    sections.add(
+      MenuSection('Modern Trade', [
+        MenuDestination(
+          label: 'Dashboard',
+          icon: Icons.grid_view_rounded,
+          shellIndex: AppShellIndex.dashboard,
+        ),
+        MenuDestination(
+          label: 'Outlets',
+          icon: Icons.corporate_fare_outlined,
+          screenKey: AppScreen.mtOutletsList,
+          builder: (_) => const MtOutletsScreen(),
+        ),
+        MenuDestination(
+          label: 'Visit History',
+          icon: Icons.history_edu_outlined,
+          screenKey: AppScreen.mtVisitsList,
+          builder: (_) => const VisitsListScreen(),
+        ),
+        MenuDestination(
+          label: 'Sales Orders',
+          icon: Icons.receipt_long_outlined,
+          screenKey: AppScreen.mtOrdersList,
+          builder: (_) => const SecondaryOrdersListScreen(
+            businessType: 'mt',
+            saleType: 'primary',
+            titleOverride: 'MT Sales Orders',
+          ),
+        ),
+      ]),
+    );
+  } else if (moduleType == 'mt_secondary' || moduleType == 'modern_trade_secondary') {
+    sections.add(
+      MenuSection('MT Secondary Sales', [
+        MenuDestination(
+          label: 'Dashboard',
+          icon: Icons.grid_view_rounded,
+          shellIndex: AppShellIndex.dashboard,
+        ),
+        MenuDestination(
+          label: 'Outlets',
+          icon: Icons.corporate_fare_outlined,
+          screenKey: AppScreen.mtOutletsList,
+          builder: (_) => const MtOutletsScreen(),
+        ),
+        MenuDestination(
+          label: 'Stock Audits',
+          icon: Icons.inventory_2_outlined,
+          screenKey: AppScreen.mtSecStockAuditsList,
+          builder: (_) => const MtStockAuditListScreen(),
+        ),
+        MenuDestination(
+          label: 'Secondary Orders',
+          icon: Icons.receipt_long_outlined,
+          screenKey: AppScreen.mtSecOrdersList,
+          builder: (_) => const MtSecOrdersListScreen(),
+        ),
+        MenuDestination(
+          label: 'Visit History',
+          icon: Icons.history_edu_outlined,
+          screenKey: AppScreen.mtVisitsList,
+          builder: (_) => const VisitsListScreen(),
+        ),
+      ]),
+    );
+  } else if (moduleType == 'primary') {
     sections.add(
       MenuSection('Sales', [
         MenuDestination(

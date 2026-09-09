@@ -22,6 +22,7 @@ class ProductSelectionScreen extends StatefulWidget {
   final int? routeId;
   final int? visitId;
   final DistributionHub? hub;
+  final String businessType;
 
   const ProductSelectionScreen({
     super.key,
@@ -33,6 +34,7 @@ class ProductSelectionScreen extends StatefulWidget {
     this.routeId,
     this.visitId,
     this.hub,
+    this.businessType = 'gt',
   });
 
   @override
@@ -50,7 +52,9 @@ class _ProductSelectionScreenState extends State<ProductSelectionScreen> {
   @override
   void initState() {
     super.initState();
-    _sortBy = widget.saleType == 'secondary' ? 'van_stock_desc' : 'name_asc';
+    _sortBy = (widget.saleType == 'secondary' && widget.businessType != 'mt')
+        ? 'van_stock_desc'
+        : 'name_asc';
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       final provider = context.read<PrimarySaleProvider>();
       await provider.fetchProductCategories();
@@ -73,6 +77,7 @@ class _ProductSelectionScreenState extends State<ProductSelectionScreen> {
       categoryId: _selectedCategoryId,
       inStockOnly: _inStockOnly,
       sortBy: _sortBy,
+      businessType: widget.businessType,
     );
   }
 
@@ -100,105 +105,93 @@ class _ProductSelectionScreenState extends State<ProductSelectionScreen> {
               return cat.name.toLowerCase().contains(catQuery.toLowerCase());
             }).toList();
 
-            return Container(
-              height: MediaQuery.of(context).size.height * 0.65,
-              padding: EdgeInsets.only(
-                top: 20,
-                left: 20,
-                right: 20,
-                bottom: MediaQuery.of(context).viewInsets.bottom + 20,
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Text(
-                        'Search & Select Category',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          color: AppColors.textPrimary,
-                        ),
-                      ),
-                      IconButton(
-                        icon: const Icon(Icons.close),
-                        onPressed: () => Navigator.pop(context),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  TextField(
-                    autofocus: true,
-                    decoration: InputDecoration(
-                      hintText: 'Search category name...',
-                      prefixIcon: const Icon(Icons.search, color: AppColors.primary),
-                      filled: true,
-                      fillColor: AppColors.background,
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: const BorderSide(color: AppColors.borderSoft),
-                      ),
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                    ),
-                    onChanged: (val) {
-                      setModalState(() {
-                        catQuery = val;
-                      });
-                    },
-                  ),
-                  const SizedBox(height: 16),
-                  Expanded(
-                    child: filteredCategories.isEmpty
-                        ? const Center(
-                            child: Text(
-                              'No categories found',
-                              style: TextStyle(color: AppColors.textSecondary),
-                            ),
-                          )
-                        : ListView.separated(
-                            itemCount: filteredCategories.length + 1,
-                            separatorBuilder: (_, __) => const Divider(height: 1, color: AppColors.borderMuted),
-                            itemBuilder: (context, index) {
-                              if (index == 0) {
-                                final isSelected = _selectedCategoryId == null;
-                                return ListTile(
-                                  title: const Text('All Categories', style: TextStyle(fontWeight: FontWeight.w600)),
-                                  trailing: isSelected ? const Icon(Icons.check_circle, color: AppColors.primary) : null,
-                                  onTap: () {
-                                    setState(() {
-                                      _selectedCategoryId = null;
-                                    });
-                                    _fetchProducts();
-                                    Navigator.pop(context);
-                                  },
-                                );
-                              }
-                              final cat = filteredCategories[index - 1];
-                              final isSelected = _selectedCategoryId == cat.id;
-                              return ListTile(
-                                title: Text(
-                                  cat.name,
-                                  style: TextStyle(
-                                    fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                                    color: isSelected ? AppColors.primary : AppColors.textPrimary,
-                                  ),
+            return DraggableScrollableSheet(
+              initialChildSize: 0.65,
+              minChildSize: 0.4,
+              maxChildSize: 0.9,
+              expand: false,
+              builder: (_, scrollController) {
+                return Column(
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.all(16.0),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              const Text(
+                                'Select Category',
+                                style: TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
                                 ),
-                                trailing: isSelected ? const Icon(Icons.check_circle, color: AppColors.primary) : null,
-                                onTap: () {
-                                  setState(() {
-                                    _selectedCategoryId = cat.id;
-                                  });
-                                  _fetchProducts();
-                                  Navigator.pop(context);
-                                },
-                              );
-                            },
+                              ),
+                              IconButton(
+                                icon: const Icon(Icons.close),
+                                onPressed: () => Navigator.pop(ctx),
+                              ),
+                            ],
                           ),
-                  ),
-                ],
-              ),
+                          const SizedBox(height: 12),
+                          TextField(
+                            onChanged: (val) {
+                              setModalState(() {
+                                catQuery = val.trim();
+                              });
+                            },
+                            decoration: ssInputDecoration(
+                              'Search category...',
+                              Icons.search,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const Divider(height: 1),
+                    Expanded(
+                      child: ListView.builder(
+                        controller: scrollController,
+                        itemCount: filteredCategories.length + 1,
+                        itemBuilder: (context, index) {
+                          if (index == 0) {
+                            final isAllSelected = _selectedCategoryId == null;
+                            return ListTile(
+                              title: const Text('All Categories'),
+                              trailing: isAllSelected
+                                  ? const Icon(Icons.check, color: AppColors.primary)
+                                  : null,
+                              onTap: () {
+                                setState(() {
+                                  _selectedCategoryId = null;
+                                });
+                                Navigator.pop(ctx);
+                                _fetchProducts();
+                              },
+                            );
+                          }
+                          final cat = filteredCategories[index - 1];
+                          final isSelected = _selectedCategoryId == cat.id;
+                          return ListTile(
+                            title: Text(cat.name),
+                            trailing: isSelected
+                                ? const Icon(Icons.check, color: AppColors.primary)
+                                : null,
+                            onTap: () {
+                              setState(() {
+                                _selectedCategoryId = cat.id;
+                              });
+                              Navigator.pop(ctx);
+                              _fetchProducts();
+                            },
+                          );
+                        },
+                      ),
+                    ),
+                  ],
+                );
+              },
             );
           },
         );
@@ -210,7 +203,7 @@ class _ProductSelectionScreenState extends State<ProductSelectionScreen> {
     if (_selectedLines.isEmpty) return;
     final lines = _selectedLines.values.toList();
     if (widget.customerName != null || widget.hub != null) {
-      if (widget.saleType == 'secondary') {
+      if (widget.saleType == 'secondary' || widget.businessType == 'mt') {
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(
@@ -222,6 +215,8 @@ class _ProductSelectionScreenState extends State<ProductSelectionScreen> {
               routeId: widget.routeId,
               visitId: widget.visitId,
               initialLines: lines,
+              businessType: widget.businessType,
+              saleType: widget.saleType,
             ),
           ),
         );
@@ -679,6 +674,7 @@ class _ProductSelectionScreenState extends State<ProductSelectionScreen> {
                             product: product,
                             lineEntry: lineEntry,
                             saleType: widget.saleType,
+                            businessType: widget.businessType,
                             onToggleSelect: () => _toggleSelect(product),
                             onQuantityChanged: (qty, damaged, quality) {
                               _updateQuantity(
@@ -751,6 +747,7 @@ class ProductSelectionCard extends StatelessWidget {
     required this.onAdjustWithBillChanged,
     required this.onToggleSelect,
     this.saleType = 'primary',
+    this.businessType = 'gt',
   });
 
   final Product product;
@@ -759,13 +756,20 @@ class ProductSelectionCard extends StatelessWidget {
   final ValueChanged<bool> onAdjustWithBillChanged;
   final VoidCallback onToggleSelect;
   final String saleType;
+  final String businessType;
 
   String _stockLabel() {
+    if (businessType == 'mt') {
+      return 'Price: ৳${product.price.toStringAsFixed(2)}';
+    }
+    // GT Business Type
     final stock = product.stock?.toInt() ?? 0;
-    if (saleType != 'secondary') {
+    if (saleType == 'secondary') {
+      return 'Van Stock: $stock   |   DB Stock: ${product.distributorStock?.toInt() ?? 0}';
+    } else {
+      // GT Primary
       return 'Warehouse Stock: $stock';
     }
-    return 'Van Stock: $stock   |   DB Stock: ${product.distributorStock?.toInt() ?? 0}';
   }
 
   @override
@@ -882,10 +886,10 @@ class ProductSelectionCard extends StatelessWidget {
 
           const Divider(height: 1, color: AppColors.borderSoft),
 
-          // Quantity Inputs Area
+          // Quantity Inputs Area: Branch by businessType -> saleType
           Padding(
             padding: const EdgeInsets.all(14),
-            child: saleType == 'secondary'
+            child: (businessType == 'gt' && saleType == 'secondary')
                 ? Row(
                     children: [
                       Expanded(
@@ -931,13 +935,10 @@ class ProductSelectionCard extends StatelessWidget {
                   ),
           ),
 
-          // Only meaningful once something is actually being returned, so it
-          // stays out of the way until then rather than sitting dead on every
-          // card. Animated so it does not jump in.
           AnimatedSize(
             duration: const Duration(milliseconds: 180),
             curve: Curves.easeOut,
-            child: (saleType == 'secondary' && (lineEntry?.hasReturn ?? false))
+            child: (businessType == 'gt' && saleType == 'secondary' && (lineEntry?.hasReturn ?? false))
                 ? AdjustReturnToggle(
                     value: lineEntry?.adjustWithBill ?? false,
                     vanStock: product.stock?.toInt() ?? 0,

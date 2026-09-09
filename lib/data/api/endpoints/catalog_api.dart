@@ -10,6 +10,7 @@ extension CatalogApi on ApiService {
     int? categoryId,
     bool? inStockOnly,
     String? sortBy,
+    String? businessType,
   }) async {
     final params = <String, dynamic>{'page_size': 1000, 'active': true};
     final query = search?.trim();
@@ -31,6 +32,9 @@ extension CatalogApi on ApiService {
     }
     if (sortBy != null && sortBy.isNotEmpty) {
       params['sort_by'] = sortBy;
+    }
+    if (businessType != null && businessType.isNotEmpty) {
+      params['business_type'] = businessType;
     }
 
     final result = await _post(AppConstants.productsEndpoint, params);

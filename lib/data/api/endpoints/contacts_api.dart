@@ -132,12 +132,14 @@ extension ContactsApi on ApiService {
     int? routeId,
     int? outletClassId,
     int? outletTypeId,
+    String? businessType,
     double? partnerLatitude,
     double? partnerLongitude,
   }) async {
     final params = <String, dynamic>{
       'name': name,
       'customer_type': 'outlet',
+      'business_type': businessType ?? 'gt',
       if (mobile != null && mobile.trim().isNotEmpty) 'mobile': mobile.trim(),
       if (phone != null && phone.trim().isNotEmpty) 'phone': phone.trim(),
       if (email != null && email.trim().isNotEmpty) 'email': email.trim(),

@@ -16,8 +16,10 @@ class SsModuleCode {
   SsModuleCode._();
 
   static const accounts = 'ACC';
-  static const primarySales = 'PS';
-  static const secondarySales = 'SS';
+  static const primarySales = 'GT_PS';
+  static const secondarySales = 'GT_SS';
+  static const modernTrade = 'MT_PS';
+  static const mtSecondarySales = 'MT_SS';
   static const hr = 'HR';
   static const dashboard = 'DSBRD';
 }
@@ -29,10 +31,30 @@ class AppScreen {
   // Top-level modules (module selection screen cards).
   static const modulePrimary = 'screen.module.primary_sale';
   static const moduleSecondary = 'screen.module.secondary_sale';
+  static const moduleMtPrimary = 'screen.module.mt_primary_sale';
+  static const moduleMtSecondary = 'screen.module.mt_secondary_sale';
   static const moduleAttendance = 'screen.module.attendance';
   static const moduleLeave = 'screen.module.leave';
   static const moduleExpense = 'screen.module.accounts';
   static const moduleMyTeam = 'screen.module.dashboard';
+
+  // Modern Trade (MT - Primary Sales) screens.
+  static const mtOutletsList = 'screen.modern_trade.outlets.list';
+  static const mtOutletDetail = 'screen.modern_trade.outlets.detail';
+  static const mtVisitsList = 'screen.modern_trade.visits.list';
+  static const mtNewJointVisit = 'screen.modern_trade.visits.new_joint_visit';
+  static const mtOrdersList = 'screen.modern_trade.orders.list';
+  static const mtOrderDetail = 'screen.modern_trade.orders.detail';
+  static const mtOrderCreate = 'screen.modern_trade.orders.create';
+  static const mtDeliveriesList = 'screen.modern_trade.deliveries.list';
+  static const mtDeliveriesDetail = 'screen.modern_trade.deliveries.detail';
+
+  // Modern Trade (MT - Secondary Sales) screens.
+  static const mtSecStockAuditsList = 'screen.mt_secondary.stock_audit.list';
+  static const mtSecStockAuditsDetail = 'screen.mt_secondary.stock_audit.detail';
+  static const mtSecStockAuditsCreate = 'screen.mt_secondary.stock_audit.create';
+  static const mtSecOrdersList = 'screen.mt_secondary.orders.list';
+  static const mtSecOrdersDetail = 'screen.mt_secondary.orders.detail';
 
   // Shell tabs.
   static const dashboard = 'screen.dashboard.home';
@@ -60,6 +82,8 @@ class AppScreen {
   static const createPrimarySale = 'screen.primary_sale.orders.create';
   static const orderDetail = 'screen.primary_sale.orders.detail';
   static const deliveriesList = 'screen.primary_sale.deliveries.list';
+  static const primaryDeliveriesDetail =
+      'screen.primary_sale.deliveries.detail';
 
   // Secondary sales.
   static const orderCreate = 'screen.secondary_sale.orders.create';
@@ -67,6 +91,8 @@ class AppScreen {
   static const secondaryOrdersList = 'screen.secondary_sale.orders.list';
   static const secondaryDeliveriesList =
       'screen.secondary_sale.deliveries.list';
+  static const secondaryDeliveriesDetail =
+      'screen.secondary_sale.deliveries.detail';
   static const validateDelivery = 'screen.secondary_sale.deliveries.validate';
 
   // Secondary sale van loading.
@@ -106,8 +132,24 @@ class AppScreen {
   static const leaveDashboard = 'screen.hr.leave';
   static const expenseDashboard = 'screen.accounts.expense';
 
-  static String deliveriesListFor(String moduleType) =>
-      moduleType == 'secondary' ? secondaryDeliveriesList : deliveriesList;
+  static String deliveriesListFor(String moduleType) {
+    if (moduleType == 'mt' || moduleType == 'modern_trade' || moduleType == 'mt_primary') {
+      return mtDeliveriesList;
+    }
+    return moduleType == 'secondary' ? secondaryDeliveriesList : deliveriesList;
+  }
+
+  static String deliveryDetailFor(String moduleType, [String? businessType]) {
+    if (businessType == 'mt' ||
+        moduleType == 'mt' ||
+        moduleType == 'modern_trade' ||
+        moduleType == 'mt_primary') {
+      return mtDeliveriesDetail;
+    }
+    return moduleType == 'secondary'
+        ? secondaryDeliveriesDetail
+        : primaryDeliveriesDetail;
+  }
 
   static String returnsListFor(String moduleType) =>
       moduleType == 'secondary' ? secondaryReturnsList : returnsList;
@@ -200,6 +242,19 @@ class AppAction {
   static const secondaryScrapsValidate =
       'action.secondary_sale.scraps.validate';
 
+  // Modern Trade (MT) actions.
+  static const mtVisitCheckIn = 'action.modern_trade.visits.check_in';
+  static const mtVisitCheckOut = 'action.modern_trade.visits.check_out';
+  static const mtJustificationCreate = 'action.modern_trade.justifications.create';
+  static const mtOrderCreate = 'action.modern_trade.orders.create';
+  static const mtOrderConfirm = 'action.modern_trade.orders.confirm';
+  static const mtOrderCancel = 'action.modern_trade.orders.cancel';
+  static const mtDeliveryValidate = 'action.modern_trade.deliveries.validate';
+
+  // Modern Trade (MT - Secondary) actions.
+  static const mtSecStockAuditCreate = 'action.mt_secondary.stock_audit.create';
+  static const mtSecStockAuditConfirm = 'action.mt_secondary.stock_audit.confirm';
+
   // Routes / contacts / employees.
   static const routeCreate = 'action.secondary_sale.routes.create';
   static const routeAddOutlet = 'action.secondary_sale.routes.add_outlet';
@@ -216,17 +271,27 @@ class AppAction {
   static const leaveCreate = 'action.hr.leave.create';
   static const expenseCreate = 'action.accounts.expense.create';
 
-  static String orderCreateFor(String saleType) =>
-      saleType == 'secondary' ? orderCreate : primaryOrderCreate;
+  static String orderCreateFor(String saleType, [String? businessType]) {
+    if (businessType == 'mt' || saleType == 'mt') return mtOrderCreate;
+    return saleType == 'secondary' ? orderCreate : primaryOrderCreate;
+  }
 
-  static String orderConfirmFor(String saleType) =>
-      saleType == 'secondary' ? orderConfirm : primaryOrderConfirm;
+  static String orderConfirmFor(String saleType, [String? businessType]) {
+    if (businessType == 'mt' || saleType == 'mt') return mtOrderConfirm;
+    return saleType == 'secondary' ? orderConfirm : primaryOrderConfirm;
+  }
 
-  static String orderCancelFor(String saleType) =>
-      saleType == 'secondary' ? orderCancel : primaryOrderCancel;
+  static String orderCancelFor(String saleType, [String? businessType]) {
+    if (businessType == 'mt' || saleType == 'mt') return mtOrderCancel;
+    return saleType == 'secondary' ? orderCancel : primaryOrderCancel;
+  }
 
-  static String deliveryValidateFor(String saleType) =>
-      saleType == 'secondary' ? deliveryValidate : primaryDeliveryValidate;
+  static String deliveryValidateFor(String saleType, [String? businessType]) {
+    if (businessType == 'mt' || saleType == 'mt' || saleType == 'modern_trade') {
+      return mtDeliveryValidate;
+    }
+    return saleType == 'secondary' ? deliveryValidate : primaryDeliveryValidate;
+  }
 
   static String returnCreateFor(String moduleType) =>
       moduleType == 'secondary' ? secondaryReturnCreate : returnCreate;
@@ -290,6 +355,8 @@ class AccessResource {
 
 const _ps = <String>[SsModuleCode.primarySales];
 const _ss = <String>[SsModuleCode.secondarySales];
+const _mt = <String>[SsModuleCode.modernTrade];
+const _mtSec = <String>[SsModuleCode.mtSecondarySales];
 const _hr = <String>[SsModuleCode.hr];
 const _acc = <String>[SsModuleCode.accounts];
 const _dashboard = <String>[SsModuleCode.dashboard];
@@ -302,7 +369,7 @@ const List<AccessResource> accessCatalog = [
     AppScreen.modulePrimary,
     'screen',
     'primary_sale',
-    'App Modules › Primary Sales',
+    'App Modules › GT - Primary Sales',
     _ps,
     legacyKeys: ['screen.module.primary'],
   ),
@@ -310,9 +377,24 @@ const List<AccessResource> accessCatalog = [
     AppScreen.moduleSecondary,
     'screen',
     'secondary_sale',
-    'App Modules › Secondary Sales',
+    'App Modules › GT - Secondary Sales',
     _ss,
     legacyKeys: ['screen.module.secondary'],
+  ),
+  AccessResource(
+    AppScreen.moduleMtPrimary,
+    'screen',
+    'modern_trade',
+    'App Modules › MT - Primary Sales',
+    _mt,
+    legacyKeys: ['screen.module.modern_trade'],
+  ),
+  AccessResource(
+    AppScreen.moduleMtSecondary,
+    'screen',
+    'mt_secondary',
+    'App Modules › MT - Secondary Sales',
+    _mtSec,
   ),
   AccessResource(
     AppScreen.moduleAttendance,
@@ -490,6 +572,13 @@ const List<AccessResource> accessCatalog = [
     _ps,
     legacyKeys: ['screen.sales.deliveries_list'],
   ),
+  AccessResource(
+    AppScreen.primaryDeliveriesDetail,
+    'screen',
+    'primary_sale',
+    'Primary Sales › Deliveries › Open detail',
+    _ps,
+  ),
 
   // Secondary sales.
   AccessResource(
@@ -523,6 +612,13 @@ const List<AccessResource> accessCatalog = [
     'Secondary Sales › Deliveries › Open list',
     _ss,
     legacyKeys: ['screen.sales.deliveries_list'],
+  ),
+  AccessResource(
+    AppScreen.secondaryDeliveriesDetail,
+    'screen',
+    'secondary_sale',
+    'Secondary Sales › Deliveries › Open detail',
+    _ss,
   ),
   AccessResource(
     AppScreen.validateDelivery,
@@ -1139,5 +1235,174 @@ const List<AccessResource> accessCatalog = [
     'Accounts › Expenses › Create (button)',
     _acc,
     legacyKeys: ['action.hr.expense_create'],
+  ),
+
+  // Modern Trade (MT) screens.
+  AccessResource(
+    AppScreen.mtOutletsList,
+    'screen',
+    'modern_trade',
+    'Modern Trade › Outlets › Open list',
+    _mt,
+  ),
+  AccessResource(
+    AppScreen.mtOutletDetail,
+    'screen',
+    'modern_trade',
+    'Modern Trade › Outlets › Open detail',
+    _mt,
+  ),
+  AccessResource(
+    AppScreen.mtVisitsList,
+    'screen',
+    'modern_trade',
+    'Modern Trade › Visits › Open list / History',
+    _mt,
+  ),
+  AccessResource(
+    AppScreen.mtNewJointVisit,
+    'screen',
+    'modern_trade',
+    'Modern Trade › Visits › Open joint visit screen',
+    _mt,
+  ),
+  AccessResource(
+    AppScreen.mtOrdersList,
+    'screen',
+    'modern_trade',
+    'Modern Trade › Orders › Open list',
+    _mt,
+  ),
+  AccessResource(
+    AppScreen.mtOrderDetail,
+    'screen',
+    'modern_trade',
+    'Modern Trade › Orders › Open detail',
+    _mt,
+  ),
+  AccessResource(
+    AppScreen.mtOrderCreate,
+    'screen',
+    'modern_trade',
+    'Modern Trade › Orders › Open create screen',
+    _mt,
+  ),
+  AccessResource(
+    AppScreen.mtDeliveriesList,
+    'screen',
+    'modern_trade',
+    'Modern Trade › Deliveries › Open list',
+    _mt,
+  ),
+  AccessResource(
+    AppScreen.mtDeliveriesDetail,
+    'screen',
+    'modern_trade',
+    'Modern Trade › Deliveries › Open detail',
+    _mt,
+  ),
+
+  // Modern Trade (MT) actions.
+  AccessResource(
+    AppAction.mtVisitCheckIn,
+    'action',
+    'modern_trade',
+    'Modern Trade › Visits › Check in (button)',
+    _mt,
+  ),
+  AccessResource(
+    AppAction.mtVisitCheckOut,
+    'action',
+    'modern_trade',
+    'Modern Trade › Visits › Check out (button)',
+    _mt,
+  ),
+  AccessResource(
+    AppAction.mtJustificationCreate,
+    'action',
+    'modern_trade',
+    'Modern Trade › Justifications › Create (button)',
+    _mt,
+  ),
+  AccessResource(
+    AppAction.mtOrderCreate,
+    'action',
+    'modern_trade',
+    'Modern Trade › Orders › Create (button)',
+    _mt,
+  ),
+  AccessResource(
+    AppAction.mtOrderConfirm,
+    'action',
+    'modern_trade',
+    'Modern Trade › Orders › Confirm (button)',
+    _mt,
+  ),
+  AccessResource(
+    AppAction.mtOrderCancel,
+    'action',
+    'modern_trade',
+    'Modern Trade › Orders › Cancel (button)',
+    _mt,
+  ),
+  AccessResource(
+    AppAction.mtDeliveryValidate,
+    'action',
+    'modern_trade',
+    'Modern Trade › Deliveries › Validate (button)',
+    _mt,
+  ),
+
+  // Modern Trade (MT - Secondary Sales) screens.
+  AccessResource(
+    AppScreen.mtSecStockAuditsList,
+    'screen',
+    'mt_secondary',
+    'MT Secondary › Stock Audits › Open list',
+    _mtSec,
+  ),
+  AccessResource(
+    AppScreen.mtSecStockAuditsDetail,
+    'screen',
+    'mt_secondary',
+    'MT Secondary › Stock Audits › Open detail',
+    _mtSec,
+  ),
+  AccessResource(
+    AppScreen.mtSecStockAuditsCreate,
+    'screen',
+    'mt_secondary',
+    'MT Secondary › Stock Audits › Open create screen',
+    _mtSec,
+  ),
+  AccessResource(
+    AppScreen.mtSecOrdersList,
+    'screen',
+    'mt_secondary',
+    'MT Secondary › Orders › Open list',
+    _mtSec,
+  ),
+  AccessResource(
+    AppScreen.mtSecOrdersDetail,
+    'screen',
+    'mt_secondary',
+    'MT Secondary › Orders › Open detail',
+    _mtSec,
+  ),
+
+  // Modern Trade (MT - Secondary Sales) actions.
+  AccessResource(
+    AppAction.mtSecStockAuditCreate,
+    'action',
+    'mt_secondary',
+    'MT Secondary › Stock Audits › Create (button)',
+    _mtSec,
+  ),
+  AccessResource(
+    AppAction.mtSecStockAuditConfirm,
+    'action',
+    'mt_secondary',
+    'MT Secondary › Stock Audits › Confirm (button)',
+    _mtSec,
   ),
 ];

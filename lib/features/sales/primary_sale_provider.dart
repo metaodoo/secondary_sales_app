@@ -232,6 +232,7 @@ class PrimarySaleProvider with ChangeNotifier {
     int? categoryId,
     bool? inStockOnly,
     String? sortBy,
+    String? businessType,
   }) async {
     _error = null;
     notifyListeners();
@@ -244,6 +245,7 @@ class PrimarySaleProvider with ChangeNotifier {
         categoryId: categoryId,
         inStockOnly: inStockOnly,
         sortBy: sortBy,
+        businessType: businessType,
       );
       _products = res.products;
       _totalProductCount = res.totalCount;
@@ -257,6 +259,7 @@ class PrimarySaleProvider with ChangeNotifier {
   Future<SaleOrderDetail?> fetchOrderDetail(
     int orderId, {
     String saleType = 'primary',
+    String? businessType,
   }) async {
     _loadingCount++;
     _error = null;
@@ -266,6 +269,7 @@ class PrimarySaleProvider with ChangeNotifier {
       _selectedOrder = await _apiService.getPrimarySaleOrderDetail(
         orderId,
         saleType: saleType,
+        businessType: businessType,
       );
       return _selectedOrder;
     } catch (e) {

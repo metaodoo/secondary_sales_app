@@ -11,6 +11,7 @@ import 'package:secondary_sales/data/models/sales/product_category.dart';
 import 'package:secondary_sales/data/models/contacts/distribution_hub.dart';
 import 'package:secondary_sales/data/models/contacts/outlet_class.dart';
 import 'package:secondary_sales/data/models/contacts/outlet_type.dart';
+import 'package:secondary_sales/data/models/contacts/res_zone.dart';
 import 'package:secondary_sales/data/models/employees/sales_employee.dart';
 import 'package:secondary_sales/data/models/sales/primary_order.dart';
 import 'package:secondary_sales/data/models/sales/sale_order_detail.dart';
@@ -24,6 +25,7 @@ import 'package:secondary_sales/data/models/routes/visit_reason.dart';
 import 'package:secondary_sales/core/access/access_control.dart';
 import 'package:secondary_sales/core/access/access_resources.dart';
 import 'package:secondary_sales/core/util/parse.dart';
+import 'package:secondary_sales/data/models/modern_trade/mt_stock_audit.dart';
 
 part 'endpoints/device_api.dart';
 part 'endpoints/contacts_api.dart';
@@ -44,6 +46,7 @@ part 'endpoints/my_team_api.dart';
 part 'endpoints/location_api.dart';
 part 'endpoints/dashboard_api.dart';
 part 'endpoints/notification_api.dart';
+part 'endpoints/modern_trade_api.dart';
 
 class ApiService {
   ApiService._internal();

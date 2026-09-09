@@ -63,6 +63,14 @@ class AppShellNavItem {
           stackIndex == AppShellIndex.sales) {
         return false;
       }
+    } else if (moduleType == 'mt_primary' || moduleType == 'mt_secondary' || moduleType == 'modern_trade') {
+      if (stackIndex == AppShellIndex.dealers ||
+          stackIndex == AppShellIndex.sales ||
+          stackIndex == AppShellIndex.routes ||
+          stackIndex == AppShellIndex.vanLoad ||
+          stackIndex == AppShellIndex.vanUnload) {
+        return false;
+      }
     }
 
     return true;

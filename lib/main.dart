@@ -12,6 +12,7 @@ import 'package:secondary_sales/features/returns/return_provider.dart';
 import 'package:secondary_sales/features/scraps/scrap_provider.dart';
 import 'package:secondary_sales/features/employees/employee_provider.dart';
 import 'package:secondary_sales/features/routes/route_provider.dart';
+import 'package:secondary_sales/features/modern_trade/modern_trade_provider.dart';
 import 'package:secondary_sales/features/my_team/my_team_provider.dart';
 import 'package:secondary_sales/features/auth/screens/auth_gate.dart';
 import 'package:secondary_sales/features/dashboard/dashboard_provider.dart';
@@ -177,6 +178,18 @@ Future<void> main() async {
           create: (_) => MyTeamProvider(),
           update: (_, auth, myTeam) {
             final provider = myTeam ?? MyTeamProvider();
+            provider.updateAuth(
+              accessToken: auth.accessToken,
+              sessionId: auth.sessionId,
+              employeeId: auth.employeeId,
+            );
+            return provider;
+          },
+        ),
+        ChangeNotifierProxyProvider<AuthProvider, ModernTradeProvider>(
+          create: (_) => ModernTradeProvider(),
+          update: (_, auth, mt) {
+            final provider = mt ?? ModernTradeProvider();
             provider.updateAuth(
               accessToken: auth.accessToken,
               sessionId: auth.sessionId,

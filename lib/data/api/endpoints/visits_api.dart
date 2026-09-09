@@ -24,6 +24,7 @@ extension VisitsApi on ApiService {
     String? image1920,
     double? latitude,
     double? longitude,
+    String? businessType,
   }) async {
     final params = <String, dynamic>{
       'employee_id': employeeId,
@@ -35,6 +36,7 @@ extension VisitsApi on ApiService {
     if (image1920 != null && image1920.isNotEmpty) params['image_1920'] = image1920;
     if (latitude != null) params['latitude'] = latitude;
     if (longitude != null) params['longitude'] = longitude;
+    if (businessType != null) params['business_type'] = businessType;
 
     final result = await _post(
       '${AppConstants.apiPrefix}/visits/create',

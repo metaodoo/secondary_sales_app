@@ -9,6 +9,7 @@ import 'package:secondary_sales/features/sales/primary_sale_provider.dart';
 import 'package:secondary_sales/features/sales/screens/order_detail_screen.dart';
 import 'package:secondary_sales/features/sales/screens/order_creation_screen.dart';
 import 'package:secondary_sales/features/routes/screens/officer_route_selection_screen.dart';
+import 'package:secondary_sales/features/modern_trade/screens/mt_outlets_screen.dart';
 import 'package:secondary_sales/features/auth/auth_provider.dart';
 import 'package:secondary_sales/core/access/access_resources.dart';
 import 'package:secondary_sales/data/api/api_service.dart';
@@ -29,6 +30,9 @@ class SecondaryOrdersListScreen extends StatefulWidget {
   /// edit are secondary-only flows and are hidden.
   final String saleType;
 
+  /// 'gt' (default) or 'mt'.
+  final String businessType;
+
   /// Optional app-bar title override.
   final String? titleOverride;
 
@@ -40,6 +44,7 @@ class SecondaryOrdersListScreen extends StatefulWidget {
     this.initialDateFrom,
     this.initialDateTo,
     this.saleType = 'secondary',
+    this.businessType = 'gt',
     this.titleOverride,
   });
 
@@ -88,6 +93,7 @@ class _SecondaryOrdersListScreenState extends State<SecondaryOrdersListScreen> {
         dateFrom: _dateFromFilter,
         dateTo: _dateToFilter,
         saleType: widget.saleType,
+        businessType: widget.businessType,
         outletId: widget.outletId,
         visitId: widget.visitId,
       );
@@ -208,9 +214,11 @@ class _SecondaryOrdersListScreenState extends State<SecondaryOrdersListScreen> {
           widget.titleOverride ??
               (widget.outletName != null
                   ? '${widget.outletName} Orders'
-                  : (widget.saleType == 'primary'
-                        ? 'Primary Sales Orders'
-                        : 'Secondary Sales Orders')),
+                  : (widget.businessType == 'mt'
+                        ? 'Modern Trade Sales Orders'
+                        : (widget.saleType == 'primary'
+                              ? 'Primary Sales Orders'
+                              : 'Secondary Sales Orders'))),
           style: const TextStyle(
             color: AppColors.primaryStrong,
             fontWeight: FontWeight.bold,
@@ -230,18 +238,29 @@ class _SecondaryOrdersListScreenState extends State<SecondaryOrdersListScreen> {
         ),
       ),
       floatingActionButton:
-          (widget.saleType == 'secondary' &&
-                  context.watch<AuthProvider>().canView(AppScreen.orderCreate))
+          (widget.businessType == 'mt' ||
+                  (widget.saleType == 'secondary' &&
+                      context.watch<AuthProvider>().canView(AppScreen.orderCreate)))
               ? SsCreateFab(
                   label: 'New Sales Order',
                   onPressed: () {
-                    Navigator.of(context)
-                        .push(
-                          MaterialPageRoute(
-                            builder: (_) => const OfficerRouteSelectionScreen(),
-                          ),
-                        )
-                        .then((_) => _fetchOrders());
+                    if (widget.businessType == 'mt') {
+                      Navigator.of(context)
+                          .push(
+                            MaterialPageRoute(
+                              builder: (_) => const MtOutletsScreen(),
+                            ),
+                          )
+                          .then((_) => _fetchOrders());
+                    } else {
+                      Navigator.of(context)
+                          .push(
+                            MaterialPageRoute(
+                              builder: (_) => const OfficerRouteSelectionScreen(),
+                            ),
+                          )
+                          .then((_) => _fetchOrders());
+                    }
                   },
                 )
               : null,
@@ -505,6 +524,7 @@ class _SecondaryOrdersListScreenState extends State<SecondaryOrdersListScreen> {
                               orderId: order.id,
                               fallbackName: order.name,
                               saleType: widget.saleType,
+                              businessType: widget.businessType,
                             ),
                           ),
                         );
@@ -518,6 +538,8 @@ class _SecondaryOrdersListScreenState extends State<SecondaryOrdersListScreen> {
                                     outletId: order.hubId,
                                     customerName: order.hubName,
                                     editOrderId: order.id,
+                                    businessType: widget.businessType,
+                                    saleType: widget.saleType,
                                   ),
                                 ),
                               );

@@ -11,6 +11,7 @@ extension SalesApi on ApiService {
     DateTime? dateFrom,
     DateTime? dateTo,
     String saleType = 'primary',
+    String? businessType,
     int? outletId,
     int? visitId,
   }) async {
@@ -20,6 +21,9 @@ extension SalesApi on ApiService {
       'page': page,
       'page_size': pageSize,
     };
+    if (businessType != null) {
+      params['business_type'] = businessType;
+    }
     if (outletId != null) {
       params['outlet_id'] = outletId;
     }
@@ -56,11 +60,19 @@ extension SalesApi on ApiService {
     throw Exception(result['message'] ?? 'Failed to load orders');
   }
 
-  Future<SaleOrderDetail> getPrimarySaleOrderDetail(int orderId, {String saleType = 'primary'}) async {
-    final result = await _post('${AppConstants.saleOrdersEndpoint}/$orderId', {
+  Future<SaleOrderDetail> getPrimarySaleOrderDetail(
+    int orderId, {
+    String saleType = 'primary',
+    String? businessType,
+  }) async {
+    final payload = <String, dynamic>{
       'employee_id': _activeEmployeeId,
       'sale_type': saleType,
-    });
+    };
+    if (businessType != null) {
+      payload['business_type'] = businessType;
+    }
+    final result = await _post('${AppConstants.saleOrdersEndpoint}/$orderId', payload);
     if (result['success'] == true) {
       return SaleOrderDetail.fromMap(result['data'] ?? <String, dynamic>{});
     }

@@ -103,16 +103,32 @@ class AuthProvider with ChangeNotifier {
     return role != 'so' && role != 'sales officer';
   }
 
+  /// User business type (gt / mt) from session
+  String get businessType => _session?.user.businessType ?? 'gt';
+  bool get isModernTrade => businessType == 'mt';
+  bool get isGeneralTrade => businessType == 'gt';
+
   bool get canAccessDealers =>
       _enforcedOr(AppScreen.dealers, _legacyManagerAccess);
 
-  // By default, Primary Sales (Company -> Distributor) is restricted to managers/TSMs.
+  // GT - Primary Sales (Company -> Distributor) restricted to managers/TSMs by default.
   bool get canAccessPrimarySales =>
-      _enforcedOr(AppScreen.modulePrimary, _legacyManagerAccess);
+      _enforcedOr(AppScreen.modulePrimary, isGeneralTrade && _legacyManagerAccess);
 
-  // Secondary Sales (Distributor -> Outlet) is accessible by SOs and TSMs.
+  // GT - Secondary Sales (Distributor -> Outlet) accessible by SOs and TSMs in GT.
   bool get canAccessSecondarySales =>
-      _enforcedOr(AppScreen.moduleSecondary, true);
+      _enforcedOr(AppScreen.moduleSecondary, isGeneralTrade);
+
+  // MT - Primary Sales (Direct Superstore Orders & Visits)
+  bool get canAccessMtPrimarySales =>
+      _enforcedOr(AppScreen.moduleMtPrimary, isModernTrade);
+
+  // MT - Secondary Sales (Stock Audit & Secondary Sales Calculation)
+  bool get canAccessMtSecondarySales =>
+      _enforcedOr(AppScreen.moduleMtSecondary, isModernTrade);
+
+  // Backward compatibility alias
+  bool get canAccessModernTrade => canAccessMtPrimarySales;
 
   /// Backend-driven screen/action access for the current user's group.
   /// Empty (allow-all) until the backend ships grants — see ACCESS_CONTROL_PLAN.md.

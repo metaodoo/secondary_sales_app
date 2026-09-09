@@ -15,6 +15,7 @@ import 'package:secondary_sales/features/sales/screens/home_tab.dart';
 import 'package:secondary_sales/features/sales/screens/order_tab.dart';
 import 'package:secondary_sales/features/routes/screens/officer_route_selection_screen.dart';
 import 'package:secondary_sales/features/settings/screens/settings_tab.dart';
+import 'package:secondary_sales/features/modern_trade/screens/mt_outlets_screen.dart';
 import 'package:secondary_sales/core/access/access_resources.dart';
 import 'package:secondary_sales/core/theme/app_theme.dart';
 
@@ -236,12 +237,18 @@ class _AppShellState extends State<AppShell> {
           _refreshOrders();
         },
       ),
-      () => OrderTab(
-        searchController: _distributorSearchController,
-        onSearchChanged: _onDistributorSearchChanged,
-        onBack: _goBack,
-        onOpenMenu: () => _scaffoldKey.currentState?.openEndDrawer(),
-      ),
+      () => (widget.moduleType == 'mt_primary' || widget.moduleType == 'modern_trade')
+          ? MtOutletsScreen(
+              onBack: _goBack,
+              onOpenMenu: () => _scaffoldKey.currentState?.openEndDrawer(),
+              onProfileTap: () => _setIndex(5),
+            )
+          : OrderTab(
+              searchController: _distributorSearchController,
+              onSearchChanged: _onDistributorSearchChanged,
+              onBack: _goBack,
+              onOpenMenu: () => _scaffoldKey.currentState?.openEndDrawer(),
+            ),
       () => SettingsTab(
         onBack: _goBack,
         onOpenMenu: () => _scaffoldKey.currentState?.openEndDrawer(),

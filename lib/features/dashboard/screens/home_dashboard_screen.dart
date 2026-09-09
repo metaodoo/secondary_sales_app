@@ -205,6 +205,8 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
 
     final canAccessPrimary = auth.canAccessPrimarySales;
     final canAccessSecondary = auth.canAccessSecondarySales;
+    final canAccessMtPrimary = auth.canAccessMtPrimarySales;
+    final canAccessMtSecondary = auth.canAccessMtSecondarySales;
     final canAccessAttendance = auth.canView(AppScreen.moduleAttendance);
     final canAccessLeave = auth.canView(AppScreen.moduleLeave);
     final canAccessExpense = auth.canView(AppScreen.moduleExpense);
@@ -231,17 +233,31 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
     final moduleItems = <_ModuleItem>[
       if (canAccessPrimary)
         _ModuleItem(
-          title: 'Primary',
+          title: 'GT - Primary',
           icon: Icons.factory_outlined,
           color: AppColors.primaryStrong,
           onTap: () => _open(const AppShell(moduleType: 'primary')),
         ),
       if (canAccessSecondary)
         _ModuleItem(
-          title: 'Secondary',
+          title: 'GT - Secondary',
           icon: Icons.storefront_outlined,
           color: const Color(0xFF10B981),
           onTap: () => _open(const AppShell(moduleType: 'secondary')),
+        ),
+      if (canAccessMtPrimary)
+        _ModuleItem(
+          title: 'MT - Primary',
+          icon: Icons.corporate_fare_outlined,
+          color: const Color(0xFF0284C7),
+          onTap: () => _open(const AppShell(moduleType: 'modern_trade')),
+        ),
+      if (canAccessMtSecondary)
+        _ModuleItem(
+          title: 'MT - Secondary',
+          icon: Icons.inventory_2_outlined,
+          color: const Color(0xFF0D9488),
+          onTap: () => _open(const AppShell(moduleType: 'mt_secondary')),
         ),
       if (canAccessAttendance)
         _ModuleItem(
@@ -366,7 +382,6 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
               ],
 
               const SectionHeader(title: 'Summary'),
-              const SizedBox(height: 12),
               _RangeSelector(preset: _preset, onSelect: _selectPreset),
               const SizedBox(height: 12),
 
