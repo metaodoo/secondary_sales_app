@@ -25,15 +25,15 @@ class DeliveriesListScreen extends StatefulWidget {
 class _DeliveriesListScreenState extends State<DeliveriesListScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
-  final List<String> _tabs = ['own', 'pending'];
-  final List<String> _tabLabels = ['Own Deliveries', 'Pending Deliveries'];
+  final List<String> _tabs = ['pending', 'own'];
+  final List<String> _tabLabels = ['Pending Deliveries', 'Own Deliveries'];
   final TextEditingController _searchController = TextEditingController();
 
   bool _isLoading = false;
   List<DeliveryItem> _deliveries = [];
   String? _error;
 
-  String _activeTab = 'own';
+  String _activeTab = 'pending';
   DateTime? _dateFromFilter;
   DateTime? _dateToFilter;
 

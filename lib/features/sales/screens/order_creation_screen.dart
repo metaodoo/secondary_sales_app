@@ -16,6 +16,7 @@ class OrderLineModel {
   final double unitPrice;
   final int dbStock;
   final int vanStock;
+  final String? uom;
   int orderQty;
   int damagedExpiredQty;
   int damageQualityQty;
@@ -27,6 +28,7 @@ class OrderLineModel {
     required this.unitPrice,
     this.dbStock = 0,
     this.vanStock = 0,
+    this.uom,
     this.orderQty = 0,
     this.damagedExpiredQty = 0,
     this.damageQualityQty = 0,
@@ -91,6 +93,7 @@ class _OrderCreationScreenState extends State<OrderCreationScreen> {
             unitPrice: entry.product.price,
             dbStock: entry.product.distributorStock?.toInt() ?? 0,
             vanStock: entry.product.stock?.toInt() ?? 0,
+            uom: entry.product.uom,
             orderQty: entry.quantity,
             damagedExpiredQty: entry.damagedQty,
             damageQualityQty: entry.qualityQty,
@@ -125,6 +128,7 @@ class _OrderCreationScreenState extends State<OrderCreationScreen> {
                     (line.product!.qtyAvailable ??
                             (line.orderedQty + line.balanceQty))
                         .toInt(),
+                uom: line.uomName,
                 orderQty: line.orderedQty.toInt(),
                 damagedExpiredQty: line.damagedExpiredQty.toInt(),
                 damageQualityQty: line.damageQualityQty.toInt(),
@@ -664,7 +668,14 @@ class _OrderCreationScreenState extends State<OrderCreationScreen> {
               ),
             ],
           ),
-          if (widget.businessType == 'gt' && widget.saleType == 'secondary') ...[
+          if (widget.businessType == 'mt') ...[
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                _buildBadge('Available Stock: ${line.vanStock} ${line.uom ?? ""}'.trim()),
+              ],
+            ),
+          ] else if (widget.businessType == 'gt' && widget.saleType == 'secondary') ...[
             const SizedBox(height: 12),
             // Stock Badges
             Row(
