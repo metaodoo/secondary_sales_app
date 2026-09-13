@@ -48,6 +48,13 @@ bool asBool(Object? value) {
   return false;
 }
 
+/// Non-null string. Returns [defaultValue] when absent (null or false) or empty.
+String asString(Object? value, {String defaultValue = ''}) {
+  if (value == null || value == false) return defaultValue;
+  final str = value.toString();
+  return str.isEmpty ? defaultValue : str;
+}
+
 /// String or null. Maps `null`, `false` and empty strings to null.
 String? asNullableString(Object? value) {
   if (value == null || value == false) return null;

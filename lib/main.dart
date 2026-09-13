@@ -17,6 +17,7 @@ import 'package:secondary_sales/features/my_team/my_team_provider.dart';
 import 'package:secondary_sales/features/auth/screens/auth_gate.dart';
 import 'package:secondary_sales/features/dashboard/dashboard_provider.dart';
 import 'package:secondary_sales/features/notifications/notification_provider.dart';
+import 'package:secondary_sales/features/notifications/notice_provider.dart';
 import 'package:secondary_sales/features/hr/leave_provider.dart';
 import 'package:secondary_sales/features/hr/attendance_provider.dart';
 import 'package:secondary_sales/features/dashboard/screens/home_dashboard_screen.dart';
@@ -40,6 +41,7 @@ Future<void> _reconcileLocationTracking(AuthProvider auth) async {
   }
   try {
     ApiService.instance.updateAccessToken(auth.accessToken);
+
     ApiService.instance.updateSessionId(auth.sessionId);
     ApiService.instance.updateEmployeeId(auth.employeeId);
 
@@ -225,6 +227,18 @@ Future<void> main() async {
             if (!auth.isAuthenticated) {
               provider.clearData(notify: false);
             }
+            return provider;
+          },
+        ),
+        ChangeNotifierProxyProvider<AuthProvider, NoticeProvider>(
+          create: (_) => NoticeProvider(),
+          update: (_, auth, notices) {
+            final provider = notices ?? NoticeProvider();
+            provider.updateAuth(
+              accessToken: auth.accessToken,
+              sessionId: auth.sessionId,
+              employeeId: auth.employeeId,
+            );
             return provider;
           },
         ),

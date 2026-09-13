@@ -21,6 +21,8 @@ import 'package:secondary_sales/data/models/inventory/warehouse.dart';
 import 'package:secondary_sales/data/models/inventory/virtual_transfer.dart';
 import 'package:secondary_sales/data/models/dashboard/dashboard_summary.dart';
 import 'package:secondary_sales/data/models/notifications/app_notification.dart';
+import 'package:secondary_sales/data/models/notifications/app_notice.dart';
+import 'package:secondary_sales/data/models/notifications/notice_channel.dart';
 import 'package:secondary_sales/data/models/routes/visit_reason.dart';
 import 'package:secondary_sales/core/access/access_control.dart';
 import 'package:secondary_sales/core/access/access_resources.dart';
@@ -46,6 +48,7 @@ part 'endpoints/my_team_api.dart';
 part 'endpoints/location_api.dart';
 part 'endpoints/dashboard_api.dart';
 part 'endpoints/notification_api.dart';
+part 'endpoints/notice_api.dart';
 part 'endpoints/modern_trade_api.dart';
 
 class ApiService {

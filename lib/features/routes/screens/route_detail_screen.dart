@@ -1,10 +1,13 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:secondary_sales/core/theme/app_theme.dart';
 import 'package:provider/provider.dart';
 
 import 'package:secondary_sales/data/models/routes/route.dart';
 import 'package:secondary_sales/features/routes/route_provider.dart';
 import 'package:secondary_sales/core/services/location_service.dart';
+import 'package:secondary_sales/core/util/proximity_helper.dart';
 import 'package:secondary_sales/features/visits/screens/route_sessions_screen.dart';
 import 'package:secondary_sales/features/auth/auth_provider.dart';
 import 'package:secondary_sales/core/access/access_resources.dart';
@@ -21,12 +24,49 @@ class RouteDetailScreen extends StatefulWidget {
 }
 
 class _RouteDetailScreenState extends State<RouteDetailScreen> {
+  StreamSubscription<Position>? _positionStreamSub;
+  final TextEditingController _outletSearchController = TextEditingController();
+  String _outletSearchQuery = '';
+
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<RouteProvider>().fetchRouteDetail(widget.routeId);
+      final provider = context.read<RouteProvider>();
+      provider.fetchRouteDetail(widget.routeId);
+      provider.refreshGpsPosition(requireFresh: false);
     });
+
+    _startLocationStream();
+  }
+
+  void _startLocationStream() {
+    try {
+      _positionStreamSub = Geolocator.getPositionStream(
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.high,
+          distanceFilter: 20,
+        ),
+      ).listen(
+        (Position position) {
+          if (mounted) {
+            context.read<RouteProvider>().updateLocation(position);
+          }
+        },
+        onError: (e) {
+          debugPrint('Location stream error in RouteDetailScreen: $e');
+        },
+      );
+    } catch (e) {
+      debugPrint('Could not initialize location stream: $e');
+    }
+  }
+
+  @override
+  void dispose() {
+    _positionStreamSub?.cancel();
+    _outletSearchController.dispose();
+    super.dispose();
   }
 
   void _openAddOutletSheet() {
@@ -201,131 +241,267 @@ class _RouteDetailScreenState extends State<RouteDetailScreen> {
                   ),
                   const SizedBox(height: 8),
 
-                  // Outlets List
-                  route.outlets.isEmpty
-                      ? const EmptyPanel(
-                          message: 'No outlets assigned to this route yet.',
-                        )
-                      : Column(
-                          children: route.outlets.map((outlet) {
-                            return Container(
-                              margin: const EdgeInsets.only(bottom: 12),
-                              decoration: ssPanelDecoration(),
-                              child: ListTile(
-                                contentPadding: const EdgeInsets.all(16),
-                                leading: Container(
-                                  width: 44,
-                                  height: 44,
-                                  decoration: BoxDecoration(
-                                    color: AppColors.primarySoft,
-                                    borderRadius: BorderRadius.circular(8),
-                                  ),
-                                  child: const Icon(
-                                    Icons.store,
-                                    color: Color(0xFF3B82F6),
-                                  ),
+                  // Search Bar for Outlets
+                  TextField(
+                    controller: _outletSearchController,
+                    onChanged: (val) => setState(() => _outletSearchQuery = val.trim()),
+                    decoration: ssInputDecoration(
+                      'Search route outlets...',
+                      Icons.search,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+
+                  // Proximity Sort & GPS Toolbar
+                  Row(
+                    children: [
+                      // Sort Nearest Toggle Button
+                      InkWell(
+                        onTap: () {
+                          provider.toggleSortByNearest();
+                          if (provider.sortByNearest && provider.currentPosition == null) {
+                            provider.refreshGpsPosition(requireFresh: false);
+                          }
+                        },
+                        borderRadius: BorderRadius.circular(20),
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 200),
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: provider.sortByNearest
+                                ? AppColors.primaryStrong
+                                : Colors.white,
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(
+                              color: provider.sortByNearest
+                                  ? AppColors.primaryStrong
+                                  : AppColors.borderSoft,
+                            ),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.near_me,
+                                size: 14,
+                                color: provider.sortByNearest
+                                    ? Colors.white
+                                    : AppColors.textSecondary,
+                              ),
+                              const SizedBox(width: 6),
+                              Text(
+                                provider.sortByNearest ? 'Nearest First' : 'Sequence Order',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                  color: provider.sortByNearest
+                                      ? Colors.white
+                                      : AppColors.textSecondary,
                                 ),
-                                title: Row(
-                                  children: [
-                                    Expanded(
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      const Spacer(),
+                      // Refresh GPS Button
+                      InkWell(
+                        onTap: provider.isGpsRefreshing
+                            ? null
+                            : () async {
+                                final pos = await provider.refreshGpsPosition(requireFresh: true);
+                                if (pos != null && mounted) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                      content: Text('GPS location updated.'),
+                                      duration: Duration(seconds: 1),
+                                    ),
+                                  );
+                                }
+                              },
+                        borderRadius: BorderRadius.circular(20),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(color: AppColors.borderSoft),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              if (provider.isGpsRefreshing)
+                                const SizedBox(
+                                  width: 12,
+                                  height: 12,
+                                  child: CircularProgressIndicator(strokeWidth: 2),
+                                )
+                              else
+                                const Icon(
+                                  Icons.my_location,
+                                  size: 14,
+                                  color: AppColors.primaryStrong,
+                                ),
+                              const SizedBox(width: 5),
+                              Text(
+                                provider.isGpsRefreshing ? 'Updating...' : 'Refresh GPS',
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                  color: AppColors.primaryStrong,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+
+                  // Outlets List
+                  Builder(
+                    builder: (context) {
+                      final sortedOutlets = provider.getSortedRouteOutlets(
+                        route.outlets,
+                        searchQuery: _outletSearchQuery,
+                      );
+
+                      if (sortedOutlets.isEmpty) {
+                        return const EmptyPanel(
+                          message: 'No outlets match criteria for this route.',
+                        );
+                      }
+
+                      return Column(
+                        children: sortedOutlets.map((outlet) {
+                          final distanceMeters = ProximityHelper.calculateDistance(
+                            userLat: provider.currentPosition?.latitude,
+                            userLng: provider.currentPosition?.longitude,
+                            outletLat: outlet.partnerLatitude,
+                            outletLng: outlet.partnerLongitude,
+                          );
+
+                          return Container(
+                            margin: const EdgeInsets.only(bottom: 12),
+                            decoration: ssPanelDecoration(),
+                            child: ListTile(
+                              contentPadding: const EdgeInsets.all(16),
+                              leading: Container(
+                                width: 44,
+                                height: 44,
+                                decoration: BoxDecoration(
+                                  color: AppColors.primarySoft,
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: const Icon(
+                                  Icons.store,
+                                  color: Color(0xFF3B82F6),
+                                ),
+                              ),
+                              title: Row(
+                                children: [
+                                  Expanded(
+                                    child: Text(
+                                      outlet.name,
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 15,
+                                        color: AppColors.textPrimary,
+                                      ),
+                                    ),
+                                  ),
+                                  if (distanceMeters != null) ...[
+                                    _buildDistanceBadge(
+                                      distanceMeters,
+                                      outlet: outlet,
+                                      userPosition: provider.currentPosition,
+                                    ),
+                                    const SizedBox(width: 6),
+                                  ],
+                                  if (outlet.sequence > 0)
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 6,
+                                        vertical: 2,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: Colors.grey.shade100,
+                                        borderRadius: BorderRadius.circular(4),
+                                      ),
                                       child: Text(
-                                        outlet.name,
-                                        style: const TextStyle(
+                                        'Seq: ${outlet.sequence}',
+                                        style: TextStyle(
+                                          fontSize: 11,
+                                          color: Colors.grey.shade600,
                                           fontWeight: FontWeight.bold,
-                                          fontSize: 15,
-                                          color: AppColors.textPrimary,
                                         ),
                                       ),
                                     ),
-                                    if (outlet.sequence > 0)
-                                      Container(
-                                        padding: const EdgeInsets.symmetric(
-                                          horizontal: 6,
-                                          vertical: 2,
-                                        ),
-                                        decoration: BoxDecoration(
-                                          color: Colors.grey.shade100,
-                                          borderRadius: BorderRadius.circular(
-                                            4,
-                                          ),
-                                        ),
-                                        child: Text(
-                                          'Seq: ${outlet.sequence}',
-                                          style: TextStyle(
-                                            fontSize: 11,
-                                            color: Colors.grey.shade600,
-                                            fontWeight: FontWeight.bold,
-                                          ),
-                                        ),
-                                      ),
-                                  ],
-                                ),
-                                subtitle: Padding(
-                                  padding: const EdgeInsets.only(top: 8.0),
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      if (outlet.mobile != null ||
-                                          outlet.phone != null)
-                                        Row(
-                                          children: [
-                                            const Icon(
-                                              Icons.phone_outlined,
-                                              size: 13,
-                                              color: AppColors.textSecondary,
-                                            ),
-                                            const SizedBox(width: 4),
-                                            Text(
-                                              outlet.mobile ??
-                                                  outlet.phone ??
-                                                  '',
-                                              style: const TextStyle(
-                                                color: AppColors.textSecondary,
-                                                fontSize: 13,
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      const SizedBox(height: 4),
+                                ],
+                              ),
+                              subtitle: Padding(
+                                padding: const EdgeInsets.only(top: 8.0),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    if (outlet.mobile != null || outlet.phone != null)
                                       Row(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
                                         children: [
                                           const Icon(
-                                            Icons.location_on_outlined,
+                                            Icons.phone_outlined,
                                             size: 13,
                                             color: AppColors.textSecondary,
                                           ),
                                           const SizedBox(width: 4),
-                                          Expanded(
-                                            child: Text(
-                                              _buildOutletAddress(outlet),
-                                              style: const TextStyle(
-                                                color: AppColors.textSecondary,
-                                                fontSize: 13,
-                                              ),
-                                              maxLines: 2,
-                                              overflow: TextOverflow.ellipsis,
+                                          Text(
+                                            outlet.mobile ?? outlet.phone ?? '',
+                                            style: const TextStyle(
+                                              color: AppColors.textSecondary,
+                                              fontSize: 13,
                                             ),
                                           ),
                                         ],
                                       ),
-                                    ],
-                                  ),
-                                ),
-                                trailing: IconButton(
-                                  icon: const Icon(
-                                    Icons.delete_outline,
-                                    color: Color(0xFFEF4444),
-                                  ),
-                                  onPressed: () =>
-                                      _confirmRemoveOutlet(route.id, outlet),
+                                    const SizedBox(height: 4),
+                                    Row(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        const Icon(
+                                          Icons.location_on_outlined,
+                                          size: 13,
+                                          color: AppColors.textSecondary,
+                                        ),
+                                        const SizedBox(width: 4),
+                                        Expanded(
+                                          child: Text(
+                                            _buildOutletAddress(outlet),
+                                            style: const TextStyle(
+                                              color: AppColors.textSecondary,
+                                              fontSize: 13,
+                                            ),
+                                            maxLines: 2,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ],
                                 ),
                               ),
-                            );
-                          }).toList(),
-                        ),
+                              trailing: IconButton(
+                                icon: const Icon(
+                                  Icons.delete_outline,
+                                  color: Color(0xFFEF4444),
+                                ),
+                                onPressed: () => _confirmRemoveOutlet(route.id, outlet),
+                              ),
+                            ),
+                          );
+                        }).toList(),
+                      );
+                    },
+                  ),
                 ],
               ),
             ),
@@ -339,6 +515,52 @@ class _RouteDetailScreenState extends State<RouteDetailScreen> {
       outlet.city,
     ].where((p) => p != null && p.trim().isNotEmpty);
     return parts.isEmpty ? 'No address specified' : parts.join(', ');
+  }
+
+  Widget _buildDistanceBadge(
+    double distanceMeters, {
+    required RouteOutlet outlet,
+    Position? userPosition,
+  }) {
+    final formatted = ProximityHelper.formatDistance(distanceMeters);
+    return InkWell(
+      onTap: () {
+        ProximityHelper.openGoogleMapsDirections(
+          context: context,
+          destinationLat: outlet.partnerLatitude,
+          destinationLng: outlet.partnerLongitude,
+          originLat: userPosition?.latitude,
+          originLng: userPosition?.longitude,
+          destinationTitle: outlet.name,
+        );
+      },
+      borderRadius: BorderRadius.circular(6),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
+        decoration: BoxDecoration(
+          color: const Color(0xFFEFF6FF),
+          borderRadius: BorderRadius.circular(6),
+          border: Border.all(color: const Color(0xFFBFDBFE), width: 0.8),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.near_me, size: 11, color: Color(0xFF2563EB)),
+            const SizedBox(width: 3),
+            Text(
+              formatted,
+              style: const TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF1D4ED8),
+              ),
+            ),
+            const SizedBox(width: 2),
+            const Icon(Icons.open_in_new, size: 9.5, color: Color(0xFF2563EB)),
+          ],
+        ),
+      ),
+    );
   }
 
   Widget _buildRouteHeaderCard(RouteModel route) {

@@ -6,6 +6,7 @@ import 'package:secondary_sales/data/models/contacts/outlet_type.dart';
 import 'package:secondary_sales/data/api/api_service.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:secondary_sales/core/services/location_service.dart';
+import 'package:secondary_sales/core/util/proximity_helper.dart';
 
 class RouteProvider with ChangeNotifier {
   final ApiService _apiService = ApiService.instance;
@@ -24,6 +25,11 @@ class RouteProvider with ChangeNotifier {
   final Set<int> _checkedOutOutletIds = {};
   int? _lastEmployeeId;
 
+  // GPS & Proximity State
+  Position? _currentPosition;
+  bool _sortByNearest = false;
+  bool _isGpsRefreshing = false;
+
   List<RouteModel> get routes => _routes;
   List<VisitReason> get visitReasons => _visitReasons;
   List<OutletClass> get outletClasses => _outletClasses;
@@ -36,6 +42,112 @@ class RouteProvider with ChangeNotifier {
   int? get currentVisitId => _currentVisitId;
   DateTime? get checkInTime => _checkInTime;
   Set<int> get checkedOutOutletIds => _checkedOutOutletIds;
+
+  Position? get currentPosition => _currentPosition;
+  bool get sortByNearest => _sortByNearest;
+  bool get isGpsRefreshing => _isGpsRefreshing;
+
+  void setSortByNearest(bool value) {
+    if (_sortByNearest != value) {
+      _sortByNearest = value;
+      notifyListeners();
+    }
+  }
+
+  void toggleSortByNearest() {
+    _sortByNearest = !_sortByNearest;
+    notifyListeners();
+  }
+
+  void updateLocation(Position position) {
+    _currentPosition = position;
+    notifyListeners();
+  }
+
+  Future<Position?> refreshGpsPosition({bool requireFresh = false}) async {
+    _isGpsRefreshing = true;
+    notifyListeners();
+    try {
+      final pos = await LocationService.getCurrentPosition(
+        requireFresh: requireFresh,
+        timeLimit: const Duration(seconds: 10),
+      );
+      _currentPosition = pos;
+      return pos;
+    } catch (e) {
+      debugPrint('GPS refresh error in RouteProvider: $e');
+      return null;
+    } finally {
+      _isGpsRefreshing = false;
+      notifyListeners();
+    }
+  }
+
+  List<RouteOutlet> getSortedRouteOutlets(
+    List<RouteOutlet> outlets, {
+    String searchQuery = '',
+  }) {
+    final q = searchQuery.trim().toLowerCase();
+    final list = outlets.where((o) {
+      if (q.isEmpty) return true;
+      final name = o.name.toLowerCase();
+      final code = (o.code ?? '').toLowerCase();
+      final owner = (o.ownerName ?? '').toLowerCase();
+      final phone = (o.phone ?? o.mobile ?? '').toLowerCase();
+      final street = (o.street ?? '').toLowerCase();
+      return name.contains(q) ||
+          code.contains(q) ||
+          owner.contains(q) ||
+          phone.contains(q) ||
+          street.contains(q);
+    }).toList();
+
+    if (!_sortByNearest || _currentPosition == null) {
+      final active = <RouteOutlet>[];
+      final rest = <RouteOutlet>[];
+      for (final o in list) {
+        if (o.id == _checkedInOutletId) {
+          active.add(o);
+        } else {
+          rest.add(o);
+        }
+      }
+      return [...active, ...rest];
+    }
+
+    final userLat = _currentPosition!.latitude;
+    final userLng = _currentPosition!.longitude;
+
+    final active = <RouteOutlet>[];
+    final withDistance = <MapEntry<RouteOutlet, double>>[];
+    final withoutCoords = <RouteOutlet>[];
+
+    for (final outlet in list) {
+      if (outlet.id == _checkedInOutletId) {
+        active.add(outlet);
+        continue;
+      }
+      final d = ProximityHelper.calculateDistance(
+        userLat: userLat,
+        userLng: userLng,
+        outletLat: outlet.partnerLatitude,
+        outletLng: outlet.partnerLongitude,
+      );
+      if (d != null) {
+        withDistance.add(MapEntry(outlet, d));
+      } else {
+        withoutCoords.add(outlet);
+      }
+    }
+
+    withDistance.sort((a, b) => a.value.compareTo(b.value));
+
+    return [
+      ...active,
+      ...withDistance.map((e) => e.key),
+      ...withoutCoords,
+    ];
+  }
 
   Future<List<VisitReason>> fetchVisitReasons() async {
     try {

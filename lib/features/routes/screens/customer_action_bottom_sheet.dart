@@ -15,6 +15,7 @@ import 'package:secondary_sales/features/sales/screens/secondary_orders_list_scr
 import 'package:secondary_sales/data/api/api_service.dart';
 import 'package:secondary_sales/features/auth/auth_provider.dart';
 import 'package:secondary_sales/core/util/dialog_helper.dart';
+import 'package:secondary_sales/core/util/proximity_helper.dart';
 
 class CustomerActionBottomSheet extends StatefulWidget {
   final String customerName;
@@ -22,6 +23,8 @@ class CustomerActionBottomSheet extends StatefulWidget {
   final String? customerCode;
   final String? phone;
   final String? mobile;
+  final double? latitude;
+  final double? longitude;
   const CustomerActionBottomSheet({
     super.key,
     required this.customerName,
@@ -29,6 +32,8 @@ class CustomerActionBottomSheet extends StatefulWidget {
     this.customerCode,
     this.phone,
     this.mobile,
+    this.latitude,
+    this.longitude,
   });
 
   @override
@@ -198,7 +203,25 @@ class _CustomerActionBottomSheetState extends State<CustomerActionBottomSheet> {
                   },
                 ),
               ),
-              const SizedBox(width: 12),
+              const SizedBox(width: 8),
+              Expanded(
+                child: _buildActionBtn(
+                  Icons.directions_outlined,
+                  'Directions',
+                  onTap: () {
+                    final routeProv = context.read<RouteProvider>();
+                    ProximityHelper.openGoogleMapsDirections(
+                      context: context,
+                      destinationLat: widget.latitude,
+                      destinationLng: widget.longitude,
+                      originLat: routeProv.currentPosition?.latitude,
+                      originLng: routeProv.currentPosition?.longitude,
+                      destinationTitle: widget.customerName,
+                    );
+                  },
+                ),
+              ),
+              const SizedBox(width: 8),
               Expanded(
                 child: _buildActionBtn(
                   Icons.phone_outlined,
@@ -356,6 +379,17 @@ class _CustomerActionBottomSheetState extends State<CustomerActionBottomSheet> {
                                 final employeeId =
                                     authProv.session?.user.employeeId;
                                 if (employeeId != null) {
+                                  if (routeProv.checkedInOutletId != null &&
+                                      routeProv.checkedInOutletId != widget.outletId) {
+                                    if (context.mounted) {
+                                      showValidationErrorDialog(
+                                        context,
+                                        'You are already checked in at another outlet. Please check out before checking in to "${widget.customerName}".',
+                                        title: 'Active Check-in Exists',
+                                      );
+                                    }
+                                    return;
+                                  }
                                   if (mounted) {
                                     setState(() => _isCheckingIn = true);
                                   }

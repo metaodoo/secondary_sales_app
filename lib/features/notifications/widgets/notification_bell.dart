@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import 'package:secondary_sales/core/theme/app_theme.dart';
+import 'package:secondary_sales/features/notifications/notice_provider.dart';
 import 'package:secondary_sales/features/notifications/notification_provider.dart';
 import 'package:secondary_sales/features/notifications/screens/notifications_screen.dart';
 
@@ -14,20 +15,22 @@ class NotificationBell extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Consumer<NotificationProvider>(
-      builder: (context, provider, _) {
-        final count = provider.unreadCount;
-        return IconButton(
-          tooltip: 'Notifications',
-          onPressed: () async {
-            await Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const NotificationsScreen()),
-            );
-            if (context.mounted) {
-              context.read<NotificationProvider>().refreshUnreadCount();
-            }
-          },
+    final notifCount = context.watch<NotificationProvider>().unreadCount;
+    final noticeCount = context.watch<NoticeProvider>().unreadCount;
+    final count = notifCount + noticeCount;
+
+    return IconButton(
+      tooltip: 'Notifications & Notices',
+      onPressed: () async {
+        await Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const NotificationsScreen()),
+        );
+        if (context.mounted) {
+          context.read<NotificationProvider>().refreshUnreadCount();
+          context.read<NoticeProvider>().refreshUnreadCount();
+        }
+      },
           icon: Stack(
             clipBehavior: Clip.none,
             children: [
@@ -65,7 +68,5 @@ class NotificationBell extends StatelessWidget {
             ],
           ),
         );
-      },
-    );
   }
 }

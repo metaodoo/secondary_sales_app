@@ -253,6 +253,7 @@ class AppAction {
 
   // Modern Trade (MT - Secondary) actions.
   static const mtSecStockAuditCreate = 'action.mt_secondary.stock_audit.create';
+  static const mtSecStockAuditSave = 'action.mt_secondary.stock_audit.create';
   static const mtSecStockAuditConfirm = 'action.mt_secondary.stock_audit.confirm';
 
   // Routes / contacts / employees.
@@ -357,6 +358,10 @@ const _ps = <String>[SsModuleCode.primarySales];
 const _ss = <String>[SsModuleCode.secondarySales];
 const _mt = <String>[SsModuleCode.modernTrade];
 const _mtSec = <String>[SsModuleCode.mtSecondarySales];
+const _mtBoth = <String>[
+  SsModuleCode.modernTrade,
+  SsModuleCode.mtSecondarySales,
+];
 const _hr = <String>[SsModuleCode.hr];
 const _acc = <String>[SsModuleCode.accounts];
 const _dashboard = <String>[SsModuleCode.dashboard];
@@ -1243,28 +1248,28 @@ const List<AccessResource> accessCatalog = [
     'screen',
     'modern_trade',
     'Modern Trade › Outlets › Open list',
-    _mt,
+    _mtBoth,
   ),
   AccessResource(
     AppScreen.mtOutletDetail,
     'screen',
     'modern_trade',
     'Modern Trade › Outlets › Open detail',
-    _mt,
+    _mtBoth,
   ),
   AccessResource(
     AppScreen.mtVisitsList,
     'screen',
     'modern_trade',
     'Modern Trade › Visits › Open list / History',
-    _mt,
+    _mtBoth,
   ),
   AccessResource(
     AppScreen.mtNewJointVisit,
     'screen',
     'modern_trade',
     'Modern Trade › Visits › Open joint visit screen',
-    _mt,
+    _mtBoth,
   ),
   AccessResource(
     AppScreen.mtOrdersList,
@@ -1308,21 +1313,21 @@ const List<AccessResource> accessCatalog = [
     'action',
     'modern_trade',
     'Modern Trade › Visits › Check in (button)',
-    _mt,
+    _mtBoth,
   ),
   AccessResource(
     AppAction.mtVisitCheckOut,
     'action',
     'modern_trade',
     'Modern Trade › Visits › Check out (button)',
-    _mt,
+    _mtBoth,
   ),
   AccessResource(
     AppAction.mtJustificationCreate,
     'action',
     'modern_trade',
     'Modern Trade › Justifications › Create (button)',
-    _mt,
+    _mtBoth,
   ),
   AccessResource(
     AppAction.mtOrderCreate,

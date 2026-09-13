@@ -81,6 +81,13 @@ class AppConstants {
       '$apiPrefix/mobile/notifications/mark-read';
   static const String mobileNotificationsMarkAllReadEndpoint =
       '$apiPrefix/mobile/notifications/mark-all-read';
+  static const String mobileNoticesEndpoint = '$apiPrefix/mobile/notices';
+  static const String mobileNoticeChannelsEndpoint =
+      '$apiPrefix/mobile/notices/channels';
+  static const String mobileNoticeMarkReadEndpoint =
+      '$apiPrefix/mobile/notices/mark-read';
+  static const String mobileNoticeUnreadCountEndpoint =
+      '$apiPrefix/mobile/notices/unread-count';
   static const String contactsEndpoint = '$apiPrefix/contacts';
   static const String createContactEndpoint = '$apiPrefix/contacts/create';
   static const String saleOrdersEndpoint = '$apiPrefix/sale-orders';

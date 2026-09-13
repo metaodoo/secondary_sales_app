@@ -7,6 +7,7 @@ import 'package:secondary_sales/core/theme/app_theme.dart';
 import 'package:secondary_sales/core/widgets/ss_ui.dart';
 import 'package:secondary_sales/data/models/modern_trade/mt_stock_audit.dart';
 import 'package:secondary_sales/features/modern_trade/modern_trade_provider.dart';
+import 'package:secondary_sales/features/modern_trade/screens/mt_outlets_screen.dart';
 import 'package:secondary_sales/features/modern_trade/screens/mt_stock_audit_create_screen.dart';
 import 'package:secondary_sales/features/modern_trade/screens/mt_stock_audit_detail_screen.dart';
 
@@ -216,17 +217,32 @@ class _MtStockAuditListScreenState extends State<MtStockAuditListScreen> {
         resourceKey: AppAction.mtSecStockAuditCreate,
         child: FloatingActionButton.extended(
           onPressed: () async {
-            await Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) => MtStockAuditCreateScreen(
-                  outletId: widget.outletId,
-                  outletName: widget.outletName,
-                  visitId: widget.visitId,
+            final provider = context.read<ModernTradeProvider>();
+            if (provider.checkedInOutletId != null) {
+              final outlet = provider.outlets
+                  .where((o) => o.id == provider.checkedInOutletId)
+                  .firstOrNull;
+              await Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => MtStockAuditCreateScreen(
+                    outletId: provider.checkedInOutletId,
+                    outletName: outlet?.name ?? widget.outletName,
+                    visitId: provider.currentVisitId,
+                  ),
                 ),
-              ),
-            );
-            _fetchAudits();
+              );
+            } else {
+              await Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => const MtOutletsScreen(),
+                ),
+              );
+            }
+            if (mounted) {
+              _fetchAudits();
+            }
           },
           backgroundColor: AppColors.primaryStrong,
           icon: const Icon(Icons.add, color: Colors.white),
@@ -378,7 +394,7 @@ class _StockAuditCard extends StatelessWidget {
                   ],
                 ),
                 Text(
-                  '${audit.totalLines} Items • Qty: ${audit.totalStockCount}',
+                  '${audit.totalLines} Items • Qty: ${audit.totalStockCount % 1 == 0 ? audit.totalStockCount.toInt() : audit.totalStockCount}',
                   style: const TextStyle(
                     fontWeight: FontWeight.bold,
                     fontSize: 13,

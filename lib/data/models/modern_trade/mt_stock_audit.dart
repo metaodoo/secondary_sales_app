@@ -124,8 +124,11 @@ class MtStockAuditProduct {
   final String name;
   final String? defaultCode;
   final String? tracking;
+  final int? categoryId;
+  final String? categoryName;
   final int? uomId;
   final String? uomName;
+  final double qtyAvailable;
   final List<MtStockAuditLot> lots;
 
   MtStockAuditProduct({
@@ -133,8 +136,11 @@ class MtStockAuditProduct {
     required this.name,
     this.defaultCode,
     this.tracking,
+    this.categoryId,
+    this.categoryName,
     this.uomId,
     this.uomName,
+    this.qtyAvailable = 0.0,
     this.lots = const [],
   });
 
@@ -149,8 +155,11 @@ class MtStockAuditProduct {
       name: map['name']?.toString() ?? '',
       defaultCode: map['default_code']?.toString(),
       tracking: map['tracking']?.toString(),
+      categoryId: asInt(map['category_id'] ?? (map['category'] is Map ? map['category']['id'] : null)),
+      categoryName: map['category_name']?.toString() ?? (map['category'] is Map ? map['category']['name']?.toString() : null),
       uomId: uom != null ? asInt(uom['id']) : null,
       uomName: uom?['name']?.toString(),
+      qtyAvailable: asDouble(map['qty_available'] ?? map['free_qty'] ?? map['stock']),
       lots: rawLots
           .map((l) => MtStockAuditLot.fromMap(Map<String, dynamic>.from(l as Map)))
           .toList(),
@@ -162,18 +171,28 @@ class MtStockAuditLot {
   final int id;
   final String name;
   final DateTime? expirationDate;
+  final double qtyAvailable;
 
   MtStockAuditLot({
     required this.id,
     required this.name,
     this.expirationDate,
+    this.qtyAvailable = 0.0,
   });
 
   String get displayName {
+    final parts = <String>[];
+    if (qtyAvailable > 0) {
+      final qtyStr = qtyAvailable % 1 == 0 ? qtyAvailable.toInt().toString() : qtyAvailable.toString();
+      parts.add('Avail: $qtyStr');
+    }
     if (expirationDate != null) {
       final formatted =
           '${expirationDate!.year}-${expirationDate!.month.toString().padLeft(2, '0')}-${expirationDate!.day.toString().padLeft(2, '0')}';
-      return '$name (Exp: $formatted)';
+      parts.add('Exp: $formatted');
+    }
+    if (parts.isNotEmpty) {
+      return '$name (${parts.join(", ")})';
     }
     return name;
   }
@@ -185,6 +204,7 @@ class MtStockAuditLot {
       expirationDate: map['expiration_date'] != null
           ? DateTime.tryParse(map['expiration_date'].toString())
           : null,
+      qtyAvailable: asDouble(map['qty_available'] ?? map['stock']),
     );
   }
 }

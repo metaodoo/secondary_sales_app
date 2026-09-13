@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import 'package:secondary_sales/core/theme/app_theme.dart';
-import 'package:secondary_sales/core/widgets/ss_ui.dart';
 import 'package:secondary_sales/data/models/modern_trade/mt_stock_audit.dart';
 import 'package:secondary_sales/features/modern_trade/modern_trade_provider.dart';
 import 'package:secondary_sales/features/modern_trade/screens/mt_sec_order_detail_screen.dart';
@@ -332,10 +331,10 @@ class _MtSecOrderCard extends StatelessWidget {
                       color: AppColors.successSoft,
                       borderRadius: BorderRadius.circular(6),
                     ),
-                    child: Text(
-                      order.state.toUpperCase(),
-                      style: const TextStyle(
-                        color: AppColors.success,
+                    child: const Text(
+                      'DONE',
+                      style: TextStyle(
+                        color: Color(0xFF16A34A),
                         fontSize: 11,
                         fontWeight: FontWeight.bold,
                       ),

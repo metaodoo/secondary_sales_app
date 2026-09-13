@@ -206,15 +206,17 @@ extension ModernTradeApi on ApiService {
 
   /// Fetch saleable products and lots with expiry dates for MT audit
   Future<List<MtStockAuditProduct>> getStockAuditProducts({
+    int? outletId,
     String? search,
     int? categoryId,
     int page = 1,
-    int pageSize = 50,
+    int pageSize = 1000,
   }) async {
     final params = <String, dynamic>{
       'employee_id': _activeEmployeeId,
       'page': page,
       'page_size': pageSize,
+      if (outletId != null) 'outlet_id': outletId,
       if (search != null && search.isNotEmpty) 'search': search,
       if (categoryId != null) 'category_id': categoryId,
     };

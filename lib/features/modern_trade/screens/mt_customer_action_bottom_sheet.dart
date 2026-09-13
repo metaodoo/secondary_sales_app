@@ -1,6 +1,9 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:provider/provider.dart';
+import 'package:secondary_sales/core/access/access_resources.dart';
+import 'package:secondary_sales/core/services/location_service.dart';
 import 'package:secondary_sales/core/theme/app_theme.dart';
 import 'package:secondary_sales/core/util/dialog_helper.dart';
 import 'package:secondary_sales/data/models/modern_trade/mt_outlet.dart';
@@ -12,7 +15,9 @@ import 'package:secondary_sales/data/models/routes/visit_reason.dart';
 import 'package:secondary_sales/features/routes/screens/visit_reason_dialog.dart';
 import 'package:secondary_sales/features/sales/screens/product_selection_screen.dart';
 import 'package:secondary_sales/features/sales/screens/secondary_orders_list_screen.dart';
+import 'package:secondary_sales/features/modern_trade/screens/mt_stock_audit_create_screen.dart';
 import 'package:secondary_sales/features/modern_trade/screens/mt_stock_audit_list_screen.dart';
+import 'package:secondary_sales/core/util/proximity_helper.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 /// Modern Trade Customer Action Bottom Sheet.
@@ -162,23 +167,76 @@ class _MtCustomerActionBottomSheetState extends State<MtCustomerActionBottomShee
     );
   }
 
-  Future<void> _handleCheckIn() async {
-    if (_isCheckingIn || _isCheckingOut) return;
+  Future<bool> _handleCheckIn() async {
+    if (_isCheckingIn || _isCheckingOut) return false;
     final provider = context.read<ModernTradeProvider>();
+
+    // 0. Prevent concurrent check-ins: if user is already checked in to another outlet
+    if (provider.checkedInOutletId != null && provider.checkedInOutletId != widget.outlet.id) {
+      final currentOutletName = provider.outlets
+          .where((o) => o.id == provider.checkedInOutletId)
+          .map((o) => o.name)
+          .firstOrNull ?? 'another outlet';
+      showValidationErrorDialog(
+        context,
+        'You are currently checked in at "$currentOutletName". You must check out from "$currentOutletName" before checking in to "${widget.outlet.name}".',
+        title: 'Active Check-in Exists',
+      );
+      return false;
+    }
+
+    // 0.1 If already checked in to THIS outlet
+    if (provider.checkedInOutletId == widget.outlet.id || widget.outlet.isActiveCheckedIn) {
+      showValidationErrorDialog(
+        context,
+        'You are already checked in to "${widget.outlet.name}".',
+        title: 'Already Checked In',
+      );
+      return false;
+    }
 
     setState(() => _isCheckingIn = true);
     try {
+      // 1. Acquire GPS position FIRST
+      final position = await LocationService.getCurrentPosition(
+        requireFresh: true,
+        timeLimit: const Duration(seconds: 15),
+      );
+
+      // 2. Validate Geofence FIRST before opening any justification request popup
+      if (widget.outlet.latitude != null &&
+          widget.outlet.longitude != null &&
+          widget.outlet.latitude != 0.0 &&
+          widget.outlet.longitude != 0.0) {
+        final double distanceMeters = Geolocator.distanceBetween(
+          position.latitude,
+          position.longitude,
+          widget.outlet.latitude!,
+          widget.outlet.longitude!,
+        );
+        final double allowedRadius = widget.outlet.outletRadius ?? 50.0;
+        if (distanceMeters > allowedRadius) {
+          throw Exception(
+            'You are ${distanceMeters.round()}m away from "${widget.outlet.name}". Allowed radius is ${allowedRadius.round()}m.',
+          );
+        }
+      }
+
+      // 3. Location is valid! If recommended proceed, else prompt for justification
       if (widget.outlet.isRecommended) {
-        await provider.checkIn(outletId: widget.outlet.id);
+        await provider.checkIn(
+          outletId: widget.outlet.id,
+          position: position,
+        );
       } else {
         final reason = await _showJustificationDialog();
         if (reason == null || reason.trim().isEmpty) {
-          setState(() => _isCheckingIn = false);
-          return;
+          return false;
         }
         await provider.checkIn(
           outletId: widget.outlet.id,
           justificationReason: reason.trim(),
+          position: position,
         );
       }
 
@@ -191,7 +249,9 @@ class _MtCustomerActionBottomSheetState extends State<MtCustomerActionBottomShee
             backgroundColor: AppColors.primaryStrong,
           ),
         );
+        return true;
       }
+      return false;
     } catch (e) {
       if (mounted) {
         showValidationErrorDialog(
@@ -200,6 +260,7 @@ class _MtCustomerActionBottomSheetState extends State<MtCustomerActionBottomShee
           title: 'Check-in Error',
         );
       }
+      return false;
     } finally {
       if (mounted) {
         setState(() => _isCheckingIn = false);
@@ -274,10 +335,412 @@ class _MtCustomerActionBottomSheetState extends State<MtCustomerActionBottomShee
     }
   }
 
+  Future<void> _handleStockAuditAction({bool directCreate = false}) async {
+    final allowed = await checkAttendanceRestriction(
+      context,
+      actionName: 'Stock Audit / Outlet Visit',
+    );
+    if (!allowed || !mounted) return;
+
+    final provider = context.read<ModernTradeProvider>();
+    final isCheckedIn = provider.checkedInOutletId == widget.outlet.id || widget.outlet.isActiveCheckedIn;
+
+    if (isCheckedIn) {
+      if (directCreate) {
+        Navigator.pop(context); // Close bottom sheet
+        if (!mounted) return;
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => MtStockAuditCreateScreen(
+              outletId: widget.outlet.id,
+              outletName: widget.outlet.name,
+              visitId: provider.currentVisitId,
+            ),
+          ),
+        );
+      } else {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => MtStockAuditListScreen(
+              outletId: widget.outlet.id,
+              outletName: widget.outlet.name,
+              visitId: provider.currentVisitId,
+            ),
+          ),
+        );
+      }
+    } else {
+      if (!mounted) return;
+      showDialog(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('Check-in Required'),
+          content: const Text(
+            'You must check in to the outlet before performing a Modern Trade stock audit.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                Navigator.pop(ctx);
+                final checkedIn = await _handleCheckIn();
+                if (checkedIn && mounted) {
+                  if (directCreate) {
+                    Navigator.pop(context);
+                    if (!mounted) return;
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => MtStockAuditCreateScreen(
+                          outletId: widget.outlet.id,
+                          outletName: widget.outlet.name,
+                          visitId: provider.currentVisitId,
+                        ),
+                      ),
+                    );
+                  } else {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => MtStockAuditListScreen(
+                          outletId: widget.outlet.id,
+                          outletName: widget.outlet.name,
+                          visitId: provider.currentVisitId,
+                        ),
+                      ),
+                    );
+                  }
+                }
+              },
+              child: const Text('Check In Now'),
+            ),
+          ],
+        ),
+      );
+    }
+  }
+
+  Future<void> _handleNewOrderAction() async {
+    final allowed = await checkAttendanceRestriction(
+      context,
+      actionName: 'Order Entry / Outlet Visit',
+    );
+    if (!allowed || !mounted) return;
+
+    final provider = context.read<ModernTradeProvider>();
+    final isCheckedIn = provider.checkedInOutletId == widget.outlet.id || widget.outlet.isActiveCheckedIn;
+    final authProv = context.read<AuthProvider>();
+    final canSkipCheckin = authProv.session?.user.permissions?.canCreateOrderWithoutCheckin ?? false;
+
+    if (isCheckedIn) {
+      Navigator.pop(context); // Close bottom sheet
+      if (!mounted) return;
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => ProductSelectionScreen(
+            saleType: 'primary',
+            partnerId: widget.outlet.id,
+            customerName: widget.outlet.name,
+            customerCode: widget.outlet.ssCode,
+            mediumId: null,
+            visitId: provider.currentVisitId,
+            businessType: 'mt',
+          ),
+        ),
+      );
+    } else if (canSkipCheckin) {
+      final nav = Navigator.of(context);
+      final selectedMediumId = await ssShowOrderMediumDialog(
+        context,
+        customerName: widget.outlet.name,
+        customerCode: widget.outlet.ssCode,
+      );
+      if (selectedMediumId != null && mounted) {
+        nav.pop(); // Close bottom sheet
+        nav.push(
+          MaterialPageRoute(
+            builder: (_) => ProductSelectionScreen(
+              saleType: 'primary',
+              partnerId: widget.outlet.id,
+              customerName: widget.outlet.name,
+              customerCode: widget.outlet.ssCode,
+              mediumId: selectedMediumId,
+              visitId: provider.currentVisitId,
+              businessType: 'mt',
+            ),
+          ),
+        );
+      }
+    } else {
+      if (!mounted) return;
+      showDialog(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('Check-in Required'),
+          content: const Text(
+            'You must check in to the outlet before creating a Modern Trade sales order.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                Navigator.pop(ctx); // Close dialog
+                await _handleCheckIn();
+              },
+              child: const Text('Check In Now'),
+            ),
+          ],
+        ),
+      );
+    }
+  }
+
+  Widget _buildBottomCta({
+    required bool canCreateOrder,
+    required bool canCreateAudit,
+  }) {
+    if (canCreateOrder && canCreateAudit) {
+      return Row(
+        children: [
+          Expanded(
+            child: OutlinedButton.icon(
+              onPressed: (_isCheckingIn || _isCheckingOut)
+                  ? null
+                  : () => _handleStockAuditAction(directCreate: true),
+              style: OutlinedButton.styleFrom(
+                side: const BorderSide(color: AppColors.primaryStrong, width: 1.5),
+                minimumSize: const Size(0, 52),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              ),
+              icon: const Icon(Icons.inventory_2_outlined, color: AppColors.primaryStrong, size: 20),
+              label: const Text(
+                'Stock Audit',
+                style: TextStyle(
+                  color: AppColors.primaryStrong,
+                  fontSize: 15,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: ElevatedButton.icon(
+              onPressed: (_isCheckingIn || _isCheckingOut)
+                  ? null
+                  : _handleNewOrderAction,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primaryStrong,
+                disabledBackgroundColor: AppColors.borderSoft,
+                minimumSize: const Size(0, 52),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              ),
+              icon: const Icon(Icons.add_shopping_cart, color: Colors.white, size: 20),
+              label: const Text(
+                'New Order',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 15,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ),
+        ],
+      );
+    } else if (canCreateOrder) {
+      return ElevatedButton.icon(
+        onPressed: (_isCheckingIn || _isCheckingOut)
+            ? null
+            : _handleNewOrderAction,
+        style: ElevatedButton.styleFrom(
+          backgroundColor: AppColors.primaryStrong,
+          disabledBackgroundColor: AppColors.borderSoft,
+          minimumSize: const Size(double.infinity, 52),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+        ),
+        icon: _isCheckingIn
+            ? const SizedBox(
+                height: 18,
+                width: 18,
+                child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+              )
+            : const Icon(Icons.add_shopping_cart, color: Colors.white, size: 20),
+        label: const Text(
+          'New Order',
+          style: TextStyle(
+            color: Colors.white,
+            fontSize: 16,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+      );
+    } else if (canCreateAudit) {
+      return ElevatedButton.icon(
+        onPressed: (_isCheckingIn || _isCheckingOut)
+            ? null
+            : () => _handleStockAuditAction(directCreate: true),
+        style: ElevatedButton.styleFrom(
+          backgroundColor: AppColors.primaryStrong,
+          disabledBackgroundColor: AppColors.borderSoft,
+          minimumSize: const Size(double.infinity, 52),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+        ),
+        icon: _isCheckingIn
+            ? const SizedBox(
+                height: 18,
+                width: 18,
+                child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+              )
+            : const Icon(Icons.inventory_2_outlined, color: Colors.white, size: 20),
+        label: const Text(
+          'New Stock Audit',
+          style: TextStyle(
+            color: Colors.white,
+            fontSize: 16,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+      );
+    } else {
+      return const SizedBox.shrink();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final provider = context.watch<ModernTradeProvider>();
     final isCheckedIn = provider.checkedInOutletId == widget.outlet.id || widget.outlet.isActiveCheckedIn;
+
+    final auth = context.watch<AuthProvider>();
+    final canAccessPrimary = auth.canAccessMtPrimarySales;
+    final canAccessSecondary = auth.canAccessMtSecondarySales;
+
+    final canViewOrders = canAccessPrimary && auth.canView(AppScreen.mtOrdersList);
+    final canViewStockAudits = canAccessSecondary && auth.canView(AppScreen.mtSecStockAuditsList);
+
+    final canCreateOrder = canAccessPrimary && auth.canDo(AppAction.mtOrderCreate);
+    final canCreateAudit = canAccessSecondary && auth.canDo(AppAction.mtSecStockAuditCreate);
+
+    final actionButtons = <Widget>[];
+
+    if (canViewOrders) {
+      actionButtons.add(
+        Expanded(
+          child: _buildActionBtn(
+            Icons.shopping_cart_outlined,
+            'Orders',
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => SecondaryOrdersListScreen(
+                    outletId: widget.outlet.id,
+                    outletName: widget.outlet.name,
+                    saleType: 'primary',
+                    businessType: 'mt',
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+      );
+    }
+
+    if (canViewStockAudits) {
+      actionButtons.add(
+        Expanded(
+          child: _buildActionBtn(
+            Icons.inventory_2_outlined,
+            'Stock\nAudit',
+            onTap: () => _handleStockAuditAction(directCreate: false),
+          ),
+        ),
+      );
+    }
+
+    actionButtons.add(
+      Expanded(
+        child: _buildActionBtn(
+          Icons.directions_outlined,
+          'Directions',
+          onTap: () {
+            ProximityHelper.openGoogleMapsDirections(
+              context: context,
+              destinationLat: widget.outlet.latitude,
+              destinationLng: widget.outlet.longitude,
+              originLat: provider.currentPosition?.latitude,
+              originLng: provider.currentPosition?.longitude,
+              destinationTitle: widget.outlet.name,
+            );
+          },
+        ),
+      ),
+    );
+
+    actionButtons.add(
+      Expanded(
+        child: _buildActionBtn(
+          Icons.phone_outlined,
+          'Call',
+          onTap: _makeCall,
+        ),
+      ),
+    );
+
+    actionButtons.add(
+      Expanded(
+        child: _buildActionBtn(
+          Icons.history,
+          'Visit\nHistory',
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => OutletVisitHistoryScreen(
+                  outletId: widget.outlet.id,
+                  outletName: widget.outlet.name,
+                ),
+              ),
+            );
+          },
+        ),
+      ),
+    );
+
+    if (isCheckedIn) {
+      actionButtons.add(
+        Expanded(
+          child: _buildActionBtn(
+            Icons.logout,
+            'Check\nOut',
+            iconColor: const Color(0xFFDC2626),
+            onTap: _handleCheckOut,
+          ),
+        ),
+      );
+    } else {
+      actionButtons.add(
+        Expanded(
+          child: _buildActionBtn(
+            Icons.login,
+            'Check\nIn',
+            iconColor: const Color(0xFF10B981),
+            onTap: _handleCheckIn,
+          ),
+        ),
+      );
+    }
 
     return Container(
       decoration: const BoxDecoration(
@@ -385,239 +848,21 @@ class _MtCustomerActionBottomSheetState extends State<MtCustomerActionBottomShee
           // Action Grid
           Row(
             children: [
-              Expanded(
-                child: _buildActionBtn(
-                  Icons.shopping_cart_outlined,
-                  'Orders',
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => SecondaryOrdersListScreen(
-                          outletId: widget.outlet.id,
-                          outletName: widget.outlet.name,
-                          saleType: 'primary',
-                          businessType: 'mt',
-                        ),
-                      ),
-                    );
-                  },
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: _buildActionBtn(
-                  Icons.inventory_2_outlined,
-                  'Stock\nAudit',
-                  onTap: () async {
-                    final allowed = await checkAttendanceRestriction(
-                      context,
-                      actionName: 'Stock Audit / Outlet Visit',
-                    );
-                    if (!allowed || !context.mounted) return;
-
-                    if (isCheckedIn) {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => MtStockAuditListScreen(
-                            outletId: widget.outlet.id,
-                            outletName: widget.outlet.name,
-                            visitId: provider.currentVisitId,
-                          ),
-                        ),
-                      );
-                    } else {
-                      showDialog(
-                        context: context,
-                        builder: (ctx) => AlertDialog(
-                          title: const Text('Check-in Required'),
-                          content: const Text(
-                            'You must check in to the outlet before performing a Modern Trade stock audit.',
-                          ),
-                          actions: [
-                            TextButton(
-                              onPressed: () => Navigator.pop(ctx),
-                              child: const Text('Cancel'),
-                            ),
-                            ElevatedButton(
-                              onPressed: () async {
-                                Navigator.pop(ctx);
-                                await _handleCheckIn();
-                                if (context.mounted &&
-                                    provider.checkedInOutletId == widget.outlet.id) {
-                                  Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (_) => MtStockAuditListScreen(
-                                        outletId: widget.outlet.id,
-                                        outletName: widget.outlet.name,
-                                        visitId: provider.currentVisitId,
-                                      ),
-                                    ),
-                                  );
-                                }
-                              },
-                              child: const Text('Check In Now'),
-                            ),
-                          ],
-                        ),
-                      );
-                    }
-                  },
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: _buildActionBtn(
-                  Icons.phone_outlined,
-                  'Call',
-                  onTap: _makeCall,
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: _buildActionBtn(
-                  Icons.history,
-                  'Visit\nHistory',
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => OutletVisitHistoryScreen(
-                          outletId: widget.outlet.id,
-                          outletName: widget.outlet.name,
-                        ),
-                      ),
-                    );
-                  },
-                ),
-              ),
-              const SizedBox(width: 8),
-              if (isCheckedIn)
-                Expanded(
-                  child: _buildActionBtn(
-                    Icons.logout,
-                    'Check\nOut',
-                    iconColor: const Color(0xFFDC2626),
-                    onTap: _handleCheckOut,
-                  ),
-                )
-              else
-                Expanded(
-                  child: _buildActionBtn(
-                    Icons.login,
-                    'Check\nIn',
-                    iconColor: const Color(0xFF10B981),
-                    onTap: _handleCheckIn,
-                  ),
-                ),
+              for (int i = 0; i < actionButtons.length; i++) ...[
+                if (i > 0) const SizedBox(width: 8),
+                actionButtons[i],
+              ],
             ],
           ),
-          const SizedBox(height: 24),
 
-          // New Order Primary Button
-          ElevatedButton(
-            onPressed: (_isCheckingIn || _isCheckingOut)
-                ? null
-                : () async {
-                    final allowed = await checkAttendanceRestriction(context, actionName: 'Order Entry / Outlet Visit');
-                    if (!allowed || !context.mounted) return;
-
-                    final authProv = context.read<AuthProvider>();
-                    final canSkipCheckin = authProv.session?.user.permissions?.canCreateOrderWithoutCheckin ?? false;
-
-                    if (isCheckedIn) {
-                      Navigator.pop(context); // Close bottom sheet
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => ProductSelectionScreen(
-                            saleType: 'primary',
-                            partnerId: widget.outlet.id,
-                            customerName: widget.outlet.name,
-                            customerCode: widget.outlet.ssCode,
-                            mediumId: null,
-                            visitId: provider.currentVisitId,
-                            businessType: 'mt',
-                          ),
-                        ),
-                      );
-                    } else if (canSkipCheckin) {
-                      final nav = Navigator.of(context);
-                      final selectedMediumId = await ssShowOrderMediumDialog(
-                        context,
-                        customerName: widget.outlet.name,
-                        customerCode: widget.outlet.ssCode,
-                      );
-                      if (selectedMediumId != null && mounted) {
-                        nav.pop(); // Close bottom sheet
-                        nav.push(
-                          MaterialPageRoute(
-                            builder: (_) => ProductSelectionScreen(
-                              saleType: 'primary',
-                              partnerId: widget.outlet.id,
-                              customerName: widget.outlet.name,
-                              customerCode: widget.outlet.ssCode,
-                              mediumId: selectedMediumId,
-                              visitId: provider.currentVisitId,
-                              businessType: 'mt',
-                            ),
-                          ),
-                        );
-                      }
-                    } else {
-                      // Check-in required prompt
-                      showDialog(
-                        context: context,
-                        builder: (ctx) => AlertDialog(
-                          title: const Text('Check-in Required'),
-                          content: const Text(
-                            'You must check in to the outlet before creating a Modern Trade sales order.',
-                          ),
-                          actions: [
-                            TextButton(
-                              onPressed: () => Navigator.pop(ctx),
-                              child: const Text('Cancel'),
-                            ),
-                            ElevatedButton(
-                              onPressed: () async {
-                                Navigator.pop(ctx); // Close dialog
-                                await _handleCheckIn();
-                              },
-                              child: const Text('Check In Now'),
-                            ),
-                          ],
-                        ),
-                      );
-                    }
-                  },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.primaryStrong,
-              disabledBackgroundColor: AppColors.borderSoft,
-              minimumSize: const Size(double.infinity, 54),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
-              ),
+          if (canCreateOrder || canCreateAudit) ...[
+            const SizedBox(height: 24),
+            _buildBottomCta(
+              canCreateOrder: canCreateOrder,
+              canCreateAudit: canCreateAudit,
             ),
-            child: _isCheckingIn
-                ? const SizedBox(
-                    height: 20,
-                    width: 20,
-                    child: CircularProgressIndicator(
-                      color: Colors.white,
-                      strokeWidth: 2.5,
-                    ),
-                  )
-                : const Text(
-                    'New Order',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-          ),
+          ],
+
           const SizedBox(height: 16),
 
           // Arrival Time / Countdown

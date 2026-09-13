@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
+import 'package:secondary_sales/core/access/access_resources.dart';
 import 'package:secondary_sales/core/theme/app_theme.dart';
 import 'package:secondary_sales/core/widgets/ss_ui.dart';
 import 'package:secondary_sales/data/models/modern_trade/mt_stock_audit.dart';
+import 'package:secondary_sales/features/auth/auth_provider.dart';
 import 'package:secondary_sales/features/modern_trade/modern_trade_provider.dart';
 import 'package:secondary_sales/features/modern_trade/screens/mt_stock_audit_create_screen.dart';
 
@@ -42,6 +44,40 @@ class _MtStockAuditDetailScreenState extends State<MtStockAuditDetailScreen> {
 
   Future<void> _confirmAudit() async {
     if (_audit == null || _audit!.isConfirmed) return;
+
+    final shouldConfirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Row(
+          children: [
+            Icon(Icons.check_circle_outline, color: Color(0xFF10B981)),
+            SizedBox(width: 8),
+            Text('Confirm Stock Audit', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+          ],
+        ),
+        content: const Text(
+          'Are you sure you want to confirm this stock audit? Once confirmed, this record cannot be edited.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF10B981),
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Yes, Confirm'),
+          ),
+        ],
+      ),
+    );
+    if (shouldConfirm != true || !mounted) return;
+
     setState(() => _isConfirming = true);
 
     try {
@@ -78,9 +114,20 @@ class _MtStockAuditDetailScreenState extends State<MtStockAuditDetailScreen> {
     }
   }
 
+  String _formatCount(double count) {
+    if (count % 1 == 0) return count.toInt().toString();
+    return count.toString();
+  }
+
   @override
   Widget build(BuildContext context) {
     final audit = _audit;
+    final canEdit = context.select<AuthProvider, bool>(
+      (auth) => auth.access.allows(AppAction.mtSecStockAuditCreate),
+    );
+    final canConfirm = context.select<AuthProvider, bool>(
+      (auth) => auth.access.allows(AppAction.mtSecStockAuditConfirm),
+    );
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -216,7 +263,7 @@ class _MtStockAuditDetailScreenState extends State<MtStockAuditDetailScreen> {
                                   style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
                                 ),
                                 Text(
-                                  'Total: ${audit.totalStockCount}',
+                                  'Total: ${_formatCount(audit.totalStockCount)}',
                                   style: const TextStyle(
                                     fontWeight: FontWeight.bold,
                                     fontSize: 15,
@@ -269,7 +316,7 @@ class _MtStockAuditDetailScreenState extends State<MtStockAuditDetailScreen> {
                                           borderRadius: BorderRadius.circular(8),
                                         ),
                                         child: Text(
-                                          '${line.stockCount} ${line.uomName ?? ''}',
+                                          '${_formatCount(line.stockCount)} ${line.uomName ?? ''}',
                                           style: const TextStyle(
                                             fontWeight: FontWeight.bold,
                                             fontSize: 14,
@@ -283,7 +330,7 @@ class _MtStockAuditDetailScreenState extends State<MtStockAuditDetailScreen> {
                           ],
                         ),
             ),
-            if (audit != null && !audit.isConfirmed)
+            if (audit != null && !audit.isConfirmed && (canEdit || canConfirm))
               Container(
                 padding: const EdgeInsets.all(16),
                 decoration: const BoxDecoration(
@@ -292,53 +339,55 @@ class _MtStockAuditDetailScreenState extends State<MtStockAuditDetailScreen> {
                 ),
                 child: Row(
                   children: [
-                    Expanded(
-                      child: OutlinedButton(
-                        onPressed: () async {
-                          await Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => MtStockAuditCreateScreen(
-                                outletId: audit.outletId,
-                                outletName: audit.outletName,
-                                editAudit: audit,
+                    if (canEdit)
+                      Expanded(
+                        child: OutlinedButton(
+                          onPressed: () async {
+                            await Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => MtStockAuditCreateScreen(
+                                  outletId: audit.outletId,
+                                  outletName: audit.outletName,
+                                  editAudit: audit,
+                                ),
                               ),
-                            ),
-                          );
-                          _loadDetail();
-                        },
-                        style: OutlinedButton.styleFrom(
-                          side: const BorderSide(color: AppColors.primaryStrong),
-                          minimumSize: const Size(0, 48),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                        ),
-                        child: const Text(
-                          'Edit Audit',
-                          style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.primaryStrong),
+                            );
+                            _loadDetail();
+                          },
+                          style: OutlinedButton.styleFrom(
+                            side: const BorderSide(color: AppColors.primaryStrong),
+                            minimumSize: const Size(0, 48),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                          ),
+                          child: const Text(
+                            'Edit Audit',
+                            style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.primaryStrong),
+                          ),
                         ),
                       ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: ElevatedButton(
-                        onPressed: _isConfirming ? null : _confirmAudit,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF10B981),
-                          minimumSize: const Size(0, 48),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    if (canEdit && canConfirm) const SizedBox(width: 12),
+                    if (canConfirm)
+                      Expanded(
+                        child: ElevatedButton(
+                          onPressed: _isConfirming ? null : _confirmAudit,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF10B981),
+                            minimumSize: const Size(0, 48),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                          ),
+                          child: _isConfirming
+                              ? const SizedBox(
+                                  height: 20,
+                                  width: 20,
+                                  child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                                )
+                              : const Text(
+                                  'Confirm Audit',
+                                  style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
+                                ),
                         ),
-                        child: _isConfirming
-                            ? const SizedBox(
-                                height: 20,
-                                width: 20,
-                                child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
-                              )
-                            : const Text(
-                                'Confirm Audit',
-                                style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
-                              ),
                       ),
-                    ),
                   ],
                 ),
               ),

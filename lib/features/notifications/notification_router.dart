@@ -7,6 +7,7 @@ import 'package:secondary_sales/features/hr/expense_provider.dart';
 import 'package:secondary_sales/features/hr/leave_provider.dart';
 import 'package:secondary_sales/features/hr/screens/expense_details_sheet.dart';
 import 'package:secondary_sales/features/hr/screens/leave_details_sheet.dart';
+import 'package:secondary_sales/features/notifications/screens/notifications_screen.dart';
 import 'package:secondary_sales/features/sales/screens/order_detail_screen.dart';
 
 /// Opens the screen for a given record reference.
@@ -61,6 +62,13 @@ class NotificationRouter {
         provider: ExpenseProvider(context.read<AuthProvider>()),
       );
     },
+    'discuss.channel': (navigator, link) async {
+      await navigator.push(
+        MaterialPageRoute(
+          builder: (_) => const NotificationsScreen(),
+        ),
+      );
+    },
   };
 
   /// True when [link] points at a model that has a registered screen.
@@ -89,6 +97,8 @@ class NotificationRouter {
         return 'Open Leave Request';
       case 'hr.expense.sheet':
         return 'Open Expense Report';
+      case 'discuss.channel':
+        return 'Open Notice Board';
       default:
         return 'Open Record';
     }

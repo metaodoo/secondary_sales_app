@@ -760,7 +760,8 @@ class ProductSelectionCard extends StatelessWidget {
 
   String _stockLabel() {
     if (businessType == 'mt') {
-      return 'Price: ৳${product.price.toStringAsFixed(2)}';
+      final stock = product.stock?.toInt() ?? 0;
+      return 'Available Stock: $stock ${product.uom ?? "Units"}   |   Price: ৳${product.price.toStringAsFixed(2)}';
     }
     // GT Business Type
     final stock = product.stock?.toInt() ?? 0;

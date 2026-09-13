@@ -1,7 +1,10 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:provider/provider.dart';
 import 'package:secondary_sales/core/theme/app_theme.dart';
 import 'package:secondary_sales/core/widgets/ss_ui.dart';
+import 'package:secondary_sales/core/util/proximity_helper.dart';
 import 'package:secondary_sales/features/modern_trade/modern_trade_provider.dart';
 import 'package:secondary_sales/data/models/modern_trade/mt_outlet.dart';
 import 'package:secondary_sales/features/modern_trade/screens/mt_customer_action_bottom_sheet.dart';
@@ -25,17 +28,45 @@ class MtOutletsScreen extends StatefulWidget {
 class _MtOutletsScreenState extends State<MtOutletsScreen> {
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
+  StreamSubscription<Position>? _positionStreamSub;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<ModernTradeProvider>().fetchOutlets();
+      final provider = context.read<ModernTradeProvider>();
+      provider.fetchOutlets();
+      provider.refreshGpsPosition(requireFresh: false);
     });
+
+    _startLocationStream();
+  }
+
+  void _startLocationStream() {
+    try {
+      _positionStreamSub = Geolocator.getPositionStream(
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.high,
+          distanceFilter: 20,
+        ),
+      ).listen(
+        (Position position) {
+          if (mounted) {
+            context.read<ModernTradeProvider>().updateLocation(position);
+          }
+        },
+        onError: (e) {
+          debugPrint('Location stream error in MT screen: $e');
+        },
+      );
+    } catch (e) {
+      debugPrint('Could not initialize location stream: $e');
+    }
   }
 
   @override
   void dispose() {
+    _positionStreamSub?.cancel();
     _searchController.dispose();
     super.dispose();
   }
@@ -52,14 +83,7 @@ class _MtOutletsScreenState extends State<MtOutletsScreen> {
   @override
   Widget build(BuildContext context) {
     final provider = context.watch<ModernTradeProvider>();
-    final allOutlets = provider.outlets;
-    final filtered = allOutlets.where((o) {
-      if (_searchQuery.isEmpty) return true;
-      final q = _searchQuery.toLowerCase();
-      final name = o.name.toLowerCase();
-      final code = (o.ssCode ?? '').toLowerCase();
-      return name.contains(q) || code.contains(q);
-    }).toList();
+    final outlets = provider.getSortedOutlets(searchQuery: _searchQuery);
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -90,7 +114,7 @@ class _MtOutletsScreenState extends State<MtOutletsScreen> {
         child: Column(
           children: [
             Padding(
-              padding: const EdgeInsets.all(16.0),
+              padding: const EdgeInsets.fromLTRB(16.0, 16.0, 16.0, 8.0),
               child: TextField(
                 controller: _searchController,
                 onChanged: (val) => setState(() => _searchQuery = val.trim()),
@@ -100,12 +124,121 @@ class _MtOutletsScreenState extends State<MtOutletsScreen> {
                 ),
               ),
             ),
+            // Proximity & GPS Toolbar
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 4.0),
+              child: Row(
+                children: [
+                  // Sort Nearest Toggle Button
+                  InkWell(
+                    onTap: () {
+                      provider.toggleSortByNearest();
+                      if (provider.sortByNearest && provider.currentPosition == null) {
+                        provider.refreshGpsPosition(requireFresh: false);
+                      }
+                    },
+                    borderRadius: BorderRadius.circular(20),
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 200),
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: provider.sortByNearest
+                            ? AppColors.primaryStrong
+                            : Colors.white,
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(
+                          color: provider.sortByNearest
+                              ? AppColors.primaryStrong
+                              : AppColors.borderSoft,
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.near_me,
+                            size: 14,
+                            color: provider.sortByNearest
+                                ? Colors.white
+                                : AppColors.textSecondary,
+                          ),
+                          const SizedBox(width: 6),
+                          Text(
+                            provider.sortByNearest ? 'Nearest First' : 'Default Order',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: provider.sortByNearest
+                                  ? Colors.white
+                                  : AppColors.textSecondary,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const Spacer(),
+                  // Refresh GPS Button
+                  InkWell(
+                    onTap: provider.isGpsRefreshing
+                        ? null
+                        : () async {
+                            final pos = await provider.refreshGpsPosition(requireFresh: true);
+                            if (pos != null && mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text('GPS location updated.'),
+                                  duration: Duration(seconds: 1),
+                                ),
+                              );
+                            }
+                          },
+                    borderRadius: BorderRadius.circular(20),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(color: AppColors.borderSoft),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          if (provider.isGpsRefreshing)
+                            const SizedBox(
+                              width: 12,
+                              height: 12,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          else
+                            const Icon(
+                              Icons.my_location,
+                              size: 14,
+                              color: AppColors.primaryStrong,
+                            ),
+                          const SizedBox(width: 5),
+                          Text(
+                            provider.isGpsRefreshing ? 'Updating...' : 'Refresh GPS',
+                            style: const TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: AppColors.primaryStrong,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 4),
             Expanded(
-              child: provider.isLoading && allOutlets.isEmpty
+              child: provider.isLoading && provider.outlets.isEmpty
                   ? const Center(child: CircularProgressIndicator())
                   : RefreshIndicator(
                       onRefresh: () => provider.fetchOutlets(),
-                      child: filtered.isEmpty
+                      child: outlets.isEmpty
                           ? const Center(
                               child: Text(
                                 'No Modern Trade outlets found.',
@@ -114,11 +247,18 @@ class _MtOutletsScreenState extends State<MtOutletsScreen> {
                             )
                           : ListView.separated(
                               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                              itemCount: filtered.length,
+                              itemCount: outlets.length,
                               separatorBuilder: (_, _) => const SizedBox(height: 12),
                               itemBuilder: (ctx, i) {
-                                final outlet = filtered[i];
+                                final outlet = outlets[i];
                                 final isCheckedIn = provider.checkedInOutletId == outlet.id || outlet.isActiveCheckedIn;
+
+                                final distanceMeters = ProximityHelper.calculateDistance(
+                                  userLat: provider.currentPosition?.latitude,
+                                  userLng: provider.currentPosition?.longitude,
+                                  outletLat: outlet.latitude,
+                                  outletLng: outlet.longitude,
+                                );
 
                                 return GestureDetector(
                                   onTap: () => _openActionModalFor(outlet),
@@ -170,6 +310,14 @@ class _MtOutletsScreenState extends State<MtOutletsScreen> {
                                                       ),
                                                     ),
                                                   ),
+                                                  if (distanceMeters != null) ...[
+                                                    _buildDistanceBadge(
+                                                      distanceMeters,
+                                                      outlet: outlet,
+                                                      userPosition: provider.currentPosition,
+                                                    ),
+                                                    const SizedBox(width: 6),
+                                                  ],
                                                   _buildBadge(outlet),
                                                 ],
                                               ),
@@ -214,6 +362,52 @@ class _MtOutletsScreenState extends State<MtOutletsScreen> {
                             ),
                     ),
             ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDistanceBadge(
+    double distanceMeters, {
+    required MtOutlet outlet,
+    Position? userPosition,
+  }) {
+    final formatted = ProximityHelper.formatDistance(distanceMeters);
+    return InkWell(
+      onTap: () {
+        ProximityHelper.openGoogleMapsDirections(
+          context: context,
+          destinationLat: outlet.latitude,
+          destinationLng: outlet.longitude,
+          originLat: userPosition?.latitude,
+          originLng: userPosition?.longitude,
+          destinationTitle: outlet.name,
+        );
+      },
+      borderRadius: BorderRadius.circular(6),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+        decoration: BoxDecoration(
+          color: const Color(0xFFEFF6FF),
+          borderRadius: BorderRadius.circular(6),
+          border: Border.all(color: const Color(0xFFBFDBFE), width: 0.8),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.near_me, size: 11, color: Color(0xFF2563EB)),
+            const SizedBox(width: 3),
+            Text(
+              formatted,
+              style: const TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w700,
+                color: Color(0xFF1D4ED8),
+              ),
+            ),
+            const SizedBox(width: 2),
+            const Icon(Icons.open_in_new, size: 9.5, color: Color(0xFF2563EB)),
           ],
         ),
       ),

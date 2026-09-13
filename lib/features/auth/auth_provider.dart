@@ -112,20 +112,43 @@ class AuthProvider with ChangeNotifier {
       _enforcedOr(AppScreen.dealers, _legacyManagerAccess);
 
   // GT - Primary Sales (Company -> Distributor) restricted to managers/TSMs by default.
-  bool get canAccessPrimarySales =>
-      _enforcedOr(AppScreen.modulePrimary, isGeneralTrade && _legacyManagerAccess);
+  bool get canAccessPrimarySales {
+    if (access.granted.isNotEmpty) {
+      return access.granted.contains(AppScreen.modulePrimary) ||
+          access.granted.contains(AppScreen.primarySalesList);
+    }
+    return _enforcedOr(AppScreen.modulePrimary, isGeneralTrade && _legacyManagerAccess);
+  }
 
   // GT - Secondary Sales (Distributor -> Outlet) accessible by SOs and TSMs in GT.
-  bool get canAccessSecondarySales =>
-      _enforcedOr(AppScreen.moduleSecondary, isGeneralTrade);
+  bool get canAccessSecondarySales {
+    if (access.granted.isNotEmpty) {
+      return access.granted.contains(AppScreen.moduleSecondary) ||
+          access.granted.contains(AppScreen.secondaryOrdersList);
+    }
+    return _enforcedOr(AppScreen.moduleSecondary, isGeneralTrade);
+  }
 
   // MT - Primary Sales (Direct Superstore Orders & Visits)
-  bool get canAccessMtPrimarySales =>
-      _enforcedOr(AppScreen.moduleMtPrimary, isModernTrade);
+  bool get canAccessMtPrimarySales {
+    if (access.granted.isNotEmpty) {
+      return access.granted.contains(AppScreen.moduleMtPrimary) ||
+          access.granted.contains(AppScreen.mtOrdersList) ||
+          access.granted.contains(AppAction.mtOrderCreate);
+    }
+    return _enforcedOr(AppScreen.moduleMtPrimary, isModernTrade);
+  }
 
   // MT - Secondary Sales (Stock Audit & Secondary Sales Calculation)
-  bool get canAccessMtSecondarySales =>
-      _enforcedOr(AppScreen.moduleMtSecondary, isModernTrade);
+  bool get canAccessMtSecondarySales {
+    if (access.granted.isNotEmpty) {
+      return access.granted.contains(AppScreen.moduleMtSecondary) ||
+          access.granted.contains(AppScreen.mtSecStockAuditsList) ||
+          access.granted.contains(AppScreen.mtSecOrdersList) ||
+          access.granted.contains(AppAction.mtSecStockAuditCreate);
+    }
+    return _enforcedOr(AppScreen.moduleMtSecondary, isModernTrade);
+  }
 
   // Backward compatibility alias
   bool get canAccessModernTrade => canAccessMtPrimarySales;
