@@ -89,9 +89,7 @@ class AppNotice {
       subject: asString(map['subject']),
       body: asString(map['body']),
       isRead: asBool(map['is_read']),
-      createdAt: map['created_at'] != null
-          ? DateTime.tryParse(asString(map['created_at']))?.toLocal()
-          : null,
+      createdAt: asDateTime(map['created_at']),
       attachments: attachmentsList,
     );
   }

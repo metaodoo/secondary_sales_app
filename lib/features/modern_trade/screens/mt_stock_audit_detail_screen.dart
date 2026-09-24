@@ -25,6 +25,7 @@ class _MtStockAuditDetailScreenState extends State<MtStockAuditDetailScreen> {
   MtStockAudit? _audit;
   bool _isLoading = true;
   bool _isConfirming = false;
+  bool _isResetting = false;
 
   @override
   void initState() {
@@ -101,6 +102,68 @@ class _MtStockAuditDetailScreenState extends State<MtStockAuditDetailScreen> {
     }
   }
 
+  Future<void> _resetAudit() async {
+    if (_audit == null || !_audit!.isConfirmed) return;
+
+    final isClosing = _audit!.type == 'closing_stock';
+    final shouldReset = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Row(
+          children: [
+            Icon(Icons.restart_alt, color: Color(0xFFE65100)),
+            SizedBox(width: 8),
+            Text('Reset to Draft', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+          ],
+        ),
+        content: Text(
+          isClosing
+              ? 'Are you sure you want to reset this Closing Stock audit to Draft? The generated secondary sales calculation for today will be updated or removed until closing stock is confirmed again.'
+              : 'Are you sure you want to reset this audit to Draft? You will be able to edit and re-confirm it.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFE65100),
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Yes, Reset'),
+          ),
+        ],
+      ),
+    );
+    if (shouldReset != true || !mounted) return;
+
+    setState(() => _isResetting = true);
+
+    try {
+      final updated = await context.read<ModernTradeProvider>().resetStockAudit(widget.auditId);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Stock Audit reset to draft successfully!'),
+          backgroundColor: Color(0xFFE65100),
+        ),
+      );
+      setState(() => _audit = updated);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isResetting = false);
+    }
+  }
+
   Color _getTypeColor(String type) {
     switch (type) {
       case 'opening_stock':
@@ -127,6 +190,12 @@ class _MtStockAuditDetailScreenState extends State<MtStockAuditDetailScreen> {
     );
     final canConfirm = context.select<AuthProvider, bool>(
       (auth) => auth.access.allows(AppAction.mtSecStockAuditConfirm),
+    );
+    final canReset = context.select<AuthProvider, bool>(
+      (auth) =>
+          auth.access.allows(AppAction.mtSecStockAuditReset) ||
+          auth.access.allows(AppAction.mtSecStockAuditConfirm) ||
+          auth.access.allows(AppAction.mtSecStockAuditCreate),
     );
 
     return Scaffold(
@@ -239,7 +308,7 @@ class _MtStockAuditDetailScreenState extends State<MtStockAuditDetailScreen> {
                                     Icons.calendar_today_outlined,
                                     'Date',
                                     audit.date != null
-                                        ? DateFormat('dd MMM yyyy, hh:mm a').format(audit.date!)
+                                        ? DateFormat('dd MMM yyyy, hh:mm a').format(audit.date!.toLocal())
                                         : 'N/A',
                                   ),
                                   if (audit.notes.isNotEmpty) ...[
@@ -388,6 +457,39 @@ class _MtStockAuditDetailScreenState extends State<MtStockAuditDetailScreen> {
                                 ),
                         ),
                       ),
+                  ],
+                ),
+              ),
+            if (audit != null && audit.isConfirmed && canReset)
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: const BoxDecoration(
+                  color: Colors.white,
+                  border: Border(top: BorderSide(color: Color(0xFFDDE6F2))),
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: _isResetting ? null : _resetAudit,
+                        icon: _isResetting
+                            ? const SizedBox(
+                                height: 18,
+                                width: 18,
+                                child: CircularProgressIndicator(color: Color(0xFFE65100), strokeWidth: 2),
+                              )
+                            : const Icon(Icons.restart_alt, color: Color(0xFFE65100), size: 20),
+                        label: Text(
+                          _isResetting ? 'Resetting...' : 'Reset to Draft',
+                          style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFFE65100)),
+                        ),
+                        style: OutlinedButton.styleFrom(
+                          side: const BorderSide(color: Color(0xFFE65100)),
+                          minimumSize: const Size(0, 48),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                        ),
+                      ),
+                    ),
                   ],
                 ),
               ),

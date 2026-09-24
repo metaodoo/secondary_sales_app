@@ -126,10 +126,12 @@ extension SalesApi on ApiService {
     required DateTime expectedDeliveryDate,
     bool confirm = true,
     int? warehouseId,
+    String businessType = 'gt',
   }) async {
     final params = {
       'employee_id': _activeEmployeeId,
       'sale_type': 'primary',
+      'business_type': businessType,
       'distributor_id': hubId,
       'order_lines': items.map((item) {
         final Product product = item['product'];
@@ -162,10 +164,12 @@ extension SalesApi on ApiService {
     int? routeId,
     int? visitId,
     bool confirm = true,
+    String businessType = 'gt',
   }) async {
     final params = {
       'employee_id': _activeEmployeeId,
       'sale_type': 'secondary',
+      'business_type': businessType,
       'outlet_id': outletId,
       'confirm': confirm,
       'order_lines': items.map((item) {
@@ -197,9 +201,11 @@ extension SalesApi on ApiService {
     required DateTime expectedDeliveryDate,
     bool confirm = true,
     int? warehouseId,
+    String businessType = 'gt',
   }) async {
     final params = {
       'employee_id': _activeEmployeeId,
+      'business_type': businessType,
       'distributor_id': hubId,
       'order_lines': items.map((item) {
         final Product product = item['product'];
@@ -236,10 +242,12 @@ extension SalesApi on ApiService {
     int? routeId,
     int? visitId,
     bool confirm = true,
+    String businessType = 'gt',
   }) async {
     final params = {
       'employee_id': _activeEmployeeId,
       'sale_type': 'secondary',
+      'business_type': businessType,
       'outlet_id': outletId,
       'confirm': confirm,
       'order_lines': items.map((item) {

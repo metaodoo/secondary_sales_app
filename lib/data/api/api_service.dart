@@ -28,6 +28,7 @@ import 'package:secondary_sales/core/access/access_control.dart';
 import 'package:secondary_sales/core/access/access_resources.dart';
 import 'package:secondary_sales/core/util/parse.dart';
 import 'package:secondary_sales/data/models/modern_trade/mt_stock_audit.dart';
+import 'package:secondary_sales/data/models/modern_trade/mt_return_request.dart';
 
 part 'endpoints/device_api.dart';
 part 'endpoints/contacts_api.dart';

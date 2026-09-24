@@ -11,8 +11,14 @@ extension CatalogApi on ApiService {
     bool? inStockOnly,
     String? sortBy,
     String? businessType,
+    int page = 1,
+    int pageSize = 20,
   }) async {
-    final params = <String, dynamic>{'page_size': 1000, 'active': true};
+    final params = <String, dynamic>{
+      'page': page,
+      'page_size': pageSize,
+      'active': true,
+    };
     final query = search?.trim();
     if (query != null && query.isNotEmpty) {
       params['name'] = query;

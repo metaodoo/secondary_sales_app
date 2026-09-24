@@ -83,6 +83,7 @@ class PrimarySaleProvider with ChangeNotifier {
     DateTime? dateFrom,
     DateTime? dateTo,
     String saleType = 'primary',
+    String? businessType = 'gt',
     int? outletId,
   }) async {
     _loadingCount++;
@@ -96,6 +97,7 @@ class PrimarySaleProvider with ChangeNotifier {
         dateFrom: dateFrom,
         dateTo: dateTo,
         saleType: saleType,
+        businessType: businessType,
         outletId: outletId,
       );
     } catch (e) {
@@ -225,7 +227,7 @@ class PrimarySaleProvider with ChangeNotifier {
     } catch (_) {}
   }
 
-  Future<void> searchProducts(
+  Future<List<Product>> searchProducts(
     String query, {
     String? saleType,
     int? partnerId,
@@ -233,6 +235,9 @@ class PrimarySaleProvider with ChangeNotifier {
     bool? inStockOnly,
     String? sortBy,
     String? businessType,
+    int page = 1,
+    int pageSize = 20,
+    bool reset = false,
   }) async {
     _error = null;
     notifyListeners();
@@ -246,11 +251,19 @@ class PrimarySaleProvider with ChangeNotifier {
         inStockOnly: inStockOnly,
         sortBy: sortBy,
         businessType: businessType,
+        page: page,
+        pageSize: pageSize,
       );
-      _products = res.products;
+      if (reset || page == 1) {
+        _products = res.products;
+      } else {
+        _products.addAll(res.products);
+      }
       _totalProductCount = res.totalCount;
+      return res.products;
     } catch (e) {
       _error = e.toString();
+      return [];
     } finally {
       notifyListeners();
     }
@@ -435,6 +448,7 @@ class PrimarySaleProvider with ChangeNotifier {
     bool createBackorder = true,
     String saleType = 'primary',
     String action = 'validate',
+    bool skipExpired = false,
   }) async {
     _loadingCount++;
     _error = null;
@@ -450,10 +464,13 @@ class PrimarySaleProvider with ChangeNotifier {
         createBackorder: createBackorder,
         saleType: saleType,
         action: action,
+        skipExpired: skipExpired,
       );
       _deliveryPrepare = null;
       await fetchRecentOrders(saleType: saleType);
       return _selectedOrder;
+    } on ExpiredLotsConfirmationException {
+      rethrow;
     } catch (e) {
       _error = e.toString();
       return null;

@@ -28,8 +28,13 @@ class _DeliveriesListScreenState extends State<DeliveriesListScreen>
   final List<String> _tabs = ['pending', 'own'];
   final List<String> _tabLabels = ['Pending Deliveries', 'Own Deliveries'];
   final TextEditingController _searchController = TextEditingController();
+  final ScrollController _scrollController = ScrollController();
+  static const int _pageSize = 50;
 
   bool _isLoading = false;
+  bool _isLoadingMore = false;
+  bool _hasMore = true;
+  int _page = 1;
   List<DeliveryItem> _deliveries = [];
   String? _error;
 
@@ -50,6 +55,7 @@ class _DeliveriesListScreenState extends State<DeliveriesListScreen>
   @override
   void initState() {
     super.initState();
+    _scrollController.addListener(_onScroll);
     _tabController = TabController(length: _tabs.length, vsync: this);
     _tabController.addListener(() {
       if (!_tabController.indexIsChanging) {
@@ -57,23 +63,46 @@ class _DeliveriesListScreenState extends State<DeliveriesListScreen>
         setState(() {
           _activeTab = tab;
         });
-        _fetchDeliveries();
+        _fetchDeliveries(reset: true);
       }
     });
-    _fetchDeliveries();
+    _fetchDeliveries(reset: true);
   }
 
   @override
   void dispose() {
+    _scrollController.dispose();
     _tabController.dispose();
     _searchController.dispose();
     super.dispose();
   }
 
-  Future<void> _fetchDeliveries([String? query]) async {
+  void _onScroll() {
+    if (!_scrollController.hasClients) return;
+    if (_scrollController.position.pixels >=
+        _scrollController.position.maxScrollExtent - 200) {
+      _fetchDeliveries();
+    }
+  }
+
+  Future<void> _fetchDeliveries({bool reset = false, String? query}) async {
+    if (reset) {
+      _page = 1;
+      _hasMore = true;
+      _isLoadingMore = false;
+    }
+    if (!reset && (!_hasMore || _isLoadingMore)) {
+      return;
+    }
+
+    if (!mounted) return;
     setState(() {
-      _isLoading = true;
-      _error = null;
+      if (reset) {
+        _isLoading = true;
+        _error = null;
+      } else {
+        _isLoadingMore = true;
+      }
     });
     try {
       final provider = context.read<PrimarySaleProvider>();
@@ -82,7 +111,8 @@ class _DeliveriesListScreenState extends State<DeliveriesListScreen>
           widget.moduleType == 'mt_primary';
 
       final result = await provider.apiService.getDeliveries(
-        pageSize: 50,
+        page: _page,
+        pageSize: _pageSize,
         search: query ?? (_searchController.text.trim().isEmpty ? null : _searchController.text.trim()),
         type: isMt ? 'primary' : widget.moduleType,
         businessType: isMt ? 'mt' : (widget.businessType ?? 'gt'),
@@ -95,7 +125,15 @@ class _DeliveriesListScreenState extends State<DeliveriesListScreen>
       );
       if (mounted) {
         setState(() {
-          _deliveries = result.items;
+          if (reset) {
+            _deliveries = result.items;
+          } else {
+            _deliveries.addAll(result.items);
+          }
+          _hasMore = result.items.length == _pageSize;
+          if (_hasMore) {
+            _page += 1;
+          }
           if (result.zones.isNotEmpty || _zones.isEmpty) {
             _zones = result.zones;
           }
@@ -117,6 +155,7 @@ class _DeliveriesListScreenState extends State<DeliveriesListScreen>
       if (mounted) {
         setState(() {
           _isLoading = false;
+          _isLoadingMore = false;
         });
       }
     }
@@ -145,7 +184,7 @@ class _DeliveriesListScreenState extends State<DeliveriesListScreen>
       _dateFromFilter = null;
       _dateToFilter = null;
     });
-    _fetchDeliveries();
+    _fetchDeliveries(reset: true);
   }
 
   void _clearOutletFilter() {
@@ -153,7 +192,7 @@ class _DeliveriesListScreenState extends State<DeliveriesListScreen>
       _selectedOutletId = null;
       _selectedOutletName = null;
     });
-    _fetchDeliveries();
+    _fetchDeliveries(reset: true);
   }
 
   void _openOutletSearchModal() {
@@ -265,7 +304,7 @@ class _DeliveriesListScreenState extends State<DeliveriesListScreen>
                                 _selectedOutletId = outlet.id;
                                 _selectedOutletName = outlet.name;
                               });
-                              _fetchDeliveries();
+                              _fetchDeliveries(reset: true);
                             },
                           );
                         },
@@ -286,7 +325,7 @@ class _DeliveriesListScreenState extends State<DeliveriesListScreen>
       _selectedZoneId = null;
       _selectedZoneName = null;
     });
-    _fetchDeliveries();
+    _fetchDeliveries(reset: true);
   }
 
   void _clearLocationFilter() {
@@ -294,7 +333,7 @@ class _DeliveriesListScreenState extends State<DeliveriesListScreen>
       _selectedLocationId = null;
       _selectedLocationName = null;
     });
-    _fetchDeliveries();
+    _fetchDeliveries(reset: true);
   }
 
   void _clearDateFilter() {
@@ -302,7 +341,7 @@ class _DeliveriesListScreenState extends State<DeliveriesListScreen>
       _dateFromFilter = null;
       _dateToFilter = null;
     });
-    _fetchDeliveries();
+    _fetchDeliveries(reset: true);
   }
 
   Future<void> _selectDateRange() async {
@@ -333,7 +372,7 @@ class _DeliveriesListScreenState extends State<DeliveriesListScreen>
         _dateFromFilter = picked.start;
         _dateToFilter = picked.end;
       });
-      _fetchDeliveries();
+      _fetchDeliveries(reset: true);
     }
   }
 
@@ -598,7 +637,7 @@ class _DeliveriesListScreenState extends State<DeliveriesListScreen>
                           _dateToFilter = tempDateTo;
                         });
                         Navigator.pop(ctx);
-                        _fetchDeliveries();
+                        _fetchDeliveries(reset: true);
                       },
                       child: const Text(
                         'Apply Filters',
@@ -709,7 +748,7 @@ class _DeliveriesListScreenState extends State<DeliveriesListScreen>
                                     icon: const Icon(Icons.clear, size: 18, color: Colors.grey),
                                     onPressed: () {
                                       _searchController.clear();
-                                      _fetchDeliveries();
+                                      _fetchDeliveries(reset: true);
                                     },
                                   )
                                 : null,
@@ -717,7 +756,7 @@ class _DeliveriesListScreenState extends State<DeliveriesListScreen>
                             contentPadding: const EdgeInsets.symmetric(vertical: 12),
                           ),
                           style: const TextStyle(fontSize: 14),
-                          onSubmitted: (val) => _fetchDeliveries(val.trim().isEmpty ? null : val.trim()),
+                          onSubmitted: (val) => _fetchDeliveries(reset: true, query: val.trim().isEmpty ? null : val.trim()),
                         ),
                       ),
                     ),
@@ -946,7 +985,7 @@ class _DeliveriesListScreenState extends State<DeliveriesListScreen>
                                   _selectedOutletId = outlet.id;
                                   _selectedOutletName = outlet.name;
                                 });
-                                _fetchDeliveries();
+                                _fetchDeliveries(reset: true);
                               },
                             ),
                           );
@@ -961,7 +1000,7 @@ class _DeliveriesListScreenState extends State<DeliveriesListScreen>
           // Deliveries List
           Expanded(
             child: RefreshIndicator(
-              onRefresh: () => _fetchDeliveries(),
+              onRefresh: () => _fetchDeliveries(reset: true),
               child: _isLoading && _deliveries.isEmpty
                   ? const Center(child: CircularProgressIndicator())
                   : _deliveries.isEmpty
@@ -973,11 +1012,18 @@ class _DeliveriesListScreenState extends State<DeliveriesListScreen>
                           ],
                         )
                       : ListView.separated(
+                          controller: _scrollController,
                           physics: const AlwaysScrollableScrollPhysics(),
                           padding: const EdgeInsets.fromLTRB(16, 8, 16, 80),
-                          itemCount: _deliveries.length,
+                          itemCount: _deliveries.length + (_isLoadingMore ? 1 : 0),
                           separatorBuilder: (context, index) => const SizedBox(height: 12),
                           itemBuilder: (context, index) {
+                            if (index >= _deliveries.length) {
+                              return const Padding(
+                                padding: EdgeInsets.symmetric(vertical: 16),
+                                child: Center(child: CircularProgressIndicator()),
+                              );
+                            }
                             final delivery = _deliveries[index];
                             return _buildDeliveryCard(delivery);
                           },
@@ -1106,7 +1152,7 @@ class _DeliveriesListScreenState extends State<DeliveriesListScreen>
             ),
           ),
         ).then((_) {
-          _fetchDeliveries();
+          _fetchDeliveries(reset: true);
         });
       },
       child: Container(

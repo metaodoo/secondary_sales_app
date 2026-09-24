@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
@@ -21,37 +22,103 @@ class MtSecOrdersListScreen extends StatefulWidget {
 }
 
 class _MtSecOrdersListScreenState extends State<MtSecOrdersListScreen> {
+  static const int _pageSize = 20;
+
   final TextEditingController _searchController = TextEditingController();
-  DateTime? _selectedDate = DateTime.now();
+  final ScrollController _scrollController = ScrollController();
+  Timer? _searchDebounce;
+  DateTime? _dateFrom = DateTime.now();
+  DateTime? _dateTo = DateTime.now();
+  int _page = 1;
+  bool _hasMore = true;
+  bool _isLoadingMore = false;
 
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) => _fetchOrders());
+    _scrollController.addListener(_onScroll);
+    WidgetsBinding.instance.addPostFrameCallback((_) => _fetchOrders(reset: true));
   }
 
   @override
   void dispose() {
+    _searchDebounce?.cancel();
+    _scrollController.dispose();
     _searchController.dispose();
     super.dispose();
   }
 
-  void _fetchOrders() {
-    final dateStr = _selectedDate != null
-        ? DateFormat('yyyy-MM-dd').format(_selectedDate!)
-        : null;
-    context.read<ModernTradeProvider>().fetchMtSecondarySales(
-          outletId: widget.outletId,
-          date: dateStr,
-        );
+  void _onScroll() {
+    if (!_scrollController.hasClients) return;
+    if (_scrollController.position.pixels >=
+        _scrollController.position.maxScrollExtent - 200) {
+      _fetchOrders();
+    }
   }
 
-  Future<void> _selectDate() async {
-    final picked = await showDatePicker(
+  void _onSearchChanged(String query) {
+    _searchDebounce?.cancel();
+    _searchDebounce = Timer(const Duration(milliseconds: 350), () {
+      _fetchOrders(reset: true);
+    });
+  }
+
+  Future<void> _fetchOrders({bool reset = false}) async {
+    if (reset) {
+      _page = 1;
+      _hasMore = true;
+      _isLoadingMore = false;
+    }
+    if (!reset && (!_hasMore || _isLoadingMore)) {
+      return;
+    }
+
+    if (mounted) {
+      setState(() {
+        if (!reset) _isLoadingMore = true;
+      });
+    }
+
+    final dateFromStr = _dateFrom != null
+        ? DateFormat('yyyy-MM-dd').format(_dateFrom!)
+        : null;
+    final dateToStr = _dateTo != null
+        ? DateFormat('yyyy-MM-dd').format(_dateTo!)
+        : null;
+    final searchStr = _searchController.text.trim().isNotEmpty
+        ? _searchController.text.trim()
+        : null;
+
+    final provider = context.read<ModernTradeProvider>();
+    await provider.fetchMtSecondarySales(
+      page: _page,
+      pageSize: _pageSize,
+      outletId: widget.outletId,
+      dateFrom: dateFromStr,
+      dateTo: dateToStr,
+      search: searchStr,
+    );
+
+    if (mounted) {
+      setState(() {
+        _hasMore = provider.secSaleOrders.length < provider.secSaleOrdersTotal;
+        if (_hasMore) {
+          _page += 1;
+        }
+        _isLoadingMore = false;
+      });
+    }
+  }
+
+  Future<void> _selectDateRange() async {
+    final now = DateTime.now();
+    final initialStart = _dateFrom ?? now;
+    final initialEnd = _dateTo ?? now;
+    final picked = await showDateRangePicker(
       context: context,
-      initialDate: _selectedDate ?? DateTime.now(),
+      initialDateRange: DateTimeRange(start: initialStart, end: initialEnd),
       firstDate: DateTime(2020),
-      lastDate: DateTime(2030),
+      lastDate: DateTime(2035),
       builder: (context, child) {
         return Theme(
           data: Theme.of(context).copyWith(
@@ -66,30 +133,59 @@ class _MtSecOrdersListScreenState extends State<MtSecOrdersListScreen> {
       },
     );
     if (picked != null) {
-      setState(() => _selectedDate = picked);
-      _fetchOrders();
+      setState(() {
+        _dateFrom = picked.start;
+        _dateTo = picked.end;
+      });
+      _fetchOrders(reset: true);
     }
+  }
+
+  void _clearDateFilter() {
+    setState(() {
+      _dateFrom = null;
+      _dateTo = null;
+    });
+    _fetchOrders(reset: true);
+  }
+
+  void _resetToToday() {
+    setState(() {
+      _dateFrom = DateTime.now();
+      _dateTo = DateTime.now();
+    });
+    _fetchOrders(reset: true);
+  }
+
+  String get _dateRangeDisplay {
+    if (_dateFrom == null && _dateTo == null) {
+      return 'All Dates';
+    }
+    if (_dateFrom != null && _dateTo != null) {
+      final isSameDay = _dateFrom!.year == _dateTo!.year &&
+          _dateFrom!.month == _dateTo!.month &&
+          _dateFrom!.day == _dateTo!.day;
+      if (isSameDay) {
+        final now = DateTime.now();
+        final isToday = _dateFrom!.year == now.year &&
+            _dateFrom!.month == now.month &&
+            _dateFrom!.day == now.day;
+        return isToday
+            ? 'Today (${DateFormat('dd MMM').format(_dateFrom!)})'
+            : DateFormat('dd MMM yyyy').format(_dateFrom!);
+      }
+      return '${DateFormat('dd MMM').format(_dateFrom!)} - ${DateFormat('dd MMM').format(_dateTo!)}';
+    }
+    if (_dateFrom != null) {
+      return 'From ${DateFormat('dd MMM').format(_dateFrom!)}';
+    }
+    return 'Until ${DateFormat('dd MMM').format(_dateTo!)}';
   }
 
   @override
   Widget build(BuildContext context) {
     final provider = context.watch<ModernTradeProvider>();
     final orders = provider.secSaleOrders;
-    final query = _searchController.text.toLowerCase().trim();
-
-    final filtered = orders.where((o) {
-      if (query.isNotEmpty) {
-        final name = o.name.toLowerCase();
-        final outlet = (o.outletName ?? '').toLowerCase();
-        final employee = (o.employeeName ?? '').toLowerCase();
-        if (!name.contains(query) &&
-            !outlet.contains(query) &&
-            !employee.contains(query)) {
-          return false;
-        }
-      }
-      return true;
-    }).toList();
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -127,9 +223,9 @@ class _MtSecOrdersListScreenState extends State<MtSecOrdersListScreen> {
                         ),
                         child: TextField(
                           controller: _searchController,
-                          onChanged: (_) => setState(() {}),
+                          onChanged: _onSearchChanged,
                           decoration: InputDecoration(
-                            hintText: 'Search order ref, outlet, or employee...',
+                            hintText: 'Search order ref, outlet...',
                             hintStyle: const TextStyle(
                               color: AppColors.textSecondary,
                               fontSize: 13,
@@ -144,7 +240,7 @@ class _MtSecOrdersListScreenState extends State<MtSecOrdersListScreen> {
                                     icon: const Icon(Icons.clear, size: 18),
                                     onPressed: () {
                                       _searchController.clear();
-                                      setState(() {});
+                                      _fetchOrders(reset: true);
                                     },
                                   )
                                 : null,
@@ -158,20 +254,20 @@ class _MtSecOrdersListScreenState extends State<MtSecOrdersListScreen> {
                     ),
                     const SizedBox(width: 8),
                     InkWell(
-                      onTap: _selectDate,
+                      onTap: _selectDateRange,
                       borderRadius: BorderRadius.circular(8),
                       child: Container(
                         height: 44,
                         padding: const EdgeInsets.symmetric(horizontal: 12),
                         decoration: BoxDecoration(
-                          color: _selectedDate != null
+                          color: (_dateFrom != null || _dateTo != null)
                               ? AppColors.primarySoft
                               : AppColors.background,
                           borderRadius: BorderRadius.circular(8),
                           border: Border.all(
-                            color: _selectedDate != null
-                                ? AppColors.primaryStrong
-                                : AppColors.borderSoft,
+                            color: (_dateFrom != null || _dateTo != null)
+                              ? AppColors.primaryStrong
+                              : AppColors.borderSoft,
                           ),
                         ),
                         child: Row(
@@ -180,30 +276,25 @@ class _MtSecOrdersListScreenState extends State<MtSecOrdersListScreen> {
                             Icon(
                               Icons.calendar_month,
                               size: 18,
-                              color: _selectedDate != null
+                              color: (_dateFrom != null || _dateTo != null)
                                   ? AppColors.primaryStrong
                                   : AppColors.textSecondary,
                             ),
                             const SizedBox(width: 6),
                             Text(
-                              _selectedDate != null
-                                  ? DateFormat('dd MMM').format(_selectedDate!)
-                                  : 'All Dates',
+                              _dateRangeDisplay,
                               style: TextStyle(
                                 fontSize: 13,
                                 fontWeight: FontWeight.w600,
-                                color: _selectedDate != null
+                                color: (_dateFrom != null || _dateTo != null)
                                     ? AppColors.primaryStrong
                                     : AppColors.textPrimary,
                               ),
                             ),
-                            if (_selectedDate != null) ...[
+                            if (_dateFrom != null || _dateTo != null) ...[
                               const SizedBox(width: 4),
                               GestureDetector(
-                                onTap: () {
-                                  setState(() => _selectedDate = null);
-                                  _fetchOrders();
-                                },
+                                onTap: _clearDateFilter,
                                 child: const Icon(
                                   Icons.close,
                                   size: 14,
@@ -217,6 +308,23 @@ class _MtSecOrdersListScreenState extends State<MtSecOrdersListScreen> {
                     ),
                   ],
                 ),
+                if (_dateFrom == null && _dateTo == null) ...[
+                  const SizedBox(height: 8),
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: InkWell(
+                      onTap: _resetToToday,
+                      child: const Text(
+                        'Set to Today',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.primaryStrong,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
               ],
             ),
           ),
@@ -224,9 +332,9 @@ class _MtSecOrdersListScreenState extends State<MtSecOrdersListScreen> {
 
           // Orders List
           Expanded(
-            child: provider.isLoading
+            child: provider.isLoading && orders.isEmpty
                 ? const Center(child: CircularProgressIndicator())
-                : filtered.isEmpty
+                : orders.isEmpty
                     ? Center(
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
@@ -238,8 +346,8 @@ class _MtSecOrdersListScreenState extends State<MtSecOrdersListScreen> {
                             ),
                             const SizedBox(height: 12),
                             Text(
-                              _selectedDate != null
-                                  ? 'No secondary sales orders on ${DateFormat("dd MMM yyyy").format(_selectedDate!)}'
+                              _dateFrom != null || _dateTo != null
+                                  ? 'No secondary sales orders for $_dateRangeDisplay'
                                   : 'No secondary sales orders found',
                               style: const TextStyle(
                                 color: AppColors.textSecondary,
@@ -250,18 +358,25 @@ class _MtSecOrdersListScreenState extends State<MtSecOrdersListScreen> {
                         ),
                       )
                     : RefreshIndicator(
-                        onRefresh: () async => _fetchOrders(),
+                        onRefresh: () async => _fetchOrders(reset: true),
                         child: ListView.separated(
+                          controller: _scrollController,
                           padding: const EdgeInsets.fromLTRB(16, 12, 16, 80),
-                          itemCount: filtered.length,
+                          itemCount: orders.length + (_isLoadingMore ? 1 : 0),
                           separatorBuilder: (context, index) =>
                               const SizedBox(height: 12),
                           itemBuilder: (context, index) {
-                            final order = filtered[index];
+                            if (index >= orders.length) {
+                              return const Padding(
+                                padding: EdgeInsets.symmetric(vertical: 16),
+                                child: Center(child: CircularProgressIndicator()),
+                              );
+                            }
+                            final order = orders[index];
                             return _MtSecOrderCard(
                               order: order,
-                              onTap: () {
-                                Navigator.push(
+                              onTap: () async {
+                                await Navigator.push(
                                   context,
                                   MaterialPageRoute(
                                     builder: (_) => MtSecOrderDetailScreen(
@@ -269,6 +384,7 @@ class _MtSecOrdersListScreenState extends State<MtSecOrdersListScreen> {
                                     ),
                                   ),
                                 );
+                                _fetchOrders(reset: true);
                               },
                             );
                           },
@@ -293,7 +409,7 @@ class _MtSecOrderCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final dateStr = order.date != null
-        ? DateFormat('dd MMM yyyy, hh:mm a').format(order.date!)
+        ? DateFormat('dd MMM yyyy, hh:mm a').format(order.date!.toLocal())
         : 'N/A';
 
     return Material(

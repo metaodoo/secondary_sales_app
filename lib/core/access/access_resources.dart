@@ -48,6 +48,15 @@ class AppScreen {
   static const mtOrderCreate = 'screen.modern_trade.orders.create';
   static const mtDeliveriesList = 'screen.modern_trade.deliveries.list';
   static const mtDeliveriesDetail = 'screen.modern_trade.deliveries.detail';
+  static const mtSaleableReturnsList =
+      'screen.modern_trade.saleable_returns.list';
+  static const mtSaleableReturnsCreate =
+      'screen.modern_trade.saleable_returns.create';
+  static const mtNonSaleableReturnsList =
+      'screen.modern_trade.non_saleable_returns.list';
+  static const mtNonSaleableReturnsCreate =
+      'screen.modern_trade.non_saleable_returns.create';
+  static const mtReturnDetail = 'screen.modern_trade.returns.detail';
 
   // Modern Trade (MT - Secondary Sales) screens.
   static const mtSecStockAuditsList = 'screen.mt_secondary.stock_audit.list';
@@ -250,11 +259,27 @@ class AppAction {
   static const mtOrderConfirm = 'action.modern_trade.orders.confirm';
   static const mtOrderCancel = 'action.modern_trade.orders.cancel';
   static const mtDeliveryValidate = 'action.modern_trade.deliveries.validate';
+  static const mtDeliveriesViewAll = 'action.modern_trade.deliveries.view_all';
+  static const mtSaleableReturnCreate =
+      'action.modern_trade.saleable_returns.create';
+  static const mtNonSaleableReturnCreate =
+      'action.modern_trade.non_saleable_returns.create';
+  static const mtReturnsSave = 'action.modern_trade.returns.save';
+  static const mtReturnsReset = 'action.modern_trade.returns.reset';
+  static const mtReturnsSubmitDm = 'action.modern_trade.returns.submit_dm';
+  static const mtReturnsSubmitKas = 'action.modern_trade.returns.submit_kas';
+  static const mtReturnsSubmitSupplyChain =
+      'action.modern_trade.returns.submit_supply_chain';
+  static const mtReturnsSubmitQc = 'action.modern_trade.returns.submit_qc';
+  static const mtReturnsSubmitSalesOperation =
+      'action.modern_trade.returns.submit_sales_operation';
+  static const mtReturnsConfirm = 'action.modern_trade.returns.confirm';
 
   // Modern Trade (MT - Secondary) actions.
   static const mtSecStockAuditCreate = 'action.mt_secondary.stock_audit.create';
   static const mtSecStockAuditSave = 'action.mt_secondary.stock_audit.create';
   static const mtSecStockAuditConfirm = 'action.mt_secondary.stock_audit.confirm';
+  static const mtSecStockAuditReset = 'action.mt_secondary.stock_audit.reset';
 
   // Routes / contacts / employees.
   static const routeCreate = 'action.secondary_sale.routes.create';
@@ -1306,6 +1331,41 @@ const List<AccessResource> accessCatalog = [
     'Modern Trade › Deliveries › Open detail',
     _mt,
   ),
+  AccessResource(
+    AppScreen.mtSaleableReturnsList,
+    'screen',
+    'modern_trade',
+    'Modern Trade › Saleable Returns › Open list',
+    _mt,
+  ),
+  AccessResource(
+    AppScreen.mtSaleableReturnsCreate,
+    'screen',
+    'modern_trade',
+    'Modern Trade › Saleable Returns › Open create screen',
+    _mt,
+  ),
+  AccessResource(
+    AppScreen.mtNonSaleableReturnsList,
+    'screen',
+    'modern_trade',
+    'Modern Trade › Non-Saleable Returns › Open list',
+    _mt,
+  ),
+  AccessResource(
+    AppScreen.mtNonSaleableReturnsCreate,
+    'screen',
+    'modern_trade',
+    'Modern Trade › Non-Saleable Returns › Open create screen',
+    _mt,
+  ),
+  AccessResource(
+    AppScreen.mtReturnDetail,
+    'screen',
+    'modern_trade',
+    'Modern Trade › Returns › Open detail',
+    _mt,
+  ),
 
   // Modern Trade (MT) actions.
   AccessResource(
@@ -1355,6 +1415,84 @@ const List<AccessResource> accessCatalog = [
     'action',
     'modern_trade',
     'Modern Trade › Deliveries › Validate (button)',
+    _mt,
+  ),
+  AccessResource(
+    AppAction.mtDeliveriesViewAll,
+    'action',
+    'modern_trade',
+    'Modern Trade › Deliveries › View All Deliveries',
+    _mt,
+    legacyKeys: ['action.delivery.view_all'],
+  ),
+  AccessResource(
+    AppAction.mtSaleableReturnCreate,
+    'action',
+    'modern_trade',
+    'Modern Trade › Saleable Returns › Create (button)',
+    _mt,
+  ),
+  AccessResource(
+    AppAction.mtNonSaleableReturnCreate,
+    'action',
+    'modern_trade',
+    'Modern Trade › Non-Saleable Returns › Create (button)',
+    _mt,
+  ),
+  AccessResource(
+    AppAction.mtReturnsSave,
+    'action',
+    'modern_trade',
+    'Modern Trade › Returns › Save line quantities (button)',
+    _mt,
+  ),
+  AccessResource(
+    AppAction.mtReturnsReset,
+    'action',
+    'modern_trade',
+    'Modern Trade › Returns › Reset to KAO (button)',
+    _mt,
+  ),
+  AccessResource(
+    AppAction.mtReturnsSubmitDm,
+    'action',
+    'modern_trade',
+    'Modern Trade › Returns › Submit to DM (button)',
+    _mt,
+  ),
+  AccessResource(
+    AppAction.mtReturnsSubmitKas,
+    'action',
+    'modern_trade',
+    'Modern Trade › Returns › Submit to KAS (button)',
+    _mt,
+  ),
+  AccessResource(
+    AppAction.mtReturnsSubmitSupplyChain,
+    'action',
+    'modern_trade',
+    'Modern Trade › Returns › Submit to Supply Chain (button)',
+    _mt,
+  ),
+  AccessResource(
+    AppAction.mtReturnsSubmitQc,
+    'action',
+    'modern_trade',
+    'Modern Trade › Returns › Submit to QC (button)',
+    _mt,
+  ),
+  AccessResource(
+    AppAction.mtReturnsSubmitSalesOperation,
+    'action',
+    'modern_trade',
+    'Modern Trade › Returns › Submit to Sales Operation (button)',
+    _mt,
+  ),
+  AccessResource(
+    AppAction.mtReturnsConfirm,
+    'action',
+    'modern_trade',
+    'Modern Trade › Returns › Confirm (button)',
     _mt,
   ),
 
@@ -1408,6 +1546,13 @@ const List<AccessResource> accessCatalog = [
     'action',
     'mt_secondary',
     'MT Secondary › Stock Audits › Confirm (button)',
+    _mtSec,
+  ),
+  AccessResource(
+    AppAction.mtSecStockAuditReset,
+    'action',
+    'mt_secondary',
+    'MT Secondary › Stock Audits › Reset to Draft (button)',
     _mtSec,
   ),
 ];

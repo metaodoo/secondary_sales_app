@@ -41,36 +41,105 @@ class VanOperationsListScreen extends StatefulWidget {
 }
 
 class _VanOperationsListScreenState extends State<VanOperationsListScreen> {
+  static const int _pageSize = 20;
+
   final TextEditingController _searchController = TextEditingController();
+  final ScrollController _scrollController = ScrollController();
   Timer? _searchDebounce;
   DateTime? _dateFromFilter;
   DateTime? _dateToFilter;
+  List<VirtualTransfer> _operations = [];
+  int _page = 1;
+  bool _hasMore = true;
+  bool _isLoadingMore = false;
+  bool _isLoading = true;
+  String? _error;
 
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) => _fetchOperations());
+    _scrollController.addListener(_onScroll);
+    WidgetsBinding.instance.addPostFrameCallback((_) => _fetchOperations(reset: true));
   }
 
   @override
   void dispose() {
     _searchDebounce?.cancel();
+    _scrollController.dispose();
     _searchController.dispose();
     super.dispose();
   }
 
-  Future<void> _fetchOperations() {
-    return context.read<TransferProvider>().fetchVirtualTransfers(
-      search: _searchController.text,
-      vanOperationType: widget.operationType,
-      dateFrom: _dateFromFilter,
-      dateTo: _dateToFilter,
-    );
+  void _onScroll() {
+    if (!_scrollController.hasClients) return;
+    if (_scrollController.position.pixels >=
+        _scrollController.position.maxScrollExtent - 200) {
+      _fetchOperations();
+    }
+  }
+
+  Future<void> _fetchOperations({bool reset = false}) async {
+    if (reset) {
+      _page = 1;
+      _hasMore = true;
+      _isLoadingMore = false;
+    }
+    if (!reset && (!_hasMore || _isLoadingMore)) {
+      return;
+    }
+
+    if (!mounted) return;
+    setState(() {
+      if (reset) {
+        _isLoading = true;
+        _error = null;
+      } else {
+        _isLoadingMore = true;
+      }
+    });
+
+    try {
+      final results = await context.read<TransferProvider>().fetchVirtualTransfers(
+        search: _searchController.text,
+        vanOperationType: widget.operationType,
+        dateFrom: _dateFromFilter,
+        dateTo: _dateToFilter,
+        page: _page,
+        pageSize: _pageSize,
+        reset: reset,
+      );
+      if (mounted) {
+        setState(() {
+          if (reset) {
+            _operations = results;
+          } else {
+            _operations.addAll(results);
+          }
+          _hasMore = results.length == _pageSize;
+          if (_hasMore) {
+            _page += 1;
+          }
+          _isLoading = false;
+          _isLoadingMore = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _error = e.toString();
+          _isLoading = false;
+          _isLoadingMore = false;
+        });
+      }
+    }
   }
 
   void _onSearchChanged(String value) {
     _searchDebounce?.cancel();
-    _searchDebounce = Timer(const Duration(milliseconds: 350), _fetchOperations);
+    _searchDebounce = Timer(
+      const Duration(milliseconds: 350),
+      () => _fetchOperations(reset: true),
+    );
   }
 
   Future<void> _pickDate() async {
@@ -87,7 +156,7 @@ class _VanOperationsListScreenState extends State<VanOperationsListScreen> {
       _dateFromFilter = picked.start;
       _dateToFilter = picked.end;
     });
-    _fetchOperations();
+    _fetchOperations(reset: true);
   }
 
   Future<void> _openCreateTransfer(String type) async {
@@ -96,7 +165,7 @@ class _VanOperationsListScreenState extends State<VanOperationsListScreen> {
       MaterialPageRoute(builder: (_) => VanLoadFormScreen(isLoad: type == 'load')),
     );
     if (mounted) {
-      _fetchOperations();
+      _fetchOperations(reset: true);
     }
   }
 
@@ -108,7 +177,7 @@ class _VanOperationsListScreenState extends State<VanOperationsListScreen> {
       ),
     );
     if (mounted) {
-      _fetchOperations();
+      _fetchOperations(reset: true);
     }
   }
 
@@ -158,8 +227,6 @@ class _VanOperationsListScreenState extends State<VanOperationsListScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final provider = context.watch<TransferProvider>();
-    final transfers = provider.virtualTransfers;
     final bool hasDateFilter = _dateFromFilter != null && _dateToFilter != null;
     final bool isLoad = widget.operationType == 'load';
 
@@ -171,7 +238,7 @@ class _VanOperationsListScreenState extends State<VanOperationsListScreen> {
       floatingActionButton: SsCreateFab(
         heroTag: isLoad ? 'vanNewLoad' : 'vanNewUnload',
         label: isLoad ? 'New Load' : 'New Unload',
-        onPressed: provider.isLoading
+        onPressed: _isLoading
             ? null
             : () => _openCreateTransfer(widget.operationType),
       ),
@@ -215,8 +282,9 @@ class _VanOperationsListScreenState extends State<VanOperationsListScreen> {
           children: [
             Expanded(
               child: RefreshIndicator(
-                onRefresh: _fetchOperations,
+                onRefresh: () => _fetchOperations(reset: true),
                 child: ListView(
+                  controller: _scrollController,
                   // Extra room: this screen stacks two FABs.
                   padding: const EdgeInsets.fromLTRB(16, 16, 16, 152),
                   children: [
@@ -254,19 +322,12 @@ class _VanOperationsListScreenState extends State<VanOperationsListScreen> {
                       ),
                       onChanged: _onSearchChanged,
                     ),
-                    const SizedBox(height: 16),
+                    const SizedBox(height: 12),
 
-                    const Text(
-                      'Selected Date Range',
-                      style: TextStyle(
-                        color: AppColors.textSecondary,
-                        fontWeight: FontWeight.w600,
-                        fontSize: 14,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
+                    // Date Filter Selector
                     InkWell(
                       onTap: _pickDate,
+                      borderRadius: BorderRadius.circular(12),
                       child: Container(
                         padding: const EdgeInsets.symmetric(
                           horizontal: 16,
@@ -281,7 +342,7 @@ class _VanOperationsListScreenState extends State<VanOperationsListScreen> {
                           children: [
                             const Icon(
                               Icons.calendar_today_outlined,
-                              color: AppColors.primary,
+                              color: AppColors.textSecondary,
                               size: 20,
                             ),
                             const SizedBox(width: 12),
@@ -303,7 +364,7 @@ class _VanOperationsListScreenState extends State<VanOperationsListScreen> {
                                     _dateFromFilter = null;
                                     _dateToFilter = null;
                                   });
-                                  _fetchOperations();
+                                  _fetchOperations(reset: true);
                                 },
                                 child: const Icon(
                                   Icons.close,
@@ -319,23 +380,34 @@ class _VanOperationsListScreenState extends State<VanOperationsListScreen> {
                     const SizedBox(height: 24),
 
 
-                    if (provider.error != null) ErrorPanel(provider.error!),
-                    if (provider.isLoading && transfers.isEmpty)
+                    if (_error != null) ErrorPanel(_error!),
+                    if (_isLoading && _operations.isEmpty)
                       const Padding(
                         padding: EdgeInsets.all(32),
                         child: Center(child: CircularProgressIndicator()),
                       )
-                    else if (transfers.isEmpty)
+                    else if (_operations.isEmpty)
                       const EmptyPanel(message: 'No operations found')
                     else ...[
-                      if (provider.isLoading)
+                      if (_isLoading)
                         const Padding(
                           padding: EdgeInsets.only(bottom: 12),
                           child: LinearProgressIndicator(),
                         ),
-                      ...transfers.map(
+                      ..._operations.map(
                         (transfer) => _buildOperationCard(transfer),
                       ),
+                      if (_isLoadingMore)
+                        const Padding(
+                          padding: EdgeInsets.symmetric(vertical: 16),
+                          child: Center(
+                            child: SizedBox(
+                              width: 24,
+                              height: 24,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            ),
+                          ),
+                        ),
                     ],
                   ],
                 ),

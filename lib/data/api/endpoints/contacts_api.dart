@@ -27,10 +27,13 @@ extension ContactsApi on ApiService {
     int? routeId,
     bool? assigned,
     String? sort,
+    int page = 1,
+    int pageSize = 20,
   }) async {
     final params = <String, dynamic>{
       'customer_type': 'outlet',
-      'page_size': 100,
+      'page': page,
+      'page_size': pageSize,
       'active': true,
     };
     final query = search?.trim();

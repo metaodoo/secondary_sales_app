@@ -140,21 +140,33 @@ class TransferProvider with ChangeNotifier {
     }
   }
 
-  Future<void> searchTransferProducts({
+  Future<List<TransferProduct>> searchTransferProducts({
     required int destinationLocationId,
     String? search,
+    int page = 1,
+    int pageSize = 20,
+    bool reset = false,
   }) async {
     _loadingCount++;
     _error = null;
     notifyListeners();
 
     try {
-      _transferProducts = await _apiService.getTransferProducts(
+      final results = await _apiService.getTransferProducts(
         destinationLocationId: destinationLocationId,
         search: search,
+        page: page,
+        pageSize: pageSize,
       );
+      if (reset || page == 1) {
+        _transferProducts = results;
+      } else {
+        _transferProducts.addAll(results);
+      }
+      return results;
     } catch (e) {
       _error = e.toString();
+      return [];
     } finally {
       if (_loadingCount > 0) _loadingCount--;
       notifyListeners();
@@ -187,27 +199,39 @@ class TransferProvider with ChangeNotifier {
     }
   }
 
-  Future<void> fetchVirtualTransfers({
+  Future<List<VirtualTransfer>> fetchVirtualTransfers({
     String? search,
     String? state,
     String? vanOperationType,
     DateTime? dateFrom,
     DateTime? dateTo,
+    int page = 1,
+    int pageSize = 20,
+    bool reset = false,
   }) async {
     _loadingCount++;
     _error = null;
     notifyListeners();
 
     try {
-      _virtualTransfers = await _apiService.getVirtualTransfers(
+      final results = await _apiService.getVirtualTransfers(
         search: search,
         state: state,
         vanOperationType: vanOperationType,
         dateFrom: dateFrom,
         dateTo: dateTo,
+        page: page,
+        pageSize: pageSize,
       );
+      if (reset || page == 1) {
+        _virtualTransfers = results;
+      } else {
+        _virtualTransfers.addAll(results);
+      }
+      return results;
     } catch (e) {
       _error = e.toString();
+      return [];
     } finally {
       if (_loadingCount > 0) _loadingCount--;
       notifyListeners();

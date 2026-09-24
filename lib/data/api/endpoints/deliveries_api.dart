@@ -10,7 +10,7 @@ extension DeliveriesApi on ApiService {
   }) async {
     final result = await _post('${AppConstants.deliveriesEndpoint}/prepare', {
       'employee_id': _activeEmployeeId,
-      'sale_order_id': orderId,
+      if (orderId > 0) 'sale_order_id': orderId,
       if (pickingId != null) 'picking_id': pickingId,
       if (saleType != null) 'sale_type': saleType,
     });
@@ -29,18 +29,33 @@ extension DeliveriesApi on ApiService {
     bool createBackorder = true,
     String? saleType,
     String action = 'validate',
+    bool skipExpired = false,
   }) async {
     final result =
         await _post('${AppConstants.deliveriesEndpoint}/$pickingId/action', {
           'employee_id': _activeEmployeeId,
-          'sale_order_id': orderId,
+          if (orderId > 0) 'sale_order_id': orderId,
           'action': action,
           if (warehouseId != null) 'warehouse_id': warehouseId,
           if (locationId != null) 'location_id': locationId,
           'create_backorder': createBackorder,
           'lines': lines.map((line) => line.toPayload()).toList(),
           if (saleType != null) 'sale_type': saleType,
+          if (skipExpired) 'skip_expired': true,
         });
+    if (result['requires_confirmation'] == true &&
+        result['confirmation_type'] == 'expired_lots') {
+      final expiredList = (result['expired_lots'] as List? ?? [])
+          .whereType<Map>()
+          .map((m) => ExpiredLotItem.fromMap(m.cast<String, dynamic>()))
+          .toList();
+      throw ExpiredLotsConfirmationException(
+        message:
+            (result['message'] ?? 'Expired lots require confirmation')
+                .toString(),
+        expiredLots: expiredList,
+      );
+    }
     if (result['success'] == true) {
       final data = result['data'];
       final order = data is Map ? data['order'] : null;
@@ -143,7 +158,7 @@ extension DeliveriesApi on ApiService {
       '${AppConstants.deliveriesEndpoint}/products/$productId/lots',
       {
         'employee_id': _activeEmployeeId,
-        'sale_order_id': saleOrderId,
+        if (saleOrderId > 0) 'sale_order_id': saleOrderId,
         if (locationId != null) 'location_id': locationId,
         if (pickingId != null) 'picking_id': pickingId,
       },
@@ -166,7 +181,7 @@ extension DeliveriesApi on ApiService {
       '${AppConstants.deliveriesEndpoint}/products/$productId/auto-assign-lots',
       {
         'employee_id': _activeEmployeeId,
-        'sale_order_id': saleOrderId,
+        if (saleOrderId > 0) 'sale_order_id': saleOrderId,
         'quantity': quantity,
         if (pickingId != null) 'picking_id': pickingId,
         if (locationId != null) 'location_id': locationId,
@@ -184,6 +199,8 @@ extension DeliveriesApi on ApiService {
             lotName: map['lot_name']?.toString() ?? '',
             productId: productId,
             availableQty: asDouble(map['quantity']),
+            expirationDate: map['expiration_date']?.toString(),
+            isExpired: map['is_expired'] == true,
           ),
           quantity: asDouble(map['quantity']),
         );

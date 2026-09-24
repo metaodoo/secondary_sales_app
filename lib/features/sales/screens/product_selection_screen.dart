@@ -42,35 +42,65 @@ class ProductSelectionScreen extends StatefulWidget {
 }
 
 class _ProductSelectionScreenState extends State<ProductSelectionScreen> {
+  static const int _pageSize = 20;
+
   final TextEditingController _searchController = TextEditingController();
+  final ScrollController _scrollController = ScrollController();
   Timer? _searchDebounce;
   final Map<int, OrderLineEntry> _selectedLines = {};
   bool _inStockOnly = false;
   late String _sortBy;
   int? _selectedCategoryId;
+  int _page = 1;
+  bool _hasMore = true;
+  bool _isLoadingMore = false;
 
   @override
   void initState() {
     super.initState();
+    _scrollController.addListener(_onScroll);
     _sortBy = (widget.saleType == 'secondary' && widget.businessType != 'mt')
         ? 'van_stock_desc'
         : 'name_asc';
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       final provider = context.read<PrimarySaleProvider>();
       await provider.fetchProductCategories();
-      _fetchProducts();
+      _fetchProducts(reset: true);
     });
   }
 
   @override
   void dispose() {
     _searchDebounce?.cancel();
+    _scrollController.dispose();
     _searchController.dispose();
     super.dispose();
   }
 
-  void _fetchProducts() {
-    context.read<PrimarySaleProvider>().searchProducts(
+  void _onScroll() {
+    if (!_scrollController.hasClients) return;
+    if (_scrollController.position.pixels >=
+        _scrollController.position.maxScrollExtent - 200) {
+      _fetchProducts();
+    }
+  }
+
+  Future<void> _fetchProducts({bool reset = false}) async {
+    if (reset) {
+      _page = 1;
+      _hasMore = true;
+      _isLoadingMore = false;
+    }
+    if (!reset && (!_hasMore || _isLoadingMore)) {
+      return;
+    }
+
+    if (!mounted) return;
+    if (!reset) {
+      setState(() => _isLoadingMore = true);
+    }
+
+    final results = await context.read<PrimarySaleProvider>().searchProducts(
       _searchController.text,
       saleType: widget.saleType,
       partnerId: widget.partnerId,
@@ -78,13 +108,26 @@ class _ProductSelectionScreenState extends State<ProductSelectionScreen> {
       inStockOnly: _inStockOnly,
       sortBy: _sortBy,
       businessType: widget.businessType,
+      page: _page,
+      pageSize: _pageSize,
+      reset: reset,
     );
+
+    if (mounted) {
+      setState(() {
+        _hasMore = results.length == _pageSize;
+        if (_hasMore) {
+          _page += 1;
+        }
+        _isLoadingMore = false;
+      });
+    }
   }
 
   void _onSearchChanged(String query) {
     _searchDebounce?.cancel();
     _searchDebounce = Timer(const Duration(milliseconds: 350), () {
-      _fetchProducts();
+      _fetchProducts(reset: true);
     });
   }
 
@@ -454,72 +497,72 @@ class _ProductSelectionScreenState extends State<ProductSelectionScreen> {
                           padding: EdgeInsets.zero,
                           itemCount: provider.categories.length + 1,
                           itemBuilder: (context, index) {
-                    if (index == 0) {
-                      final bool isSelected = _selectedCategoryId == null;
-                      return Padding(
-                        padding: const EdgeInsets.only(right: 6),
-                        child: ChoiceChip(
-                          label: const Text('All Categories'),
-                          selected: isSelected,
-                          selectedColor: AppColors.primary,
-                          labelStyle: TextStyle(
-                            color: isSelected ? Colors.white : AppColors.textPrimary,
-                            fontWeight: FontWeight.w600,
-                            fontSize: 12,
-                          ),
-                          backgroundColor: Colors.white,
-                          side: BorderSide(
-                            color: isSelected ? AppColors.primary : AppColors.borderSoft,
-                          ),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(18),
-                          ),
-                          onSelected: (_) {
-                            setState(() {
-                              _selectedCategoryId = null;
-                            });
-                            _fetchProducts();
+                            if (index == 0) {
+                              final bool isSelected = _selectedCategoryId == null;
+                              return Padding(
+                                padding: const EdgeInsets.only(right: 6),
+                                child: ChoiceChip(
+                                  label: const Text('All Categories'),
+                                  selected: isSelected,
+                                  selectedColor: AppColors.primary,
+                                  labelStyle: TextStyle(
+                                    color: isSelected ? Colors.white : AppColors.textPrimary,
+                                    fontWeight: FontWeight.w600,
+                                    fontSize: 12,
+                                  ),
+                                  backgroundColor: Colors.white,
+                                  side: BorderSide(
+                                    color: isSelected ? AppColors.primary : AppColors.borderSoft,
+                                  ),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(18),
+                                  ),
+                                  onSelected: (_) {
+                                    setState(() {
+                                      _selectedCategoryId = null;
+                                    });
+                                    _fetchProducts(reset: true);
+                                  },
+                                ),
+                              );
+                            }
+                            final cat = provider.categories[index - 1];
+                            final bool isSelected = _selectedCategoryId == cat.id;
+                            return Padding(
+                              padding: const EdgeInsets.only(right: 6),
+                              child: ChoiceChip(
+                                label: Text(cat.name),
+                                selected: isSelected,
+                                selectedColor: AppColors.primary,
+                                labelStyle: TextStyle(
+                                  color: isSelected ? Colors.white : AppColors.textPrimary,
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 12,
+                                ),
+                                backgroundColor: Colors.white,
+                                side: BorderSide(
+                                  color: isSelected ? AppColors.primary : AppColors.borderSoft,
+                                ),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(18),
+                                ),
+                                onSelected: (_) {
+                                  setState(() {
+                                    _selectedCategoryId = cat.id;
+                                  });
+                                  _fetchProducts(reset: true);
+                                },
+                              ),
+                            );
                           },
                         ),
-                      );
-                    }
-                    final cat = provider.categories[index - 1];
-                    final bool isSelected = _selectedCategoryId == cat.id;
-                    return Padding(
-                      padding: const EdgeInsets.only(right: 6),
-                      child: ChoiceChip(
-                        label: Text(cat.name),
-                        selected: isSelected,
-                        selectedColor: AppColors.primary,
-                        labelStyle: TextStyle(
-                          color: isSelected ? Colors.white : AppColors.textPrimary,
-                          fontWeight: FontWeight.w600,
-                          fontSize: 12,
-                        ),
-                        backgroundColor: Colors.white,
-                        side: BorderSide(
-                          color: isSelected ? AppColors.primary : AppColors.borderSoft,
-                        ),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(18),
-                        ),
-                        onSelected: (_) {
-                          setState(() {
-                            _selectedCategoryId = cat.id;
-                          });
-                          _fetchProducts();
-                        },
                       ),
-                    );
-                  },
+                    ),
+                  ],
                 ),
               ),
-            ),
-          ],
-        ),
-      ),
-      const SizedBox(height: 8),
-    ],
+              const SizedBox(height: 8),
+            ],
 
             // Product Count & Sorting Controls Bar
             Padding(
@@ -533,7 +576,7 @@ class _ProductSelectionScreenState extends State<ProductSelectionScreen> {
                       vertical: 5,
                     ),
                     decoration: BoxDecoration(
-                      color: AppColors.primary.withOpacity(0.08),
+                      color: AppColors.primary.withValues(alpha: 0.08),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Text(
@@ -577,7 +620,7 @@ class _ProductSelectionScreenState extends State<ProductSelectionScreen> {
                         setState(() {
                           _inStockOnly = selected;
                         });
-                        _fetchProducts();
+                        _fetchProducts(reset: true);
                       },
                     ),
                     const SizedBox(width: 4),
@@ -591,7 +634,7 @@ class _ProductSelectionScreenState extends State<ProductSelectionScreen> {
                       setState(() {
                         _sortBy = value;
                       });
-                      _fetchProducts();
+                      _fetchProducts(reset: true);
                     },
                     itemBuilder: (context) => [
                       const PopupMenuItem(
@@ -640,7 +683,7 @@ class _ProductSelectionScreenState extends State<ProductSelectionScreen> {
             Expanded(
               child: RefreshIndicator(
                 onRefresh: () async {
-                  _fetchProducts();
+                  _fetchProducts(reset: true);
                 },
                 child: provider.isLoading && provider.products.isEmpty
                     ? const Center(child: CircularProgressIndicator())
@@ -661,13 +704,26 @@ class _ProductSelectionScreenState extends State<ProductSelectionScreen> {
                         ],
                       )
                     : ListView.builder(
+                        controller: _scrollController,
                         physics: const AlwaysScrollableScrollPhysics(),
                         padding: const EdgeInsets.symmetric(
                           horizontal: 20,
                           vertical: 10,
                         ),
-                        itemCount: provider.products.length,
+                        itemCount: provider.products.length + (_isLoadingMore ? 1 : 0),
                         itemBuilder: (context, index) {
+                          if (index >= provider.products.length) {
+                            return const Padding(
+                              padding: EdgeInsets.symmetric(vertical: 16),
+                              child: Center(
+                                child: SizedBox(
+                                  width: 24,
+                                  height: 24,
+                                  child: CircularProgressIndicator(strokeWidth: 2),
+                                ),
+                              ),
+                            );
+                          }
                           final product = provider.products[index];
                           final lineEntry = _selectedLines[product.id];
                           return ProductSelectionCard(

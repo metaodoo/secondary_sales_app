@@ -17,6 +17,7 @@ import 'package:secondary_sales/features/routes/screens/visits_list_screen.dart'
 import 'package:secondary_sales/features/modern_trade/screens/mt_outlets_screen.dart';
 import 'package:secondary_sales/features/modern_trade/screens/mt_stock_audit_list_screen.dart';
 import 'package:secondary_sales/features/modern_trade/screens/mt_sec_orders_list_screen.dart';
+import 'package:secondary_sales/features/modern_trade/screens/mt_returns_list_screen.dart';
 
 class DashboardTab extends StatelessWidget {
   const DashboardTab({
@@ -121,20 +122,21 @@ class DashboardTab extends StatelessWidget {
                 builder: (context) {
                   final cards = <Widget>[
                     if (moduleType == 'mt_secondary' || moduleType == 'modern_trade_secondary') ...[
-                      _buildModuleCard(
-                        title: 'MT Outlets',
-                        icon: Icons.corporate_fare_outlined,
-                        iconColor: Colors.white,
-                        circleColor: const Color(0xFF0284C7),
-                        onTap: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => const MtOutletsScreen(),
-                            ),
-                          );
-                        },
-                      ),
+                      if (auth.canView(AppScreen.mtOutletsList))
+                        _buildModuleCard(
+                          title: 'MT Outlets',
+                          icon: Icons.corporate_fare_outlined,
+                          iconColor: Colors.white,
+                          circleColor: const Color(0xFF0284C7),
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => const MtOutletsScreen(),
+                              ),
+                            );
+                          },
+                        ),
                       if (auth.canView(AppScreen.mtSecStockAuditsList))
                         _buildModuleCard(
                           title: 'Stock Audits',
@@ -181,20 +183,21 @@ class DashboardTab extends StatelessWidget {
                           },
                         ),
                     ] else if (moduleType == 'mt_primary' || moduleType == 'modern_trade') ...[
-                      _buildModuleCard(
-                        title: 'MT Outlets',
-                        icon: Icons.corporate_fare_outlined,
-                        iconColor: Colors.white,
-                        circleColor: const Color(0xFF0284C7),
-                        onTap: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => const MtOutletsScreen(),
-                            ),
-                          );
-                        },
-                      ),
+                      if (auth.canView(AppScreen.mtOutletsList))
+                        _buildModuleCard(
+                          title: 'MT Outlets',
+                          icon: Icons.corporate_fare_outlined,
+                          iconColor: Colors.white,
+                          circleColor: const Color(0xFF0284C7),
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => const MtOutletsScreen(),
+                              ),
+                            );
+                          },
+                        ),
                       if (auth.canView(AppScreen.mtVisitsList) || auth.canView(AppScreen.visitsList))
                         _buildModuleCard(
                           title: 'Visit History',
@@ -242,6 +245,46 @@ class DashboardTab extends StatelessWidget {
                                 builder: (_) => const DeliveriesListScreen(
                                   moduleType: 'modern_trade',
                                   businessType: 'mt',
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                      if (auth.canView(AppScreen.mtSaleableReturnsList))
+                        _buildModuleCard(
+                          title: 'Saleable Return',
+                          icon: Icons.assignment_return_outlined,
+                          iconColor: Colors.white,
+                          circleColor: const Color(0xFF2563EB),
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => const MtReturnsListScreen(
+                                  returnBucket: 'saleable',
+                                  title: 'Saleable Returns',
+                                  createScreenKey: AppScreen.mtSaleableReturnsCreate,
+                                  createActionKey: AppAction.mtSaleableReturnCreate,
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                      if (auth.canView(AppScreen.mtNonSaleableReturnsList))
+                        _buildModuleCard(
+                          title: 'Non-Saleable Return',
+                          icon: Icons.recycling_outlined,
+                          iconColor: Colors.white,
+                          circleColor: const Color(0xFFDC2626),
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => const MtReturnsListScreen(
+                                  returnBucket: 'non_saleable',
+                                  title: 'Non-Saleable Returns',
+                                  createScreenKey: AppScreen.mtNonSaleableReturnsCreate,
+                                  createActionKey: AppAction.mtNonSaleableReturnCreate,
                                 ),
                               ),
                             );

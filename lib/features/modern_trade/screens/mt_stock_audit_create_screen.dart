@@ -12,6 +12,7 @@ class MtStockAuditCreateScreen extends StatefulWidget {
   final String? outletName;
   final int? visitId;
   final MtStockAudit? editAudit;
+  final String? initialType;
 
   const MtStockAuditCreateScreen({
     super.key,
@@ -19,6 +20,7 @@ class MtStockAuditCreateScreen extends StatefulWidget {
     this.outletName,
     this.visitId,
     this.editAudit,
+    this.initialType,
   });
 
   @override
@@ -57,11 +59,26 @@ class _MtStockAuditCreateScreenState extends State<MtStockAuditCreateScreen> {
           stockCount: line.stockCount,
         );
       }
+    } else if (widget.initialType != null) {
+      _selectedType = widget.initialType!;
     }
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<ModernTradeProvider>().fetchCategories();
       _loadProducts();
     });
+  }
+
+  String _typeLabel(String type) {
+    switch (type) {
+      case 'opening_stock':
+        return 'Opening Stock';
+      case 'stock_in':
+        return 'Stock In';
+      case 'closing_stock':
+        return 'Closing Stock';
+      default:
+        return 'Stock Audit';
+    }
   }
 
   @override
@@ -80,8 +97,68 @@ class _MtStockAuditCreateScreenState extends State<MtStockAuditCreateScreen> {
       categoryId: _selectedCategoryId,
     );
     if (!mounted) return;
+
+    // Track selected product IDs
+    final selectedProductIds = _entries.values
+        .where((e) => e.stockCount > 0)
+        .map((e) => e.productId)
+        .toSet();
+
+    // Map original line ordering when editing
+    final editOrderMap = <int, int>{};
+    if (widget.editAudit != null) {
+      for (int i = 0; i < widget.editAudit!.lines.length; i++) {
+        final pId = widget.editAudit!.lines[i].productId;
+        editOrderMap.putIfAbsent(pId, () => i);
+      }
+    }
+
+    final sortedProds = List<MtStockAuditProduct>.from(prods);
+
+    // If editAudit has products not present in API result, prepend them
+    final returnedIds = sortedProds.map((p) => p.id).toSet();
+    if (widget.editAudit != null && _selectedCategoryId == null && _searchController.text.trim().isEmpty) {
+      for (final line in widget.editAudit!.lines) {
+        if (!returnedIds.contains(line.productId) && line.productId > 0) {
+          final missingProduct = MtStockAuditProduct(
+            id: line.productId,
+            name: line.productName,
+            defaultCode: line.defaultCode,
+            uomName: line.uomName,
+            tracking: line.lotId != null ? 'lot' : 'none',
+            lots: line.lotId != null
+                ? [
+                    MtStockAuditLot(
+                      id: line.lotId!,
+                      name: line.lotName ?? '',
+                      expirationDate: line.expirationDate,
+                    ),
+                  ]
+                : const [],
+          );
+          sortedProds.insert(0, missingProduct);
+          returnedIds.add(line.productId);
+        }
+      }
+    }
+
+    // Sort: previously selected / counted products first, preserving edit order
+    sortedProds.sort((a, b) {
+      final aSelected = selectedProductIds.contains(a.id) || editOrderMap.containsKey(a.id);
+      final bSelected = selectedProductIds.contains(b.id) || editOrderMap.containsKey(b.id);
+      if (aSelected && !bSelected) return -1;
+      if (!aSelected && bSelected) return 1;
+      if (aSelected && bSelected) {
+        final aOrder = editOrderMap[a.id] ?? 999999;
+        final bOrder = editOrderMap[b.id] ?? 999999;
+        final cmp = aOrder.compareTo(bOrder);
+        if (cmp != 0) return cmp;
+      }
+      return 0;
+    });
+
     setState(() {
-      _availableProducts = prods;
+      _availableProducts = sortedProds;
       _isLoadingProducts = false;
     });
   }
@@ -218,6 +295,14 @@ class _MtStockAuditCreateScreenState extends State<MtStockAuditCreateScreen> {
     return _entries.values.where((item) => item.stockCount > 0).length;
   }
 
+  int get _selectedProductsCount {
+    return _entries.values
+        .where((item) => item.stockCount > 0)
+        .map((item) => item.productId)
+        .toSet()
+        .length;
+  }
+
   void _onProductEntriesChanged(MtStockAuditProduct prod, List<_AuditEntry> newEntries) {
     setState(() {
       _entries.removeWhere((k, v) => v.productId == prod.id);
@@ -348,47 +433,18 @@ class _MtStockAuditCreateScreenState extends State<MtStockAuditCreateScreen> {
         child: Column(
           children: [
             BlueHeader(
-              title: widget.editAudit != null ? 'Edit Stock Audit' : 'New Stock Audit',
+              title: widget.editAudit != null
+                  ? 'Edit ${_typeLabel(_selectedType)}'
+                  : 'New ${_typeLabel(_selectedType)}',
               subtitle: widget.outletName ?? widget.editAudit?.outletName ?? 'Modern Trade',
               leading: IconButton(
                 icon: const Icon(Icons.arrow_back, color: Colors.white),
                 onPressed: () => Navigator.pop(context),
               ),
             ),
-            // Header Settings Panel
-            Padding(
-              padding: const EdgeInsets.all(16),
-              child: Container(
-                padding: const EdgeInsets.all(14),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: AppColors.borderSoft),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'Audit Type',
-                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppColors.textSecondary),
-                    ),
-                    const SizedBox(height: 8),
-                    Row(
-                      children: [
-                        _buildTypeRadio('Opening', 'opening_stock'),
-                        const SizedBox(width: 8),
-                        _buildTypeRadio('Stock In', 'stock_in'),
-                        const SizedBox(width: 8),
-                        _buildTypeRadio('Closing', 'closing_stock'),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-            ),
             // Product Search Bar
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
               child: TextField(
                 controller: _searchController,
                 onSubmitted: (_) => _loadProducts(),
@@ -535,6 +591,32 @@ class _MtStockAuditCreateScreenState extends State<MtStockAuditCreateScreen> {
                       ),
                     ),
                   ),
+                  if (_selectedProductsCount > 0) ...[
+                    const SizedBox(width: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFE8F5E9),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: const Color(0xFFC8E6C9)),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.check_circle, size: 13, color: Color(0xFF2E7D32)),
+                          const SizedBox(width: 4),
+                          Text(
+                            '$_selectedProductsCount Selected',
+                            style: const TextStyle(
+                              color: Color(0xFF2E7D32),
+                              fontWeight: FontWeight.bold,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                   if (_selectedCategoryId != null || _searchController.text.trim().isNotEmpty) ...[
                     const SizedBox(width: 8),
                     InkWell(
@@ -666,32 +748,6 @@ class _MtStockAuditCreateScreenState extends State<MtStockAuditCreateScreen> {
               ),
             ),
           ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildTypeRadio(String label, String value) {
-    final isSelected = _selectedType == value;
-    return Expanded(
-      child: InkWell(
-        onTap: () => setState(() => _selectedType = value),
-        borderRadius: BorderRadius.circular(8),
-        child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 8),
-          decoration: BoxDecoration(
-            color: isSelected ? AppColors.primaryStrong : const Color(0xFFF1F5F9),
-            borderRadius: BorderRadius.circular(8),
-          ),
-          alignment: Alignment.center,
-          child: Text(
-            label,
-            style: TextStyle(
-              color: isSelected ? Colors.white : AppColors.textPrimary,
-              fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-              fontSize: 12,
-            ),
-          ),
         ),
       ),
     );
@@ -964,15 +1020,6 @@ class _ProductAuditCardState extends State<_ProductAuditCard> {
                         'Code: ${widget.product.defaultCode}',
                         style: const TextStyle(color: AppColors.textSecondary, fontSize: 12),
                       ),
-                    const SizedBox(height: 2),
-                    Text(
-                      'Available Stock: ${widget.product.qtyAvailable % 1 == 0 ? widget.product.qtyAvailable.toInt() : widget.product.qtyAvailable} ${widget.product.uomName ?? ""}'.trim(),
-                      style: const TextStyle(
-                        color: AppColors.primaryStrong,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
                   ],
                 ),
               ),

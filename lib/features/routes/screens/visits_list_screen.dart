@@ -103,10 +103,16 @@ class _VisitListTab extends StatefulWidget {
 }
 
 class _VisitListTabState extends State<_VisitListTab> {
+  static const int _pageSize = 30;
+
   final ApiService _apiService = ApiService.instance;
   final TextEditingController _searchController = TextEditingController();
+  final ScrollController _scrollController = ScrollController();
   Timer? _searchDebounce;
   bool _isLoading = false;
+  bool _isLoadingMore = false;
+  bool _hasMore = true;
+  int _page = 1;
   String? _error;
   String _scope = 'all'; // 'all', 'own', 'subordinates'
   List<Map<String, dynamic>> _visits = [];
@@ -114,27 +120,50 @@ class _VisitListTabState extends State<_VisitListTab> {
   @override
   void initState() {
     super.initState();
-    _fetchVisits();
+    _scrollController.addListener(_onScroll);
+    _fetchVisits(reset: true);
   }
 
   @override
   void dispose() {
     _searchDebounce?.cancel();
+    _scrollController.dispose();
     _searchController.dispose();
     super.dispose();
+  }
+
+  void _onScroll() {
+    if (!_scrollController.hasClients) return;
+    if (_scrollController.position.pixels >=
+        _scrollController.position.maxScrollExtent - 200) {
+      _fetchVisits();
+    }
   }
 
   void _onSearchChanged(String query) {
     _searchDebounce?.cancel();
     _searchDebounce = Timer(const Duration(milliseconds: 350), () {
-      _fetchVisits();
+      _fetchVisits(reset: true);
     });
   }
 
-  Future<void> _fetchVisits() async {
+  Future<void> _fetchVisits({bool reset = false}) async {
+    if (reset) {
+      _page = 1;
+      _hasMore = true;
+      _isLoadingMore = false;
+    }
+    if (!reset && (!_hasMore || _isLoadingMore)) {
+      return;
+    }
+
     setState(() {
-      _isLoading = true;
-      _error = null;
+      if (reset) {
+        _isLoading = true;
+        _error = null;
+      } else {
+        _isLoadingMore = true;
+      }
     });
 
     try {
@@ -150,14 +179,25 @@ class _VisitListTabState extends State<_VisitListTab> {
         scope: _scope,
         dateFrom: widget.dateFrom,
         dateTo: widget.dateTo,
-        page: 1,
-        pageSize: 100,
+        page: _page,
+        pageSize: _pageSize,
       );
 
       if (mounted) {
+        final List<Map<String, dynamic>> items =
+            List<Map<String, dynamic>>.from(result['data'] ?? []);
         setState(() {
-          _visits = result['data'];
+          if (reset) {
+            _visits = items;
+          } else {
+            _visits.addAll(items);
+          }
+          _hasMore = items.length == _pageSize;
+          if (_hasMore) {
+            _page += 1;
+          }
           _isLoading = false;
+          _isLoadingMore = false;
         });
       }
     } catch (e) {
@@ -165,6 +205,7 @@ class _VisitListTabState extends State<_VisitListTab> {
         setState(() {
           _error = e.toString();
           _isLoading = false;
+          _isLoadingMore = false;
         });
       }
     }
@@ -178,8 +219,9 @@ class _VisitListTabState extends State<_VisitListTab> {
     final myEmployeeId = auth.employeeId;
 
     return RefreshIndicator(
-      onRefresh: _fetchVisits,
+      onRefresh: () => _fetchVisits(reset: true),
       child: ListView(
+        controller: _scrollController,
         physics: const AlwaysScrollableScrollPhysics(),
         padding: const EdgeInsets.all(16),
         children: [
@@ -194,7 +236,7 @@ class _VisitListTabState extends State<_VisitListTab> {
                       icon: const Icon(Icons.clear, size: 18),
                       onPressed: () {
                         _searchController.clear();
-                        _fetchVisits();
+                        _fetchVisits(reset: true);
                       },
                     )
                   : null,
@@ -236,7 +278,7 @@ class _VisitListTabState extends State<_VisitListTab> {
                     onSelected: (selected) {
                       if (selected) {
                         setState(() => _scope = 'all');
-                        _fetchVisits();
+                        _fetchVisits(reset: true);
                       }
                     },
                   ),
@@ -257,7 +299,7 @@ class _VisitListTabState extends State<_VisitListTab> {
                     onSelected: (selected) {
                       if (selected) {
                         setState(() => _scope = 'own');
-                        _fetchVisits();
+                        _fetchVisits(reset: true);
                       }
                     },
                   ),
@@ -278,7 +320,7 @@ class _VisitListTabState extends State<_VisitListTab> {
                     onSelected: (selected) {
                       if (selected) {
                         setState(() => _scope = 'subordinates');
-                        _fetchVisits();
+                        _fetchVisits(reset: true);
                       }
                     },
                   ),
@@ -399,6 +441,11 @@ class _VisitListTabState extends State<_VisitListTab> {
                 ),
               );
             }),
+            if (_isLoadingMore)
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 16),
+                child: Center(child: CircularProgressIndicator()),
+              ),
           ],
         ],
       ),

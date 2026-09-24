@@ -50,7 +50,7 @@ class MtStockAudit {
       type: map['type']?.toString() ?? 'opening_stock',
       typeLabel: map['type_label']?.toString() ?? map['type']?.toString() ?? '',
       state: map['state']?.toString() ?? 'draft',
-      date: map['date'] != null ? DateTime.tryParse(map['date'].toString()) : null,
+      date: asDateTime(map['date']),
       employeeId: emp != null ? asInt(emp['id']) : null,
       employeeName: emp?['name']?.toString(),
       outletId: out != null ? asInt(out['id']) : null,
@@ -103,9 +103,7 @@ class MtStockAuditLine {
       uomName: uom?['name']?.toString(),
       lotId: lot != null ? asInt(lot['id']) : null,
       lotName: lot?['name']?.toString(),
-      expirationDate: lot?['expiration_date'] != null
-          ? DateTime.tryParse(lot!['expiration_date'].toString())
-          : null,
+      expirationDate: asDateTime(lot?['expiration_date']),
       stockCount: asDouble(map['stock_count']),
     );
   }
@@ -181,18 +179,10 @@ class MtStockAuditLot {
   });
 
   String get displayName {
-    final parts = <String>[];
-    if (qtyAvailable > 0) {
-      final qtyStr = qtyAvailable % 1 == 0 ? qtyAvailable.toInt().toString() : qtyAvailable.toString();
-      parts.add('Avail: $qtyStr');
-    }
     if (expirationDate != null) {
       final formatted =
           '${expirationDate!.year}-${expirationDate!.month.toString().padLeft(2, '0')}-${expirationDate!.day.toString().padLeft(2, '0')}';
-      parts.add('Exp: $formatted');
-    }
-    if (parts.isNotEmpty) {
-      return '$name (${parts.join(", ")})';
+      return '$name (Exp: $formatted)';
     }
     return name;
   }
@@ -201,9 +191,7 @@ class MtStockAuditLot {
     return MtStockAuditLot(
       id: asInt(map['id']),
       name: map['name']?.toString() ?? '',
-      expirationDate: map['expiration_date'] != null
-          ? DateTime.tryParse(map['expiration_date'].toString())
-          : null,
+      expirationDate: asDateTime(map['expiration_date']),
       qtyAvailable: asDouble(map['qty_available'] ?? map['stock']),
     );
   }
@@ -251,7 +239,7 @@ class MtSecSaleOrder {
     return MtSecSaleOrder(
       id: asInt(map['id']),
       name: map['name']?.toString() ?? '',
-      date: map['date'] != null ? DateTime.tryParse(map['date'].toString()) : null,
+      date: asDateTime(map['date']),
       state: map['state']?.toString() ?? 'done',
       outletId: out != null ? asInt(out['id']) : null,
       outletName: out?['name']?.toString(),
@@ -311,9 +299,7 @@ class MtSecSaleOrderLine {
       uomName: uom?['name']?.toString(),
       lotId: lot != null ? asInt(lot['id']) : null,
       lotName: lot?['name']?.toString(),
-      expirationDate: lot?['expiration_date'] != null
-          ? DateTime.tryParse(lot!['expiration_date'].toString())
-          : null,
+      expirationDate: asDateTime(lot?['expiration_date']),
       openingStockQty: asDouble(map['opening_stock_qty']),
       stockInQty: asDouble(map['stock_in_qty']),
       closingStockQty: asDouble(map['closing_stock_qty']),

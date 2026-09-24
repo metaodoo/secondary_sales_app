@@ -13,6 +13,7 @@ import 'package:secondary_sales/features/scraps/scrap_provider.dart';
 import 'package:secondary_sales/features/employees/employee_provider.dart';
 import 'package:secondary_sales/features/routes/route_provider.dart';
 import 'package:secondary_sales/features/modern_trade/modern_trade_provider.dart';
+import 'package:secondary_sales/features/modern_trade/mt_return_provider.dart';
 import 'package:secondary_sales/features/my_team/my_team_provider.dart';
 import 'package:secondary_sales/features/auth/screens/auth_gate.dart';
 import 'package:secondary_sales/features/dashboard/dashboard_provider.dart';
@@ -200,6 +201,7 @@ Future<void> main() async {
             return provider;
           },
         ),
+        ChangeNotifierProvider(create: (_) => MtReturnProvider()),
         ChangeNotifierProxyProvider<AuthProvider, DashboardProvider>(
           create: (_) => DashboardProvider(),
           update: (_, auth, dashboard) {

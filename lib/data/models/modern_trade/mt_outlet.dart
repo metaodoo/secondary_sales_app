@@ -54,9 +54,7 @@ class MtOutlet {
       isVisited: map['is_visited'] == true,
       isActiveCheckedIn: map['is_active_checked_in'] == true,
       activeVisitId: asIntOrNull(map['active_visit_id']),
-      activeCheckInTime: map['active_check_in_time'] != null && map['active_check_in_time'] != false
-          ? DateTime.tryParse(map['active_check_in_time'].toString())
-          : null,
+      activeCheckInTime: asDateTime(map['active_check_in_time']),
       justificationStatus: asNullableString(map['justification_status']),
       justificationRequestId: asIntOrNull(map['justification_request_id']),
       businessType: asNullableString(map['business_type']),

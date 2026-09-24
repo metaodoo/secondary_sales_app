@@ -14,6 +14,7 @@ import 'package:secondary_sales/features/routes/screens/visits_list_screen.dart'
 import 'package:secondary_sales/features/modern_trade/screens/mt_outlets_screen.dart';
 import 'package:secondary_sales/features/modern_trade/screens/mt_stock_audit_list_screen.dart';
 import 'package:secondary_sales/features/modern_trade/screens/mt_sec_orders_list_screen.dart';
+import 'package:secondary_sales/features/modern_trade/screens/mt_returns_list_screen.dart';
 import 'package:secondary_sales/features/employees/screens/sales_officer_list_screen.dart';
 import 'package:secondary_sales/features/hr/screens/attendance_screen.dart';
 import 'package:secondary_sales/features/hr/screens/leave_dashboard_screen.dart';
@@ -23,7 +24,6 @@ import 'package:secondary_sales/features/hr/screens/location_buffer_screen.dart'
 import 'package:secondary_sales/features/contacts/screens/dealers_tab.dart';
 import 'package:secondary_sales/features/routes/screens/officer_route_selection_screen.dart';
 import 'package:secondary_sales/features/van_loading/screens/van_operations_list_screen.dart';
-import 'package:secondary_sales/features/settings/screens/settings_tab.dart';
 
 /// Single source of truth for every top-level place the app can navigate to.
 ///
@@ -118,6 +118,37 @@ List<MenuSection> buildMenuSections(String moduleType) {
             businessType: 'mt',
             saleType: 'primary',
             titleOverride: 'MT Sales Orders',
+          ),
+        ),
+        MenuDestination(
+          label: 'Deliveries',
+          icon: Icons.local_shipping_outlined,
+          screenKey: AppScreen.mtDeliveriesList,
+          builder: (_) => const DeliveriesListScreen(
+            moduleType: 'primary',
+            businessType: 'mt',
+          ),
+        ),
+        MenuDestination(
+          label: 'Saleable Return',
+          icon: Icons.assignment_return_outlined,
+          screenKey: AppScreen.mtSaleableReturnsList,
+          builder: (_) => const MtReturnsListScreen(
+            returnBucket: 'saleable',
+            title: 'Saleable Returns',
+            createScreenKey: AppScreen.mtSaleableReturnsCreate,
+            createActionKey: AppAction.mtSaleableReturnCreate,
+          ),
+        ),
+        MenuDestination(
+          label: 'Non-Saleable Return',
+          icon: Icons.recycling_outlined,
+          screenKey: AppScreen.mtNonSaleableReturnsList,
+          builder: (_) => const MtReturnsListScreen(
+            returnBucket: 'non_saleable',
+            title: 'Non-Saleable Returns',
+            createScreenKey: AppScreen.mtNonSaleableReturnsCreate,
+            createActionKey: AppAction.mtNonSaleableReturnCreate,
           ),
         ),
       ]),

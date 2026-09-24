@@ -24,10 +24,16 @@ class OutletsListScreen extends StatefulWidget {
 }
 
 class _OutletsListScreenState extends State<OutletsListScreen> {
+  static const int _pageSize = 20;
+
   final TextEditingController _searchController = TextEditingController();
+  final ScrollController _scrollController = ScrollController();
   Timer? _searchDebounce;
   List<Map<String, dynamic>> _outlets = [];
   bool _isLoading = true;
+  bool _isLoadingMore = false;
+  bool _hasMore = true;
+  int _page = 1;
   String? _error;
 
   StreamSubscription<Position>? _positionStreamSub;
@@ -38,7 +44,8 @@ class _OutletsListScreenState extends State<OutletsListScreen> {
   @override
   void initState() {
     super.initState();
-    _fetchOutlets();
+    _scrollController.addListener(_onScroll);
+    _fetchOutlets(reset: true);
     _startLocationStream();
     _refreshGpsPosition(requireFresh: false);
   }
@@ -92,27 +99,62 @@ class _OutletsListScreenState extends State<OutletsListScreen> {
   void dispose() {
     _positionStreamSub?.cancel();
     _searchDebounce?.cancel();
+    _scrollController.dispose();
     _searchController.dispose();
     super.dispose();
   }
 
-  Future<void> _fetchOutlets([String? search]) async {
+  void _onScroll() {
+    if (!_scrollController.hasClients) return;
+    if (_scrollController.position.pixels >=
+        _scrollController.position.maxScrollExtent - 200) {
+      _fetchOutlets();
+    }
+  }
+
+  Future<void> _fetchOutlets({bool reset = false, String? search}) async {
+    if (reset) {
+      _page = 1;
+      _hasMore = true;
+      _isLoadingMore = false;
+    }
+    if (!reset && (!_hasMore || _isLoadingMore)) {
+      return;
+    }
+
+    if (!mounted) return;
     setState(() {
-      _isLoading = true;
-      _error = null;
+      if (reset) {
+        _isLoading = true;
+        _error = null;
+      } else {
+        _isLoadingMore = true;
+      }
     });
 
     try {
       final provider = Provider.of<RouteProvider>(context, listen: false);
+      final query = search ?? _searchController.text;
       // Fetch ALL outlets by passing assigned: null
       final outlets = await provider.fetchAllOutlets(
-        search: search,
+        search: query,
         assigned: null,
+        page: _page,
+        pageSize: _pageSize,
       );
       if (mounted) {
         setState(() {
-          _outlets = outlets;
+          if (reset) {
+            _outlets = outlets;
+          } else {
+            _outlets.addAll(outlets);
+          }
+          _hasMore = outlets.length == _pageSize;
+          if (_hasMore) {
+            _page += 1;
+          }
           _isLoading = false;
+          _isLoadingMore = false;
         });
       }
     } catch (e) {
@@ -120,6 +162,7 @@ class _OutletsListScreenState extends State<OutletsListScreen> {
         setState(() {
           _error = e.toString();
           _isLoading = false;
+          _isLoadingMore = false;
         });
       }
     }
@@ -128,7 +171,7 @@ class _OutletsListScreenState extends State<OutletsListScreen> {
   void _onSearchChanged(String value) {
     _searchDebounce?.cancel();
     _searchDebounce = Timer(const Duration(milliseconds: 350), () {
-      _fetchOutlets(value);
+      _fetchOutlets(reset: true, search: value);
     });
   }
 
@@ -170,7 +213,7 @@ class _OutletsListScreenState extends State<OutletsListScreen> {
       MaterialPageRoute(builder: (_) => EditOutletScreen(outlet: outlet)),
     );
     if (updated == true) {
-      _fetchOutlets(_searchController.text);
+      _fetchOutlets(reset: true);
     }
   }
 
@@ -302,8 +345,9 @@ class _OutletsListScreenState extends State<OutletsListScreen> {
       ),
       body: SafeArea(
         child: RefreshIndicator(
-          onRefresh: () => _fetchOutlets(_searchController.text),
+          onRefresh: () => _fetchOutlets(reset: true),
           child: ListView(
+            controller: _scrollController,
             padding: const EdgeInsets.symmetric(
               horizontal: AppSpacing.screen,
               vertical: AppSpacing.screen,
@@ -547,6 +591,17 @@ class _OutletsListScreenState extends State<OutletsListScreen> {
                     ),
                   );
                 }),
+              if (_isLoadingMore)
+                const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 16),
+                  child: Center(
+                    child: SizedBox(
+                      width: 24,
+                      height: 24,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    ),
+                  ),
+                ),
             ],
           ),
         ),

@@ -33,30 +33,9 @@ class AppNotification {
       title: asNullableString(map['title']) ?? '',
       body: asNullableString(map['body']) ?? '',
       isRead: asBool(map['is_read']),
-      createdAt: _parseServerTime(map['created_at']),
+      createdAt: asDateTime(map['created_at']),
       link: NotificationLink.fromMapOrNull(asMapOrNull(map['link'])),
     );
-  }
-
-  /// Odoo returns naive UTC ISO strings; mark as UTC then convert to local so
-  /// the "x minutes ago" label is correct regardless of the device timezone.
-  static DateTime? _parseServerTime(Object? value) {
-    final raw = asNullableString(value);
-    if (raw == null) return null;
-    final parsed = DateTime.tryParse(raw);
-    if (parsed == null) return null;
-    final utc = parsed.isUtc
-        ? parsed
-        : DateTime.utc(
-            parsed.year,
-            parsed.month,
-            parsed.day,
-            parsed.hour,
-            parsed.minute,
-            parsed.second,
-            parsed.millisecond,
-          );
-    return utc.toLocal();
   }
 
   AppNotification copyWith({bool? isRead}) {

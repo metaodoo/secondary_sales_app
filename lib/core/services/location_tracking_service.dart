@@ -59,6 +59,13 @@ class LocationTrackingService {
 
   static const int _notificationId = 913;
 
+  static final StreamController<List<Map<String, dynamic>>> _autoCheckOutController =
+      StreamController<List<Map<String, dynamic>>>.broadcast();
+
+  /// Stream of auto-checked-out visits detected during location sync flushes.
+  static Stream<List<Map<String, dynamic>>> get onAutoCheckOut =>
+      _autoCheckOutController.stream;
+
   /// Whether the background service is supported on the current platform.
   /// Uses [defaultTargetPlatform] (not `dart:io`) so this compiles for web too.
   static bool get _supported =>
@@ -85,6 +92,19 @@ class LocationTrackingService {
         ),
         iosConfiguration: IosConfiguration(autoStart: false),
       );
+
+      service.on('autoCheckOutVisits').listen((event) {
+        final visitsRaw = event?['visits'];
+        if (visitsRaw is List) {
+          final visits = visitsRaw
+              .whereType<Map>()
+              .map((m) => Map<String, dynamic>.from(m))
+              .toList();
+          if (visits.isNotEmpty) {
+            _autoCheckOutController.add(visits);
+          }
+        }
+      });
     } catch (e) {
       // Never let service setup block app startup.
       if (kDebugMode) {
@@ -623,6 +643,18 @@ Future<void> _flush(ServiceInstance service, {bool forced = false}) async {
           locations.length,
           'Uploaded ${locations.length}, server stored $synced',
         );
+
+        final responseData = response['data'];
+        final autoCheckedOut = responseData is Map ? responseData['auto_checked_out_visits'] : null;
+        if (autoCheckedOut is List && autoCheckedOut.isNotEmpty) {
+          service.invoke('autoCheckOutVisits', {'visits': autoCheckedOut});
+          try {
+            await prefs.setString(
+              'last_auto_checked_out_visits',
+              jsonEncode(autoCheckedOut),
+            );
+          } catch (_) {}
+        }
       } else {
         await _recordFlushFailure(
           prefs,

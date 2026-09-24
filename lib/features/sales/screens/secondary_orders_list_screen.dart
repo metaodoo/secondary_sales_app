@@ -54,40 +54,71 @@ class SecondaryOrdersListScreen extends StatefulWidget {
 }
 
 class _SecondaryOrdersListScreenState extends State<SecondaryOrdersListScreen> {
+  static const int _pageSize = 20;
+
   final TextEditingController _searchController = TextEditingController();
+  final ScrollController _scrollController = ScrollController();
   String _statusFilter = 'all';
   DateTime? _dateFromFilter;
   DateTime? _dateToFilter;
   List<PrimaryOrder> _orders = [];
   bool _isLoading = false;
+  bool _isLoadingMore = false;
+  bool _hasMore = true;
+  int _page = 1;
   String? _error;
   Timer? _searchDebounce;
 
   @override
   void initState() {
     super.initState();
+    _scrollController.addListener(_onScroll);
     _dateFromFilter = widget.initialDateFrom;
     _dateToFilter = widget.initialDateTo;
-    _fetchOrders();
+    _fetchOrders(reset: true);
   }
 
   @override
   void dispose() {
     _searchDebounce?.cancel();
+    _scrollController.dispose();
     _searchController.dispose();
     super.dispose();
   }
 
-  Future<void> _fetchOrders() async {
+  void _onScroll() {
+    if (!_scrollController.hasClients) return;
+    if (_scrollController.position.pixels >=
+        _scrollController.position.maxScrollExtent - 200) {
+      _fetchOrders();
+    }
+  }
+
+  Future<void> _fetchOrders({bool reset = false}) async {
+    if (reset) {
+      _page = 1;
+      _hasMore = true;
+      _isLoadingMore = false;
+    }
+    if (!reset && (!_hasMore || _isLoadingMore)) {
+      return;
+    }
+
     if (!mounted) return;
     setState(() {
-      _isLoading = true;
-      _error = null;
+      if (reset) {
+        _isLoading = true;
+        _error = null;
+      } else {
+        _isLoadingMore = true;
+      }
     });
 
     try {
       final provider = context.read<PrimarySaleProvider>();
       final fetched = await provider.apiService.getRecentOrders(
+        page: _page,
+        pageSize: _pageSize,
         search: _searchController.text,
         status: _statusFilter,
         dateFrom: _dateFromFilter,
@@ -99,7 +130,15 @@ class _SecondaryOrdersListScreenState extends State<SecondaryOrdersListScreen> {
       );
       if (mounted) {
         setState(() {
-          _orders = fetched;
+          if (reset) {
+            _orders = fetched;
+          } else {
+            _orders.addAll(fetched);
+          }
+          _hasMore = fetched.length == _pageSize;
+          if (_hasMore) {
+            _page += 1;
+          }
         });
       }
     } catch (e) {
@@ -112,6 +151,7 @@ class _SecondaryOrdersListScreenState extends State<SecondaryOrdersListScreen> {
       if (mounted) {
         setState(() {
           _isLoading = false;
+          _isLoadingMore = false;
         });
       }
     }
@@ -119,7 +159,10 @@ class _SecondaryOrdersListScreenState extends State<SecondaryOrdersListScreen> {
 
   void _onSearchChanged(String value) {
     _searchDebounce?.cancel();
-    _searchDebounce = Timer(const Duration(milliseconds: 350), _fetchOrders);
+    _searchDebounce = Timer(
+      const Duration(milliseconds: 350),
+      () => _fetchOrders(reset: true),
+    );
   }
 
   Future<void> _pickDate() async {
@@ -136,7 +179,7 @@ class _SecondaryOrdersListScreenState extends State<SecondaryOrdersListScreen> {
       _dateFromFilter = picked.start;
       _dateToFilter = picked.end;
     });
-    _fetchOrders();
+    _fetchOrders(reset: true);
   }
 
   void _clearDate() {
@@ -144,14 +187,14 @@ class _SecondaryOrdersListScreenState extends State<SecondaryOrdersListScreen> {
       _dateFromFilter = null;
       _dateToFilter = null;
     });
-    _fetchOrders();
+    _fetchOrders(reset: true);
   }
 
   void _clearStatus() {
     setState(() {
       _statusFilter = 'all';
     });
-    _fetchOrders();
+    _fetchOrders(reset: true);
   }
 
   void _clearAllFilters() {
@@ -160,7 +203,7 @@ class _SecondaryOrdersListScreenState extends State<SecondaryOrdersListScreen> {
       _dateFromFilter = null;
       _dateToFilter = null;
     });
-    _fetchOrders();
+    _fetchOrders(reset: true);
   }
 
   String _getStatusLabel(String state) {
@@ -251,7 +294,7 @@ class _SecondaryOrdersListScreenState extends State<SecondaryOrdersListScreen> {
                               builder: (_) => const MtOutletsScreen(),
                             ),
                           )
-                          .then((_) => _fetchOrders());
+                          .then((_) => _fetchOrders(reset: true));
                     } else {
                       Navigator.of(context)
                           .push(
@@ -259,15 +302,16 @@ class _SecondaryOrdersListScreenState extends State<SecondaryOrdersListScreen> {
                               builder: (_) => const OfficerRouteSelectionScreen(),
                             ),
                           )
-                          .then((_) => _fetchOrders());
+                          .then((_) => _fetchOrders(reset: true));
                     }
                   },
                 )
               : null,
       body: SafeArea(
         child: RefreshIndicator(
-          onRefresh: _fetchOrders,
+          onRefresh: () => _fetchOrders(reset: true),
           child: ListView(
+            controller: _scrollController,
             padding: const EdgeInsets.fromLTRB(
               AppSpacing.screen,
               AppSpacing.screen,
@@ -528,7 +572,7 @@ class _SecondaryOrdersListScreenState extends State<SecondaryOrdersListScreen> {
                             ),
                           ),
                         );
-                        _fetchOrders();
+                        _fetchOrders(reset: true);
                       },
                       onEditTap: widget.saleType == 'secondary'
                           ? () async {
@@ -543,11 +587,16 @@ class _SecondaryOrdersListScreenState extends State<SecondaryOrdersListScreen> {
                                   ),
                                 ),
                               );
-                              _fetchOrders();
+                              _fetchOrders(reset: true);
                             }
                           : null,
                     );
                   },
+                ),
+              if (_isLoadingMore)
+                const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 16),
+                  child: Center(child: CircularProgressIndicator()),
                 ),
             ],
           ),

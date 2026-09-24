@@ -24,10 +24,13 @@ extension EmployeesApi on ApiService {
   Future<List<SalesEmployee>> getEmployees({
     int? distributorId,
     String? search,
+    int page = 1,
+    int pageSize = 20,
   }) async {
     final params = <String, dynamic>{
       'employee_id': _activeEmployeeId,
-      'page_size': 100,
+      'page': page,
+      'page_size': pageSize,
     };
     if (distributorId != null) {
       params['distributor_id'] = distributorId;

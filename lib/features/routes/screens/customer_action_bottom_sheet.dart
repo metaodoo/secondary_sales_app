@@ -16,6 +16,9 @@ import 'package:secondary_sales/data/api/api_service.dart';
 import 'package:secondary_sales/features/auth/auth_provider.dart';
 import 'package:secondary_sales/core/util/dialog_helper.dart';
 import 'package:secondary_sales/core/util/proximity_helper.dart';
+import 'package:geolocator/geolocator.dart';
+import 'package:secondary_sales/data/models/routes/visit_reason.dart';
+import 'package:secondary_sales/features/routes/screens/visit_reason_dialog.dart';
 
 class CustomerActionBottomSheet extends StatefulWidget {
   final String customerName;
@@ -45,6 +48,7 @@ class _CustomerActionBottomSheetState extends State<CustomerActionBottomSheet> {
   Timer? _timer;
   Duration _duration = const Duration();
   bool _isCheckingIn = false;
+  bool _isCheckingOut = false;
 
   @override
   void initState() {
@@ -118,6 +122,233 @@ class _CustomerActionBottomSheetState extends State<CustomerActionBottomSheet> {
     return "${duration.inHours > 0 ? '${twoDigits(duration.inHours)}:' : ''}$twoDigitMinutes:$twoDigitSeconds";
   }
 
+  Future<bool> _handleCheckIn() async {
+    if (_isCheckingIn || _isCheckingOut) return false;
+    final routeProv = context.read<RouteProvider>();
+    final authProv = context.read<AuthProvider>();
+    final employeeId = authProv.session?.user.employeeId;
+    if (employeeId == null) return false;
+
+    // 0. Prevent concurrent check-ins: if user is already checked in to another outlet
+    if (routeProv.checkedInOutletId != null &&
+        routeProv.checkedInOutletId != widget.outletId) {
+      showValidationErrorDialog(
+        context,
+        'You are already checked in at another outlet. Please check out before checking in to "${widget.customerName}".',
+        title: 'Active Check-in Exists',
+      );
+      return false;
+    }
+
+    if (routeProv.checkedInOutletId == widget.outletId) {
+      showValidationErrorDialog(
+        context,
+        'You are already checked in to "${widget.customerName}".',
+        title: 'Already Checked In',
+      );
+      return false;
+    }
+
+    setState(() => _isCheckingIn = true);
+    try {
+      // 1. Acquire GPS position FIRST
+      final position = await LocationService.getCurrentPosition(
+        requireFresh: true,
+        timeLimit: const Duration(seconds: 15),
+      );
+
+      // 2. Validate Geofence FIRST
+      if (widget.latitude != null &&
+          widget.longitude != null &&
+          widget.latitude != 0.0 &&
+          widget.longitude != 0.0) {
+        final double distanceMeters = Geolocator.distanceBetween(
+          position.latitude,
+          position.longitude,
+          widget.latitude!,
+          widget.longitude!,
+        );
+        const double allowedRadius = 50.0;
+        if (distanceMeters > allowedRadius) {
+          throw Exception(
+            'You are ${distanceMeters.round()}m away from "${widget.customerName}". Allowed radius is ${allowedRadius.round()}m.',
+          );
+        }
+      }
+
+      // 3. Joint visit photo check
+      String? imageB64;
+      if (authProv.canView(AppScreen.newJointVisit)) {
+        final ImagePicker picker = ImagePicker();
+        final XFile? photo = await picker.pickImage(
+          source: ImageSource.camera,
+          imageQuality: 70,
+          maxWidth: 1024,
+          maxHeight: 1024,
+        );
+        if (photo == null) {
+          if (mounted) {
+            showValidationErrorDialog(
+              context,
+              'A check-in photo is required for joint visits.',
+              title: 'Check-in Error',
+            );
+          }
+          return false;
+        }
+        final bytes = await photo.readAsBytes();
+        imageB64 = base64Encode(bytes);
+      }
+
+      await routeProv.checkIn(
+        employeeId,
+        widget.outletId,
+        position: position,
+        image1920: imageB64,
+      );
+
+      if (mounted) {
+        _duration = const Duration();
+        _startTimer();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Checked in to ${widget.customerName} successfully!'),
+            backgroundColor: AppColors.primaryStrong,
+          ),
+        );
+        return true;
+      }
+      return false;
+    } catch (e) {
+      if (mounted) {
+        showValidationErrorDialog(
+          context,
+          e.toString().replaceAll('Exception: ', ''),
+          title: 'Check-in Error',
+        );
+      }
+      return false;
+    } finally {
+      if (mounted) {
+        setState(() => _isCheckingIn = false);
+      }
+    }
+  }
+
+  Future<void> _handleCheckOut() async {
+    if (_isCheckingOut || _isCheckingIn) return;
+    final routeProv = context.read<RouteProvider>();
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('Confirm Check Out'),
+        content: Text('Are you sure you want to check out of ${widget.customerName}?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Check Out'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm == true) {
+      VisitReasonSelection? selection;
+      if (routeProv.requiresVisitReason) {
+        if (!mounted) return;
+        selection = await VisitReasonDialog.show(context);
+        if (selection == null) return;
+      }
+
+      setState(() => _isCheckingOut = true);
+      try {
+        await routeProv.checkOut(
+          visitReasonId: selection?.reasonId,
+          reasonNotes: selection?.notes,
+          saleAmount: selection?.saleAmount,
+        );
+        _timer?.cancel();
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Checked out of ${widget.customerName}'),
+              backgroundColor: AppColors.primaryStrong,
+            ),
+          );
+        }
+      } catch (e) {
+        if (mounted) {
+          showValidationErrorDialog(
+            context,
+            e.toString().replaceAll('Exception: ', ''),
+            title: 'Check-out Error',
+          );
+        }
+      } finally {
+        if (mounted) {
+          setState(() => _isCheckingOut = false);
+        }
+      }
+    }
+  }
+
+  Future<void> _handleArchive() async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Archive Outlet'),
+        content: Text('Are you sure you want to archive "${widget.customerName}"?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFDC2626),
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Archive'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm != true || !mounted) return;
+
+    final routeProv = context.read<RouteProvider>();
+    final success = await routeProv.archiveOutlet(
+      widget.outletId,
+      activeRouteId: routeProv.activeRoute?.id,
+    );
+
+    if (!mounted) return;
+
+    if (success) {
+      Navigator.pop(context);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Outlet "${widget.customerName}" archived successfully.')),
+      );
+    } else {
+      showValidationErrorDialog(
+        context,
+        routeProv.error ?? 'Failed to archive outlet.',
+        title: 'Archive Failed',
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final routeProv = Provider.of<RouteProvider>(context);
@@ -175,9 +406,19 @@ class _CustomerActionBottomSheetState extends State<CustomerActionBottomSheet> {
                   ],
                 ),
               ),
-              IconButton(
-                icon: const Icon(Icons.close, color: AppColors.textSecondary),
-                onPressed: () => Navigator.pop(context),
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.archive_outlined, color: Color(0xFFDC2626)),
+                    tooltip: 'Archive Outlet',
+                    onPressed: _handleArchive,
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close, color: AppColors.textSecondary),
+                    onPressed: () => Navigator.pop(context),
+                  ),
+                ],
               ),
             ],
           ),
@@ -248,219 +489,108 @@ class _CustomerActionBottomSheetState extends State<CustomerActionBottomSheet> {
                 ),
               ),
               const SizedBox(width: 8),
-              Expanded(
-                child: _buildActionBtn(
-                  Icons.archive_outlined,
-                  'Archive',
-                  iconColor: const Color(0xFFDC2626),
-                  onTap: () async {
-                    final confirm = await showDialog<bool>(
-                      context: context,
-                      builder: (ctx) => AlertDialog(
-                        title: const Text('Archive Outlet'),
-                        content: Text('Are you sure you want to archive "${widget.customerName}"?'),
-                        actions: [
-                          TextButton(
-                            onPressed: () => Navigator.pop(ctx, false),
-                            child: const Text('Cancel'),
-                          ),
-                          ElevatedButton(
-                            onPressed: () => Navigator.pop(ctx, true),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color(0xFFDC2626),
-                              foregroundColor: Colors.white,
-                            ),
-                            child: const Text('Archive'),
-                          ),
-                        ],
-                      ),
-                    );
-
-                    if (confirm != true || !context.mounted) return;
-
-                    final routeProv = context.read<RouteProvider>();
-                    final success = await routeProv.archiveOutlet(
-                      widget.outletId,
-                      activeRouteId: routeProv.activeRoute?.id,
-                    );
-
-                    if (!context.mounted) return;
-
-                    if (success) {
-                      Navigator.pop(context);
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text('Outlet "${widget.customerName}" archived successfully.')),
-                      );
-                    } else {
-                      showValidationErrorDialog(
-                        context,
-                        routeProv.error ?? 'Failed to archive outlet.',
-                        title: 'Archive Failed',
-                      );
-                    }
-                  },
+              if (isCheckedIn)
+                Expanded(
+                  child: _buildActionBtn(
+                    Icons.logout,
+                    'Check\nOut',
+                    iconColor: const Color(0xFFDC2626),
+                    onTap: _handleCheckOut,
+                  ),
+                )
+              else
+                Expanded(
+                  child: _buildActionBtn(
+                    Icons.login,
+                    'Check\nIn',
+                    iconColor: const Color(0xFF10B981),
+                    onTap: _handleCheckIn,
+                  ),
                 ),
-              ),
             ],
           ),
           const SizedBox(height: 32),
 
           ElevatedButton(
-            onPressed: () async {
-              final allowed = await checkAttendanceRestriction(context, actionName: 'Order Entry / Outlet Visit');
-              if (!allowed || !context.mounted) return;
+            onPressed: (_isCheckingIn || _isCheckingOut)
+                ? null
+                : () async {
+                    final allowed = await checkAttendanceRestriction(context, actionName: 'Order Entry / Outlet Visit');
+                    if (!allowed || !context.mounted) return;
 
-              final authProv = context.read<AuthProvider>();
-              final canSkipCheckin =
-                  authProv
-                      .session
-                      ?.user
-                      .permissions
-                      ?.canCreateOrderWithoutCheckin ??
-                  false;
+                    final authProv = context.read<AuthProvider>();
+                    final canSkipCheckin =
+                        authProv
+                            .session
+                            ?.user
+                            .permissions
+                            ?.canCreateOrderWithoutCheckin ??
+                        false;
 
-              if (isCheckedIn) {
-                Navigator.pop(context); // Close bottom sheet
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => ProductSelectionScreen(
-                      saleType: 'secondary',
-                      partnerId: widget.outletId,
-                      customerName: widget.customerName,
-                      customerCode: widget.customerCode,
-                      mediumId: null,
-                      routeId: routeProv.activeRoute?.id,
-                      visitId: routeProv.currentVisitId,
-                    ),
-                  ),
-                );
-              } else if (canSkipCheckin) {
-                final nav = Navigator.of(context);
-                final selectedMediumId = await ssShowOrderMediumDialog(
-                  context,
-                  customerName: widget.customerName,
-                  customerCode: widget.customerCode,
-                );
-                if (selectedMediumId != null) {
-                  nav.pop(); // Close bottom sheet
-                  nav.push(
-                    MaterialPageRoute(
-                      builder: (_) => ProductSelectionScreen(
-                        saleType: 'secondary',
-                        partnerId: widget.outletId,
+                    if (isCheckedIn) {
+                      Navigator.pop(context); // Close bottom sheet
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => ProductSelectionScreen(
+                            saleType: 'secondary',
+                            partnerId: widget.outletId,
+                            customerName: widget.customerName,
+                            customerCode: widget.customerCode,
+                            mediumId: null,
+                            routeId: routeProv.activeRoute?.id,
+                            visitId: routeProv.currentVisitId,
+                          ),
+                        ),
+                      );
+                    } else if (canSkipCheckin) {
+                      final nav = Navigator.of(context);
+                      final selectedMediumId = await ssShowOrderMediumDialog(
+                        context,
                         customerName: widget.customerName,
                         customerCode: widget.customerCode,
-                        mediumId: selectedMediumId,
-                        routeId: routeProv.activeRoute?.id,
-                        visitId: routeProv.currentVisitId,
-                      ),
-                    ),
-                  );
-                }
-              } else {
-                showDialog(
-                  context: context,
-                  builder: (ctx) => AlertDialog(
-                    title: const Text('Check-in Required'),
-                    content: const Text(
-                      'You must check in to the outlet before creating a secondary sales order.',
-                    ),
-                    actions: [
-                      TextButton(
-                        onPressed: () => Navigator.pop(ctx),
-                        child: const Text('Cancel'),
-                      ),
-                      ElevatedButton(
-                        onPressed: _isCheckingIn
-                            ? null
-                            : () async {
+                      );
+                      if (selectedMediumId != null && mounted) {
+                        nav.pop(); // Close bottom sheet
+                        nav.push(
+                          MaterialPageRoute(
+                            builder: (_) => ProductSelectionScreen(
+                              saleType: 'secondary',
+                              partnerId: widget.outletId,
+                              customerName: widget.customerName,
+                              customerCode: widget.customerCode,
+                              mediumId: selectedMediumId,
+                              routeId: routeProv.activeRoute?.id,
+                              visitId: routeProv.currentVisitId,
+                            ),
+                          ),
+                        );
+                      }
+                    } else {
+                      showDialog(
+                        context: context,
+                        builder: (ctx) => AlertDialog(
+                          title: const Text('Check-in Required'),
+                          content: const Text(
+                            'You must check in to the outlet before creating a secondary sales order.',
+                          ),
+                          actions: [
+                            TextButton(
+                              onPressed: () => Navigator.pop(ctx),
+                              child: const Text('Cancel'),
+                            ),
+                            ElevatedButton(
+                              onPressed: () async {
                                 Navigator.pop(ctx); // Close dialog
-                                final employeeId =
-                                    authProv.session?.user.employeeId;
-                                if (employeeId != null) {
-                                  if (routeProv.checkedInOutletId != null &&
-                                      routeProv.checkedInOutletId != widget.outletId) {
-                                    if (context.mounted) {
-                                      showValidationErrorDialog(
-                                        context,
-                                        'You are already checked in at another outlet. Please check out before checking in to "${widget.customerName}".',
-                                        title: 'Active Check-in Exists',
-                                      );
-                                    }
-                                    return;
-                                  }
-                                  if (mounted) {
-                                    setState(() => _isCheckingIn = true);
-                                  }
-                                  try {
-                                    final position = await LocationService.getCurrentPosition(
-                                      requireFresh: true,
-                                      timeLimit: const Duration(seconds: 15),
-                                    );
-
-                                    String? imageB64;
-                                    if (authProv.canView(AppScreen.newJointVisit)) {
-                                      final ImagePicker picker = ImagePicker();
-                                      final XFile? photo = await picker.pickImage(
-                                        source: ImageSource.camera,
-                                        imageQuality: 70,
-                                        maxWidth: 1024,
-                                        maxHeight: 1024,
-                                      );
-                                      if (photo == null) {
-                                        if (context.mounted) {
-                                          showValidationErrorDialog(
-                                            context,
-                                            'A check-in photo is required for joint visits.',
-                                            title: 'Check-in Error',
-                                          );
-                                        }
-                                        return;
-                                      }
-                                      final bytes = await photo.readAsBytes();
-                                      imageB64 = base64Encode(bytes);
-                                    }
-
-                                    await routeProv.checkIn(
-                                      employeeId,
-                                      widget.outletId,
-                                      position: position,
-                                      image1920: imageB64,
-                                    );
-                                    if (context.mounted) {
-                                      ScaffoldMessenger.of(
-                                        context,
-                                      ).showSnackBar(
-                                        const SnackBar(
-                                          content: Text(
-                                            'Checked in successfully!',
-                                          ),
-                                        ),
-                                      );
-                                    }
-                                  } catch (e) {
-                                    if (context.mounted) {
-                                      showValidationErrorDialog(
-                                        context,
-                                        e.toString(),
-                                        title: 'Check-in Error',
-                                      );
-                                    }
-                                  } finally {
-                                    if (mounted) {
-                                      setState(() => _isCheckingIn = false);
-                                    }
-                                  }
-                                }
+                                await _handleCheckIn();
                               },
-                        child: const Text('Check In Now'),
-                      ),
-                    ],
-                  ),
-                );
-              }
-            },
+                              child: const Text('Check In Now'),
+                            ),
+                          ],
+                        ),
+                      );
+                    }
+                  },
             style: ElevatedButton.styleFrom(
               backgroundColor: AppColors.primaryStrong,
               disabledBackgroundColor: AppColors.borderSoft,

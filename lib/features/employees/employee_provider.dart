@@ -19,18 +19,33 @@ class EmployeeProvider with ChangeNotifier {
     _apiService.updateEmployeeId(employeeId);
   }
 
-  Future<void> fetchEmployees({int? distributorId, String? search}) async {
+  Future<List<SalesEmployee>> fetchEmployees({
+    int? distributorId,
+    String? search,
+    int page = 1,
+    int pageSize = 20,
+    bool reset = false,
+  }) async {
     _loadingCount++;
     _error = null;
     notifyListeners();
 
     try {
-      _employees = await _apiService.getEmployees(
+      final list = await _apiService.getEmployees(
         distributorId: distributorId,
         search: search,
+        page: page,
+        pageSize: pageSize,
       );
+      if (reset || page == 1) {
+        _employees = list;
+      } else {
+        _employees.addAll(list);
+      }
+      return list;
     } catch (e) {
       _error = e.toString();
+      return [];
     } finally {
       if (_loadingCount > 0) _loadingCount--;
       notifyListeners();

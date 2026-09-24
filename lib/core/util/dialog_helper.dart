@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:secondary_sales/core/theme/app_theme.dart';
+import 'package:secondary_sales/features/auth/auth_provider.dart';
 import 'package:secondary_sales/features/hr/attendance_provider.dart';
 import 'package:secondary_sales/features/hr/screens/attendance_screen.dart';
 
@@ -43,7 +44,7 @@ Future<void> showValidationErrorDialog(
                 shape: BoxShape.circle,
               ),
               child: Icon(
-                Icons.warning_amber_rounded,
+                Icons.error_outline_rounded,
                 color: Colors.red.shade700,
                 size: 28,
               ),
@@ -97,11 +98,25 @@ Future<void> showValidationErrorDialog(
 /// If not checked in, displays a popup restriction dialog explaining that
 /// daily attendance is mandatory for operational actions (Van Load, Order Entry, Outlet Visits),
 /// with a direct button to navigate to the Attendance Screen.
-/// Returns `true` if attendance is active, `false` otherwise.
+/// Bypassed for all Modern Trade (MT) processes.
+/// Returns `true` if attendance is active or bypassed, `false` otherwise.
 Future<bool> checkAttendanceRestriction(
   BuildContext context, {
   required String actionName,
+  String? businessType,
+  bool isMt = false,
 }) async {
+  // Attendance is NOT mandatory for any Modern Trade (MT) process/operation.
+  if (isMt || businessType == 'mt') {
+    return true;
+  }
+  try {
+    final authProv = Provider.of<AuthProvider>(context, listen: false);
+    if (authProv.businessType == 'mt' && (businessType == null || businessType == 'mt')) {
+      return true;
+    }
+  } catch (_) {}
+
   final attendanceProv = Provider.of<AttendanceProvider>(context, listen: false);
   if (attendanceProv.isCheckedIn) {
     return true;

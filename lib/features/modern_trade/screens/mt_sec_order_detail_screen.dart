@@ -100,7 +100,7 @@ class _MtSecOrderDetailScreenState extends State<MtSecOrderDetailScreen> {
 
   Widget _buildHeaderCard(MtSecSaleOrder order) {
     final dateFormatted = order.date != null
-        ? DateFormat('EEE, dd MMM yyyy').format(order.date!)
+        ? DateFormat('EEE, dd MMM yyyy').format(order.date!.toLocal())
         : 'N/A';
 
     return Container(

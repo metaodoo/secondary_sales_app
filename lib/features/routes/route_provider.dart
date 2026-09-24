@@ -377,9 +377,16 @@ class RouteProvider with ChangeNotifier {
   Future<List<Map<String, dynamic>>> fetchAllOutlets({
     String? search,
     bool? assigned = false,
+    int page = 1,
+    int pageSize = 20,
   }) async {
     try {
-      return await _apiService.getOutlets(search: search, assigned: assigned);
+      return await _apiService.getOutlets(
+        search: search,
+        assigned: assigned,
+        page: page,
+        pageSize: pageSize,
+      );
     } catch (e) {
       _error = e.toString();
       return [];
@@ -582,7 +589,12 @@ class RouteProvider with ChangeNotifier {
           }
           _checkInTime = DateTime.parse(parsedTimeStr).toLocal();
         }
-      } else {
+      } else if (_checkedInOutletId != null && _checkedOutOutletIds.contains(_checkedInOutletId)) {
+        _checkedInOutletId = null;
+        _currentVisitId = null;
+        _requiresVisitReason = false;
+        _checkInTime = null;
+      } else if (_checkedInOutletId == null) {
         _checkedInOutletId = null;
         _currentVisitId = null;
         _requiresVisitReason = false;
@@ -594,4 +606,17 @@ class RouteProvider with ChangeNotifier {
       notifyListeners();
     }
   }
+
+  /// Automatically clears active check-in state if the backend closed the visit due to geofence breach.
+  void handleAutoCheckOut(int outletId) {
+    if (_checkedInOutletId == outletId) {
+      _checkedOutOutletIds.add(outletId);
+      _checkedInOutletId = null;
+      _currentVisitId = null;
+      _requiresVisitReason = false;
+      _checkInTime = null;
+      notifyListeners();
+    }
+  }
 }
+

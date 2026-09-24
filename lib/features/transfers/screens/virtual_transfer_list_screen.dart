@@ -23,33 +23,102 @@ class VirtualTransferListScreen extends StatefulWidget {
 }
 
 class _VirtualTransferListScreenState extends State<VirtualTransferListScreen> {
+  static const int _pageSize = 20;
+
   final TextEditingController _searchController = TextEditingController();
+  final ScrollController _scrollController = ScrollController();
   Timer? _searchDebounce;
   String _state = 'all';
+  List<VirtualTransfer> _transfers = [];
+  int _page = 1;
+  bool _hasMore = true;
+  bool _isLoadingMore = false;
+  bool _isLoading = true;
+  String? _error;
 
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) => _fetchTransfers());
+    _scrollController.addListener(_onScroll);
+    WidgetsBinding.instance.addPostFrameCallback((_) => _fetchTransfers(reset: true));
   }
 
   @override
   void dispose() {
     _searchDebounce?.cancel();
+    _scrollController.dispose();
     _searchController.dispose();
     super.dispose();
   }
 
-  Future<void> _fetchTransfers() {
-    return context.read<TransferProvider>().fetchVirtualTransfers(
-      search: _searchController.text,
-      state: _state,
-    );
+  void _onScroll() {
+    if (!_scrollController.hasClients) return;
+    if (_scrollController.position.pixels >=
+        _scrollController.position.maxScrollExtent - 200) {
+      _fetchTransfers();
+    }
+  }
+
+  Future<void> _fetchTransfers({bool reset = false}) async {
+    if (reset) {
+      _page = 1;
+      _hasMore = true;
+      _isLoadingMore = false;
+    }
+    if (!reset && (!_hasMore || _isLoadingMore)) {
+      return;
+    }
+
+    if (!mounted) return;
+    setState(() {
+      if (reset) {
+        _isLoading = true;
+        _error = null;
+      } else {
+        _isLoadingMore = true;
+      }
+    });
+
+    try {
+      final results = await context.read<TransferProvider>().fetchVirtualTransfers(
+        search: _searchController.text,
+        state: _state,
+        page: _page,
+        pageSize: _pageSize,
+        reset: reset,
+      );
+      if (mounted) {
+        setState(() {
+          if (reset) {
+            _transfers = results;
+          } else {
+            _transfers.addAll(results);
+          }
+          _hasMore = results.length == _pageSize;
+          if (_hasMore) {
+            _page += 1;
+          }
+          _isLoading = false;
+          _isLoadingMore = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _error = e.toString();
+          _isLoading = false;
+          _isLoadingMore = false;
+        });
+      }
+    }
   }
 
   void _onSearchChanged(String value) {
     _searchDebounce?.cancel();
-    _searchDebounce = Timer(const Duration(milliseconds: 350), _fetchTransfers);
+    _searchDebounce = Timer(
+      const Duration(milliseconds: 350),
+      () => _fetchTransfers(reset: true),
+    );
   }
 
   Future<void> _openCreateTransfer() async {
@@ -61,7 +130,7 @@ class _VirtualTransferListScreenState extends State<VirtualTransferListScreen> {
       MaterialPageRoute(builder: (_) => const CreateVirtualTransferScreen()),
     );
     if (mounted) {
-      _fetchTransfers();
+      _fetchTransfers(reset: true);
     }
   }
 
@@ -73,7 +142,7 @@ class _VirtualTransferListScreenState extends State<VirtualTransferListScreen> {
       ),
     );
     if (mounted) {
-      _fetchTransfers();
+      _fetchTransfers(reset: true);
     }
   }
 
@@ -105,16 +174,13 @@ class _VirtualTransferListScreenState extends State<VirtualTransferListScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final provider = context.watch<TransferProvider>();
-    final transfers = provider.virtualTransfers;
-
     return Scaffold(
       backgroundColor: AppColors.background,
       floatingActionButton: PermissionGate(
         resourceKey: AppAction.transferCreate,
         child: SsCreateFab(
           label: 'New Virtual Transfer',
-          onPressed: provider.isLoading ? null : _openCreateTransfer,
+          onPressed: _isLoading ? null : _openCreateTransfer,
         ),
       ),
       body: SafeArea(
@@ -137,8 +203,9 @@ class _VirtualTransferListScreenState extends State<VirtualTransferListScreen> {
             ),
             Expanded(
               child: RefreshIndicator(
-                onRefresh: _fetchTransfers,
+                onRefresh: () => _fetchTransfers(reset: true),
                 child: ListView(
+                  controller: _scrollController,
                   padding: const EdgeInsets.fromLTRB(16, 16, 16, kSsFabScrollPadding),
                   children: [
                     TextField(
@@ -176,25 +243,25 @@ class _VirtualTransferListScreenState extends State<VirtualTransferListScreen> {
                       onChanged: (value) {
                         if (value == null) return;
                         setState(() => _state = value);
-                        _fetchTransfers();
+                        _fetchTransfers(reset: true);
                       },
                     ),
                     const SizedBox(height: 16),
-                    if (provider.error != null) ErrorPanel(provider.error!),
-                    if (provider.isLoading && transfers.isEmpty)
+                    if (_error != null) ErrorPanel(_error!),
+                    if (_isLoading && _transfers.isEmpty)
                       const Padding(
                         padding: EdgeInsets.all(32),
                         child: Center(child: CircularProgressIndicator()),
                       )
-                    else if (transfers.isEmpty)
+                    else if (_transfers.isEmpty)
                       const EmptyPanel(message: 'No virtual transfers found')
                     else ...[
-                      if (provider.isLoading)
+                      if (_isLoading)
                         const Padding(
                           padding: EdgeInsets.only(bottom: 12),
                           child: LinearProgressIndicator(),
                         ),
-                      ...transfers.map(
+                      ..._transfers.map(
                         (transfer) => _TransferCard(
                           transfer: transfer,
                           stateLabel: _stateLabel(transfer.state),
@@ -204,6 +271,17 @@ class _VirtualTransferListScreenState extends State<VirtualTransferListScreen> {
                           onTap: () => _openTransferDetail(transfer),
                         ),
                       ),
+                      if (_isLoadingMore)
+                        const Padding(
+                          padding: EdgeInsets.symmetric(vertical: 16),
+                          child: Center(
+                            child: SizedBox(
+                              width: 24,
+                              height: 24,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            ),
+                          ),
+                        ),
                     ],
                   ],
                 ),

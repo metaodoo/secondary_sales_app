@@ -92,6 +92,7 @@ extension ModernTradeApi on ApiService {
     String? date,
     String? dateFrom,
     String? dateTo,
+    String? search,
   }) async {
     final params = <String, dynamic>{
       'employee_id': employeeId ?? _activeEmployeeId,
@@ -103,6 +104,7 @@ extension ModernTradeApi on ApiService {
       if (date != null) 'date': date,
       if (dateFrom != null) 'date_from': dateFrom,
       if (dateTo != null) 'date_to': dateTo,
+      if (search != null && search.isNotEmpty) 'search': search,
     };
 
     final result = await _post(
@@ -204,6 +206,18 @@ extension ModernTradeApi on ApiService {
     throw Exception(result['message'] ?? 'Failed to confirm stock audit');
   }
 
+  /// Reset a confirmed Stock Audit to draft
+  Future<MtStockAudit> resetStockAudit(int auditId) async {
+    final result = await _post(
+      '${AppConstants.apiPrefix}/mt/stock-audits/$auditId/reset',
+      {'employee_id': _activeEmployeeId},
+    );
+    if (result['success'] == true) {
+      return MtStockAudit.fromMap(result['data'] ?? <String, dynamic>{});
+    }
+    throw Exception(result['message'] ?? 'Failed to reset stock audit');
+  }
+
   /// Fetch saleable products and lots with expiry dates for MT audit
   Future<List<MtStockAuditProduct>> getStockAuditProducts({
     int? outletId,
@@ -239,6 +253,9 @@ extension ModernTradeApi on ApiService {
     int? outletId,
     int? employeeId,
     String? date,
+    String? dateFrom,
+    String? dateTo,
+    String? search,
   }) async {
     final params = <String, dynamic>{
       'employee_id': employeeId ?? _activeEmployeeId,
@@ -246,6 +263,9 @@ extension ModernTradeApi on ApiService {
       'page_size': pageSize,
       if (outletId != null) 'outlet_id': outletId,
       if (date != null) 'date': date,
+      if (dateFrom != null) 'date_from': dateFrom,
+      if (dateTo != null) 'date_to': dateTo,
+      if (search != null && search.isNotEmpty) 'search': search,
     };
 
     final result = await _post(
@@ -273,4 +293,175 @@ extension ModernTradeApi on ApiService {
     }
     throw Exception(result['message'] ?? 'Failed to fetch MT secondary sale details');
   }
+
+  // ==========================================
+  // Modern Trade Returns Endpoints
+  // ==========================================
+
+  /// Fetch list of Modern Trade return requests
+  Future<({List<MtReturnRequest> returns, int total})> getMtReturns({
+    int page = 1,
+    int pageSize = 20,
+    String? search,
+    String? state,
+    String? returnBucket,
+    int? partnerId,
+    String? date,
+    String? dateFrom,
+    String? dateTo,
+  }) async {
+    final params = <String, dynamic>{
+      'employee_id': _activeEmployeeId,
+      'page': page,
+      'page_size': pageSize,
+      if (search != null && search.isNotEmpty) 'search': search,
+      if (state != null && state != 'all') 'state': state,
+      if (returnBucket != null && returnBucket != 'all') 'return_bucket': returnBucket,
+      if (partnerId != null) 'partner_id': partnerId,
+      if (date != null) 'date': date,
+      if (dateFrom != null) 'date_from': dateFrom,
+      if (dateTo != null) 'date_to': dateTo,
+    };
+
+    final result = await _post(
+      '${AppConstants.apiPrefix}/mt/returns',
+      params,
+    );
+    if (result['success'] == true) {
+      final List<dynamic> data = result['data'] ?? [];
+      final returns = data.map((json) => MtReturnRequest.fromMap(json)).toList();
+      final pagination = result['pagination'] is Map ? result['pagination'] as Map : null;
+      final total = pagination != null ? asInt(pagination['total']) : returns.length;
+      return (returns: returns, total: total);
+    }
+    throw Exception(result['message'] ?? 'Failed to fetch MT return requests');
+  }
+
+  /// Fetch details of a single Return Request
+  Future<MtReturnRequest> getMtReturnDetail(int returnId) async {
+    final result = await _post(
+      '${AppConstants.apiPrefix}/mt/returns/$returnId',
+      {'employee_id': _activeEmployeeId},
+    );
+    if (result['success'] == true) {
+      return MtReturnRequest.fromMap(result['data'] ?? <String, dynamic>{});
+    }
+    throw Exception(result['message'] ?? 'Failed to fetch return request details');
+  }
+
+  /// Prepare metadata for creating a new return request
+  Future<Map<String, dynamic>> prepareMtReturn({int? partnerId}) async {
+    final params = <String, dynamic>{
+      'employee_id': _activeEmployeeId,
+      if (partnerId != null) 'partner_id': partnerId,
+    };
+
+    final result = await _post(
+      '${AppConstants.apiPrefix}/mt/returns/prepare',
+      params,
+    );
+    if (result['success'] == true) {
+      return Map<String, dynamic>.from(result['data'] ?? <String, dynamic>{});
+    }
+    throw Exception(result['message'] ?? 'Failed to prepare MT return context');
+  }
+
+  /// Create a new Return Request
+  Future<MtReturnRequest> createMtReturn({
+    required int partnerId,
+    required String returnBucket,
+    String? date,
+    bool autoSubmit = false,
+    required List<Map<String, dynamic>> lines,
+  }) async {
+    final params = <String, dynamic>{
+      'employee_id': _activeEmployeeId,
+      'partner_id': partnerId,
+      'return_bucket': returnBucket,
+      'auto_submit': autoSubmit,
+      'lines': lines,
+      if (date != null) 'date': date,
+    };
+
+    final result = await _post(
+      '${AppConstants.apiPrefix}/mt/returns/create',
+      params,
+    );
+    if (result['success'] == true) {
+      return MtReturnRequest.fromMap(result['data'] ?? <String, dynamic>{});
+    }
+    throw Exception(result['message'] ?? 'Failed to create return request');
+  }
+
+  /// Update lines of an active Return Request
+  Future<MtReturnRequest> updateMtReturn(
+    int returnId, {
+    required List<Map<String, dynamic>> lines,
+  }) async {
+    final params = <String, dynamic>{
+      'employee_id': _activeEmployeeId,
+      'lines': lines,
+    };
+
+    final result = await _post(
+      '${AppConstants.apiPrefix}/mt/returns/$returnId/update',
+      params,
+    );
+    if (result['success'] == true) {
+      return MtReturnRequest.fromMap(result['data'] ?? <String, dynamic>{});
+    }
+    throw Exception(result['message'] ?? 'Failed to update return request');
+  }
+
+  /// Execute stage transition, confirm, or reset action on Return Request
+  Future<MtReturnRequest> executeMtReturnAction(
+    int returnId, {
+    required String action,
+    List<Map<String, dynamic>>? lines,
+  }) async {
+    final params = <String, dynamic>{
+      'employee_id': _activeEmployeeId,
+      'action': action,
+      if (lines != null) 'lines': lines,
+    };
+
+    final result = await _post(
+      '${AppConstants.apiPrefix}/mt/returns/$returnId/action',
+      params,
+    );
+    if (result['success'] == true) {
+      return MtReturnRequest.fromMap(result['data'] ?? <String, dynamic>{});
+    }
+    throw Exception(result['message'] ?? 'Failed to execute return action');
+  }
+
+  /// Fetch products for Modern Trade return requests
+  Future<List<Map<String, dynamic>>> getMtReturnProducts({String? search}) async {
+    final params = <String, dynamic>{
+      'employee_id': _activeEmployeeId,
+      if (search != null && search.isNotEmpty) 'search': search,
+    };
+
+    final result = await _post(
+      '${AppConstants.apiPrefix}/mt/returns/products',
+      params,
+    );
+    if (result['success'] == true) {
+      return List<Map<String, dynamic>>.from(result['data'] ?? []);
+    }
+    throw Exception(result['message'] ?? 'Failed to fetch return products');
+  }
+
+  /// Fetch lots for a product
+  Future<List<Map<String, dynamic>>> getMtReturnProductLots(int productId) async {
+    final result = await _post(
+      '${AppConstants.apiPrefix}/mt/returns/products/$productId/lots',
+      {'employee_id': _activeEmployeeId},
+    );
+    if (result['success'] == true) {
+      return List<Map<String, dynamic>>.from(result['data'] ?? []);
+    }
+    throw Exception(result['message'] ?? 'Failed to fetch product lots');
+  }
 }
+

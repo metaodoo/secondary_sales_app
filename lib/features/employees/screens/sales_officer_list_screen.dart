@@ -19,29 +19,82 @@ class SalesOfficerListScreen extends StatefulWidget {
 }
 
 class _SalesOfficerListScreenState extends State<SalesOfficerListScreen> {
+  static const int _pageSize = 20;
+
   final TextEditingController _searchController = TextEditingController();
+  final ScrollController _scrollController = ScrollController();
   Timer? _searchDebounce;
+  int _page = 1;
+  bool _hasMore = true;
+  bool _isLoadingMore = false;
 
   @override
   void initState() {
     super.initState();
+    _scrollController.addListener(_onScroll);
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<EmployeeProvider>().fetchEmployees();
+      _fetchEmployees(reset: true);
     });
   }
 
   @override
   void dispose() {
     _searchDebounce?.cancel();
+    _scrollController.dispose();
     _searchController.dispose();
     super.dispose();
   }
 
+  void _onScroll() {
+    if (!_scrollController.hasClients) return;
+    if (_scrollController.position.pixels >=
+        _scrollController.position.maxScrollExtent - 200) {
+      _fetchEmployees();
+    }
+  }
+
+  Future<void> _fetchEmployees({bool reset = false}) async {
+    if (reset) {
+      _page = 1;
+      _hasMore = true;
+      _isLoadingMore = false;
+    }
+    if (!reset && (!_hasMore || _isLoadingMore)) {
+      return;
+    }
+
+    if (!mounted) return;
+    setState(() {
+      if (!reset) {
+        _isLoadingMore = true;
+      }
+    });
+
+    final provider = context.read<EmployeeProvider>();
+    final results = await provider.fetchEmployees(
+      search: _searchController.text,
+      page: _page,
+      pageSize: _pageSize,
+      reset: reset,
+    );
+
+    if (mounted) {
+      setState(() {
+        _hasMore = results.length == _pageSize;
+        if (_hasMore) {
+          _page += 1;
+        }
+        _isLoadingMore = false;
+      });
+    }
+  }
+
   void _onSearchChanged(String value) {
     _searchDebounce?.cancel();
-    _searchDebounce = Timer(const Duration(milliseconds: 350), () {
-      context.read<EmployeeProvider>().fetchEmployees(search: value);
-    });
+    _searchDebounce = Timer(
+      const Duration(milliseconds: 350),
+      () => _fetchEmployees(reset: true),
+    );
   }
 
   Future<void> _openCreateSO() async {
@@ -50,9 +103,7 @@ class _SalesOfficerListScreenState extends State<SalesOfficerListScreen> {
       MaterialPageRoute(builder: (_) => const CreateSalesOfficerScreen()),
     );
     if (created == true && mounted) {
-      context.read<EmployeeProvider>().fetchEmployees(
-        search: _searchController.text,
-      );
+      _fetchEmployees(reset: true);
     }
   }
 
@@ -64,9 +115,7 @@ class _SalesOfficerListScreenState extends State<SalesOfficerListScreen> {
       ),
     );
     if (updated == true && mounted) {
-      context.read<EmployeeProvider>().fetchEmployees(
-        search: _searchController.text,
-      );
+      _fetchEmployees(reset: true);
     }
   }
 
@@ -114,10 +163,9 @@ class _SalesOfficerListScreenState extends State<SalesOfficerListScreen> {
               : null,
       body: SafeArea(
         child: RefreshIndicator(
-          onRefresh: () => context.read<EmployeeProvider>().fetchEmployees(
-            search: _searchController.text,
-          ),
+          onRefresh: () => _fetchEmployees(reset: true),
           child: ListView(
+            controller: _scrollController,
             padding: const EdgeInsets.fromLTRB(24, 24, 24, kSsFabScrollPadding),
             children: [
               TextField(
@@ -155,7 +203,7 @@ class _SalesOfficerListScreenState extends State<SalesOfficerListScreen> {
               ),
               const SizedBox(height: 24),
               if (provider.error != null) ErrorPanel(provider.error!),
-              if (provider.isLoading && provider.employees.isNotEmpty)
+              if (provider.isLoading && provider.employees.isNotEmpty && !_isLoadingMore)
                 const Padding(
                   padding: EdgeInsets.only(bottom: 12),
                   child: LinearProgressIndicator(),
@@ -167,13 +215,25 @@ class _SalesOfficerListScreenState extends State<SalesOfficerListScreen> {
                 )
               else if (provider.employees.isEmpty)
                 const EmptyPanel(message: 'No sales officers found')
-              else
+              else ...[
                 ...provider.employees.map(
                   (employee) => _SalesOfficerCard(
                     employee: employee,
                     onTap: () => _openSODetail(employee),
                   ),
                 ),
+                if (_isLoadingMore)
+                  const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 16),
+                    child: Center(
+                      child: SizedBox(
+                        width: 24,
+                        height: 24,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      ),
+                    ),
+                  ),
+              ],
             ],
           ),
         ),

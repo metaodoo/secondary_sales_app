@@ -15,8 +15,8 @@ import 'package:secondary_sales/data/models/routes/visit_reason.dart';
 import 'package:secondary_sales/features/routes/screens/visit_reason_dialog.dart';
 import 'package:secondary_sales/features/sales/screens/product_selection_screen.dart';
 import 'package:secondary_sales/features/sales/screens/secondary_orders_list_screen.dart';
-import 'package:secondary_sales/features/modern_trade/screens/mt_stock_audit_create_screen.dart';
 import 'package:secondary_sales/features/modern_trade/screens/mt_stock_audit_list_screen.dart';
+import 'package:secondary_sales/features/modern_trade/screens/mt_stock_audit_type_sheet.dart';
 import 'package:secondary_sales/core/util/proximity_helper.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -339,6 +339,8 @@ class _MtCustomerActionBottomSheetState extends State<MtCustomerActionBottomShee
     final allowed = await checkAttendanceRestriction(
       context,
       actionName: 'Stock Audit / Outlet Visit',
+      businessType: 'mt',
+      isMt: true,
     );
     if (!allowed || !mounted) return;
 
@@ -349,15 +351,11 @@ class _MtCustomerActionBottomSheetState extends State<MtCustomerActionBottomShee
       if (directCreate) {
         Navigator.pop(context); // Close bottom sheet
         if (!mounted) return;
-        Navigator.push(
+        await showMtAuditTypePicker(
           context,
-          MaterialPageRoute(
-            builder: (_) => MtStockAuditCreateScreen(
-              outletId: widget.outlet.id,
-              outletName: widget.outlet.name,
-              visitId: provider.currentVisitId,
-            ),
-          ),
+          outletId: widget.outlet.id,
+          outletName: widget.outlet.name,
+          visitId: provider.currentVisitId,
         );
       } else {
         Navigator.push(
@@ -393,15 +391,11 @@ class _MtCustomerActionBottomSheetState extends State<MtCustomerActionBottomShee
                   if (directCreate) {
                     Navigator.pop(context);
                     if (!mounted) return;
-                    Navigator.push(
+                    await showMtAuditTypePicker(
                       context,
-                      MaterialPageRoute(
-                        builder: (_) => MtStockAuditCreateScreen(
-                          outletId: widget.outlet.id,
-                          outletName: widget.outlet.name,
-                          visitId: provider.currentVisitId,
-                        ),
-                      ),
+                      outletId: widget.outlet.id,
+                      outletName: widget.outlet.name,
+                      visitId: provider.currentVisitId,
                     );
                   } else {
                     Navigator.push(
@@ -429,6 +423,8 @@ class _MtCustomerActionBottomSheetState extends State<MtCustomerActionBottomShee
     final allowed = await checkAttendanceRestriction(
       context,
       actionName: 'Order Entry / Outlet Visit',
+      businessType: 'mt',
+      isMt: true,
     );
     if (!allowed || !mounted) return;
 

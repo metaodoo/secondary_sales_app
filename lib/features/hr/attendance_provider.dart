@@ -28,8 +28,14 @@ class AttendanceProvider extends ChangeNotifier {
   List<Map<String, dynamic>> _historyLogs = [];
   String? _errorMessage;
 
+  int _historyPage = 1;
+  bool _hasMoreHistory = true;
+  bool _isLoadingMoreHistory = false;
+
   bool get isLoadingStatus => _isLoadingStatus;
   bool get isLoadingHistory => _isLoadingHistory;
+  bool get isLoadingMoreHistory => _isLoadingMoreHistory;
+  bool get hasMoreHistory => _hasMoreHistory;
   bool get isActionLoading => _isActionLoading;
   String get loadingMessage => _loadingMessage;
   bool get isCheckedIn => _isCheckedIn;
@@ -68,9 +74,9 @@ class AttendanceProvider extends ChangeNotifier {
 
     // ProxyProvider.update() runs during build and _loadStatus() calls
     // notifyListeners() before its first await.
-    SchedulerBinding.instance.addPostFrameCallback((_) {
+    Future.microtask(() {
       _loadStatus();
-      _loadHistory();
+      _loadHistory(reset: true);
     });
   }
 
@@ -84,7 +90,7 @@ class AttendanceProvider extends ChangeNotifier {
 
   Future<void> refresh() async {
     await _loadStatus();
-    await _loadHistory();
+    await _loadHistory(reset: true);
   }
 
   void updateAuth({String? accessToken, String? sessionId, int? employeeId}) {
@@ -139,24 +145,53 @@ class AttendanceProvider extends ChangeNotifier {
     }
   }
 
-  Future<void> _loadHistory() async {
+  Future<void> _loadHistory({bool reset = false}) async {
     if (_employeeId == 0) return;
-    _isLoadingHistory = true;
+    if (reset) {
+      _historyPage = 1;
+      _hasMoreHistory = true;
+      _isLoadingMoreHistory = false;
+    }
+    if (!reset && (!_hasMoreHistory || _isLoadingMoreHistory)) {
+      return;
+    }
+
+    if (reset) {
+      _isLoadingHistory = true;
+    } else {
+      _isLoadingMoreHistory = true;
+    }
     notifyListeners();
 
     try {
-      final response = await _apiService.getAttendanceHistory(employeeId: _employeeId);
+      final response = await _apiService.getAttendanceHistory(
+        employeeId: _employeeId,
+        page: _historyPage,
+        pageSize: 20,
+      );
       if (response['success'] == true) {
         final List logs = response['data'] ?? [];
-        _historyLogs = logs.map((e) => e as Map<String, dynamic>).toList();
+        final list = logs.map((e) => e as Map<String, dynamic>).toList();
+        if (reset) {
+          _historyLogs = list;
+        } else {
+          _historyLogs.addAll(list);
+        }
+        _hasMoreHistory = list.length == 20;
+        if (_hasMoreHistory) {
+          _historyPage += 1;
+        }
       }
     } catch (e) {
       debugPrint('Failed to load attendance history: $e');
     } finally {
       _isLoadingHistory = false;
+      _isLoadingMoreHistory = false;
       notifyListeners();
     }
   }
+
+  Future<void> loadMoreHistory() => _loadHistory(reset: false);
 
   Future<Position?> _getCurrentLocation() async {
     bool serviceEnabled;

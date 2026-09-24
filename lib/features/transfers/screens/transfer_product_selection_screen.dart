@@ -25,37 +25,82 @@ class TransferProductSelectionScreen extends StatefulWidget {
 
 class _TransferProductSelectionScreenState
     extends State<TransferProductSelectionScreen> {
+  static const int _pageSize = 20;
+
   final TextEditingController _searchController = TextEditingController();
+  final ScrollController _scrollController = ScrollController();
   final Map<int, VirtualTransferLineEntry> _selectedLines = {};
   Timer? _searchDebounce;
+  int _page = 1;
+  bool _hasMore = true;
+  bool _isLoadingMore = false;
 
   @override
   void initState() {
     super.initState();
+    _scrollController.addListener(_onScroll);
     _selectedLines.addEntries(
       widget.initialLines.map((line) => MapEntry(line.product.id, line)),
     );
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<TransferProvider>().searchTransferProducts(
-        destinationLocationId: widget.destinationLocationId,
-      );
+      _fetchProducts(reset: true);
     });
   }
 
   @override
   void dispose() {
     _searchDebounce?.cancel();
+    _scrollController.dispose();
     _searchController.dispose();
     super.dispose();
+  }
+
+  void _onScroll() {
+    if (!_scrollController.hasClients) return;
+    if (_scrollController.position.pixels >=
+        _scrollController.position.maxScrollExtent - 200) {
+      _fetchProducts();
+    }
+  }
+
+  Future<void> _fetchProducts({bool reset = false}) async {
+    if (reset) {
+      _page = 1;
+      _hasMore = true;
+      _isLoadingMore = false;
+    }
+    if (!reset && (!_hasMore || _isLoadingMore)) {
+      return;
+    }
+
+    if (!mounted) return;
+    if (!reset) {
+      setState(() => _isLoadingMore = true);
+    }
+
+    final results = await context.read<TransferProvider>().searchTransferProducts(
+      destinationLocationId: widget.destinationLocationId,
+      search: _searchController.text,
+      page: _page,
+      pageSize: _pageSize,
+      reset: reset,
+    );
+
+    if (mounted) {
+      setState(() {
+        _hasMore = results.length == _pageSize;
+        if (_hasMore) {
+          _page += 1;
+        }
+        _isLoadingMore = false;
+      });
+    }
   }
 
   void _onSearchChanged(String value) {
     _searchDebounce?.cancel();
     _searchDebounce = Timer(const Duration(milliseconds: 350), () {
-      context.read<TransferProvider>().searchTransferProducts(
-        destinationLocationId: widget.destinationLocationId,
-        search: value,
-      );
+      _fetchProducts(reset: true);
     });
   }
 
@@ -131,36 +176,52 @@ class _TransferProductSelectionScreenState
               ),
             ),
             Expanded(
-              child: ListView(
-                padding: const EdgeInsets.all(16),
-                children: [
-                  TextField(
-                    controller: _searchController,
-                    decoration: ssInputDecoration(
-                      'Search products...',
-                      Icons.search,
+              child: RefreshIndicator(
+                onRefresh: () => _fetchProducts(reset: true),
+                child: ListView(
+                  controller: _scrollController,
+                  padding: const EdgeInsets.all(16),
+                  children: [
+                    TextField(
+                      controller: _searchController,
+                      decoration: ssInputDecoration(
+                        'Search products...',
+                        Icons.search,
+                      ),
+                      onChanged: _onSearchChanged,
                     ),
-                    onChanged: _onSearchChanged,
-                  ),
-                  const SizedBox(height: 16),
-                  if (provider.error != null) ErrorPanel(provider.error!),
-                  if (provider.isLoading && provider.transferProducts.isEmpty)
-                    const Padding(
-                      padding: EdgeInsets.all(32),
-                      child: Center(child: CircularProgressIndicator()),
-                    )
-                  else if (provider.transferProducts.isEmpty)
-                    const EmptyPanel(message: 'No available products found')
-                  else
-                    ...provider.transferProducts.map((product) {
-                      final line = _selectedLines[product.id];
-                      return _TransferProductCard(
-                        product: product,
-                        isSelected: line != null,
-                        onTap: () => _toggleProduct(product),
-                      );
-                    }),
-                ],
+                    const SizedBox(height: 16),
+                    if (provider.error != null) ErrorPanel(provider.error!),
+                    if (provider.isLoading && provider.transferProducts.isEmpty)
+                      const Padding(
+                        padding: EdgeInsets.all(32),
+                        child: Center(child: CircularProgressIndicator()),
+                      )
+                    else if (provider.transferProducts.isEmpty)
+                      const EmptyPanel(message: 'No available products found')
+                    else ...[
+                      ...provider.transferProducts.map((product) {
+                        final line = _selectedLines[product.id];
+                        return _TransferProductCard(
+                          product: product,
+                          isSelected: line != null,
+                          onTap: () => _toggleProduct(product),
+                        );
+                      }),
+                      if (_isLoadingMore)
+                        const Padding(
+                          padding: EdgeInsets.symmetric(vertical: 16),
+                          child: Center(
+                            child: SizedBox(
+                              width: 24,
+                              height: 24,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            ),
+                          ),
+                        ),
+                    ],
+                  ],
+                ),
               ),
             ),
           ],

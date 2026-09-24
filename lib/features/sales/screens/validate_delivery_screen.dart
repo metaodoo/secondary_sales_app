@@ -11,6 +11,7 @@ import 'package:secondary_sales/core/access/permission_gate.dart';
 import 'package:secondary_sales/core/access/access_resources.dart';
 import 'package:secondary_sales/core/widgets/ss_ui.dart';
 import 'package:secondary_sales/core/widgets/stock_excess_dialog.dart';
+import 'package:secondary_sales/core/widgets/expired_lots_confirmation_dialog.dart';
 import 'package:secondary_sales/features/auth/auth_provider.dart';
 
 class ValidateDeliveryScreen extends StatefulWidget {
@@ -21,6 +22,7 @@ class ValidateDeliveryScreen extends StatefulWidget {
     required this.pickingId,
     required this.pickingName,
     required this.pickingState,
+    this.isReceipt = false,
     this.saleType = 'primary',
     this.businessType = 'gt',
   });
@@ -30,6 +32,7 @@ class ValidateDeliveryScreen extends StatefulWidget {
   final int pickingId;
   final String pickingName;
   final String pickingState;
+  final bool isReceipt;
   final String saleType;
   final String businessType;
 
@@ -56,6 +59,7 @@ class _ValidateDeliveryScreenState extends State<ValidateDeliveryScreen> {
   }
 
   bool get isReadOnly =>
+      widget.isReceipt ||
       widget.pickingState.toLowerCase() == 'done' ||
       widget.pickingState.toLowerCase() == 'cancel' ||
       !_canValidate;
@@ -95,6 +99,7 @@ class _ValidateDeliveryScreenState extends State<ValidateDeliveryScreen> {
             lots: _isSecondary
                 ? []
                 : (line.lotLines ?? [])
+                    .where((l) => l.lotId != null && l.lotId! > 0)
                     .map(
                       (l) => DeliveryLotInput(
                         lot: AvailableLot(
@@ -102,6 +107,8 @@ class _ValidateDeliveryScreenState extends State<ValidateDeliveryScreen> {
                           lotName: l.lotName ?? '',
                           productId: line.product?.id ?? 0,
                           availableQty: l.quantity,
+                          expirationDate: l.expirationDate,
+                          isExpired: l.isExpired,
                         ),
                         quantity: l.quantity,
                       ),
@@ -117,7 +124,7 @@ class _ValidateDeliveryScreenState extends State<ValidateDeliveryScreen> {
         final productId = input.move.product?.id;
         if (productId != null) {
           _lotsByProduct[productId] = input.lots
-              .where((l) => l.lot != null)
+              .where((l) => l.lot != null && l.lot!.lotId > 0)
               .map((l) => l.lot!)
               .toList();
         }
@@ -131,7 +138,8 @@ class _ValidateDeliveryScreenState extends State<ValidateDeliveryScreen> {
     });
 
     // Fetch complete lot lists in the background so the dropdown has all options initially
-    if (!isReadOnly && _locationId != null && !_isSecondary) {
+    final bgLocationId = _locationId ?? prepare.picking.sourceLocationId;
+    if (!isReadOnly && bgLocationId != null && !_isSecondary) {
       for (final input in inputs) {
         if (input.move.requiresLots) {
           final productId = input.move.product?.id;
@@ -140,7 +148,7 @@ class _ValidateDeliveryScreenState extends State<ValidateDeliveryScreen> {
                 .read<PrimarySaleProvider>()
                 .fetchAvailableLots(
                   productId: productId,
-                  locationId: _locationId,
+                  locationId: bgLocationId,
                   pickingId: widget.pickingId,
                   saleOrderId: widget.orderId,
                 )
@@ -150,11 +158,11 @@ class _ValidateDeliveryScreenState extends State<ValidateDeliveryScreen> {
                       final existing = _lotsByProduct[productId] ?? [];
                       final Map<int, AvailableLot> lotMap = {};
                       for (final lot in existing) {
-                        lotMap[lot.lotId] = lot;
+                        if (lot.lotId > 0) lotMap[lot.lotId] = lot;
                       }
                       // Overwrite with fresh lots from API which have correct availableQty
                       for (final lot in lots) {
-                        lotMap[lot.lotId] = lot;
+                        if (lot.lotId > 0) lotMap[lot.lotId] = lot;
                       }
                       _lotsByProduct[productId] = lotMap.values.toList();
 
@@ -269,7 +277,8 @@ class _ValidateDeliveryScreenState extends State<ValidateDeliveryScreen> {
     if (isReadOnly) return;
     final productId = input.move.product?.id;
     if (productId == null) return;
-    if (_locationId == null) {
+    final locId = _locationId ?? _prepare?.picking.sourceLocationId;
+    if (locId == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Select a source location first.')),
       );
@@ -281,7 +290,7 @@ class _ValidateDeliveryScreenState extends State<ValidateDeliveryScreen> {
     setState(() => _isLoadingLots = true);
     final lots = await context.read<PrimarySaleProvider>().fetchAvailableLots(
       productId: productId,
-      locationId: _locationId,
+      locationId: locId,
       pickingId: widget.pickingId,
       saleOrderId: widget.orderId,
     );
@@ -290,17 +299,17 @@ class _ValidateDeliveryScreenState extends State<ValidateDeliveryScreen> {
       final existing = _lotsByProduct[productId] ?? [];
       final Map<int, AvailableLot> lotMap = {};
       for (final lot in existing) {
-        lotMap[lot.lotId] = lot;
+        if (lot.lotId > 0) lotMap[lot.lotId] = lot;
       }
       for (final lot in lots) {
-        lotMap[lot.lotId] = lot;
+        if (lot.lotId > 0) lotMap[lot.lotId] = lot;
       }
       _lotsByProduct[productId] = lotMap.values.toList();
 
       // Update current inputs to reference the fresh lot objects
-      for (final input in _inputs) {
-        if (input.move.product?.id == productId) {
-          for (final lotInput in input.lots) {
+      for (final inp in _inputs) {
+        if (inp.move.product?.id == productId) {
+          for (final lotInput in inp.lots) {
             if (lotInput.lot != null &&
                 lotMap.containsKey(lotInput.lot!.lotId)) {
               lotInput.lot = lotMap[lotInput.lot!.lotId];
@@ -311,29 +320,36 @@ class _ValidateDeliveryScreenState extends State<ValidateDeliveryScreen> {
       _isLoadingLots = false;
     });
 
-    if (lots.isEmpty) {
+    final availableLotsList = _lotsByProduct[productId] ?? [];
+    if (availableLotsList.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('No available lots found at this location.'),
+          content: Text('No available lots found for this product.'),
         ),
       );
       return;
     }
 
     setState(() {
-      input.lots.add(DeliveryLotInput());
+      final defaultLot = availableLotsList.first;
+      input.lots.add(DeliveryLotInput(
+        lot: defaultLot,
+        quantity: 1.0,
+      ));
     });
   }
 
   Future<void> _confirmDelivery() async {
     FocusScope.of(context).unfocus();
     await Future<void>.delayed(Duration.zero);
+    if (!mounted) return;
 
     final prepare = _prepare;
     if (prepare == null || isReadOnly) return;
 
     final message = _validateInputs();
     if (message != null) {
+      if (!mounted) return;
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: Text(message)));
@@ -370,11 +386,13 @@ class _ValidateDeliveryScreenState extends State<ValidateDeliveryScreen> {
       }
     }
     if (excessItems.isNotEmpty) {
+      if (!mounted) return;
       await showStockExcessValidationDialog(context, excessItems: excessItems);
       return;
     }
 
     if (widget.saleType == 'primary' && !_isMt) {
+      if (!mounted) return;
       final order = await context.read<PrimarySaleProvider>().validateDelivery(
         orderId: widget.orderId,
         pickingId: prepare.picking.id,
@@ -402,6 +420,7 @@ class _ValidateDeliveryScreenState extends State<ValidateDeliveryScreen> {
     bool createBackorder = true;
 
     if (hasLessQty) {
+      if (!mounted) return;
       final bool? result = await showDialog<bool>(
         context: context,
         builder: (context) => AlertDialog(
@@ -449,14 +468,53 @@ class _ValidateDeliveryScreenState extends State<ValidateDeliveryScreen> {
     }
 
     if (!mounted) return;
-    final order = await context.read<PrimarySaleProvider>().validateDelivery(
-      orderId: widget.orderId,
-      pickingId: prepare.picking.id,
-      locationId: _locationId,
-      lines: _inputs,
-      createBackorder: createBackorder,
-      saleType: widget.saleType,
-    );
+    SaleOrderDetail? order;
+    try {
+      order = await context.read<PrimarySaleProvider>().validateDelivery(
+        orderId: widget.orderId,
+        pickingId: prepare.picking.id,
+        locationId: _locationId,
+        lines: _inputs,
+        createBackorder: createBackorder,
+        saleType: widget.saleType,
+        skipExpired: false,
+      );
+    } on ExpiredLotsConfirmationException catch (e) {
+      if (!mounted) return;
+      final bool confirmed = await showExpiredLotsConfirmationDialog(
+        context,
+        expiredLots: e.expiredLots,
+      );
+      if (confirmed && mounted) {
+        try {
+          order = await context.read<PrimarySaleProvider>().validateDelivery(
+            orderId: widget.orderId,
+            pickingId: prepare.picking.id,
+            locationId: _locationId,
+            lines: _inputs,
+            createBackorder: createBackorder,
+            saleType: widget.saleType,
+            skipExpired: true,
+          );
+        } catch (e) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text(e.toString())),
+            );
+          }
+          return;
+        }
+      } else {
+        return;
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(e.toString())),
+        );
+      }
+      return;
+    }
     if (!mounted) return;
 
     if (order == null) {
@@ -1232,7 +1290,6 @@ class _LotAllocationRow extends StatelessWidget {
     required this.onRemove,
     required this.onMinus,
     required this.onPlus,
-    this.onQuantityChanged,
     this.onQuantityInput,
   });
 
@@ -1243,12 +1300,12 @@ class _LotAllocationRow extends StatelessWidget {
   final VoidCallback onRemove;
   final VoidCallback onMinus;
   final VoidCallback onPlus;
-  final ValueChanged<double>? onQuantityChanged;
   final ValueChanged<double>? onQuantityInput;
 
   @override
   Widget build(BuildContext context) {
     if (isReadOnly) {
+      final lot = lotInput.lot;
       return Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
         decoration: BoxDecoration(
@@ -1258,20 +1315,54 @@ class _LotAllocationRow extends StatelessWidget {
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Row(
-              children: [
-                const Icon(
-                  Icons.inventory_2_outlined,
-                  size: 18,
-                  color: AppColors.textSecondary,
-                ),
-                const SizedBox(width: 8),
-                Text(
-                  lotInput.lot?.lotName ?? 'Unknown Lot',
-                  style: const TextStyle(fontWeight: FontWeight.bold),
-                ),
-              ],
+            Expanded(
+              child: Row(
+                children: [
+                  const Icon(
+                    Icons.inventory_2_outlined,
+                    size: 18,
+                    color: AppColors.textSecondary,
+                  ),
+                  const SizedBox(width: 8),
+                  Flexible(
+                    child: Text(
+                      lot?.lotName ?? 'Unknown Lot',
+                      style: const TextStyle(fontWeight: FontWeight.bold),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  if (lot?.isExpired == true) ...[
+                    const SizedBox(width: 6),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                      decoration: BoxDecoration(
+                        color: Colors.red.shade50,
+                        borderRadius: BorderRadius.circular(4),
+                        border: Border.all(color: Colors.red.shade200),
+                      ),
+                      child: Text(
+                        'Expired',
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.red.shade700,
+                        ),
+                      ),
+                    ),
+                  ] else if (lot?.expirationDate != null && lot!.expirationDate!.isNotEmpty) ...[
+                    const SizedBox(width: 6),
+                    Text(
+                      '(${lot.expirationDate})',
+                      style: const TextStyle(
+                        fontSize: 11,
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
             ),
+            const SizedBox(width: 8),
             Text(
               '${formatQty(lotInput.quantity)} units',
               style: const TextStyle(
@@ -1284,11 +1375,16 @@ class _LotAllocationRow extends StatelessWidget {
       );
     }
 
+    final isCurrentLotExpired = lotInput.lot?.isExpired == true;
+
     return Container(
       padding: const EdgeInsets.all(8),
       decoration: BoxDecoration(
         color: const Color(0xFFF8FAFC),
         borderRadius: BorderRadius.circular(8),
+        border: isCurrentLotExpired
+            ? Border.all(color: Colors.amber.shade300)
+            : null,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1297,18 +1393,65 @@ class _LotAllocationRow extends StatelessWidget {
             children: [
               Expanded(
                 child: DropdownButtonFormField<int>(
-                  value: lotInput.lot?.lotId,
+                  value: (lotInput.lot != null &&
+                          lots.any((l) => l.lotId == lotInput.lot!.lotId && l.lotId > 0))
+                      ? lotInput.lot!.lotId
+                      : null,
                   decoration: ssInputDecoration(
                     '-- Select Lot --',
                     Icons.inventory_2_outlined,
                   ),
                   items: lots
+                      .where((lot) => lot.lotId > 0)
                       .map(
                         (lot) => DropdownMenuItem<int>(
                           value: lot.lotId,
-                          child: Text(
-                            lot.lotName,
-                            overflow: TextOverflow.ellipsis,
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  lot.availableQty > 0
+                                      ? '${lot.lotName} (${formatQty(lot.availableQty)} avail)'
+                                      : lot.lotName,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                              if (lot.isExpired)
+                                Container(
+                                  margin: const EdgeInsets.only(left: 6),
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 6,
+                                    vertical: 1,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: Colors.red.shade50,
+                                    borderRadius: BorderRadius.circular(4),
+                                    border: Border.all(
+                                      color: Colors.red.shade200,
+                                    ),
+                                  ),
+                                  child: Text(
+                                    'Expired',
+                                    style: TextStyle(
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.red.shade700,
+                                    ),
+                                  ),
+                                )
+                              else if (lot.expirationDate != null &&
+                                  lot.expirationDate!.isNotEmpty)
+                                Padding(
+                                  padding: const EdgeInsets.only(left: 6),
+                                  child: Text(
+                                    'Exp: ${lot.expirationDate}',
+                                    style: const TextStyle(
+                                      fontSize: 11,
+                                      color: AppColors.textSecondary,
+                                    ),
+                                  ),
+                                ),
+                            ],
                           ),
                         ),
                       )
@@ -1331,6 +1474,31 @@ class _LotAllocationRow extends StatelessWidget {
               ),
             ],
           ),
+          if (isCurrentLotExpired)
+            Padding(
+              padding: const EdgeInsets.only(top: 4, left: 4, bottom: 2),
+              child: Row(
+                children: [
+                  const Icon(
+                    Icons.warning_amber_rounded,
+                    size: 14,
+                    color: Color(0xFFD97706),
+                  ),
+                  const SizedBox(width: 4),
+                  Expanded(
+                    child: Text(
+                      'Warning: Selected lot is expired'
+                      '${lotInput.lot?.expirationDate != null ? ' (${lotInput.lot!.expirationDate})' : ''}',
+                      style: const TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFFD97706),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
           const SizedBox(height: 8),
           Row(
             children: [
@@ -1346,12 +1514,8 @@ class _LotAllocationRow extends StatelessWidget {
                 onPlus: onPlus,
                 onValueInput: (val) {
                   final parsed = double.tryParse(val);
-                  if (parsed != null) {
-                    if (onQuantityInput != null) {
-                      onQuantityInput!(parsed);
-                    } else if (onQuantityChanged != null) {
-                      onQuantityChanged!(parsed);
-                    }
+                  if (parsed != null && onQuantityInput != null) {
+                    onQuantityInput!(parsed);
                   }
                 },
               ),

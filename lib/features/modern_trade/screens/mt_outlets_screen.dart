@@ -71,13 +71,16 @@ class _MtOutletsScreenState extends State<MtOutletsScreen> {
     super.dispose();
   }
 
-  void _openActionModalFor(MtOutlet outlet) {
-    showModalBottomSheet(
+  Future<void> _openActionModalFor(MtOutlet outlet) async {
+    await showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (ctx) => MtCustomerActionBottomSheet(outlet: outlet),
     );
+    if (mounted) {
+      setState(() {});
+    }
   }
 
   @override

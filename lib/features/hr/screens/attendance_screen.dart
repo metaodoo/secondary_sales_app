@@ -4,7 +4,6 @@ import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import 'package:secondary_sales/core/util/parse.dart';
 import 'package:secondary_sales/core/theme/app_theme.dart';
-import 'package:secondary_sales/features/auth/auth_provider.dart';
 import 'package:secondary_sales/features/hr/attendance_provider.dart';
 import 'package:secondary_sales/core/widgets/ss_ui.dart';
 
@@ -27,6 +26,7 @@ class _AttendanceScreenContent extends StatefulWidget {
 class _AttendanceScreenContentState extends State<_AttendanceScreenContent>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
+  final ScrollController _historyScrollController = ScrollController();
   DateTime _currentTime = DateTime.now();
   Timer? _clockTimer;
   DateTimeRange? _selectedDateRange;
@@ -35,6 +35,7 @@ class _AttendanceScreenContentState extends State<_AttendanceScreenContent>
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
+    _historyScrollController.addListener(_onHistoryScroll);
     _clockTimer = Timer.periodic(const Duration(seconds: 10), (timer) {
       if (mounted) {
         setState(() {
@@ -49,9 +50,18 @@ class _AttendanceScreenContentState extends State<_AttendanceScreenContent>
     });
   }
 
+  void _onHistoryScroll() {
+    if (!_historyScrollController.hasClients) return;
+    if (_historyScrollController.position.pixels >=
+        _historyScrollController.position.maxScrollExtent - 200) {
+      context.read<AttendanceProvider>().loadMoreHistory();
+    }
+  }
+
   @override
   void dispose() {
     _tabController.dispose();
+    _historyScrollController.dispose();
     _clockTimer?.cancel();
     super.dispose();
   }
@@ -502,10 +512,23 @@ class _AttendanceScreenContentState extends State<_AttendanceScreenContent>
                         ],
                       )
                     : ListView.builder(
+                        controller: _historyScrollController,
                         physics: const AlwaysScrollableScrollPhysics(),
                         padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                        itemCount: logs.length,
+                        itemCount: logs.length + (provider.isLoadingMoreHistory ? 1 : 0),
                         itemBuilder: (context, index) {
+                          if (index >= logs.length) {
+                            return const Padding(
+                              padding: EdgeInsets.symmetric(vertical: 16),
+                              child: Center(
+                                child: SizedBox(
+                                  width: 24,
+                                  height: 24,
+                                  child: CircularProgressIndicator(strokeWidth: 2),
+                                ),
+                              ),
+                            );
+                          }
                           return _buildRecordCard(logs[index]);
                         },
                       ),
@@ -542,10 +565,10 @@ class _AttendanceScreenContentState extends State<_AttendanceScreenContent>
     final formattedDate = parsedDate != null ? _formatRecordDate(parsedDate).split(' (').first : dateStr;
 
     final checkInDt = asDateTime(log['check_in']);
-    final checkIn = checkInDt != null ? DateFormat('hh:mm a').format(checkInDt) : (log['check_in']?.toString().split(' ').last ?? '--:--');
+    final checkIn = checkInDt != null ? DateFormat('hh:mm a').format(checkInDt.toLocal()) : (log['check_in']?.toString().split(' ').last ?? '--:--');
 
     final checkOutDt = asDateTime(log['check_out']);
-    final checkOut = checkOutDt != null ? DateFormat('hh:mm a').format(checkOutDt) : (log['check_out']?.toString().split(' ').last ?? '--:--');
+    final checkOut = checkOutDt != null ? DateFormat('hh:mm a').format(checkOutDt.toLocal()) : (log['check_out']?.toString().split(' ').last ?? '--:--');
     final isCurrentlyCheckedIn = log['check_out'] == null;
     final hours = (log['worked_hours'] as num?)?.toStringAsFixed(2) ?? '0.0';
     final checkInAddress = log['check_in_address'];

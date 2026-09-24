@@ -1,9 +1,11 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
 import 'package:secondary_sales/app/navigation/app_shell.dart';
 import 'package:secondary_sales/core/access/access_resources.dart';
+import 'package:secondary_sales/core/services/location_tracking_service.dart';
 import 'package:secondary_sales/core/theme/app_theme.dart';
 import 'package:secondary_sales/core/widgets/ss_ui.dart';
 import 'package:secondary_sales/data/models/dashboard/dashboard_summary.dart';
@@ -13,9 +15,11 @@ import 'package:secondary_sales/features/hr/attendance_provider.dart';
 import 'package:secondary_sales/features/hr/screens/attendance_screen.dart';
 import 'package:secondary_sales/features/hr/screens/expense_dashboard_screen.dart';
 import 'package:secondary_sales/features/hr/screens/leave_dashboard_screen.dart';
+import 'package:secondary_sales/features/modern_trade/modern_trade_provider.dart';
 import 'package:secondary_sales/features/my_team/screens/my_team_screen.dart';
 import 'package:secondary_sales/features/notifications/notification_provider.dart';
 import 'package:secondary_sales/features/notifications/widgets/notification_bell.dart';
+import 'package:secondary_sales/features/routes/route_provider.dart';
 import 'package:secondary_sales/features/settings/screens/settings_tab.dart';
 import 'package:secondary_sales/features/dashboard/module_launcher.dart';
 import 'package:secondary_sales/core/util/dialog_helper.dart';
@@ -36,6 +40,7 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
   final ScrollController _scrollController = ScrollController();
   final GlobalKey _modulesSectionKey = GlobalKey();
 
+  StreamSubscription<List<Map<String, dynamic>>>? _autoCheckOutSub;
   String _preset = 'today';
   DateTime? _customDateFrom;
   DateTime? _customDateTo;
@@ -47,6 +52,29 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
   void initState() {
     super.initState();
     _scrollController.addListener(_updateModuleShortcutVisibility);
+    _autoCheckOutSub = LocationTrackingService.onAutoCheckOut.listen((visits) {
+      if (!mounted) return;
+      final routeProv = context.read<RouteProvider>();
+      final mtProv = context.read<ModernTradeProvider>();
+      for (final v in visits) {
+        final outletId = v['outlet_id'] as int?;
+        final outletName = v['outlet_name'] as String? ?? 'Outlet';
+        final distance = v['distance_meters'];
+        if (outletId != null) {
+          routeProv.handleAutoCheckOut(outletId);
+          mtProv.handleAutoCheckOut(outletId);
+        }
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Visit to $outletName was automatically checked out (moved ${distance}m away).',
+            ),
+            backgroundColor: Colors.amber.shade800,
+            duration: const Duration(seconds: 4),
+          ),
+        );
+      }
+    });
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       _scheduleModuleVisibilityCheck();
@@ -58,6 +86,7 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
 
   @override
   void dispose() {
+    _autoCheckOutSub?.cancel();
     _scrollController
       ..removeListener(_updateModuleShortcutVisibility)
       ..dispose();

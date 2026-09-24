@@ -155,7 +155,7 @@ class ModernTradeProvider with ChangeNotifier {
     notifyListeners();
 
     try {
-      final res = await _apiService.getMtOutlets();
+      final res = await _apiService.getMtOutlets(employeeId: _lastEmployeeId);
       final list = (res['outlets'] as List? ?? []);
       _outlets = list.map((m) => MtOutlet.fromMap(m is Map<String, dynamic> ? m : Map<String, dynamic>.from(m))).toList();
       
@@ -169,7 +169,7 @@ class ModernTradeProvider with ChangeNotifier {
         if (active.activeCheckInTime != null) {
           _checkInTime = active.activeCheckInTime;
         }
-      } else {
+      } else if (_checkedInOutletId == null) {
         _checkedInOutletId = null;
         _currentVisitId = null;
         _checkInTime = null;
@@ -279,6 +279,18 @@ class ModernTradeProvider with ChangeNotifier {
     }
   }
 
+  /// Automatically clears active check-in state if the backend closed the MT visit due to geofence breach.
+  void handleAutoCheckOut(int outletId) {
+    if (_checkedInOutletId == outletId) {
+      _checkedInOutletId = null;
+      _currentVisitId = null;
+      _requiresVisitReason = false;
+      _checkInTime = null;
+      notifyListeners();
+      fetchOutlets();
+    }
+  }
+
   // ─── Modern Trade Stock Audits ──────────────────────────────────────────
   List<MtStockAudit> _stockAudits = [];
   int _stockAuditsTotal = 0;
@@ -299,6 +311,7 @@ class ModernTradeProvider with ChangeNotifier {
     String? date,
     String? dateFrom,
     String? dateTo,
+    String? search,
   }) async {
     _loadingCount++;
     _error = null;
@@ -314,6 +327,7 @@ class ModernTradeProvider with ChangeNotifier {
         date: date,
         dateFrom: dateFrom,
         dateTo: dateTo,
+        search: search,
       );
       if (page == 1) {
         _stockAudits = res.audits;
@@ -326,6 +340,37 @@ class ModernTradeProvider with ChangeNotifier {
     } finally {
       if (_loadingCount > 0) _loadingCount--;
       notifyListeners();
+    }
+  }
+
+  Future<({bool hasOpening, bool hasClosing, bool isClosingConfirmed, List<MtStockAudit> audits})> checkTodayAudits(int outletId) async {
+    try {
+      final now = DateTime.now();
+      final dateStr =
+          "${now.year.toString().padLeft(4, '0')}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}";
+      final res = await _apiService.getStockAudits(
+        outletId: outletId,
+        date: dateStr,
+        pageSize: 50,
+      );
+      final hasOpening = res.audits.any((a) => a.type == 'opening_stock');
+      final closingAudit = res.audits.where((a) => a.type == 'closing_stock').firstOrNull;
+      final hasClosing = closingAudit != null;
+      final isClosingConfirmed = closingAudit?.isConfirmed ?? false;
+      return (
+        hasOpening: hasOpening,
+        hasClosing: hasClosing,
+        isClosingConfirmed: isClosingConfirmed,
+        audits: res.audits,
+      );
+    } catch (e) {
+      debugPrint('Error checking today audits: $e');
+      return (
+        hasOpening: false,
+        hasClosing: false,
+        isClosingConfirmed: false,
+        audits: <MtStockAudit>[],
+      );
     }
   }
 
@@ -426,6 +471,23 @@ class ModernTradeProvider with ChangeNotifier {
     }
   }
 
+  Future<MtStockAudit?> resetStockAudit(int auditId) async {
+    _loadingCount++;
+    _error = null;
+    notifyListeners();
+
+    try {
+      final audit = await _apiService.resetStockAudit(auditId);
+      return audit;
+    } catch (e) {
+      _error = e.toString();
+      rethrow;
+    } finally {
+      if (_loadingCount > 0) _loadingCount--;
+      notifyListeners();
+    }
+  }
+
   Future<List<MtStockAuditProduct>> fetchAuditProducts({
     int? outletId,
     String? search,
@@ -452,6 +514,9 @@ class ModernTradeProvider with ChangeNotifier {
     int pageSize = 20,
     int? outletId,
     String? date,
+    String? dateFrom,
+    String? dateTo,
+    String? search,
   }) async {
     _loadingCount++;
     _error = null;
@@ -463,6 +528,9 @@ class ModernTradeProvider with ChangeNotifier {
         pageSize: pageSize,
         outletId: outletId,
         date: date,
+        dateFrom: dateFrom,
+        dateTo: dateTo,
+        search: search,
       );
       if (page == 1) {
         _secSaleOrders = res.orders;

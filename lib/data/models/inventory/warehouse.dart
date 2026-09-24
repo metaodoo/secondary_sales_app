@@ -58,6 +58,8 @@ class AvailableLot {
     required this.availableQty,
     this.uomName,
     this.locationName,
+    this.expirationDate,
+    this.isExpired = false,
   });
 
   final int lotId;
@@ -66,6 +68,8 @@ class AvailableLot {
   final double availableQty;
   final String? uomName;
   final String? locationName;
+  final String? expirationDate;
+  final bool isExpired;
 
   factory AvailableLot.fromMap(Map<String, dynamic> map) {
     final uom = map['uom'];
@@ -79,6 +83,8 @@ class AvailableLot {
       locationName: location is Map
           ? asNullableString(location['name'])
           : null,
+      expirationDate: map['expiration_date']?.toString(),
+      isExpired: map['is_expired'] == true,
     );
   }
 }

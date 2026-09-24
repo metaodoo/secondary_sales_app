@@ -76,11 +76,14 @@ extension TransfersApi on ApiService {
   Future<List<TransferProduct>> getTransferProducts({
     required int destinationLocationId,
     String? search,
+    int page = 1,
+    int pageSize = 20,
   }) async {
     final params = <String, dynamic>{
       'employee_id': _activeEmployeeId,
       'destination_location_id': destinationLocationId,
-      'page_size': 100,
+      'page': page,
+      'page_size': pageSize,
     };
     final query = search?.trim();
     if (query != null && query.isNotEmpty) {
@@ -270,10 +273,13 @@ extension TransfersApi on ApiService {
     String? vanOperationType,
     DateTime? dateFrom,
     DateTime? dateTo,
+    int page = 1,
+    int pageSize = 20,
   }) async {
     final params = <String, dynamic>{
       'employee_id': _activeEmployeeId,
-      'page_size': 100,
+      'page': page,
+      'page_size': pageSize,
     };
     final query = search?.trim();
     if (query != null && query.isNotEmpty) {

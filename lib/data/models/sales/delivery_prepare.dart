@@ -153,12 +153,16 @@ class DeliveryLotLine {
     required this.moveLineId,
     this.lotId,
     this.lotName,
+    this.expirationDate,
+    this.isExpired = false,
     required this.quantity,
   });
 
   final int moveLineId;
   final int? lotId;
   final String? lotName;
+  final String? expirationDate;
+  final bool isExpired;
   final double quantity;
 
   factory DeliveryLotLine.fromMap(Map<String, dynamic> map) {
@@ -167,6 +171,8 @@ class DeliveryLotLine {
       moveLineId: asInt(map['move_line_id']),
       lotId: lot is Map ? asNonZeroInt(lot['id']) : null,
       lotName: lot is Map ? asNullableString(lot['name']) : null,
+      expirationDate: lot is Map ? asNullableString(lot['expiration_date']) : null,
+      isExpired: lot is Map ? lot['is_expired'] == true : false,
       quantity: asDouble(map['quantity']),
     );
   }
@@ -201,5 +207,50 @@ class DeliveryLotInput {
 
   AvailableLot? lot;
   double quantity;
+}
+
+class ExpiredLotItem {
+  const ExpiredLotItem({
+    required this.lotId,
+    required this.lotName,
+    required this.productId,
+    required this.productName,
+    this.expirationDate,
+    required this.quantity,
+    this.uomName,
+  });
+
+  final int lotId;
+  final String lotName;
+  final int productId;
+  final String productName;
+  final String? expirationDate;
+  final double quantity;
+  final String? uomName;
+
+  factory ExpiredLotItem.fromMap(Map<String, dynamic> map) {
+    return ExpiredLotItem(
+      lotId: asInt(map['lot_id']),
+      lotName: (map['lot_name'] ?? '').toString(),
+      productId: asInt(map['product_id']),
+      productName: (map['product_name'] ?? '').toString(),
+      expirationDate: map['expiration_date']?.toString(),
+      quantity: asDouble(map['quantity']),
+      uomName: map['uom_name']?.toString(),
+    );
+  }
+}
+
+class ExpiredLotsConfirmationException implements Exception {
+  const ExpiredLotsConfirmationException({
+    required this.message,
+    required this.expiredLots,
+  });
+
+  final String message;
+  final List<ExpiredLotItem> expiredLots;
+
+  @override
+  String toString() => message;
 }
 
