@@ -1,9 +1,9 @@
 import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
-import 'package:flutter/scheduler.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:secondary_sales/core/services/media_storage_service.dart';
 import 'package:secondary_sales/core/services/location_tracking_service.dart';
 import 'package:secondary_sales/data/api/api_service.dart';
 import 'package:secondary_sales/features/auth/auth_provider.dart';
@@ -270,7 +270,14 @@ class AttendanceProvider extends ChangeNotifier {
           _loadingMessage = 'Processing photo & fetching GPS...';
           notifyListeners();
 
-          final bytes = await photo.readAsBytes();
+          final persistentFile = await MediaStorageService.persistPickedFile(
+            photo,
+            category: MediaCategory.attendance,
+            customPrefix: 'attendance_selfie',
+          );
+          final bytes = persistentFile != null
+              ? await persistentFile.readAsBytes()
+              : await photo.readAsBytes();
           checkInImageBase64 = base64Encode(bytes);
         } catch (e) {
           debugPrint('Error capturing photo: $e');

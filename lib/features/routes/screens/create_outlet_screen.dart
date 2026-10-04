@@ -8,6 +8,7 @@ import 'package:secondary_sales/features/routes/route_provider.dart';
 import 'package:secondary_sales/core/services/location_service.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:secondary_sales/core/services/media_storage_service.dart';
 import 'package:secondary_sales/features/my_team/my_team_provider.dart';
 import 'package:secondary_sales/core/util/dialog_helper.dart';
 import 'package:secondary_sales/core/widgets/ss_ui.dart';
@@ -93,7 +94,13 @@ class _CreateOutletScreenState extends State<CreateOutletScreen> {
 
       if (photo == null) return;
 
-      setState(() => _capturedPhoto = File(photo.path));
+      final persistentFile = await MediaStorageService.persistPickedFile(
+        photo,
+        category: MediaCategory.outlets,
+        customPrefix: 'outlet_registration',
+      );
+
+      setState(() => _capturedPhoto = persistentFile ?? File(photo.path));
 
       // A fix from the warm-up is the same shop, so don't make the rep wait
       // for a second one. Only fix again if there isn't a usable position.

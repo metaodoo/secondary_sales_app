@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
+import 'package:secondary_sales/core/services/media_storage_service.dart';
 import 'package:secondary_sales/core/theme/app_theme.dart';
 import 'package:secondary_sales/features/modern_trade/mt_return_provider.dart';
 import 'package:secondary_sales/features/modern_trade/screens/mt_return_product_selection_sheet.dart';
@@ -50,7 +51,15 @@ class _MtReturnCreateScreenState extends State<MtReturnCreateScreen> {
         imageQuality: 80,
       );
       if (picked == null) return;
-      final file = File(picked.path);
+      final file = await MediaStorageService.persistPickedFile(picked, category: MediaCategory.damages);
+      if (file == null) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Image file is invalid or empty. Please retake.')),
+          );
+        }
+        return;
+      }
       final bytes = await file.readAsBytes();
       final base64Str = base64Encode(bytes);
       setState(() {

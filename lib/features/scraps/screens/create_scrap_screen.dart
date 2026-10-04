@@ -7,6 +7,7 @@ import 'package:secondary_sales/core/constants.dart';
 import 'package:secondary_sales/core/theme/app_theme.dart';
 import 'package:provider/provider.dart';
 
+import 'package:secondary_sales/core/services/media_storage_service.dart';
 import 'package:secondary_sales/data/models/inventory/virtual_transfer.dart';
 import 'package:secondary_sales/features/auth/auth_provider.dart';
 import 'package:secondary_sales/features/scraps/scrap_provider.dart';
@@ -159,7 +160,12 @@ class _CreateScrapScreenState extends State<CreateScrapScreen> {
         imageQuality: 80,
       );
       if (picked == null) return;
-      final file = File(picked.path);
+      final persistentFile = await MediaStorageService.persistPickedFile(
+        picked,
+        category: MediaCategory.damages,
+        customPrefix: 'scrap_challan',
+      );
+      final file = persistentFile ?? File(picked.path);
       final bytes = await file.readAsBytes();
       final base64Str = base64Encode(bytes);
       setState(() {

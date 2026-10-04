@@ -26,6 +26,7 @@ import 'package:secondary_sales/data/api/api_service.dart';
 import 'package:secondary_sales/core/services/push_notification_service.dart';
 import 'package:secondary_sales/core/services/location_tracking_service.dart';
 import 'package:secondary_sales/core/services/app_update_service.dart';
+import 'package:secondary_sales/core/services/offline_sync_engine.dart';
 
 export 'package:secondary_sales/core/app_navigator.dart' show appNavigatorKey;
 
@@ -76,6 +77,7 @@ Future<void> main() async {
   await PushNotificationService.initialize(navigatorKey: appNavigatorKey);
   await AppConstants.initialize();
   await LocationTrackingService.configure();
+  OfflineSyncEngine.instance.initialize();
 
   final authProvider = AuthProvider();
   await authProvider.restoreSession();

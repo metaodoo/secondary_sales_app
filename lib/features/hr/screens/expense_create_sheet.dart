@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:secondary_sales/core/services/media_storage_service.dart';
 import 'package:secondary_sales/core/theme/app_theme.dart';
 import 'package:secondary_sales/features/hr/expense_provider.dart';
 
@@ -84,8 +85,17 @@ class _ExpenseCreateSheetState extends State<ExpenseCreateSheet> {
 
         if (file.bytes != null) {
           base64Str = base64Encode(file.bytes!);
+          MediaStorageService.persistBytes(
+            file.bytes!,
+            category: MediaCategory.expenses,
+            originalFileName: file.name,
+          );
         } else if (file.path != null) {
-          final bytes = await File(file.path!).readAsBytes();
+          final persistent = await MediaStorageService.persistFile(
+            File(file.path!),
+            category: MediaCategory.expenses,
+          );
+          final bytes = await (persistent ?? File(file.path!)).readAsBytes();
           base64Str = base64Encode(bytes);
         }
 

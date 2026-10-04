@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import 'dart:convert';
 import 'package:image_picker/image_picker.dart';
 import 'package:secondary_sales/core/services/location_service.dart';
+import 'package:secondary_sales/core/services/media_storage_service.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import 'package:secondary_sales/features/routes/route_provider.dart';
@@ -198,7 +199,14 @@ class _CustomerActionBottomSheetState extends State<CustomerActionBottomSheet> {
           }
           return false;
         }
-        final bytes = await photo.readAsBytes();
+        final persistentFile = await MediaStorageService.persistPickedFile(
+          photo,
+          category: MediaCategory.visits,
+          customPrefix: 'joint_visit',
+        );
+        final bytes = persistentFile != null
+            ? await persistentFile.readAsBytes()
+            : await photo.readAsBytes();
         imageB64 = base64Encode(bytes);
       }
 

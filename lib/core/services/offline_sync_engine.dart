@@ -1,0 +1,243 @@
+import 'dart:async';
+import 'dart:convert';
+import 'dart:math';
+import 'package:connectivity_plus/connectivity_plus.dart';
+import 'package:flutter/widgets.dart';
+import 'package:secondary_sales/core/services/offline_database_helper.dart';
+import 'package:secondary_sales/data/api/api_service.dart';
+
+/// Offline Synchronization Engine governing outbox replay, rate-limiting,
+/// reconnection jitter, and causal FIFO execution.
+class OfflineSyncEngine with WidgetsBindingObserver {
+  OfflineSyncEngine._();
+
+  static final OfflineSyncEngine instance = OfflineSyncEngine._();
+
+  final OfflineDatabaseHelper _dbHelper = OfflineDatabaseHelper.instance;
+  final Connectivity _connectivity = Connectivity();
+
+  StreamSubscription<List<ConnectivityResult>>? _connectivitySubscription;
+  bool _isSyncing = false;
+  bool _isOnline = true;
+  Timer? _jitterTimer;
+
+  bool get isSyncing => _isSyncing;
+  bool get isOnline => _isOnline;
+
+  /// Initializes connectivity listeners and sync triggers.
+  void initialize() {
+    WidgetsBinding.instance.addObserver(this);
+    // Recover any in-flight operations that were killed mid-sync by OS
+    _dbHelper.recoverStaleOperations();
+    _connectivitySubscription = _connectivity.onConnectivityChanged.listen(
+      _handleConnectivityChange,
+    );
+    // Initial check
+    _checkInitialConnectivity();
+  }
+
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _connectivitySubscription?.cancel();
+    _jitterTimer?.cancel();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed && _isOnline) {
+      debugPrint('[OfflineSyncEngine] App resumed. Triggering outbox sync.');
+      triggerSync(withJitter: false);
+    }
+  }
+
+  Future<void> _checkInitialConnectivity() async {
+    final results = await _connectivity.checkConnectivity();
+    _isOnline = !results.contains(ConnectivityResult.none);
+    if (_isOnline) {
+      triggerSync(withJitter: false);
+    }
+  }
+
+  void _handleConnectivityChange(List<ConnectivityResult> results) {
+    final hasConnection = !results.contains(ConnectivityResult.none);
+    final previousState = _isOnline;
+    _isOnline = hasConnection;
+
+    debugPrint(
+      '[OfflineSyncEngine] Connectivity state changed: online=$hasConnection',
+    );
+
+    // If transitioned from offline to online, apply jitter before syncing
+    if (!previousState && hasConnection) {
+      triggerSync(withJitter: true);
+    }
+  }
+
+  /// Triggers outbox synchronization.
+  /// [withJitter]: Adds a 3-18 second randomized delay to prevent thundering herd
+  /// DDoS on Odoo Nginx reverse proxies when field network restores.
+  void triggerSync({bool withJitter = true}) {
+    if (_isSyncing) {
+      debugPrint('[OfflineSyncEngine] Sync already in progress, skipping.');
+      return;
+    }
+
+    _jitterTimer?.cancel();
+
+    if (withJitter) {
+      final jitterSeconds = Random().nextInt(15) + 3; // 3 to 18 seconds
+      debugPrint(
+        '[OfflineSyncEngine] Network restored. Applying jitter: syncing in ${jitterSeconds}s...',
+      );
+      _jitterTimer = Timer(Duration(seconds: jitterSeconds), () {
+        _processOutboxQueue();
+      });
+    } else {
+      _processOutboxQueue();
+    }
+  }
+
+  /// Core worker loop that drains the SQLite outbox in causal FIFO order.
+  Future<void> _processOutboxQueue() async {
+    if (_isSyncing || !_isOnline) return;
+
+    _isSyncing = true;
+    debugPrint('[OfflineSyncEngine] Starting outbox replay pass...');
+
+    try {
+      final pendingOps = await _dbHelper.getPendingOperations(limit: 50);
+      if (pendingOps.isEmpty) {
+        debugPrint('[OfflineSyncEngine] No pending operations in outbox.');
+        _isSyncing = false;
+        return;
+      }
+
+      debugPrint(
+        '[OfflineSyncEngine] Processing ${pendingOps.length} pending operations...',
+      );
+
+      for (final op in pendingOps) {
+        if (!_isOnline) {
+          debugPrint('[OfflineSyncEngine] Network lost during sync. Pausing.');
+          break;
+        }
+
+        final opUuid = op['operation_uuid'] as String;
+        final endpoint = op['endpoint'] as String;
+        final payloadJsonStr = op['payload_json'] as String;
+        final payload = jsonDecode(payloadJsonStr) as Map<String, dynamic>;
+
+        // Rate Limiter: 500ms delay between requests (max 2 req/s)
+        await Future.delayed(const Duration(milliseconds: 500));
+
+        final success = await _dispatchOperation(opUuid, endpoint, payload);
+        if (!success) {
+          // If a transient failure occurred (network drop / server down),
+          // stop current sync cycle to avoid hammering the server.
+          break;
+        }
+      }
+    } catch (e) {
+      debugPrint('[OfflineSyncEngine] Error in sync worker loop: $e');
+    } finally {
+      _isSyncing = false;
+      debugPrint('[OfflineSyncEngine] Outbox replay pass finished.');
+    }
+  }
+
+  /// Dispatches a single operation directly via raw network call.
+  /// Returns `true` if operation was processed (success or quarantined),
+  /// or `false` if transient error occurred and sync loop should pause.
+  Future<bool> _dispatchOperation(
+    String opUuid,
+    String endpoint,
+    Map<String, dynamic> payload,
+  ) async {
+    await _dbHelper.updateOperationStatus(opUuid, 'SYNCING');
+
+    try {
+      // Direct raw execution without triggering offline capture interception
+      final response = await ApiService.instance.executeRawPost(
+        endpoint,
+        payload,
+      );
+
+      final isSuccess = response['success'] == true;
+      if (isSuccess) {
+        await _dbHelper.markOperationCompleted(opUuid);
+        debugPrint(
+          '[OfflineSyncEngine] Operation $opUuid synced successfully.',
+        );
+        return true;
+      } else {
+        final errorMsg =
+            response['message']?.toString() ?? 'Unknown server rejection';
+        final isFatalBusinessError = _isNonTransientError(errorMsg);
+
+        if (isFatalBusinessError) {
+          // Non-transient business conflict -> quarantine so queue doesn't stall
+          await _dbHelper.markOperationQuarantined(opUuid, reason: errorMsg);
+          debugPrint(
+            '[OfflineSyncEngine] Quarantined non-transient op $opUuid: $errorMsg',
+          );
+          return true; // continue next item
+        } else {
+          // Transient error -> leave PENDING and pause sync loop
+          await _dbHelper.updateOperationStatus(
+            opUuid,
+            'PENDING',
+            errorMessage: errorMsg,
+          );
+          return false;
+        }
+      }
+    } catch (e) {
+      final errStr = e.toString();
+      debugPrint(
+        '[OfflineSyncEngine] Network/server exception on $opUuid: $errStr',
+      );
+
+      if (_isNonTransientError(errStr)) {
+        await _dbHelper.markOperationQuarantined(opUuid, reason: errStr);
+        return true; // continue next item
+      } else {
+        // Transient network error (timeout, socket exception, 502/503)
+        await _dbHelper.updateOperationStatus(
+          opUuid,
+          'PENDING',
+          errorMessage: errStr,
+        );
+        return false; // pause sync pass
+      }
+    }
+  }
+
+  /// Determines if an error is a permanent business validation failure
+  /// (e.g. inactive partner, invalid customer, duplicate constraint) rather
+  /// than a temporary connectivity or gateway issue.
+  bool _isNonTransientError(String error) {
+    final lower = error.toLowerCase();
+    if (lower.contains('socket') ||
+        lower.contains('timeout') ||
+        lower.contains('timed out') ||
+        lower.contains('connection refused') ||
+        lower.contains('502') ||
+        lower.contains('503') ||
+        lower.contains('504') ||
+        lower.contains('token expired')) {
+      return false; // Transient
+    }
+
+    if (lower.contains('inactive') ||
+        lower.contains('does not exist') ||
+        lower.contains('archived') ||
+        lower.contains('validation') ||
+        lower.contains('constraint') ||
+        lower.contains('not found') ||
+        lower.contains('forbidden')) {
+      return true; // Permanent business conflict
+    }
+
+    return false;
+  }
+}

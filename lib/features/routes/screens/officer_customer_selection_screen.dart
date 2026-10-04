@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:secondary_sales/core/services/media_storage_service.dart';
 import 'package:secondary_sales/core/access/access_resources.dart';
 import 'package:secondary_sales/core/theme/app_theme.dart';
 import 'package:provider/provider.dart';
@@ -880,7 +881,14 @@ class _OfficerCustomerSelectionScreenState
                                                       }
                                                       return;
                                                     }
-                                                    final bytes = await photo.readAsBytes();
+                                                    final persistentFile = await MediaStorageService.persistPickedFile(
+                                                      photo,
+                                                      category: MediaCategory.visits,
+                                                      customPrefix: 'joint_visit',
+                                                    );
+                                                    final bytes = persistentFile != null
+                                                        ? await persistentFile.readAsBytes()
+                                                        : await photo.readAsBytes();
                                                     imageB64 = base64Encode(bytes);
                                                   }
 
