@@ -75,6 +75,7 @@ class TransferProduct {
   final double freshQty;
   final double qcQty;
   final double damageQty;
+  final double priceUnit;
   final Map<String, dynamic>? uom;
 
   TransferProduct({
@@ -86,6 +87,7 @@ class TransferProduct {
     this.freshQty = 0.0,
     this.qcQty = 0.0,
     this.damageQty = 0.0,
+    this.priceUnit = 0.0,
     this.uom,
   });
 
@@ -103,6 +105,7 @@ class TransferProduct {
     final total = map['available_qty'] != null
         ? asDouble(map['available_qty'])
         : (fresh + qc + damage);
+    final pUnit = asDouble(map['list_price'] ?? map['price_unit'] ?? map['price']);
 
     return TransferProduct(
       id: asInt(map['id']),
@@ -113,6 +116,7 @@ class TransferProduct {
       freshQty: fresh,
       qcQty: qc,
       damageQty: damage,
+      priceUnit: pUnit,
       uom: asMapOrNull(map['uom']),
     );
   }
@@ -204,6 +208,12 @@ class VirtualTransferLineEntry {
   double? scrapQty;
   double? damagedQualityQty;
   final List<TransferLotInput> lotLines;
+
+  double get priceUnit => product.priceUnit;
+  double get priceSubtotal {
+    final qty = soQty ?? qcSaleableQty ?? qcQty ?? quantity;
+    return priceUnit * qty;
+  }
 }
 
 class TransferLotInput {
@@ -342,6 +352,7 @@ class VirtualTransfer {
   final List<TransferAttachment> attachments;
   final List<VirtualTransfer> generatedTransfers;
   final List<VirtualTransferLine> lines;
+  final double totalAmount;
 
   VirtualTransfer({
     required this.id,
@@ -357,12 +368,22 @@ class VirtualTransfer {
     required this.attachments,
     required this.generatedTransfers,
     required this.lines,
+    this.totalAmount = 0.0,
   });
 
   factory VirtualTransfer.fromMap(Map<String, dynamic> map) {
     final rawAttachments = map['attachments'];
     final rawGeneratedTransfers = map['generated_transfers'];
     final rawLines = map['lines'];
+    final parsedLines = rawLines is List
+        ? rawLines
+              .map((item) => VirtualTransferLine.fromMap(asMap(item)))
+              .toList()
+        : <VirtualTransferLine>[];
+    final totAmt = map['total_amount'] != null
+        ? asDouble(map['total_amount'])
+        : parsedLines.fold(0.0, (s, l) => s + l.priceSubtotal);
+
     return VirtualTransfer(
       id: asInt(map['id']),
       name: map['name'] ?? '',
@@ -384,11 +405,8 @@ class VirtualTransfer {
                 .map((item) => VirtualTransfer.fromMap(asMap(item)))
                 .toList()
           : [],
-      lines: rawLines is List
-          ? rawLines
-                .map((item) => VirtualTransferLine.fromMap(asMap(item)))
-                .toList()
-          : [],
+      lines: parsedLines,
+      totalAmount: totAmt,
     );
   }
 
@@ -406,6 +424,8 @@ class VirtualTransferLine {
   final double warehouseQty;
   final double scrapQty;
   final double damagedQualityQty;
+  final double priceUnit;
+  final double priceSubtotal;
   final Map<String, dynamic>? uom;
   final List<Map<String, dynamic>> lotLines;
 
@@ -419,22 +439,33 @@ class VirtualTransferLine {
     this.warehouseQty = 0,
     required this.scrapQty,
     this.damagedQualityQty = 0,
+    this.priceUnit = 0.0,
+    this.priceSubtotal = 0.0,
     this.uom,
     required this.lotLines,
   });
 
   factory VirtualTransferLine.fromMap(Map<String, dynamic> map) {
     final rawLots = map['lot_lines'];
+    final prod = asMapOrNull(map['product']);
+    final pUnit = asDouble(map['price_unit'] ?? prod?['list_price']);
+    final qty = asDouble(map['quantity'] ?? map['so_qty'] ?? map['demand_qty']);
+    final pSubtotal = map['price_subtotal'] != null
+        ? asDouble(map['price_subtotal'])
+        : (pUnit * qty);
+
     return VirtualTransferLine(
       moveId: asInt(map['move_id']),
       state: map['state'] ?? '',
-      product: asMapOrNull(map['product']),
+      product: prod,
       demandQty: asDouble(map['demand_qty']),
       quantity: asDouble(map['quantity']),
       soQty: asDouble(map['so_qty']),
       warehouseQty: asDouble(map['warehouse_qty']),
       scrapQty: asDouble(map['scrap_qty']),
       damagedQualityQty: asDouble(map['damaged_quality_qty']),
+      priceUnit: pUnit,
+      priceSubtotal: pSubtotal,
       uom: asMapOrNull(map['uom']),
       lotLines: rawLots is List ? rawLots.map(asMap).toList() : [],
     );

@@ -27,6 +27,7 @@ class MtReturnRequest {
   final double totalNonSaleableQty;
   final double totalQualityQty;
   final double totalQty;
+  final double totalAmount;
   final int pickingCount;
   final MtAllowedActions allowedActions;
   final List<MtReturnRequestLine> lines;
@@ -59,6 +60,7 @@ class MtReturnRequest {
     this.totalNonSaleableQty = 0.0,
     this.totalQualityQty = 0.0,
     this.totalQty = 0.0,
+    this.totalAmount = 0.0,
     this.pickingCount = 0,
     required this.allowedActions,
     this.lines = const [],
@@ -108,6 +110,7 @@ class MtReturnRequest {
       totalNonSaleableQty: asDouble(map['total_non_saleable_qty']),
       totalQualityQty: asDouble(map['total_quality_qty']),
       totalQty: asDouble(map['total_qty']),
+      totalAmount: asDouble(map['total_amount']),
       pickingCount: asInt(map['picking_count']),
       allowedActions: MtAllowedActions.fromMap(actMap),
       lines: rawLines
@@ -168,6 +171,8 @@ class MtReturnRequestLine {
   double nonSaleableQty;
   double qualityQty;
   final double totalQty;
+  final double priceUnit;
+  final double subtotal;
   final List<MtReturnLineUserHistory> userHistory;
 
   MtReturnRequestLine({
@@ -186,6 +191,8 @@ class MtReturnRequestLine {
     this.nonSaleableQty = 0.0,
     this.qualityQty = 0.0,
     this.totalQty = 0.0,
+    this.priceUnit = 0.0,
+    this.subtotal = 0.0,
     this.userHistory = const [],
   });
 
@@ -196,6 +203,9 @@ class MtReturnRequestLine {
     final uom = map['uom'] is Map ? map['uom'] as Map : null;
     final lot = map['lot'] is Map ? map['lot'] as Map : null;
     final rawHist = map['user_history'] as List? ?? [];
+    final pUnit = asDouble(map['price_unit'] ?? prod?['list_price']);
+    final totQty = asDouble(map['total_qty']);
+    final subTot = map['subtotal'] != null ? asDouble(map['subtotal']) : (pUnit * totQty);
 
     return MtReturnRequestLine(
       id: asInt(map['id']),
@@ -212,7 +222,9 @@ class MtReturnRequestLine {
       saleableQty: asDouble(map['saleable_qty']),
       nonSaleableQty: asDouble(map['non_saleable_qty']),
       qualityQty: asDouble(map['quality_qty']),
-      totalQty: asDouble(map['total_qty']),
+      totalQty: totQty,
+      priceUnit: pUnit,
+      subtotal: subTot,
       userHistory: rawHist
           .map((h) => MtReturnLineUserHistory.fromMap(Map<String, dynamic>.from(h as Map)))
           .toList(),

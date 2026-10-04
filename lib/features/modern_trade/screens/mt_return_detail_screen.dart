@@ -289,6 +289,22 @@ class _MtReturnDetailScreenState extends State<MtReturnDetailScreen> {
             Text('Warehouse: ${rr.warehouseName}', style: TextStyle(fontSize: 12, color: Colors.grey.shade700)),
           if (rr.returnScrapLocationName != null)
             Text('Scrap Loc: ${rr.returnScrapLocationName}', style: TextStyle(fontSize: 12, color: Colors.grey.shade700)),
+          if (rr.totalAmount > 0) ...[
+            const SizedBox(height: 8),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text(
+                  'Total Return Amount',
+                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
+                ),
+                Text(
+                  '৳${rr.totalAmount.toStringAsFixed(2)}',
+                  style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: AppColors.primaryStrong),
+                ),
+              ],
+            ),
+          ],
         ],
       ),
     );
@@ -559,6 +575,30 @@ class _MtReturnDetailScreenState extends State<MtReturnDetailScreen> {
                       ),
                     ],
                   ),
+                  if (line.priceUnit > 0) ...[
+                    const SizedBox(height: 6),
+                    Row(
+                      children: [
+                        Text(
+                          'Price: ৳${line.priceUnit.toStringAsFixed(2)}',
+                          style: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.primaryStrong,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Text(
+                          'Subtotal: ৳${line.subtotal.toStringAsFixed(2)}',
+                          style: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                            color: AppColors.textPrimary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
                   const SizedBox(height: 8),
                   Wrap(
                     spacing: 8,

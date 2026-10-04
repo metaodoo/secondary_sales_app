@@ -1615,24 +1615,51 @@ class _CreateReturnScreenState extends State<CreateReturnScreen> {
                   color: Colors.white,
                   border: Border(top: BorderSide(color: Color(0xFFDDE6F2))),
                 ),
-                child: widget.returnId == null
-                    ? SizedBox(
-                        width: double.infinity,
-                        height: 50,
-                        child: ElevatedButton.icon(
-                          onPressed: provider.isLoading ? null : _createReturn,
-                          icon: const Icon(Icons.save),
-                          label: const Text('Save'),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: AppColors.primary,
-                            foregroundColor: Colors.white,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(8),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (_lines.isNotEmpty) ...[
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text(
+                            'Total Return Amount',
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.black87,
                             ),
                           ),
-                        ),
-                      )
-                    : Row(
+                          Text(
+                            '৳${_lines.fold(0.0, (s, l) => s + l.priceSubtotal).toStringAsFixed(2)}',
+                            style: const TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                              color: AppColors.primary,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                    ],
+                    widget.returnId == null
+                        ? SizedBox(
+                            width: double.infinity,
+                            height: 50,
+                            child: ElevatedButton.icon(
+                              onPressed: provider.isLoading ? null : _createReturn,
+                              icon: const Icon(Icons.save),
+                              label: const Text('Save'),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: AppColors.primary,
+                                foregroundColor: Colors.white,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                              ),
+                            ),
+                          )
+                        : Row(
                         children: [
                           if (auth.canCancelReturnFor(widget.moduleType)) ...[
                             Expanded(
@@ -1741,6 +1768,8 @@ class _CreateReturnScreenState extends State<CreateReturnScreen> {
                           ],
                         ],
                       ),
+                  ],
+                ),
               ),
           ],
         ),
@@ -1893,6 +1922,30 @@ class _ReturnLineCard extends StatelessWidget {
                           ),
                         ],
                       ),
+                      if (line.priceUnit > 0) ...[
+                        const SizedBox(height: 6),
+                        Row(
+                          children: [
+                            Text(
+                              'Price: ৳${line.priceUnit.toStringAsFixed(2)}',
+                              style: const TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                color: AppColors.primary,
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Text(
+                              'Subtotal: ৳${line.priceSubtotal.toStringAsFixed(2)}',
+                              style: const TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.black87,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
                     ],
                   ),
                 ),

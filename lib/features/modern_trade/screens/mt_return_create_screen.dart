@@ -93,6 +93,14 @@ class _MtReturnCreateScreenState extends State<MtReturnCreateScreen> {
   double get _totalQty => _selectedBucket == 'saleable'
       ? _totalSaleableQty + _totalNonSaleableQty
       : _totalNonSaleableQty + _totalQualityQty;
+  double get _totalAmount => _lines.fold(0.0, (sum, l) {
+    final prod = l['product'] as Map?;
+    final price = prod != null ? (prod['list_price'] as num?)?.toDouble() ?? 0.0 : 0.0;
+    final qty = _selectedBucket == 'saleable'
+        ? ((l['saleable_qty'] as num?)?.toDouble() ?? 0.0) + ((l['non_saleable_qty'] as num?)?.toDouble() ?? 0.0)
+        : ((l['non_saleable_qty'] as num?)?.toDouble() ?? 0.0) + ((l['quality_qty'] as num?)?.toDouble() ?? 0.0);
+    return sum + (price * qty);
+  });
 
   Map<String, dynamic>? _getOutletById(List<Map<String, dynamic>> outlets, int? id) {
     if (id == null) return null;
@@ -393,6 +401,8 @@ class _MtReturnCreateScreenState extends State<MtReturnCreateScreen> {
                   final nonSaleableQty = line['non_saleable_qty'] as double? ?? 0.0;
                   final qualityQty = line['quality_qty'] as double? ?? 0.0;
                   final totalLineQty = isSaleable ? saleableQty + nonSaleableQty : nonSaleableQty + qualityQty;
+                  final price = (product['list_price'] as num?)?.toDouble() ?? 0.0;
+                  final subtotal = price * totalLineQty;
 
                   return Container(
                     padding: const EdgeInsets.all(14),
@@ -446,6 +456,30 @@ class _MtReturnCreateScreenState extends State<MtReturnCreateScreen> {
                             ),
                           ],
                         ),
+                        if (price > 0) ...[
+                          const SizedBox(height: 6),
+                          Row(
+                            children: [
+                              Text(
+                                'Price: ৳${price.toStringAsFixed(2)}',
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                  color: AppColors.primaryStrong,
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Text(
+                                'Subtotal: ৳${subtotal.toStringAsFixed(2)}',
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.bold,
+                                  color: AppColors.textPrimary,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
                         const Divider(height: 16),
                         Wrap(
                           spacing: 8,
@@ -489,6 +523,19 @@ class _MtReturnCreateScreenState extends State<MtReturnCreateScreen> {
                       ),
                     ],
                   ),
+                  if (_totalAmount > 0) ...[
+                    const SizedBox(height: 8),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text('Total Return Amount', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+                        Text(
+                          '৳${_totalAmount.toStringAsFixed(2)}',
+                          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: AppColors.primaryStrong),
+                        ),
+                      ],
+                    ),
+                  ],
                 ],
               ),
             ),
