@@ -19,6 +19,7 @@ class MtOutlet {
     this.justificationStatus,
     this.justificationRequestId,
     this.businessType,
+    this.requiresVisitReason,
   });
 
   final int id;
@@ -38,6 +39,7 @@ class MtOutlet {
   final String? justificationStatus;
   final int? justificationRequestId;
   final String? businessType;
+  final bool? requiresVisitReason;
 
   factory MtOutlet.fromMap(Map<String, dynamic> map) {
     return MtOutlet(
@@ -58,6 +60,7 @@ class MtOutlet {
       justificationStatus: asNullableString(map['justification_status']),
       justificationRequestId: asIntOrNull(map['justification_request_id']),
       businessType: asNullableString(map['business_type']),
+      requiresVisitReason: map['requires_visit_reason'] == true,
     );
   }
 
@@ -78,5 +81,6 @@ class MtOutlet {
     'justification_status': justificationStatus,
     'justification_request_id': justificationRequestId,
     'business_type': businessType,
+    if (requiresVisitReason != null) 'requires_visit_reason': requiresVisitReason,
   };
 }

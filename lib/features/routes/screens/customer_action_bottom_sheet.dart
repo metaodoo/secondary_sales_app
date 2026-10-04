@@ -28,6 +28,7 @@ class CustomerActionBottomSheet extends StatefulWidget {
   final String? mobile;
   final double? latitude;
   final double? longitude;
+  final double? outletRadius;
   const CustomerActionBottomSheet({
     super.key,
     required this.customerName,
@@ -37,6 +38,7 @@ class CustomerActionBottomSheet extends StatefulWidget {
     this.mobile,
     this.latitude,
     this.longitude,
+    this.outletRadius,
   });
 
   @override
@@ -168,7 +170,7 @@ class _CustomerActionBottomSheetState extends State<CustomerActionBottomSheet> {
           widget.latitude!,
           widget.longitude!,
         );
-        const double allowedRadius = 50.0;
+        final double allowedRadius = widget.outletRadius ?? 50.0;
         if (distanceMeters > allowedRadius) {
           throw Exception(
             'You are ${distanceMeters.round()}m away from "${widget.customerName}". Allowed radius is ${allowedRadius.round()}m.',
@@ -422,7 +424,91 @@ class _CustomerActionBottomSheetState extends State<CustomerActionBottomSheet> {
               ),
             ],
           ),
-          const SizedBox(height: 24),
+          if (routeProv.activeRoute != null) ...[
+            const SizedBox(height: 14),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: AppColors.borderSoft),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Padding(
+                        padding: EdgeInsets.only(top: 2),
+                        child: Icon(
+                          Icons.alt_route_rounded,
+                          size: 14,
+                          color: AppColors.primaryStrong,
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      const Text(
+                        'Route: ',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                      Expanded(
+                        child: Text(
+                          routeProv.activeRoute!.name,
+                          style: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                            color: Color(0xFF1E293B),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  if (routeProv.activeRoute!.distributorName != null &&
+                      routeProv.activeRoute!.distributorName!.isNotEmpty) ...[
+                    const SizedBox(height: 6),
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Padding(
+                          padding: EdgeInsets.only(top: 2),
+                          child: Icon(
+                            Icons.business_outlined,
+                            size: 14,
+                            color: Color(0xFF0D9488),
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        const Text(
+                          'Distributor (DB): ',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                        Expanded(
+                          child: Text(
+                            routeProv.activeRoute!.distributorName!,
+                            style: const TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                              color: Color(0xFF1E293B),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ],
+          const SizedBox(height: 20),
 
           // Action Grid
           Row(

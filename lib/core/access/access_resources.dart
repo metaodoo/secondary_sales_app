@@ -423,7 +423,7 @@ const List<AccessResource> accessCatalog = [
     AppScreen.moduleMtSecondary,
     'screen',
     'mt_secondary',
-    'App Modules › MT - Secondary Sales',
+    'App Modules › Audit Sales',
     _mtSec,
   ),
   AccessResource(
@@ -1496,63 +1496,63 @@ const List<AccessResource> accessCatalog = [
     _mt,
   ),
 
-  // Modern Trade (MT - Secondary Sales) screens.
+  // Audit Sales (MT - Secondary Sales) screens.
   AccessResource(
     AppScreen.mtSecStockAuditsList,
     'screen',
     'mt_secondary',
-    'MT Secondary › Stock Audits › Open list',
+    'Audit Sales › Stock Audits › Open list',
     _mtSec,
   ),
   AccessResource(
     AppScreen.mtSecStockAuditsDetail,
     'screen',
     'mt_secondary',
-    'MT Secondary › Stock Audits › Open detail',
+    'Audit Sales › Stock Audits › Open detail',
     _mtSec,
   ),
   AccessResource(
     AppScreen.mtSecStockAuditsCreate,
     'screen',
     'mt_secondary',
-    'MT Secondary › Stock Audits › Open create screen',
+    'Audit Sales › Stock Audits › Open create screen',
     _mtSec,
   ),
   AccessResource(
     AppScreen.mtSecOrdersList,
     'screen',
     'mt_secondary',
-    'MT Secondary › Orders › Open list',
+    'Audit Sales › Orders › Open list',
     _mtSec,
   ),
   AccessResource(
     AppScreen.mtSecOrdersDetail,
     'screen',
     'mt_secondary',
-    'MT Secondary › Orders › Open detail',
+    'Audit Sales › Orders › Open detail',
     _mtSec,
   ),
 
-  // Modern Trade (MT - Secondary Sales) actions.
+  // Audit Sales (MT - Secondary Sales) actions.
   AccessResource(
     AppAction.mtSecStockAuditCreate,
     'action',
     'mt_secondary',
-    'MT Secondary › Stock Audits › Create (button)',
+    'Audit Sales › Stock Audits › Create (button)',
     _mtSec,
   ),
   AccessResource(
     AppAction.mtSecStockAuditConfirm,
     'action',
     'mt_secondary',
-    'MT Secondary › Stock Audits › Confirm (button)',
+    'Audit Sales › Stock Audits › Confirm (button)',
     _mtSec,
   ),
   AccessResource(
     AppAction.mtSecStockAuditReset,
     'action',
     'mt_secondary',
-    'MT Secondary › Stock Audits › Reset to Draft (button)',
+    'Audit Sales › Stock Audits › Reset to Draft (button)',
     _mtSec,
   ),
 ];

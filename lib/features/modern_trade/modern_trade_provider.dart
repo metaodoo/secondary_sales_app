@@ -169,9 +169,13 @@ class ModernTradeProvider with ChangeNotifier {
         if (active.activeCheckInTime != null) {
           _checkInTime = active.activeCheckInTime;
         }
+        if (active.requiresVisitReason != null) {
+          _requiresVisitReason = active.requiresVisitReason!;
+        }
       } else if (_checkedInOutletId == null) {
         _checkedInOutletId = null;
         _currentVisitId = null;
+        _requiresVisitReason = false;
         _checkInTime = null;
       }
     } catch (e) {
@@ -289,6 +293,16 @@ class ModernTradeProvider with ChangeNotifier {
       notifyListeners();
       fetchOutlets();
     }
+  }
+
+  void markOrderCreated() {
+    _requiresVisitReason = false;
+    notifyListeners();
+  }
+
+  void setRequiresVisitReason(bool value) {
+    _requiresVisitReason = value;
+    notifyListeners();
   }
 
   // ─── Modern Trade Stock Audits ──────────────────────────────────────────
@@ -411,6 +425,7 @@ class ModernTradeProvider with ChangeNotifier {
         notes: notes,
         confirm: confirm,
       );
+      _requiresVisitReason = false;
       return audit;
     } catch (e) {
       _error = e.toString();
@@ -444,6 +459,7 @@ class ModernTradeProvider with ChangeNotifier {
         notes: notes,
         confirm: confirm,
       );
+      _requiresVisitReason = false;
       return audit;
     } catch (e) {
       _error = e.toString();
@@ -461,6 +477,7 @@ class ModernTradeProvider with ChangeNotifier {
 
     try {
       final audit = await _apiService.confirmStockAudit(auditId);
+      _requiresVisitReason = false;
       return audit;
     } catch (e) {
       _error = e.toString();

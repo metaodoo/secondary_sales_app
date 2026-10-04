@@ -163,6 +163,7 @@ class MtReturnRequestLine {
   final int? lotId;
   final String? lotName;
   final String? expirationDate;
+  final String? tracking;
   double saleableQty;
   double nonSaleableQty;
   double qualityQty;
@@ -180,12 +181,15 @@ class MtReturnRequestLine {
     this.lotId,
     this.lotName,
     this.expirationDate,
+    this.tracking,
     this.saleableQty = 0.0,
     this.nonSaleableQty = 0.0,
     this.qualityQty = 0.0,
     this.totalQty = 0.0,
     this.userHistory = const [],
   });
+
+  bool get requiresLots => tracking == 'lot' || tracking == 'serial';
 
   factory MtReturnRequestLine.fromMap(Map<String, dynamic> map) {
     final prod = map['product'] is Map ? map['product'] as Map : null;
@@ -204,6 +208,7 @@ class MtReturnRequestLine {
       lotId: lot != null ? asInt(lot['id']) : null,
       lotName: lot?['name']?.toString(),
       expirationDate: lot?['expiration_date']?.toString(),
+      tracking: prod?['tracking']?.toString() ?? map['tracking']?.toString(),
       saleableQty: asDouble(map['saleable_qty']),
       nonSaleableQty: asDouble(map['non_saleable_qty']),
       qualityQty: asDouble(map['quality_qty']),
@@ -229,6 +234,8 @@ class MtReturnLineUserHistory {
   final int id;
   final int? userId;
   final String userName;
+  final int? mobileUserGroupId;
+  final String? mobileUserGroupName;
   final String? createDate;
   final double saleableQty;
   final double nonSaleableQty;
@@ -239,6 +246,8 @@ class MtReturnLineUserHistory {
     required this.id,
     this.userId,
     this.userName = '',
+    this.mobileUserGroupId,
+    this.mobileUserGroupName,
     this.createDate,
     this.saleableQty = 0.0,
     this.nonSaleableQty = 0.0,
@@ -248,10 +257,18 @@ class MtReturnLineUserHistory {
 
   factory MtReturnLineUserHistory.fromMap(Map<String, dynamic> map) {
     final user = map['user'] is Map ? map['user'] as Map : null;
+    final group = map['mobile_user_group'] is Map ? map['mobile_user_group'] as Map : null;
+    final groupName = group?['name']?.toString() ??
+        map['mobile_user_group_name']?.toString() ??
+        user?['group_name']?.toString();
+    final groupId = group != null ? asInt(group['id']) : asInt(map['mobile_user_group_id']);
+
     return MtReturnLineUserHistory(
       id: asInt(map['id']),
       userId: user != null ? asInt(user['id']) : null,
       userName: user?['name']?.toString() ?? '',
+      mobileUserGroupId: groupId,
+      mobileUserGroupName: groupName,
       createDate: map['create_date']?.toString(),
       saleableQty: asDouble(map['saleable_qty']),
       nonSaleableQty: asDouble(map['non_saleable_qty']),

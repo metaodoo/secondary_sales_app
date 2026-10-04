@@ -72,13 +72,44 @@ extension ModernTradeApi on ApiService {
     };
 
     final result = await _post(
-      '${AppConstants.apiPrefix}/mt/sale-orders/create',
+      AppConstants.createSaleOrderEndpoint,
       params,
     );
     if (result['success'] == true) {
       return Map<String, dynamic>.from(result['data'] ?? <String, dynamic>{});
     }
     throw Exception(result['message'] ?? 'Failed to create MT sales order');
+  }
+
+  /// Update an existing Modern Trade Direct Sale Order
+  Future<Map<String, dynamic>> updateMtSaleOrder({
+    required int orderId,
+    required int outletId,
+    required List<Map<String, dynamic>> orderLines,
+    int? visitId,
+    int? employeeId,
+    int? mediumId,
+    bool confirm = false,
+  }) async {
+    final params = <String, dynamic>{
+      'employee_id': employeeId ?? _activeEmployeeId,
+      'outlet_id': outletId,
+      'business_type': 'mt',
+      'sale_type': 'primary',
+      'order_lines': orderLines,
+      'confirm': confirm,
+      if (visitId != null) 'visit_id': visitId,
+      if (mediumId != null) 'medium_id': mediumId,
+    };
+
+    final result = await _post(
+      '${AppConstants.saleOrdersEndpoint}/$orderId/update',
+      params,
+    );
+    if (result['success'] == true) {
+      return Map<String, dynamic>.from(result['data'] ?? <String, dynamic>{});
+    }
+    throw Exception(result['message'] ?? 'Failed to update MT sales order');
   }
 
   /// Fetch Modern Trade Stock Audits

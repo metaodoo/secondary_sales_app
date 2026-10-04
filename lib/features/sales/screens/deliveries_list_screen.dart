@@ -1,11 +1,12 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:secondary_sales/core/theme/app_theme.dart';
 import 'package:provider/provider.dart';
 import 'package:secondary_sales/data/models/delivery_item.dart';
 import 'package:secondary_sales/data/models/contacts/res_zone.dart';
-import 'package:secondary_sales/data/models/inventory/warehouse.dart';
 import 'package:secondary_sales/data/api/api_service.dart';
 import 'package:secondary_sales/features/sales/primary_sale_provider.dart';
+import 'package:secondary_sales/features/auth/auth_provider.dart';
 import 'package:secondary_sales/features/sales/screens/validate_delivery_screen.dart';
 import 'package:secondary_sales/core/widgets/ss_ui.dart';
 
@@ -26,11 +27,11 @@ class _DeliveriesListScreenState extends State<DeliveriesListScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
   final List<String> _tabs = ['pending', 'own'];
-  final List<String> _tabLabels = ['Pending Deliveries', 'Own Deliveries'];
   final TextEditingController _searchController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   static const int _pageSize = 50;
 
+  Timer? _searchDebounce;
   bool _isLoading = false;
   bool _isLoadingMore = false;
   bool _hasMore = true;
@@ -38,19 +39,19 @@ class _DeliveriesListScreenState extends State<DeliveriesListScreen>
   List<DeliveryItem> _deliveries = [];
   String? _error;
 
+  int _pendingCount = 0;
+  int _deliveredCount = 0;
+
   String _activeTab = 'pending';
   DateTime? _dateFromFilter;
   DateTime? _dateToFilter;
 
   int? _selectedZoneId;
   String? _selectedZoneName;
-  int? _selectedLocationId;
-  String? _selectedLocationName;
-  int? _selectedOutletId;
-  String? _selectedOutletName;
+  int? _selectedAreaId;
+  String? _selectedAreaName;
   List<ResZone> _zones = [];
-  List<StockLocation> _locations = [];
-  List<DeliveryOutletFilter> _outlets = [];
+  List<DeliveryAreaFilter> _areas = [];
 
   @override
   void initState() {
@@ -60,10 +61,12 @@ class _DeliveriesListScreenState extends State<DeliveriesListScreen>
     _tabController.addListener(() {
       if (!_tabController.indexIsChanging) {
         final tab = _tabs[_tabController.index];
-        setState(() {
-          _activeTab = tab;
-        });
-        _fetchDeliveries(reset: true);
+        if (_activeTab != tab) {
+          setState(() {
+            _activeTab = tab;
+          });
+          _fetchDeliveries(reset: true);
+        }
       }
     });
     _fetchDeliveries(reset: true);
@@ -71,10 +74,18 @@ class _DeliveriesListScreenState extends State<DeliveriesListScreen>
 
   @override
   void dispose() {
+    _searchDebounce?.cancel();
     _scrollController.dispose();
     _tabController.dispose();
     _searchController.dispose();
     super.dispose();
+  }
+
+  void _onSearchChanged(String val) {
+    _searchDebounce?.cancel();
+    _searchDebounce = Timer(const Duration(milliseconds: 350), () {
+      _fetchDeliveries(reset: true);
+    });
   }
 
   void _onScroll() {
@@ -106,9 +117,7 @@ class _DeliveriesListScreenState extends State<DeliveriesListScreen>
     });
     try {
       final provider = context.read<PrimarySaleProvider>();
-      final isMt = widget.businessType == 'mt' ||
-          widget.moduleType == 'modern_trade' ||
-          widget.moduleType == 'mt_primary';
+      final isMt = _isMt;
 
       final result = await provider.apiService.getDeliveries(
         page: _page,
@@ -117,9 +126,8 @@ class _DeliveriesListScreenState extends State<DeliveriesListScreen>
         type: isMt ? 'primary' : widget.moduleType,
         businessType: isMt ? 'mt' : (widget.businessType ?? 'gt'),
         segment: _activeTab,
-        outletId: _selectedOutletId,
+        areaId: _selectedAreaId,
         zoneId: _selectedZoneId,
-        locationId: _selectedLocationId,
         dateFrom: _dateFromFilter,
         dateTo: _dateToFilter,
       );
@@ -130,6 +138,8 @@ class _DeliveriesListScreenState extends State<DeliveriesListScreen>
           } else {
             _deliveries.addAll(result.items);
           }
+          _pendingCount = result.pendingCount;
+          _deliveredCount = result.deliveredCount;
           _hasMore = result.items.length == _pageSize;
           if (_hasMore) {
             _page += 1;
@@ -137,11 +147,8 @@ class _DeliveriesListScreenState extends State<DeliveriesListScreen>
           if (result.zones.isNotEmpty || _zones.isEmpty) {
             _zones = result.zones;
           }
-          if (result.locations.isNotEmpty || _locations.isEmpty) {
-            _locations = result.locations;
-          }
-          if (result.outlets.isNotEmpty || _outlets.isEmpty) {
-            _outlets = result.outlets;
+          if (result.areas.isNotEmpty || _areas.isEmpty) {
+            _areas = result.areas;
           }
         });
       }
@@ -161,41 +168,47 @@ class _DeliveriesListScreenState extends State<DeliveriesListScreen>
     }
   }
 
-  bool get _isMt =>
-      widget.businessType == 'mt' ||
-      widget.moduleType == 'modern_trade' ||
-      widget.moduleType == 'mt_primary';
+  bool get _isMt {
+    if (widget.businessType == 'mt' ||
+        widget.moduleType == 'modern_trade' ||
+        widget.moduleType == 'mt_primary') {
+      return true;
+    }
+    try {
+      final auth = context.read<AuthProvider>();
+      return auth.isModernTrade;
+    } catch (_) {
+      return false;
+    }
+  }
 
   bool get _hasActiveFilters => _isMt
-      ? (_selectedOutletId != null ||
+      ? (_selectedAreaId != null ||
           _selectedZoneId != null ||
-          _selectedLocationId != null ||
           (_dateFromFilter != null && _dateToFilter != null))
       : (_dateFromFilter != null && _dateToFilter != null);
 
   void _clearAllFilters() {
     setState(() {
-      _selectedOutletId = null;
-      _selectedOutletName = null;
+      _selectedAreaId = null;
+      _selectedAreaName = null;
       _selectedZoneId = null;
       _selectedZoneName = null;
-      _selectedLocationId = null;
-      _selectedLocationName = null;
       _dateFromFilter = null;
       _dateToFilter = null;
     });
     _fetchDeliveries(reset: true);
   }
 
-  void _clearOutletFilter() {
+  void _clearAreaFilter() {
     setState(() {
-      _selectedOutletId = null;
-      _selectedOutletName = null;
+      _selectedAreaId = null;
+      _selectedAreaName = null;
     });
     _fetchDeliveries(reset: true);
   }
 
-  void _openOutletSearchModal() {
+  void _openAreaSearchModal() {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -207,10 +220,8 @@ class _DeliveriesListScreenState extends State<DeliveriesListScreen>
         String query = '';
         return StatefulBuilder(
           builder: (context, setModalState) {
-            final filteredOutlets = _outlets.where((out) {
-              return out.name.toLowerCase().contains(query.toLowerCase()) ||
-                  (out.ssCode != null &&
-                      out.ssCode!.toLowerCase().contains(query.toLowerCase()));
+            final filteredAreas = _areas.where((a) {
+              return a.name.toLowerCase().contains(query.toLowerCase());
             }).toList();
 
             return DraggableScrollableSheet(
@@ -222,15 +233,15 @@ class _DeliveriesListScreenState extends State<DeliveriesListScreen>
                 return Column(
                   children: [
                     Padding(
-                      padding: const EdgeInsets.all(16.0),
-                      child: Column(
+                       padding: const EdgeInsets.all(16.0),
+                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
                               const Text(
-                                'Select Outlet',
+                                'Select Area',
                                 style: TextStyle(
                                   fontSize: 18,
                                   fontWeight: FontWeight.bold,
@@ -250,7 +261,7 @@ class _DeliveriesListScreenState extends State<DeliveriesListScreen>
                               });
                             },
                             decoration: InputDecoration(
-                              hintText: 'Search outlet by name or code...',
+                              hintText: 'Search area by name...',
                               prefixIcon: const Icon(Icons.search),
                               filled: true,
                               fillColor: AppColors.background,
@@ -269,31 +280,28 @@ class _DeliveriesListScreenState extends State<DeliveriesListScreen>
                     Expanded(
                       child: ListView.builder(
                         controller: scrollController,
-                        itemCount: filteredOutlets.length + 1,
+                        itemCount: filteredAreas.length + 1,
                         itemBuilder: (context, index) {
                           if (index == 0) {
-                            final isSelected = _selectedOutletId == null;
+                            final isSelected = _selectedAreaId == null;
                             return ListTile(
-                              leading: const Icon(Icons.storefront_outlined),
-                              title: const Text('All Outlets'),
+                              leading: const Icon(Icons.location_city_outlined),
+                              title: const Text('All Areas'),
                               trailing: isSelected
                                   ? const Icon(Icons.check,
                                       color: AppColors.primary)
                                   : null,
                               onTap: () {
                                 Navigator.pop(ctx);
-                                _clearOutletFilter();
+                                _clearAreaFilter();
                               },
                             );
                           }
-                          final outlet = filteredOutlets[index - 1];
-                          final isSelected = _selectedOutletId == outlet.id;
+                          final area = filteredAreas[index - 1];
+                          final isSelected = _selectedAreaId == area.id;
                           return ListTile(
-                            leading: const Icon(Icons.store),
-                            title: Text(outlet.name),
-                            subtitle: outlet.ssCode != null
-                                ? Text(outlet.ssCode!)
-                                : null,
+                            leading: const Icon(Icons.location_city),
+                            title: Text(area.name),
                             trailing: isSelected
                                 ? const Icon(Icons.check,
                                     color: AppColors.primary)
@@ -301,8 +309,8 @@ class _DeliveriesListScreenState extends State<DeliveriesListScreen>
                             onTap: () {
                               Navigator.pop(ctx);
                               setState(() {
-                                _selectedOutletId = outlet.id;
-                                _selectedOutletName = outlet.name;
+                                _selectedAreaId = area.id;
+                                _selectedAreaName = area.name;
                               });
                               _fetchDeliveries(reset: true);
                             },
@@ -328,13 +336,6 @@ class _DeliveriesListScreenState extends State<DeliveriesListScreen>
     _fetchDeliveries(reset: true);
   }
 
-  void _clearLocationFilter() {
-    setState(() {
-      _selectedLocationId = null;
-      _selectedLocationName = null;
-    });
-    _fetchDeliveries(reset: true);
-  }
 
   void _clearDateFilter() {
     setState(() {
@@ -378,7 +379,6 @@ class _DeliveriesListScreenState extends State<DeliveriesListScreen>
 
   Future<void> _openFilterBottomSheet() async {
     int? tempZoneId = _selectedZoneId;
-    int? tempLocationId = _selectedLocationId;
     DateTime? tempDateFrom = _dateFromFilter;
     DateTime? tempDateTo = _dateToFilter;
 
@@ -419,7 +419,6 @@ class _DeliveriesListScreenState extends State<DeliveriesListScreen>
                         onPressed: () {
                           setSheetState(() {
                             tempZoneId = null;
-                            tempLocationId = null;
                             tempDateFrom = null;
                             tempDateTo = null;
                           });
@@ -480,57 +479,12 @@ class _DeliveriesListScreenState extends State<DeliveriesListScreen>
                   ),
                   const SizedBox(height: 16),
 
-                  // Location Filter
-                  const Text(
-                    'Stock Location',
-                    style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.textSecondary,
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFF8FAFC),
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: AppColors.borderSoft),
-                    ),
-                    child: DropdownButtonHideUnderline(
-                      child: DropdownButton<int?>(
-                        isExpanded: true,
-                        value: tempLocationId,
-                        hint: const Text('All Locations', style: TextStyle(fontSize: 14)),
-                        icon: const Icon(Icons.keyboard_arrow_down, color: AppColors.textSecondary),
-                        items: [
-                          const DropdownMenuItem<int?>(
-                            value: null,
-                            child: Text('All Locations', style: TextStyle(fontSize: 14, color: AppColors.textSecondary)),
-                          ),
-                          ..._locations.map((loc) => DropdownMenuItem<int?>(
-                                value: loc.id,
-                                child: Text(
-                                  loc.completeName ?? loc.name,
-                                  style: const TextStyle(fontSize: 14, color: AppColors.textPrimary),
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              )),
-                        ],
-                        onChanged: (val) {
-                          setSheetState(() {
-                            tempLocationId = val;
-                          });
-                        },
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-
                   // Date Range Filter
-                  const Text(
-                    'Date Range',
-                    style: TextStyle(
+                  Text(
+                    _activeTab == 'pending'
+                        ? 'Scheduled Date Range'
+                        : 'Effective Date Range',
+                    style: const TextStyle(
                       fontSize: 13,
                       fontWeight: FontWeight.w600,
                       color: AppColors.textSecondary,
@@ -583,7 +537,9 @@ class _DeliveriesListScreenState extends State<DeliveriesListScreen>
                             child: Text(
                               (tempDateFrom != null && tempDateTo != null)
                                   ? '${ssFormatDate(tempDateFrom!)} - ${ssFormatDate(tempDateTo!)}'
-                                  : 'Select date range',
+                                  : (_activeTab == 'pending'
+                                      ? 'Select scheduled date range'
+                                      : 'Select effective date range'),
                               style: TextStyle(
                                 fontSize: 14,
                                 color: (tempDateFrom != null)
@@ -628,11 +584,6 @@ class _DeliveriesListScreenState extends State<DeliveriesListScreen>
                               ? _zones.firstWhere((z) => z.id == tempZoneId, orElse: () => ResZone(id: tempZoneId!, name: 'Zone $tempZoneId')).name
                               : null;
 
-                          _selectedLocationId = tempLocationId;
-                          _selectedLocationName = tempLocationId != null
-                              ? _locations.firstWhere((l) => l.id == tempLocationId, orElse: () => StockLocation(id: tempLocationId!, name: 'Loc $tempLocationId')).name
-                              : null;
-
                           _dateFromFilter = tempDateFrom;
                           _dateToFilter = tempDateTo;
                         });
@@ -656,12 +607,6 @@ class _DeliveriesListScreenState extends State<DeliveriesListScreen>
 
   @override
   Widget build(BuildContext context) {
-    final int totalCount = _deliveries.length;
-    final int pendingCount = _deliveries
-        .where((d) => d.state == 'waiting' || d.state == 'confirmed' || d.state == 'assigned')
-        .length;
-    final int deliveredCount = _deliveries.where((d) => d.state == 'done').length;
-
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
       appBar: AppBar(
@@ -697,29 +642,25 @@ class _DeliveriesListScreenState extends State<DeliveriesListScreen>
           labelColor: AppColors.primary,
           unselectedLabelColor: AppColors.textSecondary,
           indicatorColor: AppColors.primary,
-          tabs: _tabLabels.map((label) {
-            return Tab(text: label);
-          }).toList(),
+          tabs: [
+            Tab(
+              text: _pendingCount > 0
+                  ? 'Pending (${_formatCount(_pendingCount)})'
+                  : 'Pending Deliveries',
+            ),
+            Tab(
+              text: _deliveredCount > 0
+                  ? 'Delivered (${_formatCount(_deliveredCount)})'
+                  : 'Own Deliveries',
+            ),
+          ],
         ),
       ),
       body: Column(
         children: [
-          // Stat cards header (Matching Leave Dashboard 1:1)
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-            child: Row(
-              children: [
-                _buildStatCard('Total', '$totalCount', Colors.indigo),
-                const SizedBox(width: 8),
-                _buildStatCard('Pending', '$pendingCount', Colors.amber[800]!),
-                const SizedBox(width: 8),
-                _buildStatCard('Delivered', '$deliveredCount', Colors.green),
-              ],
-            ),
-          ),
           // Filter Bar
           Padding(
-            padding: const EdgeInsets.fromLTRB(16.0, 4.0, 16.0, 8.0),
+            padding: const EdgeInsets.fromLTRB(16.0, 12.0, 16.0, 8.0),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -756,6 +697,7 @@ class _DeliveriesListScreenState extends State<DeliveriesListScreen>
                             contentPadding: const EdgeInsets.symmetric(vertical: 12),
                           ),
                           style: const TextStyle(fontSize: 14),
+                          onChanged: _onSearchChanged,
                           onSubmitted: (val) => _fetchDeliveries(reset: true, query: val.trim().isEmpty ? null : val.trim()),
                         ),
                       ),
@@ -784,8 +726,12 @@ class _DeliveriesListScreenState extends State<DeliveriesListScreen>
                                   : AppColors.textSecondary,
                             ),
                             tooltip: _isMt
-                                ? 'Filter by Zone, Location & Date'
-                                : 'Filter by Date Range',
+                                ? (_activeTab == 'pending'
+                                    ? 'Filter by Zone & Scheduled Date'
+                                    : 'Filter by Zone & Effective Date')
+                                : (_activeTab == 'pending'
+                                    ? 'Filter by Scheduled Date'
+                                    : 'Filter by Effective Date'),
                             onPressed: _isMt
                                 ? _openFilterBottomSheet
                                 : _selectDateRange,
@@ -816,7 +762,7 @@ class _DeliveriesListScreenState extends State<DeliveriesListScreen>
                     runSpacing: 6,
                     crossAxisAlignment: WrapCrossAlignment.center,
                     children: [
-                      if (_isMt && _selectedOutletName != null)
+                      if (_isMt && _selectedAreaName != null)
                         Chip(
                           backgroundColor: AppColors.primary.withValues(alpha: 0.08),
                           labelStyle: const TextStyle(
@@ -825,10 +771,10 @@ class _DeliveriesListScreenState extends State<DeliveriesListScreen>
                             fontWeight: FontWeight.w500,
                           ),
                           side: BorderSide(color: AppColors.primary.withValues(alpha: 0.2)),
-                          avatar: const Icon(Icons.storefront_outlined, size: 14, color: AppColors.primary),
-                          label: Text('Outlet: $_selectedOutletName'),
+                          avatar: const Icon(Icons.location_city_outlined, size: 14, color: AppColors.primary),
+                          label: Text('Area: $_selectedAreaName'),
                           deleteIcon: const Icon(Icons.close, size: 14, color: AppColors.primary),
-                          onDeleted: _clearOutletFilter,
+                          onDeleted: _clearAreaFilter,
                         ),
                       if (_isMt && _selectedZoneName != null)
                         Chip(
@@ -844,20 +790,6 @@ class _DeliveriesListScreenState extends State<DeliveriesListScreen>
                           deleteIcon: const Icon(Icons.close, size: 14, color: AppColors.primary),
                           onDeleted: _clearZoneFilter,
                         ),
-                      if (_isMt && _selectedLocationName != null)
-                        Chip(
-                          backgroundColor: AppColors.primary.withValues(alpha: 0.08),
-                          labelStyle: const TextStyle(
-                            color: AppColors.primary,
-                            fontSize: 12,
-                            fontWeight: FontWeight.w500,
-                          ),
-                          side: BorderSide(color: AppColors.primary.withValues(alpha: 0.2)),
-                          avatar: const Icon(Icons.warehouse_outlined, size: 14, color: AppColors.primary),
-                          label: Text('Loc: $_selectedLocationName'),
-                          deleteIcon: const Icon(Icons.close, size: 14, color: AppColors.primary),
-                          onDeleted: _clearLocationFilter,
-                        ),
                       if (_dateFromFilter != null && _dateToFilter != null)
                         Chip(
                           backgroundColor: AppColors.primary.withValues(alpha: 0.08),
@@ -868,7 +800,9 @@ class _DeliveriesListScreenState extends State<DeliveriesListScreen>
                           ),
                           side: BorderSide(color: AppColors.primary.withValues(alpha: 0.2)),
                           avatar: const Icon(Icons.calendar_month, size: 14, color: AppColors.primary),
-                          label: Text('${ssFormatDate(_dateFromFilter!)} - ${ssFormatDate(_dateToFilter!)}'),
+                          label: Text(
+                            '${_activeTab == 'pending' ? 'Schedule' : 'Effective'}: ${ssFormatDate(_dateFromFilter!)} - ${ssFormatDate(_dateToFilter!)}',
+                          ),
                           deleteIcon: const Icon(Icons.close, size: 14, color: AppColors.primary),
                           onDeleted: _clearDateFilter,
                         ),
@@ -892,14 +826,14 @@ class _DeliveriesListScreenState extends State<DeliveriesListScreen>
               ],
             ),
           ),
-          // Left-to-Right Scrollable Outlet Filter Bar (Matching Category Bar pattern)
-          if (_isMt && _outlets.isNotEmpty) ...[
+          // Left-to-Right Scrollable Area Filter Bar
+          if (_isMt) ...[
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
               child: Row(
                 children: [
                   InkWell(
-                    onTap: _openOutletSearchModal,
+                    onTap: _openAreaSearchModal,
                     borderRadius: BorderRadius.circular(18),
                     child: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
@@ -914,7 +848,7 @@ class _DeliveriesListScreenState extends State<DeliveriesListScreen>
                           Icon(Icons.search, size: 16, color: AppColors.primary),
                           SizedBox(width: 4),
                           Text(
-                            'Outlet',
+                            'Area',
                             style: TextStyle(
                               fontSize: 12,
                               fontWeight: FontWeight.bold,
@@ -932,14 +866,14 @@ class _DeliveriesListScreenState extends State<DeliveriesListScreen>
                       child: ListView.builder(
                         scrollDirection: Axis.horizontal,
                         padding: EdgeInsets.zero,
-                        itemCount: _outlets.length + 1,
+                        itemCount: _areas.length + 1,
                         itemBuilder: (context, index) {
                           if (index == 0) {
-                            final bool isSelected = _selectedOutletId == null;
+                            final bool isSelected = _selectedAreaId == null;
                             return Padding(
                               padding: const EdgeInsets.only(right: 6),
                               child: ChoiceChip(
-                                label: const Text('All Outlets'),
+                                label: const Text('All Areas'),
                                 selected: isSelected,
                                 selectedColor: AppColors.primary,
                                 labelStyle: TextStyle(
@@ -955,17 +889,17 @@ class _DeliveriesListScreenState extends State<DeliveriesListScreen>
                                   borderRadius: BorderRadius.circular(18),
                                 ),
                                 onSelected: (_) {
-                                  _clearOutletFilter();
+                                  _clearAreaFilter();
                                 },
                               ),
                             );
                           }
-                          final outlet = _outlets[index - 1];
-                          final bool isSelected = _selectedOutletId == outlet.id;
+                          final area = _areas[index - 1];
+                          final bool isSelected = _selectedAreaId == area.id;
                           return Padding(
                             padding: const EdgeInsets.only(right: 6),
                             child: ChoiceChip(
-                              label: Text(outlet.name),
+                              label: Text(area.name),
                               selected: isSelected,
                               selectedColor: AppColors.primary,
                               labelStyle: TextStyle(
@@ -982,8 +916,8 @@ class _DeliveriesListScreenState extends State<DeliveriesListScreen>
                               ),
                               onSelected: (_) {
                                 setState(() {
-                                  _selectedOutletId = outlet.id;
-                                  _selectedOutletName = outlet.name;
+                                  _selectedAreaId = area.id;
+                                  _selectedAreaName = area.name;
                                 });
                                 _fetchDeliveries(reset: true);
                               },
@@ -997,6 +931,8 @@ class _DeliveriesListScreenState extends State<DeliveriesListScreen>
               ),
             ),
           ],
+          // Summary Metrics Cards (Full unpaginated counts)
+          _buildSummaryCards(),
           // Deliveries List
           Expanded(
             child: RefreshIndicator(
@@ -1035,46 +971,6 @@ class _DeliveriesListScreenState extends State<DeliveriesListScreen>
     );
   }
 
-  Widget _buildStatCard(String title, String value, Color color) {
-    return Expanded(
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 8),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: color.withValues(alpha: 0.2), width: 1),
-          boxShadow: [
-            BoxShadow(
-              color: color.withValues(alpha: 0.04),
-              blurRadius: 10,
-              offset: const Offset(0, 4),
-            ),
-          ],
-        ),
-        child: Column(
-          children: [
-            Text(
-              title,
-              style: const TextStyle(
-                fontSize: 12,
-                color: AppColors.textSecondary,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            const SizedBox(height: 6),
-            Text(
-              value,
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-                color: color,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
 
   Widget _buildEmptyState() {
     return Column(
@@ -1135,9 +1031,7 @@ class _DeliveriesListScreenState extends State<DeliveriesListScreen>
           );
           return;
         }
-        final isMt = widget.businessType == 'mt' ||
-            widget.moduleType == 'modern_trade' ||
-            widget.moduleType == 'mt_primary';
+        final isMt = _isMt;
         Navigator.push(
           context,
           MaterialPageRoute(
@@ -1330,5 +1224,110 @@ class _DeliveriesListScreenState extends State<DeliveriesListScreen>
       'Dec',
     ];
     return '${months[dt.month - 1]} ${dt.day}, ${dt.year}';
+  }
+
+  String _formatCount(int count) {
+    return count.toString().replaceAllMapped(
+      RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
+      (Match m) => '${m[1]},',
+    );
+  }
+
+  Widget _buildSummaryCards() {
+    final bool isPending = _activeTab == 'pending';
+    final int count = isPending ? _pendingCount : _deliveredCount;
+    final String title = isPending ? 'Pending Deliveries' : 'Delivered Orders';
+    final String subtitle = isPending
+        ? (_selectedAreaName != null
+            ? 'Area: $_selectedAreaName'
+            : 'Matching active filters')
+        : 'Delivered by me';
+    final Color accentColor = isPending
+        ? const Color(0xFFD97706)
+        : const Color(0xFF16A34A);
+    final Color bgColor = isPending
+        ? const Color(0xFFFFFBEB)
+        : const Color(0xFFF0FDF4);
+    final IconData icon = isPending
+        ? Icons.hourglass_top_rounded
+        : Icons.check_circle_outline_rounded;
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16.0, 4.0, 16.0, 8.0),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        decoration: BoxDecoration(
+          color: bgColor,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: accentColor.withValues(alpha: 0.35), width: 1.2),
+          boxShadow: [
+            BoxShadow(
+              color: accentColor.withValues(alpha: 0.08),
+              blurRadius: 8,
+              offset: const Offset(0, 3),
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: accentColor.withValues(alpha: 0.15),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(
+                icon,
+                size: 24,
+                color: accentColor,
+              ),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    title,
+                    style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    subtitle,
+                    style: const TextStyle(
+                      fontSize: 11,
+                      color: AppColors.textSecondary,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ),
+            ),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: accentColor.withValues(alpha: 0.3)),
+              ),
+              child: Text(
+                _formatCount(count),
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  color: accentColor,
+                  letterSpacing: -0.5,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }

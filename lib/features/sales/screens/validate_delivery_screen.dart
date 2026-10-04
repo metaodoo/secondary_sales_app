@@ -12,6 +12,7 @@ import 'package:secondary_sales/core/access/access_resources.dart';
 import 'package:secondary_sales/core/widgets/ss_ui.dart';
 import 'package:secondary_sales/core/widgets/stock_excess_dialog.dart';
 import 'package:secondary_sales/core/widgets/expired_lots_confirmation_dialog.dart';
+import 'package:secondary_sales/core/widgets/searchable_lot_selector.dart';
 import 'package:secondary_sales/features/auth/auth_provider.dart';
 
 class ValidateDeliveryScreen extends StatefulWidget {
@@ -414,59 +415,6 @@ class _ValidateDeliveryScreenState extends State<ValidateDeliveryScreen> {
       return;
     }
 
-    bool hasLessQty = _inputs.any(
-      (input) => input.quantityDone < input.move.orderedQty,
-    );
-    bool createBackorder = true;
-
-    if (hasLessQty) {
-      if (!mounted) return;
-      final bool? result = await showDialog<bool>(
-        context: context,
-        builder: (context) => AlertDialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-          ),
-          title: const Text(
-            'Create Backorder?',
-            style: TextStyle(
-              fontWeight: FontWeight.bold,
-              color: Color(0xFF1E3A8A),
-            ),
-          ),
-          content: const Text(
-            'You have processed less products than the initial demand. '
-            'Do you want to create a backorder for the remaining products?',
-            style: TextStyle(fontSize: 15),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(null),
-              child: const Text(
-                'Cancel',
-                style: TextStyle(color: AppColors.textSecondary),
-              ),
-            ),
-            FilledButton(
-              onPressed: () => Navigator.of(context).pop(true),
-              style: FilledButton.styleFrom(
-                backgroundColor: const Color(0xFF16C083),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8),
-                ),
-              ),
-              child: const Text('Create Backorder'),
-            ),
-          ],
-        ),
-      );
-
-      if (result == null) {
-        return;
-      }
-      createBackorder = result;
-    }
-
     if (!mounted) return;
     SaleOrderDetail? order;
     try {
@@ -475,7 +423,7 @@ class _ValidateDeliveryScreenState extends State<ValidateDeliveryScreen> {
         pickingId: prepare.picking.id,
         locationId: _locationId,
         lines: _inputs,
-        createBackorder: createBackorder,
+        createBackorder: false,
         saleType: widget.saleType,
         skipExpired: false,
       );
@@ -492,7 +440,7 @@ class _ValidateDeliveryScreenState extends State<ValidateDeliveryScreen> {
             pickingId: prepare.picking.id,
             locationId: _locationId,
             lines: _inputs,
-            createBackorder: createBackorder,
+            createBackorder: false,
             saleType: widget.saleType,
             skipExpired: true,
           );
@@ -1392,78 +1340,25 @@ class _LotAllocationRow extends StatelessWidget {
           Row(
             children: [
               Expanded(
-                child: DropdownButtonFormField<int>(
-                  value: (lotInput.lot != null &&
+                child: GenericSearchableLotSelector<AvailableLot>(
+                  selectedItem: (lotInput.lot != null &&
                           lots.any((l) => l.lotId == lotInput.lot!.lotId && l.lotId > 0))
-                      ? lotInput.lot!.lotId
+                      ? lotInput.lot
                       : null,
-                  decoration: ssInputDecoration(
-                    '-- Select Lot --',
-                    Icons.inventory_2_outlined,
-                  ),
-                  items: lots
-                      .where((lot) => lot.lotId > 0)
-                      .map(
-                        (lot) => DropdownMenuItem<int>(
-                          value: lot.lotId,
-                          child: Row(
-                            children: [
-                              Expanded(
-                                child: Text(
-                                  lot.availableQty > 0
-                                      ? '${lot.lotName} (${formatQty(lot.availableQty)} avail)'
-                                      : lot.lotName,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ),
-                              if (lot.isExpired)
-                                Container(
-                                  margin: const EdgeInsets.only(left: 6),
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 6,
-                                    vertical: 1,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: Colors.red.shade50,
-                                    borderRadius: BorderRadius.circular(4),
-                                    border: Border.all(
-                                      color: Colors.red.shade200,
-                                    ),
-                                  ),
-                                  child: Text(
-                                    'Expired',
-                                    style: TextStyle(
-                                      fontSize: 10,
-                                      fontWeight: FontWeight.bold,
-                                      color: Colors.red.shade700,
-                                    ),
-                                  ),
-                                )
-                              else if (lot.expirationDate != null &&
-                                  lot.expirationDate!.isNotEmpty)
-                                Padding(
-                                  padding: const EdgeInsets.only(left: 6),
-                                  child: Text(
-                                    'Exp: ${lot.expirationDate}',
-                                    style: const TextStyle(
-                                      fontSize: 11,
-                                      color: AppColors.textSecondary,
-                                    ),
-                                  ),
-                                ),
-                            ],
-                          ),
-                        ),
-                      )
-                      .toList(),
-                  onChanged: (lotId) {
-                    AvailableLot? selected;
-                    for (final lot in lots) {
-                      if (lot.lotId == lotId) {
-                        selected = lot;
-                        break;
-                      }
-                    }
+                  items: lots.where((lot) => lot.lotId > 0).toList(),
+                  getLabel: (lot) => lot.availableQty > 0
+                      ? '${lot.lotName} (${formatQty(lot.availableQty)} avail)'
+                      : lot.lotName,
+                  getSubtitle: (lot) => lot.expirationDate != null && lot.expirationDate!.isNotEmpty
+                      ? 'Exp: ${lot.expirationDate}'
+                      : null,
+                  getBadgeText: (lot) => lot.isExpired ? 'Expired' : null,
+                  getBadgeColor: (lot) => lot.isExpired ? Colors.red.shade700 : null,
+                  modalTitle: 'Select Lot Number',
+                  hintText: '-- Select Lot --',
+                  allowClear: true,
+                  clearLabel: '-- Clear Lot Selection --',
+                  onChanged: (selected) {
                     onChanged(selected);
                   },
                 ),

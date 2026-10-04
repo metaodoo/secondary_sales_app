@@ -574,7 +574,7 @@ class _SecondaryOrdersListScreenState extends State<SecondaryOrdersListScreen> {
                         );
                         _fetchOrders(reset: true);
                       },
-                      onEditTap: widget.saleType == 'secondary'
+                      onEditTap: (widget.businessType == 'mt' || widget.saleType == 'secondary')
                           ? () async {
                               await Navigator.of(context).push(
                                 MaterialPageRoute(

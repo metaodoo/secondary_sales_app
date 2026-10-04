@@ -10,6 +10,7 @@ import 'package:secondary_sales/features/transfers/screens/transfer_product_sele
 import 'package:secondary_sales/features/transfers/screens/virtual_transfer_detail_screen.dart';
 import 'package:secondary_sales/core/widgets/ss_ui.dart';
 import 'package:secondary_sales/core/widgets/stock_excess_dialog.dart';
+import 'package:secondary_sales/core/widgets/searchable_lot_selector.dart';
 
 class CreateVirtualTransferScreen extends StatefulWidget {
   const CreateVirtualTransferScreen({super.key});
@@ -588,32 +589,10 @@ class _TransferLotAllocationRow extends StatelessWidget {
           Row(
             children: [
               Expanded(
-                child: DropdownButtonFormField<int>(
-                  initialValue: lotInput.lot?.lotId,
-                  isExpanded: true,
-                  decoration: ssInputDecoration(
-                    '-- Select Lot --',
-                    Icons.inventory_2_outlined,
-                  ),
-                  items: lots
-                      .map(
-                        (lot) => DropdownMenuItem<int>(
-                          value: lot.lotId,
-                          child: Text(
-                            lot.lotName,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                      )
-                      .toList(),
-                  onChanged: (lotId) {
-                    TransferLot? selected;
-                    for (final lot in lots) {
-                      if (lot.lotId == lotId) {
-                        selected = lot;
-                        break;
-                      }
-                    }
+                child: SearchableLotSelector(
+                  selectedLot: lotInput.lot,
+                  lots: lots,
+                  onChanged: (selected) {
                     onChanged(selected);
                   },
                 ),

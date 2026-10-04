@@ -176,32 +176,62 @@ class MtReturnLineHistorySheet extends StatelessWidget {
                           children: [
                             Row(
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              crossAxisAlignment: CrossAxisAlignment.center,
                               children: [
-                                Row(
-                                  children: [
-                                    CircleAvatar(
-                                      radius: 14,
-                                      backgroundColor: AppColors.primaryStrong.withOpacity(0.15),
-                                      child: Text(
-                                        item.userName.isNotEmpty ? item.userName[0].toUpperCase() : 'U',
-                                        style: const TextStyle(
-                                          fontSize: 12,
-                                          fontWeight: FontWeight.w700,
-                                          color: AppColors.primaryStrong,
+                                Expanded(
+                                  child: Row(
+                                    children: [
+                                      CircleAvatar(
+                                        radius: 14,
+                                        backgroundColor: AppColors.primaryStrong.withOpacity(0.15),
+                                        child: Text(
+                                          item.userName.isNotEmpty ? item.userName[0].toUpperCase() : 'U',
+                                          style: const TextStyle(
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.w700,
+                                            color: AppColors.primaryStrong,
+                                          ),
                                         ),
                                       ),
-                                    ),
-                                    const SizedBox(width: 8),
-                                    Text(
-                                      item.userName.isNotEmpty ? item.userName : 'Unknown User',
-                                      style: const TextStyle(
-                                        fontSize: 13,
-                                        fontWeight: FontWeight.w600,
-                                        color: AppColors.textPrimary,
+                                      const SizedBox(width: 8),
+                                      Expanded(
+                                        child: Wrap(
+                                          crossAxisAlignment: WrapCrossAlignment.center,
+                                          spacing: 6,
+                                          runSpacing: 2,
+                                          children: [
+                                            Text(
+                                              item.userName.isNotEmpty ? item.userName : 'Unknown User',
+                                              style: const TextStyle(
+                                                fontSize: 13,
+                                                fontWeight: FontWeight.w600,
+                                                color: AppColors.textPrimary,
+                                              ),
+                                            ),
+                                            if (item.mobileUserGroupName != null && item.mobileUserGroupName!.isNotEmpty)
+                                              Container(
+                                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                                decoration: BoxDecoration(
+                                                  color: AppColors.primaryStrong.withOpacity(0.08),
+                                                  borderRadius: BorderRadius.circular(4),
+                                                  border: Border.all(color: AppColors.primaryStrong.withOpacity(0.2)),
+                                                ),
+                                                child: Text(
+                                                  item.mobileUserGroupName!,
+                                                  style: const TextStyle(
+                                                    fontSize: 10,
+                                                    fontWeight: FontWeight.w600,
+                                                    color: AppColors.primaryStrong,
+                                                  ),
+                                                ),
+                                              ),
+                                          ],
+                                        ),
                                       ),
-                                    ),
-                                  ],
+                                    ],
+                                  ),
                                 ),
+                                const SizedBox(width: 8),
                                 if (item.createDate != null)
                                   Text(
                                     item.createDate!.contains('T')

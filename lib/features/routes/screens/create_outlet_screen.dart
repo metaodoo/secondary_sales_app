@@ -709,65 +709,146 @@ class _CreateOutletScreenState extends State<CreateOutletScreen> {
                         );
                       },
                     ),
-                    const SizedBox(height: 16),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
+                    const SizedBox(height: 20),
+                    // Card style for Route & Distributor (DB) assignment
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF8FAFC),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: const Color(0xFFE2E8F0)),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
                             children: [
-                              const Text(
-                                'Route',
-                                style: TextStyle(
-                                  fontWeight: FontWeight.w500,
-                                  fontSize: 14,
+                              Container(
+                                padding: const EdgeInsets.all(6),
+                                decoration: BoxDecoration(
+                                  color: AppColors.primarySoft,
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: const Icon(
+                                  Icons.alt_route_rounded,
+                                  size: 16,
+                                  color: AppColors.primaryStrong,
                                 ),
                               ),
-                              const SizedBox(height: 8),
-                              TextFormField(
-                                initialValue: widget.routeName,
-                                readOnly: true,
-                                decoration: InputDecoration(
-                                  filled: true,
-                                  fillColor: AppColors.borderMuted,
-                                  border: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(8),
-                                    borderSide: BorderSide.none,
+                              const SizedBox(width: 8),
+                              const Text(
+                                'ASSIGNED ROUTE & DISTRIBUTOR',
+                                style: TextStyle(
+                                  color: AppColors.primaryStrong,
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w700,
+                                  letterSpacing: 0.8,
+                                ),
+                              ),
+                              const Spacer(),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                  vertical: 3,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFECFDF5),
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(
+                                    color: const Color(0xFFA7F3D0),
+                                    width: 0.8,
+                                  ),
+                                ),
+                                child: const Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(
+                                      Icons.check_circle,
+                                      size: 11,
+                                      color: Color(0xFF059669),
+                                    ),
+                                    SizedBox(width: 4),
+                                    Text(
+                                      'Auto-Assigned',
+                                      style: TextStyle(
+                                        color: Color(0xFF059669),
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 14),
+                          const Divider(height: 1, color: Color(0xFFE2E8F0)),
+                          const SizedBox(height: 12),
+                          // Route Row
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const SizedBox(
+                                width: 95,
+                                child: Text(
+                                  'Route Name',
+                                  style: TextStyle(
+                                    color: AppColors.textSecondary,
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  widget.routeName.isNotEmpty
+                                      ? widget.routeName
+                                      : 'Unassigned Route',
+                                  style: const TextStyle(
+                                    color: Color(0xFF1E293B),
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.bold,
+                                    height: 1.3,
                                   ),
                                 ),
                               ),
                             ],
                           ),
-                        ),
-                        const SizedBox(width: 16),
-                        Expanded(
-                          child: Column(
+                          const SizedBox(height: 10),
+                          // DB / Distributor Row
+                          Row(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              const Text(
-                                'DB Name',
-                                style: TextStyle(
-                                  fontWeight: FontWeight.w500,
-                                  fontSize: 14,
+                              const SizedBox(
+                                width: 95,
+                                child: Text(
+                                  'Distributor (DB)',
+                                  style: TextStyle(
+                                    color: AppColors.textSecondary,
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w600,
+                                  ),
                                 ),
                               ),
-                              const SizedBox(height: 8),
-                              TextFormField(
-                                initialValue: widget.distributorName,
-                                readOnly: true,
-                                decoration: InputDecoration(
-                                  filled: true,
-                                  fillColor: AppColors.borderMuted,
-                                  border: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(8),
-                                    borderSide: BorderSide.none,
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  widget.distributorName.isNotEmpty
+                                      ? widget.distributorName
+                                      : 'Unassigned Distributor',
+                                  style: const TextStyle(
+                                    color: Color(0xFF1E293B),
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.bold,
+                                    height: 1.3,
                                   ),
                                 ),
                               ),
                             ],
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
                     const SizedBox(height: 24),
                     const Divider(color: AppColors.borderSoft),

@@ -3,6 +3,7 @@ import 'package:secondary_sales/core/theme/app_theme.dart';
 import 'package:provider/provider.dart';
 
 import 'package:secondary_sales/features/auth/auth_provider.dart';
+import 'package:secondary_sales/features/auth/screens/connection_setup_screen.dart';
 import 'package:secondary_sales/core/access/access_resources.dart';
 import 'package:secondary_sales/features/employees/screens/sales_officer_list_screen.dart';
 import 'package:secondary_sales/features/hr/screens/attendance_screen.dart';
@@ -227,6 +228,20 @@ class SettingsTab extends StatelessWidget {
                           ),
                         );
                       }
+                    },
+                  ),
+                  const Divider(height: 1, color: AppColors.borderMuted),
+                  _buildSettingItem(
+                    icon: Icons.cloud_outlined,
+                    title: 'Server Connection',
+                    trailing: auth.baseUrl.isNotEmpty ? auth.baseUrl : 'Not set',
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const ConnectionSetupScreen(),
+                        ),
+                      );
                     },
                   ),
                   const Divider(height: 1, color: AppColors.borderMuted),

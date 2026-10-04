@@ -9,6 +9,8 @@ import 'package:secondary_sales/features/sales/primary_sale_provider.dart';
 import 'package:secondary_sales/features/sales/screens/product_selection_screen.dart';
 import 'package:secondary_sales/core/widgets/ss_ui.dart';
 import 'package:secondary_sales/core/widgets/order_form_widgets.dart';
+import 'package:secondary_sales/features/modern_trade/modern_trade_provider.dart';
+import 'package:secondary_sales/features/routes/route_provider.dart';
 
 class OrderLineModel {
   final int productId;
@@ -80,6 +82,7 @@ class _OrderCreationScreenState extends State<OrderCreationScreen> {
   List<OrderLineModel> lines = [];
   bool _isSubmitting = false;
   bool _isInitLoaded = false;
+  String? _existingOrderState;
 
   @override
   void initState() {
@@ -111,10 +114,15 @@ class _OrderCreationScreenState extends State<OrderCreationScreen> {
 
   Future<void> _loadOrderDetails() async {
     final provider = context.read<PrimarySaleProvider>();
-    await provider.fetchOrderDetail(widget.editOrderId!, saleType: 'secondary');
+    await provider.fetchOrderDetail(
+      widget.editOrderId!,
+      saleType: widget.saleType,
+      businessType: widget.businessType,
+    );
     final detail = provider.selectedOrder;
     if (detail != null && mounted) {
       setState(() {
+        _existingOrderState = detail.state.toLowerCase();
         lines.clear();
         for (final line in detail.lines) {
           if (line.product != null) {
@@ -132,6 +140,7 @@ class _OrderCreationScreenState extends State<OrderCreationScreen> {
                 orderQty: line.orderedQty.toInt(),
                 damagedExpiredQty: line.damagedExpiredQty.toInt(),
                 damageQualityQty: line.damageQualityQty.toInt(),
+                adjustWithBill: line.adjustWithBill,
               ),
             );
           }
@@ -209,7 +218,7 @@ class _OrderCreationScreenState extends State<OrderCreationScreen> {
     });
   }
 
-  Future<void> _submitOrder() async {
+  Future<void> _submitOrder({bool confirm = false}) async {
     if (lines.isEmpty) return;
 
     setState(() {
@@ -235,32 +244,69 @@ class _OrderCreationScreenState extends State<OrderCreationScreen> {
             )
             .toList();
 
-        final result = await apiService.createMtSaleOrder(
-          outletId: widget.outletId,
-          orderLines: items,
-          visitId: widget.visitId,
-          mediumId: widget.mediumId,
-          confirm: true,
-        );
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('MT Order submitted successfully!')),
+        if (widget.editOrderId != null) {
+          await apiService.updateMtSaleOrder(
+            orderId: widget.editOrderId!,
+            outletId: widget.outletId,
+            orderLines: items,
+            visitId: widget.visitId,
+            mediumId: widget.mediumId,
+            confirm: confirm,
           );
-          final orderId = result['id'] as int?;
-          if (orderId != null) {
-            Navigator.pushReplacement(
-              context,
-              MaterialPageRoute(
-                builder: (_) => OrderDetailScreen(
-                  orderId: orderId,
-                  fallbackName: result['name']?.toString() ?? 'MT Order',
-                  saleType: 'primary',
-                  businessType: 'mt',
+          if (mounted) {
+            try {
+              context.read<ModernTradeProvider>().markOrderCreated();
+            } catch (_) {}
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(
+                  confirm
+                      ? 'MT Order confirmed successfully!'
+                      : 'MT Order updated successfully!',
                 ),
+                backgroundColor: const Color(0xFF10B981),
               ),
             );
-          } else {
             Navigator.pop(context);
+          }
+        } else {
+          final result = await apiService.createMtSaleOrder(
+            outletId: widget.outletId,
+            orderLines: items,
+            visitId: widget.visitId,
+            mediumId: widget.mediumId,
+            confirm: confirm,
+          );
+          if (mounted) {
+            try {
+              context.read<ModernTradeProvider>().markOrderCreated();
+            } catch (_) {}
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(
+                  confirm
+                      ? 'MT Order confirmed successfully!'
+                      : 'MT Order saved as draft!',
+                ),
+                backgroundColor: const Color(0xFF10B981),
+              ),
+            );
+            final orderId = result['id'] as int?;
+            if (orderId != null) {
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => OrderDetailScreen(
+                    orderId: orderId,
+                    fallbackName: result['name']?.toString() ?? 'MT Order',
+                    saleType: 'primary',
+                    businessType: 'mt',
+                  ),
+                ),
+              );
+            } else {
+              Navigator.pop(context);
+            }
           }
         }
       } else {
@@ -286,11 +332,17 @@ class _OrderCreationScreenState extends State<OrderCreationScreen> {
             mediumId: widget.mediumId,
             routeId: widget.routeId,
             visitId: widget.visitId,
-            confirm: true,
+            confirm: confirm,
           );
           if (mounted) {
+            try {
+              context.read<RouteProvider>().markOrderCreated();
+            } catch (_) {}
             ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Order updated successfully!')),
+              const SnackBar(
+                content: Text('Order updated successfully!'),
+                backgroundColor: Color(0xFF10B981),
+              ),
             );
             Navigator.pop(context);
           }
@@ -301,11 +353,21 @@ class _OrderCreationScreenState extends State<OrderCreationScreen> {
             mediumId: widget.mediumId,
             routeId: widget.routeId,
             visitId: widget.visitId,
-            confirm: true,
+            confirm: confirm,
           );
           if (mounted) {
+            try {
+              context.read<RouteProvider>().markOrderCreated();
+            } catch (_) {}
             ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Order submitted successfully!')),
+              SnackBar(
+                content: Text(
+                  confirm
+                      ? 'Order submitted successfully!'
+                      : 'Order saved as draft!',
+                ),
+                backgroundColor: const Color(0xFF10B981),
+              ),
             );
             final orderId = result['id'] as int?;
             if (orderId != null) {
@@ -564,9 +626,9 @@ class _OrderCreationScreenState extends State<OrderCreationScreen> {
                     ),
                   ),
 
-                  // Bottom Confirm Button
+                  // Bottom Action Buttons
                   Container(
-                    padding: const EdgeInsets.all(20),
+                    padding: const EdgeInsets.all(16),
                     decoration: const BoxDecoration(
                       color: Colors.white,
                       boxShadow: [
@@ -577,36 +639,112 @@ class _OrderCreationScreenState extends State<OrderCreationScreen> {
                         ),
                       ],
                     ),
-                    child: ElevatedButton(
-                      onPressed: (lines.isNotEmpty && !_isSubmitting)
-                          ? _submitOrder
-                          : null,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.primaryStrong,
-                        disabledBackgroundColor: AppColors.borderSoft,
-                        minimumSize: const Size(double.infinity, 54),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                      ),
-                      child: _isSubmitting
-                          ? const SizedBox(
-                              height: 24,
-                              width: 24,
-                              child: CircularProgressIndicator(
-                                color: Colors.white,
-                                strokeWidth: 2,
-                              ),
-                            )
-                          : Text(
-                              widget.editOrderId != null ? 'Save' : 'Confirm',
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 16,
-                                fontWeight: FontWeight.bold,
+                    child: (_existingOrderState == 'sale')
+                        ? ElevatedButton(
+                            onPressed: (lines.isNotEmpty && !_isSubmitting)
+                                ? () => _submitOrder(confirm: true)
+                                : null,
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppColors.primaryStrong,
+                              disabledBackgroundColor: AppColors.borderSoft,
+                              minimumSize: const Size(double.infinity, 50),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(10),
                               ),
                             ),
-                    ),
+                            child: _isSubmitting
+                                ? const SizedBox(
+                                    height: 22,
+                                    width: 22,
+                                    child: CircularProgressIndicator(
+                                      color: Colors.white,
+                                      strokeWidth: 2,
+                                    ),
+                                  )
+                                : const Text(
+                                    'Save Changes',
+                                    style: TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                          )
+                        : Row(
+                            children: [
+                              Expanded(
+                                child: SizedBox(
+                                  height: 50,
+                                  child: OutlinedButton(
+                                    onPressed: (lines.isNotEmpty && !_isSubmitting)
+                                        ? () => _submitOrder(confirm: false)
+                                        : null,
+                                    style: OutlinedButton.styleFrom(
+                                      side: const BorderSide(
+                                        color: AppColors.primary,
+                                        width: 1.5,
+                                      ),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(10),
+                                      ),
+                                    ),
+                                    child: _isSubmitting
+                                        ? const SizedBox(
+                                            height: 20,
+                                            width: 20,
+                                            child: CircularProgressIndicator(
+                                              strokeWidth: 2,
+                                            ),
+                                          )
+                                        : const Text(
+                                            'Save as Draft',
+                                            style: TextStyle(
+                                              color: AppColors.primary,
+                                              fontSize: 14,
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                          ),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: SizedBox(
+                                  height: 50,
+                                  child: ElevatedButton(
+                                    onPressed: (lines.isNotEmpty && !_isSubmitting)
+                                        ? () => _submitOrder(confirm: true)
+                                        : null,
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: AppColors.primaryStrong,
+                                      disabledBackgroundColor: AppColors.borderSoft,
+                                      elevation: 0,
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(10),
+                                      ),
+                                    ),
+                                    child: _isSubmitting
+                                        ? const SizedBox(
+                                            height: 22,
+                                            width: 22,
+                                            child: CircularProgressIndicator(
+                                              color: Colors.white,
+                                              strokeWidth: 2,
+                                            ),
+                                          )
+                                        : const Text(
+                                            'Confirm Order',
+                                            style: TextStyle(
+                                              color: Colors.white,
+                                              fontSize: 14,
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                          ),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
                   ),
                 ],
               ),

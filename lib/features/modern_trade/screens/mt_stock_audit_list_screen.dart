@@ -207,7 +207,7 @@ class _MtStockAuditListScreenState extends State<MtStockAuditListScreen> {
               title: 'Stock Audits',
               subtitle: widget.outletName != null
                   ? widget.outletName!
-                  : 'Modern Trade Secondary Sales',
+                  : 'Audit Sales',
               leading: IconButton(
                 icon: const Icon(Icons.arrow_back, color: Colors.white),
                 onPressed: () => Navigator.pop(context),

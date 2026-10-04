@@ -32,6 +32,7 @@ subprojects {
             if (ext.namespace == null) {
                 ext.namespace = project.group.toString()
             }
+            ext.ndkVersion = "27.0.12077973"
         }
     }
     if (state.executed) forceCompileSdk() else afterEvaluate { forceCompileSdk() }

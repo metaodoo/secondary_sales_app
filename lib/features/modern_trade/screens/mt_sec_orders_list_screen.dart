@@ -193,7 +193,7 @@ class _MtSecOrdersListScreenState extends State<MtSecOrdersListScreen> {
         title: Text(
           widget.outletName != null
               ? '${widget.outletName} - Secondary Orders'
-              : 'MT Secondary Sales Orders',
+              : 'Audit Sales Orders',
           style: const TextStyle(
             color: AppColors.primaryStrong,
             fontWeight: FontWeight.bold,

@@ -77,6 +77,7 @@ extension DeliveriesApi on ApiService {
     int? outletId,
     int? zoneId,
     int? locationId,
+    int? areaId,
     DateTime? dateFrom,
     DateTime? dateTo,
   }) async {
@@ -97,6 +98,7 @@ extension DeliveriesApi on ApiService {
     if (outletId != null) params['outlet_id'] = outletId;
     if (zoneId != null) params['zone_id'] = zoneId;
     if (locationId != null) params['location_id'] = locationId;
+    if (areaId != null) params['area_id'] = areaId;
     if (dateFrom != null) {
       params['date_from'] =
           '${dateFrom.year.toString().padLeft(4, '0')}-${dateFrom.month.toString().padLeft(2, '0')}-${dateFrom.day.toString().padLeft(2, '0')}';
@@ -114,11 +116,13 @@ extension DeliveriesApi on ApiService {
       List<ResZone> zones = [];
       List<StockLocation> locations = [];
       List<DeliveryOutletFilter> outlets = [];
+      List<DeliveryAreaFilter> areas = [];
       if (result['filter_options'] is Map) {
         final fMap = result['filter_options'] as Map;
         final rawZones = fMap['zones'] as List? ?? [];
         final rawLocs = fMap['locations'] as List? ?? [];
         final rawOutlets = fMap['outlets'] as List? ?? [];
+        final rawAreas = fMap['areas'] as List? ?? [];
         zones = rawZones
             .map((z) => ResZone.fromMap(Map<String, dynamic>.from(z as Map)))
             .toList();
@@ -130,6 +134,10 @@ extension DeliveriesApi on ApiService {
             .map((o) =>
                 DeliveryOutletFilter.fromMap(Map<String, dynamic>.from(o as Map)))
             .toList();
+        areas = rawAreas
+            .map((a) =>
+                DeliveryAreaFilter.fromMap(Map<String, dynamic>.from(a as Map)))
+            .toList();
       }
 
       final pagination =
@@ -137,12 +145,25 @@ extension DeliveriesApi on ApiService {
       final total =
           pagination != null ? asInt(pagination['total']) : items.length;
 
+      int pendingCount = 0;
+      int deliveredCount = 0;
+      if (result['summary_counts'] is Map) {
+        final summary = result['summary_counts'] as Map;
+        pendingCount = asInt(summary['pending_count']);
+        deliveredCount = asInt(summary['delivered_count']);
+      } else {
+        pendingCount = total;
+      }
+
       return DeliveryListResult(
         items: items,
         zones: zones,
         locations: locations,
         outlets: outlets,
+        areas: areas,
         total: total,
+        pendingCount: pendingCount,
+        deliveredCount: deliveredCount,
       );
     }
     throw Exception(result['message'] ?? 'Failed to fetch deliveries');

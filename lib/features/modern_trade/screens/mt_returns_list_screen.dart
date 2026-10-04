@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:secondary_sales/core/access/access_resources.dart';
@@ -29,6 +30,7 @@ class MtReturnsListScreen extends StatefulWidget {
 class _MtReturnsListScreenState extends State<MtReturnsListScreen> {
   final TextEditingController _searchController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
+  Timer? _searchDebounce;
 
   final List<({String key, String label})> _stages = const [
     (key: 'all', label: 'All'),
@@ -55,9 +57,20 @@ class _MtReturnsListScreenState extends State<MtReturnsListScreen> {
 
   @override
   void dispose() {
+    _searchDebounce?.cancel();
     _searchController.dispose();
     _scrollController.dispose();
     super.dispose();
+  }
+
+  void _onSearchChanged(String val) {
+    setState(() {});
+    _searchDebounce?.cancel();
+    _searchDebounce = Timer(const Duration(milliseconds: 350), () {
+      if (mounted) {
+        context.read<MtReturnProvider>().setSearchQuery(val.trim(), returnBucket: widget.returnBucket);
+      }
+    });
   }
 
   void _onScroll() {
@@ -143,11 +156,8 @@ class _MtReturnsListScreenState extends State<MtReturnsListScreen> {
                       borderSide: BorderSide.none,
                     ),
                   ),
-                  onChanged: (val) {
-                    setState(() {});
-                    provider.setSearchQuery(val, returnBucket: widget.returnBucket);
-                  },
-                  onSubmitted: (val) => provider.setSearchQuery(val, returnBucket: widget.returnBucket),
+                  onChanged: _onSearchChanged,
+                  onSubmitted: (val) => provider.setSearchQuery(val.trim(), returnBucket: widget.returnBucket),
                 ),
                 const SizedBox(height: 10),
                 // Status Filter Chips
@@ -251,7 +261,7 @@ class _MtReturnsListScreenState extends State<MtReturnsListScreen> {
           border: Border.all(color: Colors.grey.shade200),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.02),
+              color: Colors.black.withValues(alpha: 0.02),
               offset: const Offset(0, 2),
               blurRadius: 4,
             ),
@@ -351,7 +361,7 @@ class _MtReturnsListScreenState extends State<MtReturnsListScreen> {
       decoration: BoxDecoration(
         color: bg,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: fg.withOpacity(0.35)),
+        border: Border.all(color: fg.withValues(alpha: 0.35)),
       ),
       child: Text(
         label.toUpperCase(),

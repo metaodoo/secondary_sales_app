@@ -72,7 +72,7 @@ class DashboardTab extends StatelessWidget {
               : (moduleType == 'mt_primary' || moduleType == 'modern_trade'
                   ? 'MT - Primary Sales'
                   : (moduleType == 'mt_secondary' || moduleType == 'modern_trade_secondary'
-                      ? 'MT - Secondary Sales'
+                      ? 'Audit Sales'
                       : 'Secondary Sales')),
           style: const TextStyle(
             color: AppColors.primaryStrong,

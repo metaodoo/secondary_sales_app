@@ -3,6 +3,7 @@ import 'package:secondary_sales/core/theme/app_theme.dart';
 import 'package:provider/provider.dart';
 
 import 'package:secondary_sales/features/auth/auth_provider.dart';
+import 'package:secondary_sales/features/auth/screens/connection_setup_screen.dart';
 import 'package:secondary_sales/core/widgets/ss_ui.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -324,6 +325,85 @@ class _LoginScreenState extends State<LoginScreen> {
                           ),
                         ],
                       ),
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 12,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: AppColors.borderSoft),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(
+                          Icons.cloud_outlined,
+                          size: 20,
+                          color: AppColors.textSecondary,
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                auth.baseUrl.isNotEmpty
+                                    ? auth.baseUrl
+                                    : 'No Server Configured',
+                                style: const TextStyle(
+                                  color: Color(0xFF1E293B),
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              if (auth.dbName.isNotEmpty)
+                                Text(
+                                  'Database: ${auth.dbName}',
+                                  style: const TextStyle(
+                                    color: AppColors.textSecondary,
+                                    fontSize: 11,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        TextButton(
+                          onPressed: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => const ConnectionSetupScreen(),
+                              ),
+                            );
+                          },
+                          style: TextButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 6,
+                            ),
+                            minimumSize: Size.zero,
+                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                          ),
+                          child: const Text(
+                            'Change Server',
+                            style: TextStyle(
+                              color: AppColors.primary,
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ],

@@ -9,6 +9,7 @@ import 'package:provider/provider.dart';
 import 'package:secondary_sales/data/models/sales/sale_order_detail.dart';
 import 'package:secondary_sales/features/sales/primary_sale_provider.dart';
 import 'package:secondary_sales/features/sales/screens/validate_delivery_screen.dart';
+import 'package:secondary_sales/features/sales/screens/order_creation_screen.dart';
 import 'package:secondary_sales/core/widgets/ss_ui.dart';
 import 'package:secondary_sales/core/widgets/dashboard_cards.dart';
 
@@ -180,6 +181,26 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     }
   }
 
+  Future<void> _openEditOrder(SaleOrderDetail order) async {
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => OrderCreationScreen(
+          outletId: order.distributor?.id ?? 0,
+          customerName: order.distributor?.name ?? 'Outlet',
+          editOrderId: order.id,
+          businessType: widget.businessType,
+          saleType: widget.saleType,
+        ),
+      ),
+    );
+    if (!mounted) return;
+    context.read<PrimarySaleProvider>().fetchOrderDetail(
+      widget.orderId,
+      saleType: widget.saleType,
+      businessType: widget.businessType,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final provider = context.watch<PrimarySaleProvider>();
@@ -234,6 +255,41 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                             _openDeliveryValidation(order, picking),
                       ),
                       const SizedBox(height: 16),
+                      if (((order.state.toLowerCase() == 'draft' ||
+                                  order.state.toLowerCase() == 'sent' ||
+                                  order.state.toLowerCase() == 'quotation') ||
+                              (order.state.toLowerCase() == 'sale' &&
+                                  (order.deliveryStatus.toLowerCase() == 'no' ||
+                                      order.deliveryStatus.toLowerCase() == 'pending' ||
+                                      order.deliveryStatus.isEmpty))) &&
+                          (widget.businessType == 'mt' || widget.saleType == 'secondary')) ...[
+                        SizedBox(
+                          width: double.infinity,
+                          height: 50,
+                          child: OutlinedButton.icon(
+                            onPressed: () => _openEditOrder(order),
+                            icon: const Icon(Icons.edit_outlined, size: 18),
+                            label: const Text(
+                              'Edit Order',
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 14,
+                              ),
+                            ),
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: AppColors.primary,
+                              side: const BorderSide(
+                                color: AppColors.primary,
+                                width: 1.5,
+                              ),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(9),
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                      ],
                       Row(
                         children: [
                           Expanded(

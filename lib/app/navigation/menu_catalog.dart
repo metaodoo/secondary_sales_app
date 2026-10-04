@@ -155,7 +155,7 @@ List<MenuSection> buildMenuSections(String moduleType) {
     );
   } else if (moduleType == 'mt_secondary' || moduleType == 'modern_trade_secondary') {
     sections.add(
-      MenuSection('MT Secondary Sales', [
+      MenuSection('Audit Sales', [
         MenuDestination(
           label: 'Dashboard',
           icon: Icons.grid_view_rounded,

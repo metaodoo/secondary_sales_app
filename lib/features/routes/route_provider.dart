@@ -191,6 +191,7 @@ class RouteProvider with ChangeNotifier {
       _lastEmployeeId = employeeId;
       _checkedInOutletId = null;
       _currentVisitId = null;
+      _requiresVisitReason = false;
       _checkInTime = null;
       _checkedOutOutletIds.clear();
       if (employeeId != null) {
@@ -617,6 +618,16 @@ class RouteProvider with ChangeNotifier {
       _checkInTime = null;
       notifyListeners();
     }
+  }
+
+  void markOrderCreated() {
+    _requiresVisitReason = false;
+    notifyListeners();
+  }
+
+  void setRequiresVisitReason(bool value) {
+    _requiresVisitReason = value;
+    notifyListeners();
   }
 }
 

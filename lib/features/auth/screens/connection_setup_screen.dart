@@ -94,6 +94,9 @@ class _ConnectionSetupScreenState extends State<ConnectionSetupScreen> {
         baseUrl: _serverController.text,
         dbName: _dbController.text.trim(),
       );
+      if (mounted && Navigator.canPop(context)) {
+        Navigator.pop(context);
+      }
     } catch (e) {
       if (!mounted) return;
       setState(() => _error = e.toString());
@@ -107,9 +110,20 @@ class _ConnectionSetupScreenState extends State<ConnectionSetupScreen> {
   @override
   Widget build(BuildContext context) {
     final isBusy = _isLoadingDatabases || _isConfirming;
+    final canPop = Navigator.canPop(context);
 
     return Scaffold(
       backgroundColor: AppColors.background,
+      appBar: canPop
+          ? AppBar(
+              backgroundColor: Colors.transparent,
+              elevation: 0,
+              leading: IconButton(
+                icon: const Icon(Icons.arrow_back, color: AppColors.textPrimary),
+                onPressed: () => Navigator.pop(context),
+              ),
+            )
+          : null,
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(

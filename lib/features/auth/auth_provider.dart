@@ -254,7 +254,22 @@ class AuthProvider with ChangeNotifier {
     await AppConstants.saveConnection(baseUrl: baseUrl, dbName: dbName);
     _odooSessionId = sessionId;
     final prefs = await SharedPreferences.getInstance();
+    await _clearStoredSession(prefs);
     await prefs.setString(AppConstants.sessionIdKey, sessionId);
+    _session = null;
+    _error = null;
+    notifyListeners();
+  }
+
+  Future<void> resetConnection() async {
+    final prefs = await SharedPreferences.getInstance();
+    await _clearStoredSession(prefs);
+    await prefs.remove(AppConstants.sessionIdKey);
+    await AppConstants.clearConnection();
+    _session = null;
+    _odooSessionId = null;
+    _error = null;
+    resetToRootRoute();
     notifyListeners();
   }
 

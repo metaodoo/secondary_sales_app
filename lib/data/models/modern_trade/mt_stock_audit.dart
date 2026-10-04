@@ -76,6 +76,7 @@ class MtStockAuditLine {
   final int? lotId;
   final String? lotName;
   final DateTime? expirationDate;
+  final String? tracking;
   final double stockCount;
 
   MtStockAuditLine({
@@ -87,8 +88,11 @@ class MtStockAuditLine {
     this.lotId,
     this.lotName,
     this.expirationDate,
+    this.tracking,
     required this.stockCount,
   });
+
+  bool get requiresLots => tracking == 'lot' || tracking == 'serial';
 
   factory MtStockAuditLine.fromMap(Map<String, dynamic> map) {
     final prod = map['product'] is Map ? map['product'] as Map : null;
@@ -104,6 +108,7 @@ class MtStockAuditLine {
       lotId: lot != null ? asInt(lot['id']) : null,
       lotName: lot?['name']?.toString(),
       expirationDate: asDateTime(lot?['expiration_date']),
+      tracking: prod?['tracking']?.toString(),
       stockCount: asDouble(map['stock_count']),
     );
   }

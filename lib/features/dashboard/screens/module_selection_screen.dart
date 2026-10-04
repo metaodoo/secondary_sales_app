@@ -133,11 +133,11 @@ class ModuleSelectionScreen extends StatelessWidget {
                 const SizedBox(height: 24),
               ],
 
-              // ─── MT - Secondary Sales ───────────────
+              // ─── Audit Sales (MT Secondary) ───────────
               if (canAccessMtSecondary) ...[
                 _buildLargeModuleCard(
                   context,
-                  title: 'MT - Secondary Sales',
+                  title: 'Audit Sales',
                   description:
                       'Daily stock audit (opening, stock in, closing) & secondary sales tracking.',
                   icon: Icons.inventory_2_outlined,

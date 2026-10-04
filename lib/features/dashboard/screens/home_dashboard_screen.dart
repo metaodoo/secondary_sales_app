@@ -283,7 +283,7 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
         ),
       if (canAccessMtSecondary)
         _ModuleItem(
-          title: 'MT - Secondary',
+          title: 'Audit Sales',
           icon: Icons.inventory_2_outlined,
           color: const Color(0xFF0D9488),
           onTap: () => _open(const AppShell(moduleType: 'mt_secondary')),

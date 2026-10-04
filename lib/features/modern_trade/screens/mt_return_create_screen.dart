@@ -86,6 +86,22 @@ class _MtReturnCreateScreenState extends State<MtReturnCreateScreen> {
       return;
     }
 
+    for (final l in _lines) {
+      final product = l['product'] as Map<String, dynamic>?;
+      final tracking = product?['tracking']?.toString();
+      final isTracked = tracking == 'lot' || tracking == 'serial';
+      if (isTracked && (l['lot_id'] == null || l['lot_id'] == 0)) {
+        final prodName = product?['name']?.toString() ?? 'Tracked product';
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            backgroundColor: Colors.red.shade700,
+            content: Text('Lot selection is mandatory for tracked product "$prodName".'),
+          ),
+        );
+        return;
+      }
+    }
+
     final dateStr = "${_selectedDate.year}-${_selectedDate.month.toString().padLeft(2, '0')}-${_selectedDate.day.toString().padLeft(2, '0')}";
     final linesPayload = _lines.map((l) {
       return {

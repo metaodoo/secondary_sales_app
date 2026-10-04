@@ -47,6 +47,15 @@ class AppConstants {
     _hasSavedConnection = true;
   }
 
+  static Future<void> clearConnection() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(baseUrlKey);
+    await prefs.remove(dbNameKey);
+    _baseUrl = '';
+    _dbName = '';
+    _hasSavedConnection = false;
+  }
+
   static String normalizeBaseUrl(String value) {
     var url = value.trim();
     if (url.isEmpty) return url;

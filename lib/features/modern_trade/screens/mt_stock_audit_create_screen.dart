@@ -1,8 +1,10 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:secondary_sales/core/access/access_resources.dart';
 import 'package:secondary_sales/core/theme/app_theme.dart';
 import 'package:secondary_sales/core/widgets/ss_ui.dart';
+import 'package:secondary_sales/core/widgets/searchable_lot_selector.dart';
 import 'package:secondary_sales/data/models/modern_trade/mt_stock_audit.dart';
 import 'package:secondary_sales/features/auth/auth_provider.dart';
 import 'package:secondary_sales/features/modern_trade/modern_trade_provider.dart';
@@ -32,6 +34,7 @@ class _MtStockAuditCreateScreenState extends State<MtStockAuditCreateScreen> {
   int? _selectedCategoryId;
   final TextEditingController _notesController = TextEditingController();
   final TextEditingController _searchController = TextEditingController();
+  Timer? _searchDebounce;
 
   List<MtStockAuditProduct> _availableProducts = [];
   bool _isLoadingProducts = false;
@@ -54,6 +57,8 @@ class _MtStockAuditCreateScreenState extends State<MtStockAuditCreateScreen> {
           productName: line.productName,
           defaultCode: line.defaultCode,
           uomName: line.uomName,
+          tracking: line.tracking,
+          requiresLots: line.requiresLots,
           lotId: line.lotId,
           lotName: line.lotName,
           stockCount: line.stockCount,
@@ -83,9 +88,17 @@ class _MtStockAuditCreateScreenState extends State<MtStockAuditCreateScreen> {
 
   @override
   void dispose() {
+    _searchDebounce?.cancel();
     _notesController.dispose();
     _searchController.dispose();
     super.dispose();
+  }
+
+  void _onSearchChanged(String query) {
+    _searchDebounce?.cancel();
+    _searchDebounce = Timer(const Duration(milliseconds: 350), () {
+      _loadProducts();
+    });
   }
 
   Future<void> _loadProducts() async {
@@ -325,6 +338,18 @@ class _MtStockAuditCreateScreenState extends State<MtStockAuditCreateScreen> {
       return;
     }
 
+    for (final line in activeLines) {
+      if (line.requiresLots && (line.lotId == null || line.lotId == 0)) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            backgroundColor: Colors.red.shade700,
+            content: Text('Lot / Batch selection is mandatory for tracked product "${line.productName}".'),
+          ),
+        );
+        return;
+      }
+    }
+
     final effectiveOutletId = widget.outletId ?? widget.editAudit?.outletId;
     if (effectiveOutletId == null) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -447,14 +472,20 @@ class _MtStockAuditCreateScreenState extends State<MtStockAuditCreateScreen> {
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
               child: TextField(
                 controller: _searchController,
+                onChanged: _onSearchChanged,
                 onSubmitted: (_) => _loadProducts(),
                 decoration: InputDecoration(
                   hintText: 'Search products by name or code...',
                   prefixIcon: const Icon(Icons.search, size: 20),
-                  suffixIcon: IconButton(
-                    icon: const Icon(Icons.arrow_forward, size: 20),
-                    onPressed: _loadProducts,
-                  ),
+                  suffixIcon: _searchController.text.isNotEmpty
+                      ? IconButton(
+                          icon: const Icon(Icons.clear, size: 18),
+                          onPressed: () {
+                            _searchController.clear();
+                            _loadProducts();
+                          },
+                        )
+                      : null,
                   contentPadding: const EdgeInsets.symmetric(horizontal: 16),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(10),
@@ -759,6 +790,8 @@ class _AuditEntry {
   final String productName;
   final String? defaultCode;
   final String? uomName;
+  final String? tracking;
+  final bool requiresLots;
   final int? lotId;
   final String? lotName;
   final double stockCount;
@@ -768,6 +801,8 @@ class _AuditEntry {
     required this.productName,
     this.defaultCode,
     this.uomName,
+    this.tracking,
+    this.requiresLots = false,
     this.lotId,
     this.lotName,
     required this.stockCount,
@@ -847,14 +882,16 @@ class _ProductAuditCardState extends State<_ProductAuditCard> {
         _lotRows.add(row);
       }
     } else {
-      if (widget.product.lots.isNotEmpty) {
-        final row = _LotRowData(
-          lotId: widget.product.lots.first.id,
-          lotName: widget.product.lots.first.name,
-          initialQty: 0.0,
-        );
-        _attachFocusListener(row);
-        _lotRows.add(row);
+      if (widget.product.requiresLots) {
+        if (widget.product.lots.isNotEmpty) {
+          final row = _LotRowData(
+            lotId: widget.product.lots.first.id,
+            lotName: widget.product.lots.first.name,
+            initialQty: 0.0,
+          );
+          _attachFocusListener(row);
+          _lotRows.add(row);
+        }
       } else {
         final row = _LotRowData(
           lotId: null,
@@ -932,6 +969,8 @@ class _ProductAuditCardState extends State<_ProductAuditCard> {
           productName: widget.product.name,
           defaultCode: widget.product.defaultCode,
           uomName: widget.product.uomName,
+          tracking: widget.product.tracking,
+          requiresLots: widget.product.requiresLots,
           lotId: row.lotId,
           lotName: row.lotName,
           stockCount: qty,
@@ -986,7 +1025,6 @@ class _ProductAuditCardState extends State<_ProductAuditCard> {
 
   @override
   Widget build(BuildContext context) {
-    final hasLots = widget.product.lots.isNotEmpty;
     final totalQty = _totalCardQuantity;
     final hasQty = totalQty > 0;
 
@@ -1057,175 +1095,190 @@ class _ProductAuditCardState extends State<_ProductAuditCard> {
           ),
 
           // Body: Lot Rows OR Single Count Row
-          if (hasLots) ...[
-            const SizedBox(height: 8),
-            ...List.generate(_lotRows.length, (index) {
-              final row = _lotRows[index];
-              final rowQty = double.tryParse(row.controller.text.trim()) ?? 0.0;
-              return Container(
-                margin: const EdgeInsets.only(bottom: 8),
-                padding: const EdgeInsets.all(8),
+          if (widget.product.requiresLots) ...[
+            if (widget.product.lots.isEmpty) ...[
+              const SizedBox(height: 8),
+              Container(
+                padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFF8FAFC),
+                  color: const Color(0xFFFEF2F2),
                   borderRadius: BorderRadius.circular(8),
-                  border: Border.all(
-                    color: rowQty > 0
-                        ? AppColors.primaryStrong.withValues(alpha: 0.35)
-                        : const Color(0xFFE2E8F0),
-                  ),
+                  border: Border.all(color: const Color(0xFFFECACA)),
                 ),
-                child: Column(
+                child: Row(
                   children: [
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Container(
-                            height: 38,
-                            padding: const EdgeInsets.symmetric(horizontal: 10),
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              borderRadius: BorderRadius.circular(6),
-                              border: Border.all(color: AppColors.borderSoft),
-                            ),
-                            child: DropdownButtonHideUnderline(
-                              child: DropdownButton<int>(
-                                isExpanded: true,
-                                value: row.lotId,
-                                hint: const Text('Select Lot & Expiry', style: TextStyle(fontSize: 12)),
-                                items: widget.product.lots.map((lot) {
-                                  return DropdownMenuItem<int>(
-                                    value: lot.id,
-                                    child: Text(
-                                      lot.displayName,
-                                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500),
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                  );
-                                }).toList(),
-                                onChanged: (val) {
-                                  if (val == null) return;
-                                  setState(() {
-                                    row.lotId = val;
-                                    final selectedLot = widget.product.lots.firstWhere((l) => l.id == val);
-                                    row.lotName = selectedLot.name;
-                                  });
-                                  _notifyChanged();
-                                },
-                              ),
-                            ),
-                          ),
-                        ),
-                        if (_lotRows.length > 1) ...[
-                          const SizedBox(width: 6),
-                          InkWell(
-                            onTap: () => _removeLotRow(index),
-                            borderRadius: BorderRadius.circular(6),
-                            child: Container(
-                              padding: const EdgeInsets.all(6),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFFFEE2E2),
-                                borderRadius: BorderRadius.circular(6),
-                              ),
-                              child: const Icon(
-                                Icons.delete_outline,
-                                color: Color(0xFFEF4444),
-                                size: 18,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        const Text(
-                          'Count:',
-                          style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
-                        ),
-                        Row(
-                          children: [
-                            IconButton(
-                              icon: const Icon(Icons.remove_circle_outline, color: AppColors.primaryStrong),
-                              padding: EdgeInsets.zero,
-                              constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-                              onPressed: () {
-                                final current = double.tryParse(row.controller.text.trim()) ?? 0.0;
-                                if (current > 0) _setQty(row, current - 1);
-                              },
-                            ),
-                            const SizedBox(width: 4),
-                            SizedBox(
-                              width: 70,
-                              height: 36,
-                              child: TextField(
-                                controller: row.controller,
-                                focusNode: row.focusNode,
-                                keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                                textAlign: TextAlign.center,
-                                decoration: InputDecoration(
-                                  contentPadding: EdgeInsets.zero,
-                                  border: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(8),
-                                    borderSide: const BorderSide(color: AppColors.borderSoft),
-                                  ),
-                                ),
-                                onChanged: (val) {
-                                  _notifyChanged();
-                                  setState(() {});
-                                },
-                              ),
-                            ),
-                            const SizedBox(width: 4),
-                            IconButton(
-                              icon: const Icon(Icons.add_circle_outline, color: AppColors.primaryStrong),
-                              padding: EdgeInsets.zero,
-                              constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-                              onPressed: () {
-                                final current = double.tryParse(row.controller.text.trim()) ?? 0.0;
-                                _setQty(row, current + 1);
-                              },
-                            ),
-                          ],
-                        ),
-                      ],
+                    const Icon(Icons.warning_amber_rounded, color: Color(0xFFDC2626), size: 18),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'This product requires lot tracking, but no valid active lots are available.',
+                        style: TextStyle(fontSize: 12, color: Colors.red.shade900, fontWeight: FontWeight.w500),
+                      ),
                     ),
                   ],
                 ),
-              );
-            }),
-            // "+ Add Lot / Batch" Button
-            Align(
-              alignment: Alignment.centerLeft,
-              child: InkWell(
-                onTap: _addLotRow,
-                borderRadius: BorderRadius.circular(6),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 10),
+              ),
+            ] else ...[
+              const SizedBox(height: 8),
+              ...List.generate(_lotRows.length, (index) {
+                final row = _lotRows[index];
+                final rowQty = double.tryParse(row.controller.text.trim()) ?? 0.0;
+                return Container(
+                  margin: const EdgeInsets.only(bottom: 8),
+                  padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: AppColors.primarySoft,
-                    borderRadius: BorderRadius.circular(6),
-                    border: Border.all(color: AppColors.primaryTint),
+                    color: const Color(0xFFF8FAFC),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                      color: rowQty > 0
+                          ? AppColors.primaryStrong.withValues(alpha: 0.35)
+                          : const Color(0xFFE2E8F0),
+                    ),
                   ),
-                  child: const Row(
-                    mainAxisSize: MainAxisSize.min,
+                  child: Column(
                     children: [
-                      Icon(Icons.add, size: 16, color: AppColors.primaryStrong),
-                      SizedBox(width: 4),
-                      Text(
-                        'Add Lot / Batch',
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.bold,
-                          color: AppColors.primaryStrong,
-                        ),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: GenericSearchableLotSelector<MtStockAuditLot>(
+                              selectedItem: row.lotId != null
+                                  ? widget.product.lots.firstWhere(
+                                      (l) => l.id == row.lotId,
+                                      orElse: () => MtStockAuditLot(
+                                        id: row.lotId!,
+                                        name: row.lotName ?? 'Lot #${row.lotId}',
+                                      ),
+                                    )
+                                  : null,
+                              items: widget.product.lots,
+                              getLabel: (lot) => lot.name,
+                              getSubtitle: (lot) => lot.expirationDate != null
+                                  ? 'Exp: ${lot.expirationDate!.year}-${lot.expirationDate!.month.toString().padLeft(2, '0')}-${lot.expirationDate!.day.toString().padLeft(2, '0')}'
+                                  : null,
+                              modalTitle: 'Select Lot & Expiry',
+                              hintText: 'Select Lot & Expiry *',
+                              onChanged: (val) {
+                                if (val == null) return;
+                                setState(() {
+                                  row.lotId = val.id;
+                                  row.lotName = val.name;
+                                });
+                                _notifyChanged();
+                              },
+                            ),
+                          ),
+                          if (_lotRows.length > 1) ...[
+                            const SizedBox(width: 6),
+                            InkWell(
+                              onTap: () => _removeLotRow(index),
+                              borderRadius: BorderRadius.circular(6),
+                              child: Container(
+                                padding: const EdgeInsets.all(6),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFFEE2E2),
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: const Icon(
+                                  Icons.delete_outline,
+                                  color: Color(0xFFEF4444),
+                                  size: 18,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text(
+                            'Count:',
+                            style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+                          ),
+                          Row(
+                            children: [
+                              IconButton(
+                                icon: const Icon(Icons.remove_circle_outline, color: AppColors.primaryStrong),
+                                padding: EdgeInsets.zero,
+                                constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                                onPressed: () {
+                                  final current = double.tryParse(row.controller.text.trim()) ?? 0.0;
+                                  if (current > 0) _setQty(row, current - 1);
+                                },
+                              ),
+                              const SizedBox(width: 4),
+                              SizedBox(
+                                width: 70,
+                                height: 36,
+                                child: TextField(
+                                  controller: row.controller,
+                                  focusNode: row.focusNode,
+                                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                                  textAlign: TextAlign.center,
+                                  decoration: InputDecoration(
+                                    contentPadding: EdgeInsets.zero,
+                                    border: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(8),
+                                      borderSide: const BorderSide(color: AppColors.borderSoft),
+                                    ),
+                                  ),
+                                  onChanged: (val) {
+                                    _notifyChanged();
+                                    setState(() {});
+                                  },
+                                ),
+                              ),
+                              const SizedBox(width: 4),
+                              IconButton(
+                                icon: const Icon(Icons.add_circle_outline, color: AppColors.primaryStrong),
+                                padding: EdgeInsets.zero,
+                                constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                                onPressed: () {
+                                  final current = double.tryParse(row.controller.text.trim()) ?? 0.0;
+                                  _setQty(row, current + 1);
+                                },
+                              ),
+                            ],
+                          ),
+                        ],
                       ),
                     ],
                   ),
+                );
+              }),
+              // "+ Add Lot / Batch" Button
+              Align(
+                alignment: Alignment.centerLeft,
+                child: InkWell(
+                  onTap: _addLotRow,
+                  borderRadius: BorderRadius.circular(6),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 10),
+                    decoration: BoxDecoration(
+                      color: AppColors.primarySoft,
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border.all(color: AppColors.primaryTint),
+                    ),
+                    child: const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.add, size: 16, color: AppColors.primaryStrong),
+                        SizedBox(width: 4),
+                        Text(
+                          'Add Lot / Batch',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                            color: AppColors.primaryStrong,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
               ),
-            ),
+            ],
           ] else ...[
             // Single Count row for products without lots
             const SizedBox(height: 10),

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:secondary_sales/core/theme/app_theme.dart';
+import 'package:secondary_sales/core/widgets/searchable_lot_selector.dart';
 import 'package:secondary_sales/data/models/modern_trade/mt_return_request.dart';
 import 'package:secondary_sales/features/modern_trade/mt_return_provider.dart';
 
@@ -139,6 +140,16 @@ class _MtReturnLineEditSheetState extends State<MtReturnLineEditSheet> {
 
     // Collect active entries
     for (final entry in _entries) {
+      if (widget.line.requiresLots && (entry.lotId == null || entry.lotId == 0)) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            backgroundColor: Colors.red.shade700,
+            content: Text('Lot selection is mandatory for tracked product "${widget.line.productName}".'),
+          ),
+        );
+        return;
+      }
+
       final sQty = double.tryParse(entry.saleableCtrl.text) ?? 0.0;
       final nsQty = double.tryParse(entry.nonSaleableCtrl.text) ?? 0.0;
       final qQty = double.tryParse(entry.qualityCtrl.text) ?? 0.0;
@@ -255,7 +266,7 @@ class _MtReturnLineEditSheetState extends State<MtReturnLineEditSheet> {
             child: ListView.separated(
               padding: const EdgeInsets.all(16),
               itemCount: _entries.length,
-              separatorBuilder: (_, __) => const SizedBox(height: 16),
+              separatorBuilder: (_, _) => const SizedBox(height: 16),
               itemBuilder: (context, index) {
                 final entry = _entries[index];
                 final isOriginal = entry.lineId != null;
@@ -309,50 +320,74 @@ class _MtReturnLineEditSheetState extends State<MtReturnLineEditSheet> {
                       const SizedBox(height: 12),
 
                       // Lot Selector Dropdown
-                      const Text('Lot / Serial Number', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+                      Row(
+                        children: [
+                          Text(
+                            widget.line.requiresLots
+                                ? 'Lot / Serial Number (Required)'
+                                : 'Lot / Serial Number (Optional)',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: widget.line.requiresLots ? const Color(0xFFDC2626) : AppColors.textPrimary,
+                            ),
+                          ),
+                          if (widget.line.requiresLots)
+                            const Text(' *', style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold)),
+                        ],
+                      ),
                       const SizedBox(height: 4),
                       provider.isLoadingLots
                           ? const Center(child: Padding(padding: EdgeInsets.all(8), child: LinearProgressIndicator()))
-                          : DropdownButtonFormField<int?>(
-                              value: entry.lotId,
-                              isExpanded: true,
-                              decoration: InputDecoration(
-                                hintText: 'Select Lot (Optional)...',
-                                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                                border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                                filled: true,
-                                fillColor: Colors.white,
-                              ),
-                              items: [
-                                const DropdownMenuItem<int?>(
-                                  value: null,
-                                  child: Text('No Lot / Standard'),
+                          : (widget.line.requiresLots && lots.isEmpty)
+                              ? Container(
+                                  padding: const EdgeInsets.all(10),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFFEF2F2),
+                                    borderRadius: BorderRadius.circular(8),
+                                    border: Border.all(color: const Color(0xFFFECACA)),
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      const Icon(Icons.warning_amber_rounded, color: Color(0xFFDC2626), size: 16),
+                                      const SizedBox(width: 6),
+                                      Expanded(
+                                        child: Text(
+                                          'No unexpired lots found for this tracked product.',
+                                          style: TextStyle(fontSize: 11, color: Colors.red.shade900, fontWeight: FontWeight.w500),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                )
+                              : GenericSearchableLotSelector<Map<String, dynamic>>(
+                                  selectedItem: entry.lotId != null
+                                      ? lots.firstWhere(
+                                          (l) => l['id'] == entry.lotId,
+                                          orElse: () => {'id': entry.lotId, 'name': entry.lotName ?? 'Lot #${entry.lotId}'},
+                                        )
+                                      : null,
+                                  items: lots,
+                                  getLabel: (lot) => lot['name']?.toString() ?? '',
+                                  getSubtitle: (lot) => lot['expiration_date'] != null && lot['expiration_date'].toString().isNotEmpty
+                                      ? 'Exp: ${lot['expiration_date']}'
+                                      : null,
+                                  modalTitle: 'Select Return Lot',
+                                  hintText: widget.line.requiresLots ? 'Select Lot (Required)...' : 'Select Lot (Optional)...',
+                                  allowClear: !widget.line.requiresLots,
+                                  clearLabel: 'No Lot / Standard',
+                                  onChanged: (val) {
+                                    setState(() {
+                                      if (val != null) {
+                                        entry.lotId = val['id'] as int?;
+                                        entry.lotName = val['name']?.toString();
+                                      } else {
+                                        entry.lotId = null;
+                                        entry.lotName = null;
+                                      }
+                                    });
+                                  },
                                 ),
-                                ...lots.map((lot) {
-                                  final id = lot['id'] as int?;
-                                  final name = lot['name']?.toString() ?? '';
-                                  final exp = lot['expiration_date']?.toString();
-                                  final label = exp != null && exp.isNotEmpty ? '$name (Exp: $exp)' : name;
-                                  return DropdownMenuItem<int?>(
-                                    value: id,
-                                    child: Text(label, overflow: TextOverflow.ellipsis),
-                                  );
-                                }),
-                              ],
-                              onChanged: (val) {
-                                setState(() {
-                                  entry.lotId = val;
-                                  if (val != null) {
-                                    try {
-                                      final matched = lots.firstWhere((l) => l['id'] == val);
-                                      entry.lotName = matched['name']?.toString();
-                                    } catch (_) {}
-                                  } else {
-                                    entry.lotName = null;
-                                  }
-                                });
-                              },
-                            ),
                       const SizedBox(height: 12),
 
                       // Quantities

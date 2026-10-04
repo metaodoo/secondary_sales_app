@@ -102,6 +102,7 @@ class _OfficerCustomerSelectionScreenState
     String? mobile,
     double? latitude,
     double? longitude,
+    double? outletRadius,
   }) async {
     await showModalBottomSheet(
       context: context,
@@ -115,6 +116,7 @@ class _OfficerCustomerSelectionScreenState
         mobile: mobile,
         latitude: latitude,
         longitude: longitude,
+        outletRadius: outletRadius,
       ),
     );
     if (mounted) {
@@ -235,7 +237,106 @@ class _OfficerCustomerSelectionScreenState
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Padding(
-                    padding: const EdgeInsets.fromLTRB(20.0, 16.0, 20.0, 8.0),
+                    padding: const EdgeInsets.fromLTRB(20.0, 12.0, 20.0, 4.0),
+                    child: Container(
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(color: AppColors.borderSoft),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.02),
+                            blurRadius: 6,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.all(8),
+                                decoration: BoxDecoration(
+                                  color: AppColors.primarySoft,
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: const Icon(
+                                  Icons.alt_route_rounded,
+                                  size: 18,
+                                  color: AppColors.primaryStrong,
+                                ),
+                              ),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    const Text(
+                                      'ROUTE',
+                                      style: TextStyle(
+                                        color: AppColors.primaryStrong,
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.bold,
+                                        letterSpacing: 0.8,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      widget.routeName,
+                                      style: const TextStyle(
+                                        color: AppColors.textPrimary,
+                                        fontSize: 15,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                          if (routeDetail?.distributorName != null &&
+                              routeDetail!.distributorName!.isNotEmpty) ...[
+                            const SizedBox(height: 10),
+                            const Divider(height: 1, color: AppColors.borderMuted),
+                            const SizedBox(height: 8),
+                            Row(
+                              children: [
+                                const Icon(
+                                  Icons.business_outlined,
+                                  size: 15,
+                                  color: Color(0xFF0D9488),
+                                ),
+                                const SizedBox(width: 6),
+                                const Text(
+                                  'Distributor (DB): ',
+                                  style: TextStyle(
+                                    color: AppColors.textSecondary,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                                Expanded(
+                                  child: Text(
+                                    routeDetail.distributorName!,
+                                    style: const TextStyle(
+                                      color: Color(0xFF1E293B),
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(20.0, 10.0, 20.0, 8.0),
                     child: TextField(
                       controller: _searchController,
                       onChanged: (val) {
@@ -455,10 +556,12 @@ class _OfficerCustomerSelectionScreenState
                               _openActionModalFor(
                                 outlet.id,
                                 outlet.name,
+                                outletCode: outlet.code,
                                 phone: outlet.phone,
                                 mobile: outlet.mobile,
                                 latitude: outlet.partnerLatitude,
                                 longitude: outlet.partnerLongitude,
+                                outletRadius: outlet.outletRadius,
                               );
                             },
                             child: Container(
@@ -788,11 +891,16 @@ class _OfficerCustomerSelectionScreenState
                                                    image1920: imageB64,
                                                  );
                                                  if (context.mounted) {
-                                                    _openActionModalFor(
-                                                      outlet.id,
-                                                      outlet.name,
-                                                      outletCode: outlet.code,
-                                                    );
+                                                   _openActionModalFor(
+                                                     outlet.id,
+                                                     outlet.name,
+                                                     outletCode: outlet.code,
+                                                     phone: outlet.phone,
+                                                     mobile: outlet.mobile,
+                                                     latitude: outlet.partnerLatitude,
+                                                     longitude: outlet.partnerLongitude,
+                                                     outletRadius: outlet.outletRadius,
+                                                   );
                                                  }
                                                } catch (e) {
                                                  if (context.mounted) {

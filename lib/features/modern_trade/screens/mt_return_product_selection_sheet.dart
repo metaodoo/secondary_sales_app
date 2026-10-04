@@ -1,6 +1,8 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:secondary_sales/core/theme/app_theme.dart';
+import 'package:secondary_sales/core/widgets/searchable_lot_selector.dart';
 import 'package:secondary_sales/features/modern_trade/mt_return_provider.dart';
 
 class MtReturnProductSelectionSheet extends StatefulWidget {
@@ -32,6 +34,7 @@ class _MtReturnProductSelectionSheetState extends State<MtReturnProductSelection
   final TextEditingController _saleableQtyController = TextEditingController(text: '0');
   final TextEditingController _nonSaleableQtyController = TextEditingController(text: '0');
   final TextEditingController _qualityQtyController = TextEditingController(text: '0');
+  Timer? _searchDebounce;
 
   Map<String, dynamic>? _selectedProduct;
   int? _selectedLotId;
@@ -46,11 +49,21 @@ class _MtReturnProductSelectionSheetState extends State<MtReturnProductSelection
 
   @override
   void dispose() {
+    _searchDebounce?.cancel();
     _searchController.dispose();
     _saleableQtyController.dispose();
     _nonSaleableQtyController.dispose();
     _qualityQtyController.dispose();
     super.dispose();
+  }
+
+  void _onSearchChanged(String val) {
+    _searchDebounce?.cancel();
+    _searchDebounce = Timer(const Duration(milliseconds: 300), () {
+      if (mounted) {
+        context.read<MtReturnProvider>().fetchReturnProducts(search: val.trim());
+      }
+    });
   }
 
   void _onSelectProduct(Map<String, dynamic> product) {
@@ -90,6 +103,19 @@ class _MtReturnProductSelectionSheetState extends State<MtReturnProductSelection
         );
         return;
       }
+    }
+
+    final tracking = _selectedProduct?['tracking']?.toString();
+    final isTracked = tracking == 'lot' || tracking == 'serial';
+
+    if (isTracked && (_selectedLotId == null || _selectedLotId == 0)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          backgroundColor: Colors.red,
+          content: Text('Please select a Lot / Serial number for this tracked product.'),
+        ),
+      );
+      return;
     }
 
     final provider = context.read<MtReturnProvider>();
@@ -186,9 +212,19 @@ class _MtReturnProductSelectionSheetState extends State<MtReturnProductSelection
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
           child: TextField(
             controller: _searchController,
+            onChanged: _onSearchChanged,
             decoration: InputDecoration(
               hintText: 'Search products by name or code...',
               prefixIcon: const Icon(Icons.search, size: 20),
+              suffixIcon: _searchController.text.isNotEmpty
+                  ? IconButton(
+                      icon: const Icon(Icons.clear, size: 18),
+                      onPressed: () {
+                        _searchController.clear();
+                        provider.fetchReturnProducts(search: '');
+                      },
+                    )
+                  : null,
               filled: true,
               fillColor: Colors.grey.shade100,
               contentPadding: const EdgeInsets.symmetric(vertical: 0, horizontal: 16),
@@ -197,7 +233,6 @@ class _MtReturnProductSelectionSheetState extends State<MtReturnProductSelection
                 borderSide: BorderSide.none,
               ),
             ),
-            onChanged: (val) => provider.fetchReturnProducts(search: val),
           ),
         ),
         Expanded(
@@ -255,9 +290,9 @@ class _MtReturnProductSelectionSheetState extends State<MtReturnProductSelection
           Container(
             padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
-              color: AppColors.primaryStrong.withOpacity(0.06),
+              color: AppColors.primaryStrong.withValues(alpha: 0.06),
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: AppColors.primaryStrong.withOpacity(0.2)),
+              border: Border.all(color: AppColors.primaryStrong.withValues(alpha: 0.2)),
             ),
             child: Row(
               children: [
@@ -291,41 +326,70 @@ class _MtReturnProductSelectionSheetState extends State<MtReturnProductSelection
           const SizedBox(height: 18),
 
           // Lot Picker
-          const Text(
-            'Lot / Serial Number (Optional)',
-            style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
+          Row(
+            children: [
+              Text(
+                (_selectedProduct?['tracking'] == 'lot' || _selectedProduct?['tracking'] == 'serial')
+                    ? 'Lot / Serial Number (Required)'
+                    : 'Lot / Serial Number (Optional)',
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: (_selectedProduct?['tracking'] == 'lot' || _selectedProduct?['tracking'] == 'serial')
+                      ? const Color(0xFFDC2626)
+                      : AppColors.textPrimary,
+                ),
+              ),
+              if (_selectedProduct?['tracking'] == 'lot' || _selectedProduct?['tracking'] == 'serial')
+                const Text(' *', style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold)),
+            ],
           ),
           const SizedBox(height: 6),
           if (provider.isLoadingLots)
             const Center(child: Padding(padding: EdgeInsets.all(8), child: CircularProgressIndicator()))
-          else
-            DropdownButtonFormField<int?>(
-              value: _selectedLotId,
-              isExpanded: true,
-              decoration: InputDecoration(
-                hintText: 'Select lot number...',
-                contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+          else if ((_selectedProduct?['tracking'] == 'lot' || _selectedProduct?['tracking'] == 'serial') && provider.availableLots.isEmpty)
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFEF2F2),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: const Color(0xFFFECACA)),
               ),
-              items: [
-                const DropdownMenuItem<int?>(
-                  value: null,
-                  child: Text('No specific lot', style: TextStyle(color: Colors.grey)),
-                ),
-                ...provider.availableLots.map((lot) {
-                  final id = lot['id'] as int?;
-                  final lotName = lot['name']?.toString() ?? '';
-                  final exp = lot['expiration_date']?.toString();
-                  return DropdownMenuItem<int?>(
-                    value: id,
+              child: Row(
+                children: [
+                  const Icon(Icons.warning_amber_rounded, color: Color(0xFFDC2626), size: 18),
+                  const SizedBox(width: 8),
+                  Expanded(
                     child: Text(
-                      exp != null && exp.isNotEmpty ? '$lotName (Exp: $exp)' : lotName,
-                      overflow: TextOverflow.ellipsis,
+                      'No unexpired lots found for this tracked product.',
+                      style: TextStyle(fontSize: 12, color: Colors.red.shade900, fontWeight: FontWeight.w500),
                     ),
-                  );
-                }),
-              ],
-              onChanged: (val) => setState(() => _selectedLotId = val),
+                  ),
+                ],
+              ),
+            )
+          else
+            GenericSearchableLotSelector<Map<String, dynamic>>(
+              selectedItem: _selectedLotId != null
+                  ? provider.availableLots.firstWhere(
+                      (l) => l['id'] == _selectedLotId,
+                      orElse: () => {'id': _selectedLotId, 'name': 'Lot #$_selectedLotId'},
+                    )
+                  : null,
+              items: provider.availableLots,
+              getLabel: (lot) => lot['name']?.toString() ?? '',
+              getSubtitle: (lot) => lot['expiration_date'] != null && lot['expiration_date'].toString().isNotEmpty
+                  ? 'Exp: ${lot['expiration_date']}'
+                  : null,
+              modalTitle: 'Select Return Lot',
+              hintText: (_selectedProduct?['tracking'] == 'lot' || _selectedProduct?['tracking'] == 'serial')
+                  ? 'Select lot number *'
+                  : 'Select lot number...',
+              allowClear: !(_selectedProduct?['tracking'] == 'lot' || _selectedProduct?['tracking'] == 'serial'),
+              clearLabel: 'No specific lot',
+              onChanged: (val) {
+                setState(() => _selectedLotId = val != null ? val['id'] as int? : null);
+              },
             ),
           const SizedBox(height: 20),
 

@@ -14,34 +14,49 @@ import 'package:secondary_sales/data/models/inventory/virtual_transfer.dart';
 /// widget is what keeps the three flows in step by construction rather than by
 /// remembering to copy a change twice.
 
-class SearchableLotSelector extends StatefulWidget {
-  final TransferLot? selectedLot;
-  final List<TransferLot> lots;
-  final ValueChanged<TransferLot?> onChanged;
+/// Generic Lot picker with a searchable bottom sheet.
+class GenericSearchableLotSelector<T> extends StatelessWidget {
+  final T? selectedItem;
+  final List<T> items;
+  final ValueChanged<T?> onChanged;
+  final String Function(T item) getLabel;
+  final String? Function(T item)? getSubtitle;
+  final String? Function(T item)? getBadgeText;
+  final Color? Function(T item)? getBadgeColor;
   final bool isReadOnly;
+  final String hintText;
+  final String modalTitle;
+  final bool allowClear;
+  final String clearLabel;
 
-  const SearchableLotSelector({
+  const GenericSearchableLotSelector({
     super.key,
-    required this.selectedLot,
-    required this.lots,
+    required this.selectedItem,
+    required this.items,
     required this.onChanged,
+    required this.getLabel,
+    this.getSubtitle,
+    this.getBadgeText,
+    this.getBadgeColor,
     this.isReadOnly = false,
+    this.hintText = 'Search & Select Lot...',
+    this.modalTitle = 'Select Lot Number',
+    this.allowClear = false,
+    this.clearLabel = 'No Lot / Standard',
   });
 
   @override
-  State<SearchableLotSelector> createState() => _SearchableLotSelectorState();
-}
-
-class _SearchableLotSelectorState extends State<SearchableLotSelector> {
-  @override
   Widget build(BuildContext context) {
+    final hasSelection = selectedItem != null;
+    final labelText = hasSelection ? getLabel(selectedItem as T) : hintText;
+
     return InkWell(
-      onTap: widget.isReadOnly ? null : () => _showSearchModal(context),
+      onTap: isReadOnly ? null : () => _showSearchModal(context),
       borderRadius: BorderRadius.circular(6),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
         decoration: BoxDecoration(
-          color: widget.isReadOnly ? Colors.grey[100] : Colors.white,
+          color: isReadOnly ? Colors.grey[100] : Colors.white,
           border: Border.all(color: const Color(0xFFDDE6F2)),
           borderRadius: BorderRadius.circular(6),
         ),
@@ -49,15 +64,11 @@ class _SearchableLotSelectorState extends State<SearchableLotSelector> {
           children: [
             Expanded(
               child: Text(
-                widget.selectedLot?.lotName ?? 'Search & Select Lot...',
+                labelText,
                 style: TextStyle(
                   fontSize: 13,
-                  fontWeight: widget.selectedLot != null
-                      ? FontWeight.w600
-                      : FontWeight.normal,
-                  color: widget.selectedLot != null
-                      ? Colors.black87
-                      : AppColors.textSecondary,
+                  fontWeight: hasSelection ? FontWeight.w600 : FontWeight.normal,
+                  color: hasSelection ? Colors.black87 : AppColors.textSecondary,
                 ),
                 overflow: TextOverflow.ellipsis,
               ),
@@ -74,45 +85,125 @@ class _SearchableLotSelectorState extends State<SearchableLotSelector> {
   }
 
   void _showSearchModal(BuildContext context) {
-    showModalBottomSheet<TransferLot>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (ctx) => _LotSearchBottomSheet(
-        lots: widget.lots,
-        currentLot: widget.selectedLot,
-      ),
+    showGenericSearchableLotPicker<T>(
+      context,
+      items: items,
+      currentItem: selectedItem,
+      getLabel: getLabel,
+      getSubtitle: getSubtitle,
+      getBadgeText: getBadgeText,
+      getBadgeColor: getBadgeColor,
+      title: modalTitle,
+      allowClear: allowClear,
+      clearLabel: clearLabel,
     ).then((selected) {
-      if (selected != null && mounted) {
-        widget.onChanged(selected);
-      }
+      onChanged(selected);
     });
   }
 }
 
-class _LotSearchBottomSheet extends StatefulWidget {
+/// Convenience wrapper for TransferLot.
+class SearchableLotSelector extends StatelessWidget {
+  final TransferLot? selectedLot;
   final List<TransferLot> lots;
-  final TransferLot? currentLot;
+  final ValueChanged<TransferLot?> onChanged;
+  final bool isReadOnly;
 
-  const _LotSearchBottomSheet({
+  const SearchableLotSelector({
+    super.key,
+    required this.selectedLot,
     required this.lots,
-    this.currentLot,
+    required this.onChanged,
+    this.isReadOnly = false,
   });
 
   @override
-  State<_LotSearchBottomSheet> createState() => _LotSearchBottomSheetState();
+  Widget build(BuildContext context) {
+    return GenericSearchableLotSelector<TransferLot>(
+      selectedItem: selectedLot,
+      items: lots,
+      onChanged: onChanged,
+      isReadOnly: isReadOnly,
+      getLabel: (lot) => lot.lotName,
+      modalTitle: 'Select Lot Number',
+    );
+  }
 }
 
-class _LotSearchBottomSheetState extends State<_LotSearchBottomSheet> {
+/// Standalone modal bottom sheet helper for searchable lot selection.
+Future<T?> showGenericSearchableLotPicker<T>(
+  BuildContext context, {
+  required List<T> items,
+  T? currentItem,
+  required String Function(T item) getLabel,
+  String? Function(T item)? getSubtitle,
+  String? Function(T item)? getBadgeText,
+  Color? Function(T item)? getBadgeColor,
+  String title = 'Select Lot Number',
+  String searchHint = 'Type to filter (e.g. lot00001)...',
+  bool allowClear = false,
+  String clearLabel = 'No Lot / Standard',
+}) {
+  return showModalBottomSheet<T?>(
+    context: context,
+    isScrollControlled: true,
+    backgroundColor: Colors.transparent,
+    builder: (ctx) => _GenericLotSearchBottomSheet<T>(
+      items: items,
+      currentItem: currentItem,
+      getLabel: getLabel,
+      getSubtitle: getSubtitle,
+      getBadgeText: getBadgeText,
+      getBadgeColor: getBadgeColor,
+      title: title,
+      searchHint: searchHint,
+      allowClear: allowClear,
+      clearLabel: clearLabel,
+    ),
+  );
+}
+
+class _GenericLotSearchBottomSheet<T> extends StatefulWidget {
+  final List<T> items;
+  final T? currentItem;
+  final String Function(T item) getLabel;
+  final String? Function(T item)? getSubtitle;
+  final String? Function(T item)? getBadgeText;
+  final Color? Function(T item)? getBadgeColor;
+  final String title;
+  final String searchHint;
+  final bool allowClear;
+  final String clearLabel;
+
+  const _GenericLotSearchBottomSheet({
+    required this.items,
+    this.currentItem,
+    required this.getLabel,
+    this.getSubtitle,
+    this.getBadgeText,
+    this.getBadgeColor,
+    required this.title,
+    required this.searchHint,
+    required this.allowClear,
+    required this.clearLabel,
+  });
+
+  @override
+  State<_GenericLotSearchBottomSheet<T>> createState() =>
+      _GenericLotSearchBottomSheetState<T>();
+}
+
+class _GenericLotSearchBottomSheetState<T>
+    extends State<_GenericLotSearchBottomSheet<T>> {
   final TextEditingController _controller = TextEditingController();
   Timer? _debounceTimer;
-  List<TransferLot> _filteredLots = [];
+  List<T> _filteredItems = [];
   bool _isSearching = false;
 
   @override
   void initState() {
     super.initState();
-    _filteredLots = List.from(widget.lots);
+    _filteredItems = List.from(widget.items);
   }
 
   @override
@@ -125,17 +216,20 @@ class _LotSearchBottomSheetState extends State<_LotSearchBottomSheet> {
   void _onSearchChanged(String query) {
     setState(() => _isSearching = true);
     _debounceTimer?.cancel();
-    // 300ms Search Debouncing as requested
-    _debounceTimer = Timer(const Duration(milliseconds: 300), () {
+    _debounceTimer = Timer(const Duration(milliseconds: 250), () {
       final q = query.trim().toLowerCase();
       if (!mounted) return;
       setState(() {
         _isSearching = false;
         if (q.isEmpty) {
-          _filteredLots = List.from(widget.lots);
+          _filteredItems = List.from(widget.items);
         } else {
-          _filteredLots = widget.lots.where((lot) {
-            return lot.lotName.toLowerCase().contains(q);
+          final words = q.split(RegExp(r'\s+')).where((w) => w.isNotEmpty).toList();
+          _filteredItems = widget.items.where((item) {
+            final label = widget.getLabel(item).toLowerCase();
+            final subtitle = widget.getSubtitle?.call(item)?.toLowerCase() ?? '';
+            final fullText = '$label $subtitle';
+            return words.every((w) => fullText.contains(w));
           }).toList();
         }
       });
@@ -170,10 +264,10 @@ class _LotSearchBottomSheetState extends State<_LotSearchBottomSheet> {
                 size: 22,
               ),
               const SizedBox(width: 8),
-              const Expanded(
+              Expanded(
                 child: Text(
-                  'Select Lot Number',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                  widget.title,
+                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                 ),
               ),
               IconButton(
@@ -188,7 +282,7 @@ class _LotSearchBottomSheetState extends State<_LotSearchBottomSheet> {
             autofocus: true,
             onChanged: _onSearchChanged,
             decoration: InputDecoration(
-              hintText: 'Type to filter (e.g. lot00001)...',
+              hintText: widget.searchHint,
               prefixIcon: const Icon(Icons.search, color: AppColors.primaryStrong),
               suffixIcon: _controller.text.isNotEmpty
                   ? IconButton(
@@ -217,12 +311,23 @@ class _LotSearchBottomSheetState extends State<_LotSearchBottomSheet> {
             ),
           ),
           const SizedBox(height: 12),
+          if (widget.allowClear)
+            ListTile(
+              dense: true,
+              contentPadding: const EdgeInsets.symmetric(horizontal: 8),
+              leading: const Icon(Icons.remove_circle_outline, color: Colors.grey, size: 20),
+              title: Text(
+                widget.clearLabel,
+                style: const TextStyle(color: Colors.grey, fontWeight: FontWeight.w600, fontSize: 13),
+              ),
+              onTap: () => Navigator.pop(context, null),
+            ),
           if (_isSearching)
             const Padding(
               padding: EdgeInsets.all(24),
               child: Center(child: CircularProgressIndicator()),
             )
-          else if (_filteredLots.isEmpty)
+          else if (_filteredItems.isEmpty)
             Padding(
               padding: const EdgeInsets.all(32),
               child: Center(
@@ -238,30 +343,68 @@ class _LotSearchBottomSheetState extends State<_LotSearchBottomSheet> {
           else
             Expanded(
               child: ListView.separated(
-                itemCount: _filteredLots.length,
+                itemCount: _filteredItems.length,
                 separatorBuilder: (_, index) => const Divider(
                   height: 1,
                   color: AppColors.borderSoft,
                 ),
                 itemBuilder: (context, index) {
-                  final lot = _filteredLots[index];
-                  final isSelected = widget.currentLot?.lotId == lot.lotId;
+                  final item = _filteredItems[index];
+                  final isSelected = widget.currentItem == item;
+                  final label = widget.getLabel(item);
+                  final subtitle = widget.getSubtitle?.call(item);
+                  final badgeText = widget.getBadgeText?.call(item);
+                  final badgeColor = widget.getBadgeColor?.call(item) ?? Colors.blue;
+
                   return ListTile(
                     contentPadding: const EdgeInsets.symmetric(
                       horizontal: 8,
                       vertical: 4,
                     ),
-                    title: Text(
-                      lot.lotName,
-                      style: TextStyle(
-                        fontWeight:
-                            isSelected ? FontWeight.bold : FontWeight.w500,
-                        color: isSelected
-                            ? AppColors.primaryStrong
-                            : AppColors.textPrimary,
-                        fontSize: 14,
-                      ),
+                    title: Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            label,
+                            style: TextStyle(
+                              fontWeight:
+                                  isSelected ? FontWeight.bold : FontWeight.w500,
+                              color: isSelected
+                                  ? AppColors.primaryStrong
+                                  : AppColors.textPrimary,
+                              fontSize: 14,
+                            ),
+                          ),
+                        ),
+                        if (badgeText != null && badgeText.isNotEmpty)
+                          Container(
+                            margin: const EdgeInsets.only(left: 6),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 6,
+                              vertical: 2,
+                            ),
+                            decoration: BoxDecoration(
+                              color: badgeColor.withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(4),
+                              border: Border.all(color: badgeColor.withValues(alpha: 0.3)),
+                            ),
+                            child: Text(
+                              badgeText,
+                              style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                                color: badgeColor,
+                              ),
+                            ),
+                          ),
+                      ],
                     ),
+                    subtitle: subtitle != null && subtitle.isNotEmpty
+                        ? Text(
+                            subtitle,
+                            style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                          )
+                        : null,
                     trailing: isSelected
                         ? const Icon(
                             Icons.check_circle,
@@ -273,7 +416,7 @@ class _LotSearchBottomSheetState extends State<_LotSearchBottomSheet> {
                             color: AppColors.borderSoft,
                             size: 18,
                           ),
-                    onTap: () => Navigator.pop(context, lot),
+                    onTap: () => Navigator.pop(context, item),
                   );
                 },
               ),

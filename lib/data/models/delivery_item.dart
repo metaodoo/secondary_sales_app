@@ -7,15 +7,38 @@ class DeliveryListResult {
   final List<ResZone> zones;
   final List<StockLocation> locations;
   final List<DeliveryOutletFilter> outlets;
+  final List<DeliveryAreaFilter> areas;
   final int total;
+  final int pendingCount;
+  final int deliveredCount;
 
   const DeliveryListResult({
     required this.items,
     this.zones = const [],
     this.locations = const [],
     this.outlets = const [],
+    this.areas = const [],
     this.total = 0,
+    this.pendingCount = 0,
+    this.deliveredCount = 0,
   });
+}
+
+class DeliveryAreaFilter {
+  final int id;
+  final String name;
+
+  const DeliveryAreaFilter({
+    required this.id,
+    required this.name,
+  });
+
+  factory DeliveryAreaFilter.fromMap(Map<String, dynamic> map) {
+    return DeliveryAreaFilter(
+      id: asInt(map['id']),
+      name: (map['name'] ?? '').toString(),
+    );
+  }
 }
 
 class DeliveryOutletFilter {

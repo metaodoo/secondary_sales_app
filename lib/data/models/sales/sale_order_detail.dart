@@ -146,6 +146,7 @@ class SaleOrderDetailLine {
     required this.balanceQty,
     required this.damagedExpiredQty,
     required this.damageQualityQty,
+    this.adjustWithBill = false,
     this.uomName,
     required this.priceUnit,
     required this.discount,
@@ -160,6 +161,7 @@ class SaleOrderDetailLine {
   final double balanceQty;
   final double damagedExpiredQty;
   final double damageQualityQty;
+  final bool adjustWithBill;
   final String? uomName;
   final double priceUnit;
   final double discount;
@@ -179,6 +181,7 @@ class SaleOrderDetailLine {
       balanceQty: asDouble(map['balance_qty']),
       damagedExpiredQty: asDouble(map['damaged_expired_qty'] ?? 0.0),
       damageQualityQty: asDouble(map['damage_quality_qty'] ?? 0.0),
+      adjustWithBill: asBool(map['ss_adjust_with_bill']),
       uomName: uom is Map ? asNullableString(uom['name']) : null,
       priceUnit: asDouble(map['price_unit']),
       discount: asDouble(map['discount']),
