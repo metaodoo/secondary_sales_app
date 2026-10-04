@@ -1,4 +1,7 @@
+import 'dart:convert';
+import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 import 'package:secondary_sales/core/theme/app_theme.dart';
 import 'package:secondary_sales/features/modern_trade/mt_return_provider.dart';
@@ -24,6 +27,10 @@ class _MtReturnCreateScreenState extends State<MtReturnCreateScreen> {
   DateTime _selectedDate = DateTime.now();
   final List<Map<String, dynamic>> _lines = [];
 
+  File? _challanImageFile;
+  String? _challanImageBase64;
+  String? _challanImageName;
+
   @override
   void initState() {
     super.initState();
@@ -31,6 +38,35 @@ class _MtReturnCreateScreenState extends State<MtReturnCreateScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<MtReturnProvider>().fetchPrepareContext();
     });
+  }
+
+  Future<void> _pickChallanImage(ImageSource source) async {
+    try {
+      final picker = ImagePicker();
+      final picked = await picker.pickImage(
+        source: source,
+        maxWidth: 1600,
+        maxHeight: 1600,
+        imageQuality: 80,
+      );
+      if (picked == null) return;
+      final file = File(picked.path);
+      final bytes = await file.readAsBytes();
+      final base64Str = base64Encode(bytes);
+      setState(() {
+        _challanImageFile = file;
+        _challanImageBase64 = base64Str;
+        _challanImageName = picked.name.isNotEmpty
+            ? picked.name
+            : 'return_challan_${DateTime.now().millisecondsSinceEpoch}.jpg';
+      });
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to pick photo: $e')),
+        );
+      }
+    }
   }
 
   void _onAddProduct() async {
@@ -102,6 +138,16 @@ class _MtReturnCreateScreenState extends State<MtReturnCreateScreen> {
       }
     }
 
+    if (_challanImageBase64 == null || _challanImageBase64!.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Return Challan Photo Evidence is mandatory for Modern Trade Return.'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
     final dateStr = "${_selectedDate.year}-${_selectedDate.month.toString().padLeft(2, '0')}-${_selectedDate.day.toString().padLeft(2, '0')}";
     final linesPayload = _lines.map((l) {
       return {
@@ -118,6 +164,8 @@ class _MtReturnCreateScreenState extends State<MtReturnCreateScreen> {
       returnBucket: _selectedBucket,
       date: dateStr,
       lines: linesPayload,
+      attachmentBase64: _challanImageBase64,
+      attachmentFilename: _challanImageName,
     );
 
     if (result != null && mounted) {
@@ -273,6 +321,11 @@ class _MtReturnCreateScreenState extends State<MtReturnCreateScreen> {
                 ],
               ),
             ),
+
+            const SizedBox(height: 16),
+
+            // Photo Evidence Card
+            _buildPhotoEvidenceSection(),
 
             const SizedBox(height: 20),
 
@@ -514,6 +567,137 @@ class _MtReturnCreateScreenState extends State<MtReturnCreateScreen> {
           fontWeight: isBold ? FontWeight.w700 : FontWeight.w500,
           color: color,
         ),
+      ),
+    );
+  }
+
+  Widget _buildPhotoEvidenceSection() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: _challanImageFile == null
+              ? Colors.grey.shade200
+              : AppColors.primaryStrong,
+          width: _challanImageFile == null ? 1 : 1.5,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Row(
+            children: [
+              Text(
+                'Challan Photo Evidence',
+                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
+              ),
+              SizedBox(width: 4),
+              Text(
+                '*',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.red,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'Upload a clear photo of the return challan document.',
+            style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+          ),
+          const SizedBox(height: 12),
+          if (_challanImageFile == null)
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: () => _pickChallanImage(ImageSource.camera),
+                    icon: const Icon(Icons.camera_alt_outlined, size: 18),
+                    label: const Text('Camera'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: AppColors.primaryStrong,
+                      side: const BorderSide(color: AppColors.primaryStrong),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: () => _pickChallanImage(ImageSource.gallery),
+                    icon: const Icon(Icons.photo_library_outlined, size: 18),
+                    label: const Text('Gallery'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: AppColors.primaryStrong,
+                      side: const BorderSide(color: AppColors.primaryStrong),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            )
+          else
+            Row(
+              children: [
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(6),
+                  child: Image.file(
+                    _challanImageFile!,
+                    width: 50,
+                    height: 50,
+                    fit: BoxFit.cover,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        _challanImageName ?? 'Photo Attached',
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w600,
+                          fontSize: 13,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const Text(
+                        'Photo Evidence Attached',
+                        style: TextStyle(
+                          color: Colors.green,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                IconButton(
+                  icon: const Icon(
+                    Icons.delete_outline,
+                    color: Colors.red,
+                  ),
+                  onPressed: () {
+                    setState(() {
+                      _challanImageFile = null;
+                      _challanImageBase64 = null;
+                      _challanImageName = null;
+                    });
+                  },
+                ),
+              ],
+            ),
+        ],
       ),
     );
   }

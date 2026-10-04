@@ -404,6 +404,8 @@ extension ModernTradeApi on ApiService {
     String? date,
     bool autoSubmit = false,
     required List<Map<String, dynamic>> lines,
+    String? attachmentBase64,
+    String? attachmentFilename,
   }) async {
     final params = <String, dynamic>{
       'employee_id': _activeEmployeeId,
@@ -412,6 +414,8 @@ extension ModernTradeApi on ApiService {
       'auto_submit': autoSubmit,
       'lines': lines,
       if (date != null) 'date': date,
+      if (attachmentBase64 != null) 'attachment_base64': attachmentBase64,
+      if (attachmentFilename != null) 'attachment_filename': attachmentFilename,
     };
 
     final result = await _post(

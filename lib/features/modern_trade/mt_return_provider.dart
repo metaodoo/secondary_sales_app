@@ -177,6 +177,8 @@ class MtReturnProvider extends ChangeNotifier {
     String? date,
     bool autoSubmit = false,
     required List<Map<String, dynamic>> lines,
+    String? attachmentBase64,
+    String? attachmentFilename,
   }) async {
     _isActionLoading = true;
     _errorMessage = null;
@@ -189,6 +191,8 @@ class MtReturnProvider extends ChangeNotifier {
         date: date,
         autoSubmit: autoSubmit,
         lines: lines,
+        attachmentBase64: attachmentBase64,
+        attachmentFilename: attachmentFilename,
       );
       _selectedReturn = res;
       await fetchReturns(returnBucket: returnBucket, refresh: true);

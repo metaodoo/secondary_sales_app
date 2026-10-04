@@ -67,6 +67,7 @@ class _ValidateDeliveryScreenState extends State<ValidateDeliveryScreen> {
 
   bool get _isMt => widget.businessType == 'mt';
   bool get _isSecondary => widget.saleType == 'secondary';
+  bool get _hideLots => _isSecondary || _isMt;
 
   @override
   void dispose() {
@@ -97,7 +98,7 @@ class _ValidateDeliveryScreenState extends State<ValidateDeliveryScreen> {
             quantityDone: isReadOnly
                 ? line.quantityDone
                 : line.defaultDeliveryQty,
-            lots: _isSecondary
+            lots: _hideLots
                 ? []
                 : (line.lotLines ?? [])
                     .where((l) => l.lotId != null && l.lotId! > 0)
@@ -140,7 +141,8 @@ class _ValidateDeliveryScreenState extends State<ValidateDeliveryScreen> {
 
     // Fetch complete lot lists in the background so the dropdown has all options initially
     final bgLocationId = _locationId ?? prepare.picking.sourceLocationId;
-    if (!isReadOnly && bgLocationId != null && !_isSecondary) {
+    if (!isReadOnly && bgLocationId != null && !_hideLots) {
+
       for (final input in inputs) {
         if (input.move.requiresLots) {
           final productId = input.move.product?.id;
@@ -187,7 +189,7 @@ class _ValidateDeliveryScreenState extends State<ValidateDeliveryScreen> {
     }
 
     // Mirror Odoo: auto-assign FIFO for tracked products with no pre-assigned lots
-    if (!isReadOnly) {
+    if (!isReadOnly && !_hideLots) {
       for (final input in inputs) {
         if (input.move.requiresLots &&
             input.lots.isEmpty &&
@@ -197,6 +199,7 @@ class _ValidateDeliveryScreenState extends State<ValidateDeliveryScreen> {
         }
       }
     }
+
   }
 
   void _setLocation(int? locationId) {
@@ -488,7 +491,8 @@ class _ValidateDeliveryScreenState extends State<ValidateDeliveryScreen> {
         return 'Delivery quantity cannot exceed ordered quantity.';
       }
 
-      if (_isSecondary || !input.move.requiresLots || input.quantityDone <= 0) continue;
+      if (_hideLots || !input.move.requiresLots || input.quantityDone <= 0) continue;
+
     }
     return null;
   }
@@ -692,7 +696,7 @@ class _ValidateDeliveryScreenState extends State<ValidateDeliveryScreen> {
                           isReassigning: _isReassigning[productId] ?? false,
                           reassignError: _reassignErrors[productId],
                           allocatedQty: _allocatedQty(input),
-                          isSecondary: _isSecondary,
+                          hideLots: _hideLots,
                           onRemove: () {
                             setState(() => _inputs.remove(input));
                           },
@@ -1037,7 +1041,7 @@ class _DeliveryLinePanel extends StatelessWidget {
     required this.onLotPlus,
     this.onQuantityInput,
     this.onLotQtyInput,
-    this.isSecondary = false,
+    this.hideLots = false,
   });
 
   final DeliveryLineInput input;
@@ -1059,7 +1063,7 @@ class _DeliveryLinePanel extends StatelessWidget {
   final ValueChanged<double>? onQuantityInput;
   final void Function(DeliveryLotInput lotInput, double quantity)?
   onLotQtyInput;
-  final bool isSecondary;
+  final bool hideLots;
 
   @override
   Widget build(BuildContext context) {
@@ -1138,7 +1142,7 @@ class _DeliveryLinePanel extends StatelessWidget {
                 ),
             ],
           ),
-          if (!isSecondary) ...[
+          if (!hideLots) ...[
             const Divider(height: 28),
             Row(
               children: [
