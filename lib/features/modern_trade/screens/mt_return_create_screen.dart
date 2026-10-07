@@ -46,9 +46,9 @@ class _MtReturnCreateScreenState extends State<MtReturnCreateScreen> {
       final picker = ImagePicker();
       final picked = await picker.pickImage(
         source: source,
-        maxWidth: 1600,
-        maxHeight: 1600,
-        imageQuality: 80,
+        maxWidth: 1280,
+        maxHeight: 1280,
+        imageQuality: 70,
       );
       if (picked == null) return;
       final file = await MediaStorageService.persistPickedFile(picked, category: MediaCategory.damages);

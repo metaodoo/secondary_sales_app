@@ -1,8 +1,10 @@
 import 'dart:convert';
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:secondary_sales/core/services/media_storage_service.dart';
 import 'package:secondary_sales/core/theme/app_theme.dart';
 import 'package:secondary_sales/features/hr/leave_provider.dart';
 
@@ -269,21 +271,36 @@ class _LeaveRequestSheetState extends State<LeaveRequestSheet> {
     try {
       final result = await FilePicker.platform.pickFiles(
         type: FileType.any,
-        withData: true,
+        withData: kIsWeb,
       );
 
       if (result != null && result.files.isNotEmpty) {
-        final file = result.files.first;
-        if (file.bytes != null) {
+        final pickedFile = result.files.first;
+        String? base64Str;
+
+        if (pickedFile.path != null) {
+          final persistent = await MediaStorageService.persistFile(
+            File(pickedFile.path!),
+            category: MediaCategory.documents,
+          );
+          final bytes = await (persistent ?? File(pickedFile.path!)).readAsBytes();
+          base64Str = base64Encode(bytes);
+        } else if (pickedFile.bytes != null) {
+          final persistent = await MediaStorageService.persistBytes(
+            pickedFile.bytes!,
+            category: MediaCategory.documents,
+            originalFileName: pickedFile.name,
+          );
+          final bytes = persistent != null
+              ? await persistent.readAsBytes()
+              : pickedFile.bytes!;
+          base64Str = base64Encode(bytes);
+        }
+
+        if (base64Str != null) {
           setState(() {
-            _attachmentName = file.name;
-            _attachmentBase64 = base64Encode(file.bytes!);
-          });
-        } else if (file.path != null) {
-          final bytes = await File(file.path!).readAsBytes();
-          setState(() {
-            _attachmentName = file.name;
-            _attachmentBase64 = base64Encode(bytes);
+            _attachmentName = pickedFile.name;
+            _attachmentBase64 = base64Str;
           });
         }
       }

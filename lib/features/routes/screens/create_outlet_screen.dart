@@ -94,6 +94,8 @@ class _CreateOutletScreenState extends State<CreateOutletScreen> {
     try {
       final XFile? photo = await picker.pickImage(
         source: ImageSource.camera,
+        maxWidth: 1024,
+        maxHeight: 1024,
         imageQuality: 70,
       );
 

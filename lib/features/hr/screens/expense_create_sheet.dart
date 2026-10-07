@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:file_picker/file_picker.dart';
@@ -76,32 +77,35 @@ class _ExpenseCreateSheetState extends State<ExpenseCreateSheet> {
     try {
       final result = await FilePicker.platform.pickFiles(
         type: FileType.any,
-        withData: true,
+        withData: kIsWeb,
       );
 
       if (result != null && result.files.isNotEmpty) {
-        final file = result.files.first;
+        final pickedFile = result.files.first;
         String? base64Str;
 
-        if (file.bytes != null) {
-          base64Str = base64Encode(file.bytes!);
-          MediaStorageService.persistBytes(
-            file.bytes!,
-            category: MediaCategory.expenses,
-            originalFileName: file.name,
-          );
-        } else if (file.path != null) {
+        if (pickedFile.path != null) {
           final persistent = await MediaStorageService.persistFile(
-            File(file.path!),
+            File(pickedFile.path!),
             category: MediaCategory.expenses,
           );
-          final bytes = await (persistent ?? File(file.path!)).readAsBytes();
+          final bytes = await (persistent ?? File(pickedFile.path!)).readAsBytes();
+          base64Str = base64Encode(bytes);
+        } else if (pickedFile.bytes != null) {
+          final persistent = await MediaStorageService.persistBytes(
+            pickedFile.bytes!,
+            category: MediaCategory.expenses,
+            originalFileName: pickedFile.name,
+          );
+          final bytes = persistent != null
+              ? await persistent.readAsBytes()
+              : pickedFile.bytes!;
           base64Str = base64Encode(bytes);
         }
 
         if (base64Str != null) {
           setState(() {
-            _attachmentName = file.name;
+            _attachmentName = pickedFile.name;
             _attachmentBase64 = base64Str;
           });
         }
