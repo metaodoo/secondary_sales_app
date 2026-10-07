@@ -13,6 +13,7 @@ import 'package:secondary_sales/features/auth/auth_provider.dart';
 import 'package:secondary_sales/features/scraps/scrap_provider.dart';
 import 'package:secondary_sales/features/scraps/screens/scrap_product_selection_screen.dart';
 
+import 'package:secondary_sales/core/widgets/app_camera_capture_dialog.dart';
 import 'package:secondary_sales/core/widgets/searchable_lot_selector.dart';
 import 'package:secondary_sales/core/widgets/ss_ui.dart';
 import 'package:secondary_sales/core/widgets/stock_excess_dialog.dart';
@@ -152,27 +153,37 @@ class _CreateScrapScreenState extends State<CreateScrapScreen> {
 
   Future<void> _pickChallanImage(ImageSource source) async {
     try {
-      final picker = ImagePicker();
-      final picked = await picker.pickImage(
-        source: source,
-        maxWidth: 1280,
-        maxHeight: 1280,
-        imageQuality: 70,
-      );
+      final XFile? picked;
+      if (source == ImageSource.camera) {
+        picked = await AppCameraCaptureDialog.capture(
+          context,
+          title: 'Capture Scrap Photo',
+          helperTip: 'Align the scrap product or document inside the frame',
+        );
+      } else {
+        final picker = ImagePicker();
+        picked = await picker.pickImage(
+          source: source,
+          maxWidth: 1280,
+          maxHeight: 1280,
+          imageQuality: 70,
+        );
+      }
       if (picked == null) return;
+      final photo = picked;
       final persistentFile = await MediaStorageService.persistPickedFile(
-        picked,
+        photo,
         category: MediaCategory.damages,
         customPrefix: 'scrap_challan',
       );
-      final file = persistentFile ?? File(picked.path);
+      final file = persistentFile ?? File(photo.path);
       final bytes = await file.readAsBytes();
       final base64Str = base64Encode(bytes);
       setState(() {
         _challanImageFile = file;
         _challanImageBase64 = base64Str;
-        _challanImageName = picked.name.isNotEmpty
-            ? picked.name
+        _challanImageName = photo.name.isNotEmpty
+            ? photo.name
             : 'return_scrap_${DateTime.now().millisecondsSinceEpoch}.jpg';
       });
     } catch (e) {

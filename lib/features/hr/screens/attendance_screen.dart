@@ -278,7 +278,10 @@ class _AttendanceScreenContentState extends State<_AttendanceScreenContent>
                       onPressed: provider.isActionLoading
                           ? null
                           : () {
-                              provider.performAction(isCheckedIn ? 'check_out' : 'check_in');
+                              provider.performAction(
+                                isCheckedIn ? 'check_out' : 'check_in',
+                                context: context,
+                              );
                             },
                       child: provider.isActionLoading
                           ? Row(

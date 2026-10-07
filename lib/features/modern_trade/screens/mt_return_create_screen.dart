@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
+import 'package:secondary_sales/core/widgets/app_camera_capture_dialog.dart';
 import 'package:secondary_sales/core/services/media_storage_service.dart';
 import 'package:secondary_sales/core/theme/app_theme.dart';
 import 'package:secondary_sales/features/modern_trade/mt_return_provider.dart';
@@ -43,15 +44,25 @@ class _MtReturnCreateScreenState extends State<MtReturnCreateScreen> {
 
   Future<void> _pickChallanImage(ImageSource source) async {
     try {
-      final picker = ImagePicker();
-      final picked = await picker.pickImage(
-        source: source,
-        maxWidth: 1280,
-        maxHeight: 1280,
-        imageQuality: 70,
-      );
+      final XFile? picked;
+      if (source == ImageSource.camera) {
+        picked = await AppCameraCaptureDialog.capture(
+          context,
+          title: 'Capture Return Challan',
+          helperTip: 'Align the return challan document inside the frame',
+        );
+      } else {
+        final picker = ImagePicker();
+        picked = await picker.pickImage(
+          source: source,
+          maxWidth: 1280,
+          maxHeight: 1280,
+          imageQuality: 70,
+        );
+      }
       if (picked == null) return;
-      final file = await MediaStorageService.persistPickedFile(picked, category: MediaCategory.damages);
+      final photo = picked;
+      final file = await MediaStorageService.persistPickedFile(photo, category: MediaCategory.damages);
       if (file == null) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -65,8 +76,8 @@ class _MtReturnCreateScreenState extends State<MtReturnCreateScreen> {
       setState(() {
         _challanImageFile = file;
         _challanImageBase64 = base64Str;
-        _challanImageName = picked.name.isNotEmpty
-            ? picked.name
+        _challanImageName = photo.name.isNotEmpty
+            ? photo.name
             : 'return_challan_${DateTime.now().millisecondsSinceEpoch}.jpg';
       });
     } catch (e) {

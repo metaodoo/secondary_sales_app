@@ -100,6 +100,7 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
     final attendance = context.read<AttendanceProvider>();
     final ok = await attendance.performAction(
       currentlyCheckedIn ? 'check_out' : 'check_in',
+      context: context,
     );
     if (!mounted) return;
     if (ok) {

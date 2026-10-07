@@ -17,11 +17,13 @@ import 'package:secondary_sales/core/theme/app_theme.dart';
 class AppCameraCaptureDialog extends StatefulWidget {
   final String title;
   final String helperTip;
+  final CameraLensDirection initialLensDirection;
 
   const AppCameraCaptureDialog({
     super.key,
     this.title = 'Capture Outlet Photo',
     this.helperTip = 'Align the shop front or signboard within the frame',
+    this.initialLensDirection = CameraLensDirection.back,
   });
 
   /// Opens the lightweight in-app camera modal.
@@ -30,6 +32,7 @@ class AppCameraCaptureDialog extends StatefulWidget {
     BuildContext context, {
     String title = 'Capture Outlet Photo',
     String helperTip = 'Align the shop front or signboard within the frame',
+    CameraLensDirection initialLensDirection = CameraLensDirection.back,
   }) async {
     return Navigator.of(context).push<XFile?>(
       MaterialPageRoute(
@@ -37,6 +40,7 @@ class AppCameraCaptureDialog extends StatefulWidget {
         builder: (ctx) => AppCameraCaptureDialog(
           title: title,
           helperTip: helperTip,
+          initialLensDirection: initialLensDirection,
         ),
       ),
     );
@@ -116,11 +120,18 @@ class _AppCameraCaptureDialogState extends State<AppCameraCaptureDialog>
         return;
       }
 
-      // Default to rear camera if available
-      final backIndex = _availableCameras.indexWhere(
-        (c) => c.lensDirection == CameraLensDirection.back,
+      // Select camera matching requested initial direction (or fallback)
+      final preferredIndex = _availableCameras.indexWhere(
+        (c) => c.lensDirection == widget.initialLensDirection,
       );
-      _selectedCameraIndex = backIndex != -1 ? backIndex : 0;
+      if (preferredIndex != -1) {
+        _selectedCameraIndex = preferredIndex;
+      } else {
+        final backIndex = _availableCameras.indexWhere(
+          (c) => c.lensDirection == CameraLensDirection.back,
+        );
+        _selectedCameraIndex = backIndex != -1 ? backIndex : 0;
+      }
 
       await _initController(_availableCameras[_selectedCameraIndex]);
     } catch (e) {

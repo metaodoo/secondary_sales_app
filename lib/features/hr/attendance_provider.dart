@@ -1,8 +1,10 @@
 import 'dart:async';
 import 'dart:convert';
-import 'package:flutter/foundation.dart';
+import 'package:camera/camera.dart';
+import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:secondary_sales/core/widgets/app_camera_capture_dialog.dart';
 import 'package:secondary_sales/core/services/media_storage_service.dart';
 import 'package:secondary_sales/core/services/location_tracking_service.dart';
 import 'package:secondary_sales/core/services/offline_database_helper.dart';
@@ -293,7 +295,7 @@ class AttendanceProvider extends ChangeNotifier {
     }
   }
 
-  Future<bool> performAction(String action) async {
+  Future<bool> performAction(String action, {BuildContext? context}) async {
     if (_employeeId == 0) return false;
     _isActionLoading = true;
     _errorMessage = null;
@@ -304,14 +306,24 @@ class AttendanceProvider extends ChangeNotifier {
       String? checkInImageBase64;
       if (action == 'check_in') {
         try {
-          final picker = ImagePicker();
-          final XFile? photo = await picker.pickImage(
-            source: ImageSource.camera,
-            preferredCameraDevice: CameraDevice.front,
-            maxWidth: 1024,
-            maxHeight: 1024,
-            imageQuality: 70,
-          );
+          final XFile? photo;
+          if (context != null && context.mounted) {
+            photo = await AppCameraCaptureDialog.capture(
+              context,
+              title: 'Attendance Selfie',
+              helperTip: 'Take a clear selfie for attendance check-in',
+              initialLensDirection: CameraLensDirection.front,
+            );
+          } else {
+            final picker = ImagePicker();
+            photo = await picker.pickImage(
+              source: ImageSource.camera,
+              preferredCameraDevice: CameraDevice.front,
+              maxWidth: 1024,
+              maxHeight: 1024,
+              imageQuality: 70,
+            );
+          }
 
           if (photo == null) {
             _errorMessage = 'Selfie photo is required for attendance log-in.';
