@@ -348,12 +348,9 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
         elevation: 0,
         actions: [
           const NotificationBell(),
-          Padding(
-            padding: const EdgeInsets.only(right: 16),
-            child: ProfileAvatar(
-              onTap: () =>
-                  _open(SettingsTab(onBack: () => Navigator.of(context).pop())),
-            ),
+          const Padding(
+            padding: EdgeInsets.only(right: 16),
+            child: ProfileAvatar(),
           ),
         ],
       ),
