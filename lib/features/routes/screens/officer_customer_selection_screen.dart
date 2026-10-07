@@ -553,6 +553,7 @@ class _OfficerCustomerSelectionScreenState
                           );
 
                           return GestureDetector(
+                            behavior: HitTestBehavior.opaque,
                             onTap: () {
                               _openActionModalFor(
                                 outlet.id,
@@ -837,17 +838,27 @@ class _OfficerCustomerSelectionScreenState
                                                }
                                                setState(() => _checkingInOutletId = outlet.id);
                                                try {
-                                                  // 1. Acquire GPS position FIRST
-                                                  final position = await LocationService.getCurrentPosition(
-                                                    requireFresh: true,
-                                                    timeLimit: const Duration(seconds: 15),
-                                                  );
+                                                  // 1. Acquire GPS position with offline & permission fallback
+                                                  Position? position;
+                                                  try {
+                                                    position = await LocationService.getCurrentPosition(
+                                                      requireFresh: !auth.canSkipAttendanceGeo,
+                                                      timeLimit: const Duration(seconds: 5),
+                                                    );
+                                                  } catch (_) {
+                                                    position = await Geolocator.getLastKnownPosition();
+                                                    if (position == null && !auth.canSkipAttendanceGeo) {
+                                                      rethrow;
+                                                    }
+                                                  }
 
                                                   // 2. Validate Geofence FIRST before letting user take a photo
-                                                  if (outlet.partnerLatitude != null &&
+                                                  if (!auth.canSkipAttendanceGeo &&
+                                                      outlet.partnerLatitude != null &&
                                                       outlet.partnerLongitude != null &&
                                                       outlet.partnerLatitude != 0.0 &&
-                                                      outlet.partnerLongitude != 0.0) {
+                                                      outlet.partnerLongitude != 0.0 &&
+                                                      position != null) {
                                                     final double distanceMeters = Geolocator.distanceBetween(
                                                       position.latitude,
                                                       position.longitude,

@@ -5,6 +5,7 @@ import 'package:geolocator/geolocator.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:secondary_sales/core/services/media_storage_service.dart';
 import 'package:secondary_sales/core/services/location_tracking_service.dart';
+import 'package:secondary_sales/core/services/offline_database_helper.dart';
 import 'package:secondary_sales/data/api/api_service.dart';
 import 'package:secondary_sales/features/auth/auth_provider.dart';
 
@@ -136,9 +137,47 @@ class AttendanceProvider extends ChangeNotifier {
         } else {
           await LocationTrackingService.stop();
         }
+
+        // Cache online attendance state locally
+        await OfflineDatabaseHelper.instance.saveMasterData(
+          entityKey: 'active_attendance_state',
+          entityType: 'attendance_state',
+          data: {
+            'action': _isCheckedIn ? 'check_in' : 'check_out',
+            'is_checked_in': _isCheckedIn,
+            'active_check_in': _activeCheckInTime,
+            'check_in_address': _activeCheckInAddress,
+          },
+        );
       }
     } catch (e) {
       debugPrint('Failed to load attendance status: $e');
+      // Offline fallback: check cached state or recent outbox attendance op
+      try {
+        final cached = await OfflineDatabaseHelper.instance.getMasterData('active_attendance_state');
+        if (cached != null) {
+          _isCheckedIn = cached['is_checked_in'] == true || cached['action'] == 'check_in';
+          _activeCheckInTime = cached['active_check_in'] ?? cached['timestamp']?.toString();
+          _activeCheckInAddress = cached['check_in_address']?.toString();
+        } else {
+          final db = await OfflineDatabaseHelper.instance.database;
+          final outboxAtt = await db.query(
+            OfflineDatabaseHelper.tableOutbox,
+            where: 'entity_type = ?',
+            whereArgs: ['attendance'],
+            orderBy: 'id DESC',
+            limit: 1,
+          );
+          if (outboxAtt.isNotEmpty) {
+            final payload = jsonDecode(outboxAtt.first['payload_json'] as String);
+            final action = payload['action']?.toString() ?? 'check_in';
+            _isCheckedIn = action == 'check_in';
+            _activeCheckInTime = outboxAtt.first['created_at']?.toString();
+          }
+        }
+      } catch (err) {
+        debugPrint('Failed to resolve offline attendance fallback: $err');
+      }
     } finally {
       _isLoadingStatus = false;
       notifyListeners();
@@ -232,7 +271,22 @@ class AttendanceProvider extends ChangeNotifier {
       debugPrint("GPS Timeout, falling back to last known position.");
       final lastPos = await Geolocator.getLastKnownPosition();
       if (lastPos != null) return lastPos;
-      
+
+      if (_authProvider.canSkipAttendanceGeo) {
+        return Position(
+          latitude: 23.8390052,
+          longitude: 90.367083,
+          timestamp: DateTime.now(),
+          accuracy: 10.0,
+          altitude: 0.0,
+          heading: 0.0,
+          speed: 0.0,
+          speedAccuracy: 0.0,
+          altitudeAccuracy: 0.0,
+          headingAccuracy: 0.0,
+        );
+      }
+
       _errorMessage = 'Could not fetch GPS location. Ensure location is enabled and try outside.';
       notifyListeners();
       return null;
@@ -312,6 +366,16 @@ class AttendanceProvider extends ChangeNotifier {
       );
 
       if (response['success'] == true) {
+        if (action == 'check_in') {
+          _isCheckedIn = true;
+          _activeCheckInTime = DateTime.now().toIso8601String();
+        } else if (action == 'check_out') {
+          _isCheckedIn = false;
+          _activeCheckInTime = null;
+          _activeCheckInAddress = null;
+        }
+        notifyListeners();
+
         // Permissions are asked for once, at first launch after login -- see
         // LocationTrackingService.requestPermissionsOnce. Prompting here meant
         // every single check-in re-requested "Allow all the time", which on

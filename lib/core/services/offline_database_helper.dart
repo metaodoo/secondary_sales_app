@@ -244,6 +244,17 @@ class OfflineDatabaseHelper {
       );
     } else if (entityType == 'visit_update') {
       await clearMasterData(entityType: 'visit_state');
+    } else if (entityType == 'attendance') {
+      final action = payload['action']?.toString() ?? 'check_in';
+      await saveMasterData(
+        entityKey: 'active_attendance_state',
+        entityType: 'attendance_state',
+        data: {
+          'action': action,
+          'is_checked_in': action == 'check_in',
+          'timestamp': nowIso,
+        },
+      );
     }
 
     debugPrint(
@@ -318,6 +329,38 @@ class OfflineDatabaseHelper {
       whereArgs: [operationUuid],
     );
     debugPrint('[OfflineDB] Completed & purged outbox op: $operationUuid');
+  }
+
+  /// When a parent visit syncs and receives a server-assigned visit ID,
+  /// this method cascades and patches all pending child operations (e.g. secondary orders)
+  /// that reference this parent_uuid, replacing their synthetic visit_id with the real serverVisitId.
+  Future<void> patchChildVisitId(String parentUuid, int serverVisitId) async {
+    final db = await database;
+    final children = await db.query(
+      tableOutbox,
+      where: 'parent_uuid = ?',
+      whereArgs: [parentUuid],
+    );
+
+    for (final child in children) {
+      final childUuid = child['operation_uuid'] as String;
+      final payloadJsonStr = child['payload_json'] as String;
+      try {
+        final payload = jsonDecode(payloadJsonStr) as Map<String, dynamic>;
+        payload['visit_id'] = serverVisitId;
+        await db.update(
+          tableOutbox,
+          {'payload_json': jsonEncode(payload)},
+          where: 'operation_uuid = ?',
+          whereArgs: [childUuid],
+        );
+        debugPrint(
+          '[OfflineDB] Patched child op $childUuid with real server visit_id: $serverVisitId',
+        );
+      } catch (e) {
+        debugPrint('[OfflineDB] Error patching child payload for $childUuid: $e');
+      }
+    }
   }
 
   /// Quarantines an operation so fatal non-transient errors (e.g. inactive customer)
@@ -403,10 +446,34 @@ class OfflineDatabaseHelper {
         whereArgs: [entityKey],
         limit: 1,
       );
-      if (rows.isEmpty) return null;
-      final dataStr = rows.first['data_json'] as String?;
-      if (dataStr == null || dataStr.isEmpty) return null;
-      return jsonDecode(dataStr);
+      if (rows.isNotEmpty) {
+        final dataStr = rows.first['data_json'] as String?;
+        if (dataStr != null && dataStr.isNotEmpty) {
+          return jsonDecode(dataStr);
+        }
+      }
+
+      // Relational tables fallback bridge (v2/v3 schema)
+      if (entityKey.startsWith('routes')) {
+        final local = await getLocalRoutes();
+        if (local.isNotEmpty) return local;
+      } else if (entityKey == 'catalog_products' || entityKey.startsWith('products')) {
+        final local = await getLocalProducts();
+        if (local.isNotEmpty) return local;
+      } else if (entityKey.startsWith('contacts_route_')) {
+        final suffix = entityKey.replaceFirst('contacts_route_', '');
+        final rId = int.tryParse(suffix);
+        final local = await getLocalOutlets(routeId: rId);
+        if (local.isNotEmpty) return local;
+      } else if (entityKey == 'distributors') {
+        final local = await getLocalDistributors();
+        if (local.isNotEmpty) return local;
+      } else if (entityKey == 'visit_reasons') {
+        final local = await getReferenceMetadata('visit_reasons');
+        if (local != null) return local;
+      }
+
+      return null;
     } catch (e) {
       debugPrint('[OfflineDB] Error reading cached master data $entityKey: $e');
       return null;

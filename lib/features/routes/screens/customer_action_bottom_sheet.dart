@@ -154,17 +154,27 @@ class _CustomerActionBottomSheetState extends State<CustomerActionBottomSheet> {
 
     setState(() => _isCheckingIn = true);
     try {
-      // 1. Acquire GPS position FIRST
-      final position = await LocationService.getCurrentPosition(
-        requireFresh: true,
-        timeLimit: const Duration(seconds: 15),
-      );
+      // 1. Acquire GPS position with offline & permission fallback
+      Position? position;
+      try {
+        position = await LocationService.getCurrentPosition(
+          requireFresh: !authProv.canSkipAttendanceGeo,
+          timeLimit: const Duration(seconds: 5),
+        );
+      } catch (_) {
+        position = await Geolocator.getLastKnownPosition();
+        if (position == null && !authProv.canSkipAttendanceGeo) {
+          rethrow;
+        }
+      }
 
       // 2. Validate Geofence FIRST
-      if (widget.latitude != null &&
+      if (!authProv.canSkipAttendanceGeo &&
+          widget.latitude != null &&
           widget.longitude != null &&
           widget.latitude != 0.0 &&
-          widget.longitude != 0.0) {
+          widget.longitude != 0.0 &&
+          position != null) {
         final double distanceMeters = Geolocator.distanceBetween(
           position.latitude,
           position.longitude,

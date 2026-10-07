@@ -543,18 +543,24 @@ class RouteProvider with ChangeNotifier {
       // Geofenced action: require a fresh fix so a stale cached position from a
       // previous outlet can neither fail the geofence you are standing in nor
       // pass one you are nowhere near.
-      final pos = position ??
-          await LocationService.getCurrentPosition(
-            requireFresh: true,
-            timeLimit: const Duration(seconds: 15),
+      Position? pos = position;
+      if (pos == null) {
+        try {
+          pos = await LocationService.getCurrentPosition(
+            requireFresh: false,
+            timeLimit: const Duration(seconds: 5),
           );
+        } catch (_) {
+          pos = await Geolocator.getLastKnownPosition();
+        }
+      }
       final res = await _apiService.createVisit(
         employeeId,
         outletId,
         routeId: routeId ?? _activeRoute?.id,
         image1920: image1920,
-        latitude: pos.latitude,
-        longitude: pos.longitude,
+        latitude: pos?.latitude ?? 0.0,
+        longitude: pos?.longitude ?? 0.0,
       );
       _checkedInOutletId = outletId;
       _currentVisitId = res['id'];

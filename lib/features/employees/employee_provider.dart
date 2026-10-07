@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:secondary_sales/data/models/employees/sales_employee.dart';
 import 'package:secondary_sales/data/api/api_service.dart';
+import 'package:secondary_sales/core/services/offline_database_helper.dart';
 
 class EmployeeProvider with ChangeNotifier {
   final ApiService _apiService = ApiService.instance;
@@ -146,8 +147,18 @@ class EmployeeProvider with ChangeNotifier {
     _error = null;
     notifyListeners();
     try {
-      return await _apiService.getRoutes(distributorId: distributorId);
+      final routes = await _apiService.getRoutes(distributorId: distributorId);
+      if (routes.isNotEmpty) return routes;
+      return await OfflineDatabaseHelper.instance.getLocalRoutes(
+        distributorId: distributorId,
+      );
     } catch (e) {
+      final local = await OfflineDatabaseHelper.instance.getLocalRoutes(
+        distributorId: distributorId,
+      );
+      if (local.isNotEmpty) {
+        return local;
+      }
       _error = e.toString();
       return [];
     } finally {

@@ -193,16 +193,43 @@ class OfflineSyncEngine with WidgetsBindingObserver {
         payload,
       );
 
-      final isSuccess = response['success'] == true;
+      final respSuccess = response['success'] == true;
+      final errorMsg =
+          response['message']?.toString() ?? 'Unknown server rejection';
+      final lowerMsg = errorMsg.toLowerCase();
+
+      // Idempotency: If server returns success OR an idempotent state confirmation
+      // (e.g. rep already logged in/out, outlet already checked in, duplicate record exists),
+      // treat the operation as completed rather than stalling the queue.
+      final isIdempotentSuccess = lowerMsg.contains('already logged in') ||
+          lowerMsg.contains('already logged out') ||
+          lowerMsg.contains('already signed in') ||
+          lowerMsg.contains('already signed out') ||
+          lowerMsg.contains('already checked in') ||
+          lowerMsg.contains('already synced') ||
+          lowerMsg.contains('already exists') ||
+          lowerMsg.contains('duplicate');
+
+      final isSuccess = respSuccess || isIdempotentSuccess;
+
       if (isSuccess) {
+        // If this operation returned a server-assigned ID (e.g. visit create returned data.id),
+        // cascade and patch any pending child operations in the outbox queue.
+        final respData = response['data'];
+        if (respData is Map && respData['id'] != null) {
+          final serverId = int.tryParse(respData['id'].toString());
+          if (serverId != null && serverId > 0) {
+            await _dbHelper.patchChildVisitId(opUuid, serverId);
+          }
+        }
+
         await _dbHelper.markOperationCompleted(opUuid);
         debugPrint(
-          '[OfflineSyncEngine] Operation $opUuid synced successfully.',
+          '[OfflineSyncEngine] Operation $opUuid synced successfully'
+          '${isIdempotentSuccess ? ' (idempotent duplicate detected)' : ''}.',
         );
         return true;
       } else {
-        final errorMsg =
-            response['message']?.toString() ?? 'Unknown server rejection';
         final isFatalBusinessError = _isNonTransientError(errorMsg);
 
         if (isFatalBusinessError || currentRetries >= kMaxOutboxRetries) {
