@@ -178,6 +178,13 @@ await dbHelper.executeTransaction((txn) async {
 4. **Lifecycle Trigger**: Fires on `AppLifecycleState.resumed`.
 5. **Manual Trigger**: "Sync Now" button on the Offline & Outbox screen.
 
+### 6.1 Debounced Real-Time FCM Delta Stock Push (Multi-Officer Guard)
+When multiple sales officers operate under the same distributor, warehouse inventory changes (e.g. primary inward receipts, other officer confirmed orders, returns) broadcast delta updates to related active apps:
+1. **Odoo 2-Minute Server Debounce & Batching**: Distributor stock moves are queued and debounced for 2 minutes before emitting an FCM multicast message, aggregating all modified products under that distributor into a single batch.
+2. **FCM Collapse Key**: Sent with `collapse_key: "dist_stock_<distributor_id>"` and `priority: normal`, ensuring zero device notification queue churn and zero unneeded battery wake-locks during Doze mode.
+3. **Instant Mobile SQLite Update**: Mobile app `PushNotificationService` captures `distributor_stock_delta` messages, updating `local_distributor_stocks` via atomic SQL with 0 network calls and notifying active UI cart/catalog providers.
+4. **Offline Resilience**: Officers out of network range during an FCM push automatically catch up on reconnecting via the Phase 2 master data sync after clearing their outbox in Phase 1.
+
 ---
 
 ## 7. Verification & Testing Strategy
