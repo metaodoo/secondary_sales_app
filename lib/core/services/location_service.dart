@@ -79,8 +79,12 @@ class LocationService {
   /// Captures a high-accuracy GPS fix by streaming satellite positions and
   /// sampling until an accurate reading is obtained (accuracy <= [desiredAccuracyInMeters])
   /// or until [timeLimit] elapses, returning the highest precision fix recorded.
+  ///
+  /// Fixes coarser than [maxAcceptableAccuracyInMeters] (e.g. 1-3 km cell towers)
+  /// are rejected on timeout to prevent saving false locations.
   static Future<Position> getAccuratePosition({
-    double desiredAccuracyInMeters = 30.0,
+    double desiredAccuracyInMeters = 25.0,
+    double maxAcceptableAccuracyInMeters = 100.0,
     Duration timeLimit = const Duration(seconds: 12),
   }) async {
     final bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
@@ -113,7 +117,7 @@ class LocationService {
       if (bestPosition == null || pos.accuracy < bestPosition!.accuracy) {
         bestPosition = pos;
       }
-      // Once we reach target accuracy (e.g. <= 30m), resolve immediately!
+      // Once we reach target accuracy (e.g. <= 25m), resolve immediately!
       if (pos.accuracy <= desiredAccuracyInMeters && !completer.isCompleted) {
         completer.complete(pos);
       }
@@ -138,12 +142,18 @@ class LocationService {
 
     final timer = Timer(timeLimit, () {
       if (!completer.isCompleted) {
-        if (bestPosition != null) {
+        if (bestPosition != null &&
+            bestPosition!.accuracy > 0 &&
+            bestPosition!.accuracy <= maxAcceptableAccuracyInMeters) {
           completer.complete(bestPosition);
         } else {
+          final accDetail = bestPosition != null && bestPosition!.accuracy > 0
+              ? ' (accuracy ±${bestPosition!.accuracy.round()}m is too coarse)'
+              : '';
           completer.completeError(
             Exception(
-              'Could not get an accurate GPS fix. Please ensure you have a clear view of the sky and try again.',
+              'Could not get an accurate GPS satellite fix$accDetail. '
+              'Please ensure you have a clear view of the sky and try again.',
             ),
           );
         }

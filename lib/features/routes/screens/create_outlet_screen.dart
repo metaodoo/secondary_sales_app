@@ -131,13 +131,15 @@ class _CreateOutletScreenState extends State<CreateOutletScreen> {
 
     try {
       Position position;
-      // If the background warmup already has a sharp satellite fix (<= 25m), use it
+      // If the background warmup already has a sharp satellite fix (<= 25m), use it immediately!
       if (_warmedPosition != null && _warmedPosition!.accuracy <= 25.0) {
         position = _warmedPosition!;
       } else {
+        // Sample high-accuracy GPS for up to 6 seconds directly at the shop entrance
         position = await LocationService.getAccuratePosition(
-          desiredAccuracyInMeters: 30.0,
-          timeLimit: const Duration(seconds: 12),
+          desiredAccuracyInMeters: 25.0,
+          maxAcceptableAccuracyInMeters: 100.0,
+          timeLimit: const Duration(seconds: 6),
         );
       }
 
@@ -522,6 +524,7 @@ class _CreateOutletScreenState extends State<CreateOutletScreen> {
                                   children: [
                                     Image.file(
                                       _capturedPhoto!,
+                                      cacheWidth: 600,
                                       width: double.infinity,
                                       height: double.infinity,
                                       fit: BoxFit.cover,
@@ -546,14 +549,14 @@ class _CreateOutletScreenState extends State<CreateOutletScreen> {
                                               ),
                                               const SizedBox(width: 4),
                                               Text(
-                                                _capturedLatitude != null &&
-                                                        _capturedLongitude !=
-                                                            null
-                                                    ? 'Lat: ${_capturedLatitude!.toStringAsFixed(6)}, Lon: ${_capturedLongitude!.toStringAsFixed(6)}'
-                                                    : _isResolvingAddress
-                                                    ? 'Getting location…'
-                                                    : (_locationError ??
-                                                          'Location not captured'),
+                                                _isResolvingAddress && _capturedLatitude == null
+                                                    ? 'Locking shop GPS coordinates…'
+                                                    : _capturedLatitude != null &&
+                                                            _capturedLongitude !=
+                                                                null
+                                                        ? 'Lat: ${_capturedLatitude!.toStringAsFixed(6)}, Lon: ${_capturedLongitude!.toStringAsFixed(6)}${_capturedAccuracy != null ? ' (±${_capturedAccuracy!.round()}m)' : ''}'
+                                                        : (_locationError ??
+                                                              'Location not captured'),
                                                 style: const TextStyle(
                                                   color: Colors.white,
                                                   fontWeight: FontWeight.bold,
