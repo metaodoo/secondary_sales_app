@@ -72,6 +72,18 @@ class MediaStorageService {
       // Always save compressed images as .jpg
       final safeTargetPath = p.setExtension(targetPath, '.jpg');
 
+      // If the source image is already reasonably small (< 400KB) and has .jpg/.jpeg extension,
+      // it was likely already downsampled and compressed by ImagePicker (e.g. maxWidth: 1024, imageQuality: 70).
+      // Bypassing a redundant C++/NDK FlutterImageCompress avoids heavy native allocations and OOM crashes
+      // on 3GB RAM devices (like Oppo A17k).
+      if (sourceLength < 400 * 1024 && (ext.toLowerCase() == '.jpg' || ext.toLowerCase() == '.jpeg')) {
+        debugPrint(
+          '[MediaStorageService] Image already optimized (${(sourceLength / 1024).toStringAsFixed(1)} KB). '
+          'Skipping secondary NDK compression to preserve low-end device RAM.',
+        );
+        return await sourceFile.copy(safeTargetPath);
+      }
+
       final XFile? compressedXFile = await FlutterImageCompress.compressAndGetFile(
         sourceFile.absolute.path,
         safeTargetPath,

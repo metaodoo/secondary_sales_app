@@ -17,6 +17,7 @@ import 'package:geolocator/geolocator.dart';
 import 'package:secondary_sales/core/services/location_service.dart';
 import 'package:secondary_sales/core/util/proximity_helper.dart';
 import 'package:secondary_sales/core/util/dialog_helper.dart';
+import 'package:secondary_sales/core/widgets/app_camera_capture_dialog.dart';
 import 'package:secondary_sales/core/widgets/ss_ui.dart';
 
 class OfficerCustomerSelectionScreen extends StatefulWidget {
@@ -875,12 +876,10 @@ class _OfficerCustomerSelectionScreenState
 
                                                   String? imageB64;
                                                   if (auth.canView(AppScreen.newJointVisit)) {
-                                                    final ImagePicker picker = ImagePicker();
-                                                    final XFile? photo = await picker.pickImage(
-                                                      source: ImageSource.camera,
-                                                      imageQuality: 70,
-                                                      maxWidth: 1024,
-                                                      maxHeight: 1024,
+                                                    final XFile? photo = await AppCameraCaptureDialog.capture(
+                                                      context,
+                                                      title: 'Joint Visit Check-in',
+                                                      helperTip: 'Take a check-in photo with the outlet owner',
                                                     );
                                                     if (photo == null) {
                                                       if (context.mounted) {

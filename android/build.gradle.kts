@@ -37,6 +37,12 @@ subprojects {
     }
     if (state.executed) forceCompileSdk() else afterEvaluate { forceCompileSdk() }
 
+    afterEvaluate {
+        configurations.findByName("compileOnly")?.let {
+            dependencies.add("compileOnly", "androidx.concurrent:concurrent-futures:1.2.0")
+        }
+    }
+
     project.evaluationDependsOn(":app")
 }
 

@@ -11,7 +11,9 @@ import 'package:image_picker/image_picker.dart';
 import 'package:secondary_sales/core/services/media_storage_service.dart';
 import 'package:secondary_sales/features/my_team/my_team_provider.dart';
 import 'package:secondary_sales/core/util/dialog_helper.dart';
+import 'package:secondary_sales/core/widgets/app_camera_capture_dialog.dart';
 import 'package:secondary_sales/core/widgets/ss_ui.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class CreateOutletScreen extends StatefulWidget {
   final int routeId;
@@ -49,9 +51,12 @@ class _CreateOutletScreenState extends State<CreateOutletScreen> {
 
   int? _selectedOutletTypeId;
 
+  static const String _kDraftPrefix = 'outlet_create_draft_';
+
   @override
   void initState() {
     super.initState();
+    _restoreDraftAndLostData();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final provider = Provider.of<RouteProvider>(context, listen: false);
       provider.fetchOutletTypes();
@@ -59,10 +64,101 @@ class _CreateOutletScreenState extends State<CreateOutletScreen> {
     });
   }
 
+  Future<void> _persistDraft({bool isCapturingPhoto = false}) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('${_kDraftPrefix}name', _nameController.text);
+      await prefs.setString('${_kDraftPrefix}phone', _phoneController.text);
+      await prefs.setString('${_kDraftPrefix}owner', _ownerNameController.text);
+      await prefs.setString('${_kDraftPrefix}address', _addressController.text);
+      await prefs.setInt('${_kDraftPrefix}route_id', widget.routeId);
+      await prefs.setString('${_kDraftPrefix}route_name', widget.routeName);
+      await prefs.setString('${_kDraftPrefix}distributor_name', widget.distributorName);
+      if (_selectedOutletTypeId != null) {
+        await prefs.setInt('${_kDraftPrefix}type_id', _selectedOutletTypeId!);
+      }
+      await prefs.setBool('outlet_creation_pending_photo', isCapturingPhoto);
+    } catch (e) {
+      debugPrint('[CreateOutletScreen] Error saving draft: $e');
+    }
+  }
+
+  Future<void> _loadDraft() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final draftRouteId = prefs.getInt('${_kDraftPrefix}route_id');
+      if (draftRouteId == widget.routeId) {
+        final name = prefs.getString('${_kDraftPrefix}name') ?? '';
+        final phone = prefs.getString('${_kDraftPrefix}phone') ?? '';
+        final owner = prefs.getString('${_kDraftPrefix}owner') ?? '';
+        final address = prefs.getString('${_kDraftPrefix}address') ?? '';
+        final typeId = prefs.getInt('${_kDraftPrefix}type_id');
+
+        if (_nameController.text.isEmpty && name.isNotEmpty) {
+          _nameController.text = name;
+        }
+        if (_phoneController.text.isEmpty && phone.isNotEmpty) {
+          _phoneController.text = phone;
+        }
+        if (_ownerNameController.text.isEmpty && owner.isNotEmpty) {
+          _ownerNameController.text = owner;
+        }
+        if (_addressController.text.isEmpty && address.isNotEmpty) {
+          _addressController.text = address;
+        }
+        if (_selectedOutletTypeId == null && typeId != null) {
+          _selectedOutletTypeId = typeId;
+        }
+      }
+    } catch (e) {
+      debugPrint('[CreateOutletScreen] Error loading draft: $e');
+    }
+  }
+
+  Future<void> _restoreDraftAndLostData() async {
+    await _loadDraft();
+
+    // Recover lost photo if Android OS destroyed MainActivity while camera was open
+    try {
+      final ImagePicker picker = ImagePicker();
+      final LostDataResponse response = await picker.retrieveLostData();
+      if (!response.isEmpty) {
+        if (response.file != null) {
+          debugPrint(
+            '[CreateOutletScreen] Recovered lost image from Android activity recreation: ${response.file!.path}',
+          );
+          await _handleCapturedPhoto(response.file!);
+        } else if (response.exception != null) {
+          debugPrint(
+            '[CreateOutletScreen] LostDataResponse exception: ${response.exception}',
+          );
+        }
+      }
+    } catch (e) {
+      debugPrint('[CreateOutletScreen] Error retrieving lost camera data: $e');
+    }
+  }
+
+  static Future<void> clearDraft() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove('${_kDraftPrefix}name');
+      await prefs.remove('${_kDraftPrefix}phone');
+      await prefs.remove('${_kDraftPrefix}owner');
+      await prefs.remove('${_kDraftPrefix}address');
+      await prefs.remove('${_kDraftPrefix}route_id');
+      await prefs.remove('${_kDraftPrefix}route_name');
+      await prefs.remove('${_kDraftPrefix}distributor_name');
+      await prefs.remove('${_kDraftPrefix}type_id');
+      await prefs.setBool('outlet_creation_pending_photo', false);
+    } catch (_) {}
+  }
+
   /// Silently wakes up the GPS satellite receiver in the background so that
   /// satellite lock is established by the time the rep snaps the outlet photo.
   void _startGpsWarmup() {
     try {
+      _warmupSubscription?.cancel();
       _warmupSubscription = Geolocator.getPositionStream(
         locationSettings: const LocationSettings(
           accuracy: LocationAccuracy.best,
@@ -89,28 +185,55 @@ class _CreateOutletScreenState extends State<CreateOutletScreen> {
     super.dispose();
   }
 
-  Future<void> _captureOutletPhoto() async {
-    final ImagePicker picker = ImagePicker();
-    try {
-      final XFile? photo = await picker.pickImage(
-        source: ImageSource.camera,
-        maxWidth: 1024,
-        maxHeight: 1024,
-        imageQuality: 70,
-      );
+  Future<void> _handleCapturedPhoto(XFile photo) async {
+    final persistentFile = await MediaStorageService.persistPickedFile(
+      photo,
+      category: MediaCategory.outlets,
+      customPrefix: 'outlet_registration',
+    );
 
-      if (photo == null) return;
-
-      final persistentFile = await MediaStorageService.persistPickedFile(
-        photo,
-        category: MediaCategory.outlets,
-        customPrefix: 'outlet_registration',
-      );
-
+    if (mounted) {
       setState(() => _capturedPhoto = persistentFile ?? File(photo.path));
+    }
 
-      // Always capture GPS location freshly at the moment the photo is taken
-      await _captureLocation();
+    // Always capture GPS location freshly at the moment the photo is taken
+    await _captureLocation();
+
+    // Mark photo capture completed
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool('outlet_creation_pending_photo', false);
+    } catch (_) {}
+  }
+
+  Future<void> _captureOutletPhoto() async {
+    // 1. Pause continuous GPS warmup to free CPU and memory for the camera session
+    _warmupSubscription?.cancel();
+    _warmupSubscription = null;
+
+    // 2. Persist current draft form state so it survives any unexpected low-memory activity kills
+    await _persistDraft(isCapturingPhoto: true);
+    if (!mounted) return;
+
+    try {
+      // 3. Launch lightweight in-app camera dialog (stays in foreground, ~35MB RAM, no activity destruction)
+      final XFile? photo = await AppCameraCaptureDialog.capture(
+        context,
+        title: 'Capture Outlet Photo',
+        helperTip: 'Align the shop front or signboard within the frame',
+      );
+
+      if (photo == null) {
+        // User backed out of camera without taking photo
+        try {
+          final prefs = await SharedPreferences.getInstance();
+          await prefs.setBool('outlet_creation_pending_photo', false);
+        } catch (_) {}
+        _startGpsWarmup();
+        return;
+      }
+
+      await _handleCapturedPhoto(photo);
     } catch (e) {
       if (!mounted) return;
       setState(() => _isResolvingAddress = false);
@@ -250,6 +373,7 @@ class _CreateOutletScreenState extends State<CreateOutletScreen> {
       if (!mounted) return;
 
       if (newOutlet != null) {
+        await clearDraft();
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Outlet created successfully')),
         );
@@ -311,7 +435,10 @@ class _CreateOutletScreenState extends State<CreateOutletScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(
+                Wrap(
+                  spacing: 6,
+                  runSpacing: 2,
+                  crossAxisAlignment: WrapCrossAlignment.center,
                   children: [
                     Text(
                       hasFix ? 'Outlet Location Captured' : 'Outlet Location *',
@@ -321,8 +448,7 @@ class _CreateOutletScreenState extends State<CreateOutletScreen> {
                         color: hasFix ? AppColors.textPrimary : accent,
                       ),
                     ),
-                    if (hasFix && acc != null) ...[
-                      const SizedBox(width: 6),
+                    if (hasFix && acc != null)
                       Container(
                         padding: const EdgeInsets.symmetric(
                           horizontal: 5,
@@ -359,7 +485,6 @@ class _CreateOutletScreenState extends State<CreateOutletScreen> {
                           ),
                         ),
                       ),
-                    ],
                   ],
                 ),
                 const SizedBox(height: 2),
