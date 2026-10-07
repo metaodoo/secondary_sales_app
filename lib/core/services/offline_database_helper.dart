@@ -424,6 +424,13 @@ class OfflineDatabaseHelper {
       );
     } else {
       await db.delete(tableMasterCache);
+      await db.delete(tableDistributors);
+      await db.delete(tableRoutes);
+      await db.delete(tableOutlets);
+      await db.delete(tableVans);
+      await db.delete(tableProductsStock);
+      await db.delete(tableDistributorStocks);
+      await db.delete(tableReferenceMetadata);
     }
   }
 
@@ -469,19 +476,124 @@ class OfflineDatabaseHelper {
     );
   }
 
-  /// Retrieves all cached master data metadata entries.
+  /// Retrieves all cached master data metadata entries, including relational tables and legacy cache.
   Future<List<Map<String, dynamic>>> getAllMasterData() async {
     final db = await database;
-    return db.query(
+    final List<Map<String, dynamic>> results = [];
+
+    // 1. Relational Outlets
+    final outlets = await getLocalOutlets();
+    if (outlets.isNotEmpty) {
+      final latest = await db.query(tableOutlets, columns: ['updated_at'], orderBy: 'updated_at DESC', limit: 1);
+      results.add({
+        'entity_key': 'outlets',
+        'entity_type': 'Outlets',
+        'updated_at': latest.isNotEmpty ? latest.first['updated_at'] : DateTime.now().toIso8601String(),
+        'data_json': jsonEncode(outlets),
+      });
+    }
+
+    // 2. Relational Routes
+    final routes = await getLocalRoutes();
+    if (routes.isNotEmpty) {
+      final latest = await db.query(tableRoutes, columns: ['updated_at'], orderBy: 'updated_at DESC', limit: 1);
+      results.add({
+        'entity_key': 'routes',
+        'entity_type': 'Routes & Beats',
+        'updated_at': latest.isNotEmpty ? latest.first['updated_at'] : DateTime.now().toIso8601String(),
+        'data_json': jsonEncode(routes),
+      });
+    }
+
+    // 3. Relational Products
+    final products = await getLocalProducts();
+    if (products.isNotEmpty) {
+      final latest = await db.query(tableProductsStock, columns: ['updated_at'], orderBy: 'updated_at DESC', limit: 1);
+      results.add({
+        'entity_key': 'products',
+        'entity_type': 'Products & Catalog',
+        'updated_at': latest.isNotEmpty ? latest.first['updated_at'] : DateTime.now().toIso8601String(),
+        'data_json': jsonEncode(products),
+      });
+    }
+
+    // 4. Relational Distributors
+    final distributors = await getLocalDistributors();
+    if (distributors.isNotEmpty) {
+      final latest = await db.query(tableDistributors, columns: ['updated_at'], orderBy: 'updated_at DESC', limit: 1);
+      results.add({
+        'entity_key': 'distributors',
+        'entity_type': 'Distributors',
+        'updated_at': latest.isNotEmpty ? latest.first['updated_at'] : DateTime.now().toIso8601String(),
+        'data_json': jsonEncode(distributors),
+      });
+    }
+
+    // 5. Relational Distributor Stocks
+    final distStocks = await db.query(tableDistributorStocks, limit: 500);
+    if (distStocks.isNotEmpty) {
+      final latest = await db.query(tableDistributorStocks, columns: ['updated_at'], orderBy: 'updated_at DESC', limit: 1);
+      results.add({
+        'entity_key': 'distributor_stocks',
+        'entity_type': 'Distributor Warehouse Stock',
+        'updated_at': latest.isNotEmpty ? latest.first['updated_at'] : DateTime.now().toIso8601String(),
+        'data_json': jsonEncode(distStocks),
+      });
+    }
+
+    // 6. Relational Vans
+    final vans = await getLocalVans();
+    if (vans.isNotEmpty) {
+      final latest = await db.query(tableVans, columns: ['updated_at'], orderBy: 'updated_at DESC', limit: 1);
+      results.add({
+        'entity_key': 'vans',
+        'entity_type': 'Delivery Vans',
+        'updated_at': latest.isNotEmpty ? latest.first['updated_at'] : DateTime.now().toIso8601String(),
+        'data_json': jsonEncode(vans),
+      });
+    }
+
+    // 7. Reference Metadata
+    final refMeta = await db.query(tableReferenceMetadata);
+    if (refMeta.isNotEmpty) {
+      final latest = await db.query(tableReferenceMetadata, columns: ['updated_at'], orderBy: 'updated_at DESC', limit: 1);
+      results.add({
+        'entity_key': 'visit_reasons',
+        'entity_type': 'Reference Metadata',
+        'updated_at': latest.isNotEmpty ? latest.first['updated_at'] : DateTime.now().toIso8601String(),
+        'data_json': jsonEncode(refMeta),
+      });
+    }
+
+    // Legacy tableMasterCache entries
+    final legacy = await db.query(
       tableMasterCache,
       columns: ['entity_key', 'entity_type', 'updated_at', 'data_json'],
       orderBy: 'updated_at DESC',
     );
+    results.addAll(legacy);
+
+    return results;
   }
 
   /// Deletes a specific cached master data key.
   Future<void> deleteMasterDataKey(String entityKey) async {
     final db = await database;
+    if (entityKey == 'outlets') {
+      await db.delete(tableOutlets);
+    } else if (entityKey == 'routes') {
+      await db.delete(tableRoutes);
+    } else if (entityKey == 'products') {
+      await db.delete(tableProductsStock);
+    } else if (entityKey == 'distributors') {
+      await db.delete(tableDistributors);
+    } else if (entityKey == 'distributor_stocks') {
+      await db.delete(tableDistributorStocks);
+    } else if (entityKey == 'vans') {
+      await db.delete(tableVans);
+    } else if (entityKey == 'visit_reasons') {
+      await db.delete(tableReferenceMetadata);
+    }
     await db.delete(
       tableMasterCache,
       where: 'entity_key = ?',
