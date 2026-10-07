@@ -70,18 +70,28 @@ Stores outlets under the officer's routes:
 * *Indexes:* `idx_local_outlets_route` on `route_id`, `idx_local_outlets_coords` on `(latitude, longitude)`
 
 #### `local_products_stock`
-Stores product catalog with live stock balances:
+Stores master product catalog with van stock:
 * `id` INTEGER PRIMARY KEY
 * `name` TEXT NOT NULL
 * `default_code` TEXT
 * `barcode` TEXT
 * `unit_price` REAL NOT NULL DEFAULT 0.0
 * `uom_name` TEXT
+* `category_id` INTEGER
 * `category_name` TEXT
-* `distributor_stock` REAL NOT NULL DEFAULT 0.0
 * `van_stock` REAL NOT NULL DEFAULT 0.0
 * `updated_at` TEXT NOT NULL
 * *Indexes:* `idx_local_products_code` on `default_code`, `idx_local_products_category` on `category_name`
+
+#### `local_distributor_stocks`
+Stores warehouse stock per distributor for secondary sales order booking:
+* `distributor_id` INTEGER NOT NULL
+* `product_id` INTEGER NOT NULL
+* `stock_qty` REAL NOT NULL DEFAULT 0.0
+* `nearest_expiry` TEXT
+* `updated_at` TEXT NOT NULL
+* *Primary Key:* `(distributor_id, product_id)`
+* *Indexes:* `idx_dist_stock_dist` on `distributor_id`, `idx_dist_stock_prod` on `product_id`
 
 #### `local_vans`
 Stores virtual van loading locations linked to the officer:
@@ -116,7 +126,7 @@ Only executed when Phase 1 finishes with zero pending items:
 2. `GET /api/v1/ss/routes` (employee_id) $\rightarrow$ populate `local_routes`.
 3. For each route: `GET /api/v1/ss/routes/<route_id>` $\rightarrow$ populate `local_outlets`.
 4. `GET /api/v1/virtual-locations` (employee_id) $\rightarrow$ populate `local_vans`.
-5. `GET /api/v1/products` (sale_type = 'secondary', partner_id = distributor_id) $\rightarrow$ populate `local_products_stock` with both `distributor_stock` and `van_stock`.
+5. For each assigned distributor: `GET /api/v1/products` (`sale_type = 'secondary'`, `partner_id = distributor.id`) $\rightarrow$ populate `local_products_stock` (master catalog details and van stock) and `local_distributor_stocks` (`distributor_id`, `product_id`, `stock_qty`, `nearest_expiry`).
 6. `GET /api/v1/visits/reasons` $\rightarrow$ populate `local_reference_metadata`.
 7. All inbound entities are written in a single atomic SQLite transaction (`db.transaction()`). If network interrupts midway, transaction rolls back cleanly without partial corruption.
 
@@ -126,10 +136,16 @@ Only executed when Phase 1 finishes with zero pending items:
 
 ### 5.1 Secondary Sale Order Placement
 ```dart
-// 1. Check local stock
+// 1. Check local stock (both van stock and distributor stock)
 final product = await dbHelper.getLocalProduct(productId);
-if (product.vanStock < requestedQty) {
-  final proceed = await showSoftWarningDialog('Requested qty exceeds remaining van stock (${product.vanStock}). Proceed?');
+final distStock = await dbHelper.getDistributorStock(distributorId, productId);
+
+// Evaluates available stock based on fulfillment mode (van spot delivery or distributor warehouse dispatch)
+final availableStock = isVanDelivery ? product.vanStock : distStock;
+if (availableStock < requestedQty) {
+  final proceed = await showSoftWarningDialog(
+    'Requested qty exceeds remaining stock ($availableStock). Proceed anyway?',
+  );
   if (!proceed) return;
 }
 
