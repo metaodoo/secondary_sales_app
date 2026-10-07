@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:firebase_core/firebase_core.dart';
@@ -6,6 +7,7 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
+import 'package:secondary_sales/core/services/offline_database_helper.dart';
 import 'package:secondary_sales/data/api/api_service.dart';
 import 'package:secondary_sales/data/models/notifications/app_notification.dart';
 import 'package:secondary_sales/features/notifications/notification_router.dart';
@@ -34,6 +36,7 @@ class PushNotificationService {
       await Firebase.initializeApp();
       await _messaging.requestPermission(alert: true, badge: true, sound: true);
 
+      FirebaseMessaging.onMessage.listen(_handleForegroundMessage);
       FirebaseMessaging.onMessageOpenedApp.listen(_handleNotificationTap);
 
       final initialMessage = await _messaging.getInitialMessage();
@@ -196,5 +199,40 @@ class PushNotificationService {
       }
       unawaited(NotificationRouter.open(currentNavigator, link));
     });
+  }
+
+  static Future<void> _handleForegroundMessage(RemoteMessage message) async {
+    final data = message.data;
+    if (data['type'] == 'distributor_stock_delta') {
+      await _processStockDeltaMessage(data);
+    }
+  }
+
+  static Future<void> _processStockDeltaMessage(Map<String, dynamic> data) async {
+    try {
+      final distributorId = int.tryParse(data['distributor_id']?.toString() ?? '');
+      final updatesStr = data['updates']?.toString();
+      if (distributorId == null || updatesStr == null) return;
+
+      final updates = jsonDecode(updatesStr) as List;
+      for (final item in updates) {
+        if (item is Map) {
+          final productId = int.tryParse(item['product_id']?.toString() ?? '');
+          final stock = (item['stock'] as num?)?.toDouble() ?? 0.0;
+          if (productId != null && productId > 0) {
+            await OfflineDatabaseHelper.instance.updateSingleDistributorStock(
+              distributorId,
+              productId,
+              stock,
+            );
+          }
+        }
+      }
+      debugPrint(
+        '[PushNotificationService] Processed distributor stock delta for dist #$distributorId: ${updates.length} items.',
+      );
+    } catch (e) {
+      debugPrint('[PushNotificationService] Error processing stock delta: $e');
+    }
   }
 }

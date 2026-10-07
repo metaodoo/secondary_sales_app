@@ -7,6 +7,7 @@ import 'package:secondary_sales/data/models/sales/delivery_prepare.dart';
 import 'package:secondary_sales/data/models/inventory/warehouse.dart';
 import 'package:secondary_sales/data/api/api_service.dart';
 
+import 'package:secondary_sales/core/services/offline_database_helper.dart';
 import 'package:secondary_sales/data/models/sales/product_category.dart';
 
 class PrimarySaleProvider with ChangeNotifier {
@@ -262,6 +263,44 @@ class PrimarySaleProvider with ChangeNotifier {
       _totalProductCount = res.totalCount;
       return res.products;
     } catch (e) {
+      try {
+        final local = await OfflineDatabaseHelper.instance.getLocalProducts(
+          categoryId: categoryId,
+          search: query,
+          inStockOnly: inStockOnly ?? false,
+        );
+        if (local.isNotEmpty) {
+          final mapped = <Product>[];
+          for (final row in local) {
+            final pId = row['id'] as int;
+            double? distStock;
+            if (partnerId != null && partnerId > 0) {
+              distStock = await OfflineDatabaseHelper.instance.getDistributorStock(
+                partnerId,
+                pId,
+              );
+            }
+            mapped.add(Product(
+              id: pId,
+              name: row['name'] as String,
+              code: row['default_code'] as String?,
+              price: (row['unit_price'] as num?)?.toDouble() ?? 0.0,
+              uom: row['uom_name'] as String? ?? 'Unit',
+              stock: (row['van_stock'] as num?)?.toDouble(),
+              distributorStock: distStock,
+              categoryId: row['category_id'] as int?,
+              categoryName: row['category_name'] as String?,
+            ));
+          }
+          if (reset || page == 1) {
+            _products = mapped;
+          } else {
+            _products.addAll(mapped);
+          }
+          _totalProductCount = mapped.length;
+          return mapped;
+        }
+      } catch (_) {}
       _error = e.toString();
       return [];
     } finally {

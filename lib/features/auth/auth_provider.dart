@@ -9,6 +9,7 @@ import 'package:secondary_sales/core/access/access_control.dart';
 import 'package:secondary_sales/core/access/access_resources.dart';
 import 'package:secondary_sales/core/app_navigator.dart';
 import 'package:secondary_sales/core/constants.dart';
+import 'package:secondary_sales/core/services/master_data_sync_service.dart';
 import 'package:secondary_sales/core/services/push_notification_service.dart';
 import 'package:secondary_sales/data/models/auth/mobile_auth_session.dart';
 import 'package:secondary_sales/data/api/api_service.dart';
@@ -375,6 +376,7 @@ class AuthProvider with ChangeNotifier {
       );
       unawaited(refreshAccessControl());
       unawaited(_autoSyncCatalogIfAllowed());
+      unawaited(MasterDataSyncService.instance.triggerDailySync());
       return true;
     } catch (e) {
       _error = e.toString();

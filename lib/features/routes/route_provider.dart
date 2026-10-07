@@ -6,6 +6,7 @@ import 'package:secondary_sales/data/models/contacts/outlet_type.dart';
 import 'package:secondary_sales/data/api/api_service.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:secondary_sales/core/services/location_service.dart';
+import 'package:secondary_sales/core/services/offline_database_helper.dart';
 import 'package:secondary_sales/core/util/proximity_helper.dart';
 
 class RouteProvider with ChangeNotifier {
@@ -212,7 +213,14 @@ class RouteProvider with ChangeNotifier {
       );
       _routes = list.map((m) => RouteModel.fromMap(m)).toList();
     } catch (e) {
-      _error = e.toString();
+      final local = await OfflineDatabaseHelper.instance.getLocalRoutes(
+        distributorId: distributorId,
+      );
+      if (local.isNotEmpty) {
+        _routes = local.map((m) => RouteModel.fromMap(m)).toList();
+      } else {
+        _error = e.toString();
+      }
     } finally {
       if (_loadingCount > 0) _loadingCount--;
       notifyListeners();
@@ -231,13 +239,41 @@ class RouteProvider with ChangeNotifier {
       final map = await _apiService.getRouteDetail(routeId);
       final detail = RouteModel.fromMap(map);
       _activeRoute = detail;
-      // Also update in list if present
       final idx = _routes.indexWhere((r) => r.id == routeId);
       if (idx != -1) {
         _routes[idx] = detail;
       }
       return detail;
     } catch (e) {
+      final localOutlets = await OfflineDatabaseHelper.instance.getLocalOutlets(
+        routeId: routeId,
+      );
+      if (localOutlets.isNotEmpty) {
+        final existingRoute = _routes.firstWhere(
+          (r) => r.id == routeId,
+          orElse: () => RouteModel(
+            id: routeId,
+            name: 'Route #$routeId',
+            active: true,
+            employees: [],
+            outlets: [],
+            outletCount: 0,
+          ),
+        );
+        final outletsList = localOutlets.map((m) => RouteOutlet.fromMap(m)).toList();
+        final detail = RouteModel(
+          id: existingRoute.id,
+          name: existingRoute.name,
+          active: existingRoute.active,
+          distributorId: existingRoute.distributorId,
+          distributorName: existingRoute.distributorName,
+          employees: existingRoute.employees,
+          outletCount: outletsList.length,
+          outlets: outletsList,
+        );
+        _activeRoute = detail;
+        return detail;
+      }
       _error = e.toString();
       return null;
     } finally {

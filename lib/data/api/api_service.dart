@@ -107,6 +107,8 @@ class ApiService {
     _employeeId = employeeId;
   }
 
+  int? get activeEmployeeId => _employeeId;
+
   void updateAccessToken(String? accessToken) {
     _accessToken = accessToken;
   }

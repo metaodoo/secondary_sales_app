@@ -257,6 +257,7 @@ class _ProductSelectionScreenState extends State<ProductSelectionScreen> {
               mediumId: widget.mediumId,
               routeId: widget.routeId,
               visitId: widget.visitId,
+              distributorId: widget.hub?.id,
               initialLines: lines,
               businessType: widget.businessType,
               saleType: widget.saleType,

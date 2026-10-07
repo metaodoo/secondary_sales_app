@@ -7,6 +7,7 @@ import 'package:secondary_sales/features/sales/screens/order_detail_screen.dart'
 import 'package:secondary_sales/data/models/sales/order_line_entry.dart';
 import 'package:secondary_sales/features/sales/primary_sale_provider.dart';
 import 'package:secondary_sales/features/sales/screens/product_selection_screen.dart';
+import 'package:secondary_sales/core/services/offline_database_helper.dart';
 import 'package:secondary_sales/core/widgets/ss_ui.dart';
 import 'package:secondary_sales/core/widgets/order_form_widgets.dart';
 import 'package:secondary_sales/features/modern_trade/modern_trade_provider.dart';
@@ -55,6 +56,7 @@ class OrderCreationScreen extends StatefulWidget {
   final int? mediumId;
   final int? routeId;
   final int? visitId;
+  final int? distributorId;
   final int? editOrderId;
   final List<OrderLineEntry>? initialLines;
   final String businessType;
@@ -68,6 +70,7 @@ class OrderCreationScreen extends StatefulWidget {
     this.mediumId,
     this.routeId,
     this.visitId,
+    this.distributorId,
     this.editOrderId,
     this.initialLines,
     this.businessType = 'gt',
@@ -311,6 +314,33 @@ class _OrderCreationScreenState extends State<OrderCreationScreen> {
         }
       } else {
         // --- Business Type: General Trade (GT) ---
+        // Soft Warning: Check if any ordered quantity exceeds recorded stock
+        final stockExceededLines = lines.where((l) => l.dbStock > 0 && l.orderQty > l.dbStock).toList();
+        if (stockExceededLines.isNotEmpty) {
+          final proceed = await showDialog<bool>(
+            context: context,
+            builder: (ctx) => AlertDialog(
+              title: const Text('Stock Exceeded'),
+              content: Text(
+                'The following items exceed recorded distributor stock:\n\n' +
+                stockExceededLines.map((e) => '• ${e.productName}: Ordered ${e.orderQty}, Available ${e.dbStock}').join('\n') +
+                '\n\nDo you want to proceed with order booking anyway?',
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx, false),
+                  child: const Text('Review Cart'),
+                ),
+                ElevatedButton(
+                  onPressed: () => Navigator.pop(ctx, true),
+                  child: const Text('Proceed'),
+                ),
+              ],
+            ),
+          );
+          if (proceed != true) return;
+        }
+
         final items = lines
             .map(
               (l) => {
@@ -355,6 +385,26 @@ class _OrderCreationScreenState extends State<OrderCreationScreen> {
             visitId: widget.visitId,
             confirm: confirm,
           );
+
+          // Atomically decrement local stock in SQLite
+          int? distId = widget.distributorId;
+          if (distId == null && widget.outletId > 0) {
+            final outlet = await OfflineDatabaseHelper.instance.getLocalOutletById(widget.outletId);
+            distId = outlet?['distributor_id'] as int?;
+          }
+          for (final item in items) {
+            final pId = item['product_id'] as int;
+            final qty = (item['order_qty'] as num).toDouble();
+            if (qty > 0) {
+              await OfflineDatabaseHelper.instance.decrementLocalStock(
+                productId: pId,
+                quantity: qty,
+                distributorId: distId,
+                isVanDelivery: false,
+              );
+            }
+          }
+
           if (mounted) {
             try {
               context.read<RouteProvider>().markOrderCreated();

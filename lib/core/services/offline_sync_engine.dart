@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:math';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/widgets.dart';
+import 'package:secondary_sales/core/services/master_data_sync_service.dart';
 import 'package:secondary_sales/core/services/offline_database_helper.dart';
 import 'package:secondary_sales/data/api/api_service.dart';
 
@@ -20,6 +21,7 @@ class OfflineSyncEngine with WidgetsBindingObserver {
   bool _isSyncing = false;
   bool _isOnline = true;
   Timer? _jitterTimer;
+  Timer? _periodicTimer;
 
   bool get isSyncing => _isSyncing;
   bool get isOnline => _isOnline;
@@ -34,12 +36,22 @@ class OfflineSyncEngine with WidgetsBindingObserver {
     );
     // Initial check
     _checkInitialConnectivity();
+
+    // 15-minute background periodic sync when online
+    _periodicTimer?.cancel();
+    _periodicTimer = Timer.periodic(const Duration(minutes: 15), (_) {
+      if (_isOnline && !_isSyncing) {
+        debugPrint('[OfflineSyncEngine] 15-minute periodic sync triggered.');
+        triggerSync(withJitter: true);
+      }
+    });
   }
 
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _connectivitySubscription?.cancel();
     _jitterTimer?.cancel();
+    _periodicTimer?.cancel();
   }
 
   @override
@@ -97,6 +109,11 @@ class OfflineSyncEngine with WidgetsBindingObserver {
     }
   }
 
+  /// Direct execution of outbox queue processing (used by MasterDataSyncService).
+  Future<void> processOutboxQueueDirect() async {
+    await _processOutboxQueue();
+  }
+
   /// Core worker loop that drains the SQLite outbox in causal FIFO order.
   Future<void> _processOutboxQueue() async {
     if (_isSyncing || !_isOnline) return;
@@ -109,6 +126,7 @@ class OfflineSyncEngine with WidgetsBindingObserver {
       if (pendingOps.isEmpty) {
         debugPrint('[OfflineSyncEngine] No pending operations in outbox.');
         _isSyncing = false;
+        unawaited(MasterDataSyncService.instance.triggerDailySync());
         return;
       }
 
@@ -142,6 +160,10 @@ class OfflineSyncEngine with WidgetsBindingObserver {
     } finally {
       _isSyncing = false;
       debugPrint('[OfflineSyncEngine] Outbox replay pass finished.');
+      final remaining = await _dbHelper.getPendingCount();
+      if (remaining == 0 && _isOnline) {
+        unawaited(MasterDataSyncService.instance.triggerDailySync());
+      }
     }
   }
 
