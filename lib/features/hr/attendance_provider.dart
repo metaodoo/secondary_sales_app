@@ -6,6 +6,7 @@ import 'package:geolocator/geolocator.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:secondary_sales/core/widgets/app_camera_capture_dialog.dart';
 import 'package:secondary_sales/core/services/media_storage_service.dart';
+import 'package:secondary_sales/core/services/location_service.dart';
 import 'package:secondary_sales/core/services/location_tracking_service.dart';
 import 'package:secondary_sales/core/services/offline_database_helper.dart';
 import 'package:secondary_sales/data/api/api_service.dart';
@@ -263,16 +264,18 @@ class AttendanceProvider extends ChangeNotifier {
     } 
 
     try {
-      return await Geolocator.getCurrentPosition(
-        locationSettings: const LocationSettings(
-          accuracy: LocationAccuracy.high,
-          timeLimit: Duration(seconds: 10),
-        ),
+      return await LocationService.resolveCheckInPosition(
+        desiredAccuracy: 25.0,
+        maxAcceptableAccuracy: 70.0,
+        burstTimeout: const Duration(seconds: 4),
       );
     } catch (e) {
-      debugPrint("GPS Timeout, falling back to last known position.");
+      debugPrint("GPS lock failed, checking fallback: $e");
       final lastPos = await Geolocator.getLastKnownPosition();
-      if (lastPos != null) return lastPos;
+      if (lastPos != null) {
+        final age = DateTime.now().difference(lastPos.timestamp).inMinutes;
+        if (age < 5) return lastPos;
+      }
 
       if (_authProvider.canSkipAttendanceGeo) {
         return Position(

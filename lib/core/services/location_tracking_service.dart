@@ -10,6 +10,7 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:secondary_sales/core/constants.dart';
+import 'package:secondary_sales/core/services/kinematic_location_bridge.dart';
 import 'package:secondary_sales/core/services/location_db_helper.dart';
 import 'package:secondary_sales/data/api/api_service.dart';
 import 'package:secondary_sales/data/api/auth_service.dart';
@@ -509,6 +510,15 @@ Future<void> _sample(
       );
     } catch (_) {
       position = await Geolocator.getLastKnownPosition();
+    }
+
+    if (position != null) {
+      KinematicLocationBridge.instance.updateFix(position);
+    } else {
+      final estimated = KinematicLocationBridge.instance.getEstimatedPosition();
+      if (estimated != null && estimated.confidence >= 0.7 && estimated.accuracy <= 50.0) {
+        position = estimated.toPosition();
+      }
     }
     if (position == null) return;
 

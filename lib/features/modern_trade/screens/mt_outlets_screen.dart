@@ -5,6 +5,8 @@ import 'package:provider/provider.dart';
 import 'package:secondary_sales/core/theme/app_theme.dart';
 import 'package:secondary_sales/core/widgets/ss_ui.dart';
 import 'package:secondary_sales/core/util/proximity_helper.dart';
+import 'package:secondary_sales/core/services/gps_lock_service.dart';
+import 'package:secondary_sales/core/widgets/gps_status_banner.dart';
 import 'package:secondary_sales/features/modern_trade/modern_trade_provider.dart';
 import 'package:secondary_sales/data/models/modern_trade/mt_outlet.dart';
 import 'package:secondary_sales/features/modern_trade/screens/mt_customer_action_bottom_sheet.dart';
@@ -25,48 +27,52 @@ class MtOutletsScreen extends StatefulWidget {
   State<MtOutletsScreen> createState() => _MtOutletsScreenState();
 }
 
-class _MtOutletsScreenState extends State<MtOutletsScreen> {
+class _MtOutletsScreenState extends State<MtOutletsScreen> with WidgetsBindingObserver {
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
-  StreamSubscription<Position>? _positionStreamSub;
+  final GpsLockService _gpsLockService = GpsLockService();
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final provider = context.read<ModernTradeProvider>();
       provider.fetchOutlets();
-      provider.refreshGpsPosition(requireFresh: false);
     });
 
-    _startLocationStream();
+    _startGpsMonitoring();
   }
 
-  void _startLocationStream() {
-    try {
-      _positionStreamSub = Geolocator.getPositionStream(
-        locationSettings: const LocationSettings(
-          accuracy: LocationAccuracy.high,
-          distanceFilter: 20,
-        ),
-      ).listen(
-        (Position position) {
+  void _startGpsMonitoring() {
+    _gpsLockService.startTracking(
+      onPositionUpdate: (Position position) {
+        if (mounted) {
+          context.read<ModernTradeProvider>().updateLocation(position);
+        }
+      },
+    );
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.paused || state == AppLifecycleState.inactive) {
+      _gpsLockService.pause();
+    } else if (state == AppLifecycleState.resumed) {
+      _gpsLockService.resume(
+        onPositionUpdate: (Position position) {
           if (mounted) {
             context.read<ModernTradeProvider>().updateLocation(position);
           }
         },
-        onError: (e) {
-          debugPrint('Location stream error in MT screen: $e');
-        },
       );
-    } catch (e) {
-      debugPrint('Could not initialize location stream: $e');
     }
   }
 
   @override
   void dispose() {
-    _positionStreamSub?.cancel();
+    WidgetsBinding.instance.removeObserver(this);
+    _gpsLockService.dispose();
     _searchController.dispose();
     super.dispose();
   }
@@ -116,8 +122,12 @@ class _MtOutletsScreenState extends State<MtOutletsScreen> {
       body: SafeArea(
         child: Column(
           children: [
+            GpsStatusBanner(
+              lockStateNotifier: _gpsLockService.stateNotifier,
+              onRefresh: _startGpsMonitoring,
+            ),
             Padding(
-              padding: const EdgeInsets.fromLTRB(16.0, 16.0, 16.0, 8.0),
+              padding: const EdgeInsets.fromLTRB(16.0, 8.0, 16.0, 8.0),
               child: TextField(
                 controller: _searchController,
                 onChanged: (val) => setState(() => _searchQuery = val.trim()),

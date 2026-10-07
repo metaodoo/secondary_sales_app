@@ -50,9 +50,42 @@ class ModernTradeProvider with ChangeNotifier {
     notifyListeners();
   }
 
+  Position? _lastDisplacementPosition;
+
   void updateLocation(Position position) {
+    // 1. Accuracy Gating: reject coarse fixes (> 75m) if we already have a recent good fix (<= 30m)
+    if (_currentPosition != null && _currentPosition!.accuracy <= 30.0) {
+      final age = DateTime.now().difference(_currentPosition!.timestamp).inSeconds;
+      if (age < 90 && position.accuracy > 75.0) {
+        return;
+      }
+    }
+
+    final prev = _currentPosition;
     _currentPosition = position;
-    notifyListeners();
+
+    // 2. Displacement / Jitter Gating: only notify if moved >= 15m or accuracy improved
+    bool shouldNotify = false;
+    if (prev == null || _lastDisplacementPosition == null) {
+      shouldNotify = true;
+      _lastDisplacementPosition = position;
+    } else {
+      final moved = Geolocator.distanceBetween(
+        _lastDisplacementPosition!.latitude,
+        _lastDisplacementPosition!.longitude,
+        position.latitude,
+        position.longitude,
+      );
+      final accuracyImproved = prev.accuracy > 35.0 && position.accuracy <= 25.0;
+      if (moved >= 15.0 || accuracyImproved) {
+        shouldNotify = true;
+        _lastDisplacementPosition = position;
+      }
+    }
+
+    if (shouldNotify) {
+      notifyListeners();
+    }
   }
 
   Future<Position?> refreshGpsPosition({bool requireFresh = false}) async {

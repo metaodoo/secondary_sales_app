@@ -197,10 +197,12 @@ class _MtCustomerActionBottomSheetState extends State<MtCustomerActionBottomShee
 
     setState(() => _isCheckingIn = true);
     try {
-      // 1. Acquire GPS position FIRST
-      final position = await LocationService.getCurrentPosition(
-        requireFresh: true,
-        timeLimit: const Duration(seconds: 15),
+      // 1. Acquire GPS position with fast-converging resolver (re-using fresh MT position if available)
+      final position = await LocationService.resolveCheckInPosition(
+        cachedPosition: provider.currentPosition,
+        desiredAccuracy: 25.0,
+        maxAcceptableAccuracy: 70.0,
+        burstTimeout: const Duration(seconds: 4),
       );
 
       // 2. Validate Geofence FIRST before opening any justification request popup
@@ -215,9 +217,13 @@ class _MtCustomerActionBottomSheetState extends State<MtCustomerActionBottomShee
           widget.outlet.longitude!,
         );
         final double allowedRadius = widget.outlet.outletRadius ?? 50.0;
-        if (distanceMeters > allowedRadius) {
+        if (!ProximityHelper.isGeofenceSatisfied(
+          distanceMeters: distanceMeters,
+          accuracyMeters: position.accuracy,
+          allowedRadius: allowedRadius,
+        )) {
           throw Exception(
-            'You are ${distanceMeters.round()}m away from "${widget.outlet.name}". Allowed radius is ${allowedRadius.round()}m.',
+            'You are ${distanceMeters.round()}m away from "${widget.outlet.name}". Allowed radius is ${allowedRadius.round()}m (GPS accuracy: ±${position.accuracy.round()}m).',
           );
         }
       }

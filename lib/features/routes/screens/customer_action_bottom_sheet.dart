@@ -155,16 +155,18 @@ class _CustomerActionBottomSheetState extends State<CustomerActionBottomSheet> {
 
     setState(() => _isCheckingIn = true);
     try {
-      // 1. Acquire GPS position with offline & permission fallback
+      // 1. Acquire GPS position with fast-converging resolver (re-using fresh route position if available)
       Position? position;
+      final routeProv = context.read<RouteProvider>();
       try {
-        position = await LocationService.getCurrentPosition(
-          requireFresh: !authProv.canSkipAttendanceGeo,
-          timeLimit: const Duration(seconds: 5),
+        position = await LocationService.resolveCheckInPosition(
+          cachedPosition: routeProv.currentPosition,
+          desiredAccuracy: 25.0,
+          maxAcceptableAccuracy: 70.0,
+          burstTimeout: const Duration(seconds: 4),
         );
-      } catch (_) {
-        position = await Geolocator.getLastKnownPosition();
-        if (position == null && !authProv.canSkipAttendanceGeo) {
+      } catch (e) {
+        if (!authProv.canSkipAttendanceGeo) {
           rethrow;
         }
       }
@@ -183,9 +185,13 @@ class _CustomerActionBottomSheetState extends State<CustomerActionBottomSheet> {
           widget.longitude!,
         );
         final double allowedRadius = widget.outletRadius ?? 50.0;
-        if (distanceMeters > allowedRadius) {
+        if (!ProximityHelper.isGeofenceSatisfied(
+          distanceMeters: distanceMeters,
+          accuracyMeters: position.accuracy,
+          allowedRadius: allowedRadius,
+        )) {
           throw Exception(
-            'You are ${distanceMeters.round()}m away from "${widget.customerName}". Allowed radius is ${allowedRadius.round()}m.',
+            'You are ${distanceMeters.round()}m away from "${widget.customerName}". Allowed radius is ${allowedRadius.round()}m (GPS accuracy: ±${position.accuracy.round()}m).',
           );
         }
       }

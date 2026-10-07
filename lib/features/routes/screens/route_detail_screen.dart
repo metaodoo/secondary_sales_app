@@ -13,6 +13,8 @@ import 'package:secondary_sales/features/auth/auth_provider.dart';
 import 'package:secondary_sales/core/access/access_resources.dart';
 import 'package:secondary_sales/core/widgets/ss_ui.dart';
 import 'package:secondary_sales/core/util/dialog_helper.dart';
+import 'package:secondary_sales/core/services/gps_lock_service.dart';
+import 'package:secondary_sales/core/widgets/gps_status_banner.dart';
 
 class RouteDetailScreen extends StatefulWidget {
   final int routeId;
@@ -23,48 +25,52 @@ class RouteDetailScreen extends StatefulWidget {
   State<RouteDetailScreen> createState() => _RouteDetailScreenState();
 }
 
-class _RouteDetailScreenState extends State<RouteDetailScreen> {
-  StreamSubscription<Position>? _positionStreamSub;
+class _RouteDetailScreenState extends State<RouteDetailScreen> with WidgetsBindingObserver {
+  final GpsLockService _gpsLockService = GpsLockService();
   final TextEditingController _outletSearchController = TextEditingController();
   String _outletSearchQuery = '';
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final provider = context.read<RouteProvider>();
       provider.fetchRouteDetail(widget.routeId);
-      provider.refreshGpsPosition(requireFresh: false);
     });
 
-    _startLocationStream();
+    _startGpsMonitoring();
   }
 
-  void _startLocationStream() {
-    try {
-      _positionStreamSub = Geolocator.getPositionStream(
-        locationSettings: const LocationSettings(
-          accuracy: LocationAccuracy.high,
-          distanceFilter: 20,
-        ),
-      ).listen(
-        (Position position) {
+  void _startGpsMonitoring() {
+    _gpsLockService.startTracking(
+      onPositionUpdate: (Position position) {
+        if (mounted) {
+          context.read<RouteProvider>().updateLocation(position);
+        }
+      },
+    );
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.paused || state == AppLifecycleState.inactive) {
+      _gpsLockService.pause();
+    } else if (state == AppLifecycleState.resumed) {
+      _gpsLockService.resume(
+        onPositionUpdate: (Position position) {
           if (mounted) {
             context.read<RouteProvider>().updateLocation(position);
           }
         },
-        onError: (e) {
-          debugPrint('Location stream error in RouteDetailScreen: $e');
-        },
       );
-    } catch (e) {
-      debugPrint('Could not initialize location stream: $e');
     }
   }
 
   @override
   void dispose() {
-    _positionStreamSub?.cancel();
+    WidgetsBinding.instance.removeObserver(this);
+    _gpsLockService.dispose();
     _outletSearchController.dispose();
     super.dispose();
   }
@@ -240,6 +246,13 @@ class _RouteDetailScreenState extends State<RouteDetailScreen> {
                     ],
                   ),
                   const SizedBox(height: 8),
+
+                  // Non-intrusive GPS Satellite Lock Status Banner
+                  GpsStatusBanner(
+                    lockStateNotifier: _gpsLockService.stateNotifier,
+                    onRefresh: _startGpsMonitoring,
+                  ),
+                  const SizedBox(height: 4),
 
                   // Search Bar for Outlets
                   TextField(

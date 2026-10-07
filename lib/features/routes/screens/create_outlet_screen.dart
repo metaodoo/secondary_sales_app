@@ -13,6 +13,8 @@ import 'package:secondary_sales/features/my_team/my_team_provider.dart';
 import 'package:secondary_sales/core/util/dialog_helper.dart';
 import 'package:secondary_sales/core/widgets/app_camera_capture_dialog.dart';
 import 'package:secondary_sales/core/widgets/ss_ui.dart';
+import 'package:secondary_sales/core/services/gps_lock_service.dart';
+import 'package:secondary_sales/core/widgets/gps_status_banner.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class CreateOutletScreen extends StatefulWidget {
@@ -46,7 +48,6 @@ class _CreateOutletScreenState extends State<CreateOutletScreen> {
   bool _isResolvingAddress = false;
   bool _isSaving = false;
 
-  StreamSubscription<Position>? _warmupSubscription;
   Position? _warmedPosition;
 
   int? _selectedOutletTypeId;
@@ -154,30 +155,25 @@ class _CreateOutletScreenState extends State<CreateOutletScreen> {
     } catch (_) {}
   }
 
+  final GpsLockService _gpsLockService = GpsLockService();
+
   /// Silently wakes up the GPS satellite receiver in the background so that
   /// satellite lock is established by the time the rep snaps the outlet photo.
   void _startGpsWarmup() {
-    try {
-      _warmupSubscription?.cancel();
-      _warmupSubscription = Geolocator.getPositionStream(
-        locationSettings: const LocationSettings(
-          accuracy: LocationAccuracy.best,
-          distanceFilter: 0,
-        ),
-      ).listen(
-        (pos) {
-          if (_warmedPosition == null || pos.accuracy < _warmedPosition!.accuracy) {
-            _warmedPosition = pos;
-          }
-        },
-        onError: (_) {},
-      );
-    } catch (_) {}
+    _gpsLockService.startTracking(
+      targetAccuracy: 25.0,
+      weakThreshold: 45.0,
+      onPositionUpdate: (pos) {
+        if (_warmedPosition == null || pos.accuracy < _warmedPosition!.accuracy) {
+          _warmedPosition = pos;
+        }
+      },
+    );
   }
 
   @override
   void dispose() {
-    _warmupSubscription?.cancel();
+    _gpsLockService.dispose();
     _nameController.dispose();
     _phoneController.dispose();
     _addressController.dispose();
@@ -208,8 +204,7 @@ class _CreateOutletScreenState extends State<CreateOutletScreen> {
 
   Future<void> _captureOutletPhoto() async {
     // 1. Pause continuous GPS warmup to free CPU and memory for the camera session
-    _warmupSubscription?.cancel();
-    _warmupSubscription = null;
+    _gpsLockService.pause();
 
     // 2. Persist current draft form state so it survives any unexpected low-memory activity kills
     await _persistDraft(isCapturingPhoto: true);
@@ -590,6 +585,12 @@ class _CreateOutletScreenState extends State<CreateOutletScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    GpsStatusBanner(
+                      lockStateNotifier: _gpsLockService.stateNotifier,
+                      onRefresh: _startGpsWarmup,
+                    ),
+                    const SizedBox(height: 8),
+
                     const Text(
                       'OUTLET IMAGE & LOCATION',
                       style: TextStyle(

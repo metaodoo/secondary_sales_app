@@ -60,9 +60,46 @@ class RouteProvider with ChangeNotifier {
     notifyListeners();
   }
 
+  Position? _lastDisplacementPosition;
+
   void updateLocation(Position position) {
+    // 1. Accuracy Gating: If we already have a recent sharp fix (<= 30m received in last 90s),
+    // and the new fix is degraded (> 75m, e.g. indoor cell-tower spike), reject the coarse fix!
+    if (_currentPosition != null && _currentPosition!.accuracy <= 30.0) {
+      final age = DateTime.now().difference(_currentPosition!.timestamp).inSeconds;
+      if (age < 90 && position.accuracy > 75.0) {
+        return; // Reject multipath / cell-tower glitch
+      }
+    }
+
+    final prev = _currentPosition;
     _currentPosition = position;
-    notifyListeners();
+
+    // 2. Displacement / Jitter Gating:
+    // Avoid triggering full 100-outlet UI re-layouts if device has not moved significantly
+    // (displacement < 15m) unless accuracy improved significantly (e.g. from 50m to 15m)
+    // or this is the very first fix.
+    bool shouldNotify = false;
+    if (prev == null || _lastDisplacementPosition == null) {
+      shouldNotify = true;
+      _lastDisplacementPosition = position;
+    } else {
+      final moved = Geolocator.distanceBetween(
+        _lastDisplacementPosition!.latitude,
+        _lastDisplacementPosition!.longitude,
+        position.latitude,
+        position.longitude,
+      );
+      final accuracyImproved = prev.accuracy > 35.0 && position.accuracy <= 25.0;
+      if (moved >= 15.0 || accuracyImproved) {
+        shouldNotify = true;
+        _lastDisplacementPosition = position;
+      }
+    }
+
+    if (shouldNotify) {
+      notifyListeners();
+    }
   }
 
   Future<Position?> refreshGpsPosition({bool requireFresh = false}) async {

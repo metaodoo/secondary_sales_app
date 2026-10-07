@@ -50,6 +50,25 @@ class ProximityHelper {
     return distanceMeters <= radiusMeters;
   }
 
+  /// Checks if geofence is satisfied taking GPS Circular Error Probable (CEP) into account.
+  /// Standard GPS accuracy defines a 68% confidence radius. In dense markets and under
+  /// canopies, GPS jitter shifts coordinates by up to 25m even when standing inside the shop.
+  ///
+  /// This applies a 50% CEP tolerance (capped at 15m maximum) to prevent false lockouts
+  /// while strictly enforcing the company's geofence boundary.
+  static bool isGeofenceSatisfied({
+    required double? distanceMeters,
+    double? accuracyMeters,
+    double allowedRadius = 50.0,
+  }) {
+    if (distanceMeters == null) return false;
+    final acc = accuracyMeters ?? 0.0;
+    // For standard GPS fixes, discount 50% of the CEP accuracy uncertainty, clamped to 15m max
+    final uncertaintyDiscount = acc <= 30.0 ? (acc * 0.5) : 15.0;
+    final effectiveDistance = (distanceMeters - uncertaintyDiscount).clamp(0.0, double.infinity);
+    return effectiveDistance <= allowedRadius;
+  }
+
   /// Generates the Google Maps Universal Directions Uri.
   static Uri getGoogleMapsDirectionsUri({
     required double destinationLat,

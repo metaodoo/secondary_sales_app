@@ -19,6 +19,8 @@ import 'package:secondary_sales/core/util/proximity_helper.dart';
 import 'package:secondary_sales/core/util/dialog_helper.dart';
 import 'package:secondary_sales/core/widgets/app_camera_capture_dialog.dart';
 import 'package:secondary_sales/core/widgets/ss_ui.dart';
+import 'package:secondary_sales/core/services/gps_lock_service.dart';
+import 'package:secondary_sales/core/widgets/gps_status_banner.dart';
 
 class OfficerCustomerSelectionScreen extends StatefulWidget {
   final int routeId;
@@ -35,13 +37,14 @@ class OfficerCustomerSelectionScreen extends StatefulWidget {
 }
 
 class _OfficerCustomerSelectionScreenState
-    extends State<OfficerCustomerSelectionScreen> {
+    extends State<OfficerCustomerSelectionScreen>
+    with WidgetsBindingObserver {
   int? selectedOutletId;
   String? selectedOutletName;
   int? _checkingInOutletId;
   int? _checkingOutOutletId;
   late Future<RouteModel?> _routeFuture;
-  StreamSubscription<Position>? _positionStreamSub;
+  final GpsLockService _gpsLockService = GpsLockService();
 
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
@@ -49,40 +52,44 @@ class _OfficerCustomerSelectionScreenState
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     final routeProv = Provider.of<RouteProvider>(
       context,
       listen: false,
     );
     _routeFuture = routeProv.fetchRouteDetail(widget.routeId);
-    routeProv.refreshGpsPosition(requireFresh: false);
-    _startLocationStream();
+    _startGpsMonitoring();
   }
 
-  void _startLocationStream() {
-    try {
-      _positionStreamSub = Geolocator.getPositionStream(
-        locationSettings: const LocationSettings(
-          accuracy: LocationAccuracy.high,
-          distanceFilter: 20,
-        ),
-      ).listen(
-        (Position position) {
+  void _startGpsMonitoring() {
+    _gpsLockService.startTracking(
+      onPositionUpdate: (Position position) {
+        if (mounted) {
+          context.read<RouteProvider>().updateLocation(position);
+        }
+      },
+    );
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.paused || state == AppLifecycleState.inactive) {
+      _gpsLockService.pause();
+    } else if (state == AppLifecycleState.resumed) {
+      _gpsLockService.resume(
+        onPositionUpdate: (Position position) {
           if (mounted) {
             context.read<RouteProvider>().updateLocation(position);
           }
         },
-        onError: (e) {
-          debugPrint('Location stream error in OfficerCustomerSelectionScreen: $e');
-        },
       );
-    } catch (e) {
-      debugPrint('Could not initialize location stream: $e');
     }
   }
 
   @override
   void dispose() {
-    _positionStreamSub?.cancel();
+    WidgetsBinding.instance.removeObserver(this);
+    _gpsLockService.dispose();
     _searchController.dispose();
     super.dispose();
   }
@@ -337,8 +344,15 @@ class _OfficerCustomerSelectionScreenState
                       ),
                     ),
                   ),
+
+                  // Non-intrusive GPS Satellite Lock Status Banner
+                  GpsStatusBanner(
+                    lockStateNotifier: _gpsLockService.stateNotifier,
+                    onRefresh: _startGpsMonitoring,
+                  ),
+
                   Padding(
-                    padding: const EdgeInsets.fromLTRB(20.0, 10.0, 20.0, 8.0),
+                    padding: const EdgeInsets.fromLTRB(20.0, 6.0, 20.0, 8.0),
                     child: TextField(
                       controller: _searchController,
                       onChanged: (val) {
@@ -581,6 +595,7 @@ class _OfficerCustomerSelectionScreenState
                                 ),
                               ),
                               child: Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Container(
                                     padding: const EdgeInsets.all(12),
@@ -681,14 +696,18 @@ class _OfficerCustomerSelectionScreenState
                                                 ),
                                               ),
                                               const SizedBox(width: 6),
-                                              Text(
-                                                routeProv.checkInTime != null
-                                                    ? 'Checked In at ${_formatTime(routeProv.checkInTime!)}'
-                                                    : 'Checked In',
-                                                style: const TextStyle(
-                                                  color: Color(0xFF10B981),
-                                                  fontSize: 12,
-                                                  fontWeight: FontWeight.w600,
+                                              Expanded(
+                                                child: Text(
+                                                  routeProv.checkInTime != null
+                                                      ? 'Checked In at ${_formatTime(routeProv.checkInTime!)}'
+                                                      : 'Checked In',
+                                                  maxLines: 1,
+                                                  overflow: TextOverflow.ellipsis,
+                                                  style: const TextStyle(
+                                                    color: Color(0xFF10B981),
+                                                    fontSize: 12,
+                                                    fontWeight: FontWeight.w600,
+                                                  ),
                                                 ),
                                               ),
                                             ],
@@ -707,13 +726,17 @@ class _OfficerCustomerSelectionScreenState
                                                 ),
                                               ),
                                               const SizedBox(width: 6),
-                                              const Text(
-                                                'Checked Out',
-                                                style: TextStyle(
-                                                  color:
-                                                      AppColors.textSecondary,
-                                                  fontSize: 12,
-                                                  fontWeight: FontWeight.w600,
+                                              const Expanded(
+                                                child: Text(
+                                                  'Checked Out',
+                                                  maxLines: 1,
+                                                  overflow: TextOverflow.ellipsis,
+                                                  style: TextStyle(
+                                                    color:
+                                                        AppColors.textSecondary,
+                                                    fontSize: 12,
+                                                    fontWeight: FontWeight.w600,
+                                                  ),
                                                 ),
                                               ),
                                             ],
@@ -839,16 +862,18 @@ class _OfficerCustomerSelectionScreenState
                                                }
                                                setState(() => _checkingInOutletId = outlet.id);
                                                try {
-                                                  // 1. Acquire GPS position with offline & permission fallback
+                                                  // 1. Acquire GPS position with fast-converging resolver (re-using fresh route position if available)
                                                   Position? position;
+                                                  final routeProv = context.read<RouteProvider>();
                                                   try {
-                                                    position = await LocationService.getCurrentPosition(
-                                                      requireFresh: !auth.canSkipAttendanceGeo,
-                                                      timeLimit: const Duration(seconds: 5),
+                                                    position = await LocationService.resolveCheckInPosition(
+                                                      cachedPosition: routeProv.currentPosition,
+                                                      desiredAccuracy: 25.0,
+                                                      maxAcceptableAccuracy: 70.0,
+                                                      burstTimeout: const Duration(seconds: 4),
                                                     );
-                                                  } catch (_) {
-                                                    position = await Geolocator.getLastKnownPosition();
-                                                    if (position == null && !auth.canSkipAttendanceGeo) {
+                                                  } catch (e) {
+                                                    if (!auth.canSkipAttendanceGeo) {
                                                       rethrow;
                                                     }
                                                   }
@@ -867,9 +892,13 @@ class _OfficerCustomerSelectionScreenState
                                                       outlet.partnerLongitude!,
                                                     );
                                                     final double allowedRadius = outlet.outletRadius ?? 50.0;
-                                                    if (distanceMeters > allowedRadius) {
+                                                    if (!ProximityHelper.isGeofenceSatisfied(
+                                                      distanceMeters: distanceMeters,
+                                                      accuracyMeters: position.accuracy,
+                                                      allowedRadius: allowedRadius,
+                                                    )) {
                                                       throw Exception(
-                                                        'You are ${distanceMeters.round()}m away from "${outlet.name}". Allowed radius is ${allowedRadius.round()}m.',
+                                                        'You are ${distanceMeters.round()}m away from "${outlet.name}". Allowed radius is ${allowedRadius.round()}m (GPS accuracy: ±${position.accuracy.round()}m).',
                                                       );
                                                     }
                                                   }
