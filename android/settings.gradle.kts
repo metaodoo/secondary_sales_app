@@ -1,8 +1,16 @@
 pluginManagement {
     val flutterSdkPath =
         run {
+            val localPropsFile = file("local.properties")
+            if (localPropsFile.exists()) {
+                val lines = localPropsFile.readLines()
+                val sanitized = lines.filterNot { it.trim().startsWith("ndk.dir") }
+                if (lines.size != sanitized.size) {
+                    localPropsFile.writeText(sanitized.joinToString("\n") + "\n")
+                }
+            }
             val properties = java.util.Properties()
-            file("local.properties").inputStream().use { properties.load(it) }
+            localPropsFile.inputStream().use { properties.load(it) }
             val flutterSdkPath = properties.getProperty("flutter.sdk")
             require(flutterSdkPath != null) { "flutter.sdk not set in local.properties" }
             flutterSdkPath

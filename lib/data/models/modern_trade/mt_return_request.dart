@@ -69,6 +69,7 @@ class MtReturnRequest {
 
   bool get isSaleable => returnBucket == 'saleable';
   bool get isNonSaleable => returnBucket == 'non_saleable';
+  bool get isQuality => returnBucket == 'quality';
   bool get isConfirmed => state.toLowerCase() == 'confirmed';
   bool get isDraft => state.toLowerCase() == 'kao';
 

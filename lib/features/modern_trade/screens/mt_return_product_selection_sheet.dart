@@ -408,6 +408,20 @@ class _MtReturnProductSelectionSheetState extends State<MtReturnProductSelection
               color: Colors.orange,
               hint: 'Damaged/Scrap units',
             ),
+          ] else if (widget.returnBucket == 'quality') ...[
+            _buildQtyInput(
+              label: 'Quality Defect Quantity',
+              controller: _qualityQtyController,
+              color: Colors.purple,
+              hint: 'Units returned for quality inspection',
+            ),
+            const SizedBox(height: 14),
+            _buildQtyInput(
+              label: 'Non-Saleable Quantity (Optional)',
+              controller: _nonSaleableQtyController,
+              color: Colors.orange,
+              hint: 'Damaged/Broken units for scrap',
+            ),
           ] else ...[
             _buildQtyInput(
               label: 'Non-Saleable Quantity',

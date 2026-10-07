@@ -9,6 +9,7 @@ import 'package:secondary_sales/features/employees/screens/sales_officer_list_sc
 import 'package:secondary_sales/features/hr/screens/attendance_screen.dart';
 import 'package:secondary_sales/features/hr/screens/leave_dashboard_screen.dart';
 import 'package:secondary_sales/features/hr/screens/location_buffer_screen.dart';
+import 'package:secondary_sales/features/settings/screens/offline_data_screen.dart';
 import 'package:secondary_sales/core/widgets/ss_ui.dart';
 
 class SettingsTab extends StatelessWidget {
@@ -167,6 +168,19 @@ class SettingsTab extends StatelessWidget {
                         context,
                         MaterialPageRoute(
                           builder: (_) => const LocationBufferScreen(),
+                        ),
+                      );
+                    },
+                  ),
+                  const Divider(height: 1, color: AppColors.borderMuted),
+                  _buildSettingItem(
+                    icon: Icons.sync_alt_outlined,
+                    title: 'Offline & Outbox Data',
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const OfflineDataScreen(),
                         ),
                       );
                     },

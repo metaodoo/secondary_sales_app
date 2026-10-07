@@ -3,6 +3,7 @@ import 'package:secondary_sales/data/models/inventory/virtual_location.dart';
 import 'dart:async';
 import 'dart:io';
 import 'dart:convert';
+import 'package:uuid/uuid.dart';
 import 'package:flutter/foundation.dart';
 import 'package:secondary_sales/core/services/offline_database_helper.dart';
 import 'package:secondary_sales/core/services/offline_sync_engine.dart';
@@ -380,6 +381,16 @@ class ApiService {
   ]) async {
     final isWrite = _isWriteEndpoint(path);
     final isCacheableRead = _isCacheableReadEndpoint(path);
+    final entityType = isWrite ? _resolveEntityType(path) : null;
+
+    if (entityType == 'order') {
+      final existingUuid = params['client_order_uuid']?.toString() ?? params['client_uuid']?.toString();
+      final orderUuid = (existingUuid != null && existingUuid.isNotEmpty)
+          ? existingUuid
+          : const Uuid().v4();
+      params['client_order_uuid'] = orderUuid;
+      params['client_uuid'] = orderUuid;
+    }
 
     // Fast-path: If known to be offline, bypass 20s network timeout immediately
     if (!OfflineSyncEngine.instance.isOnline) {

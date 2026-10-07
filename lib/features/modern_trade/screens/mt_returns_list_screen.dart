@@ -97,10 +97,14 @@ class _MtReturnsListScreenState extends State<MtReturnsListScreen> {
 
     final specificActionKey = widget.returnBucket == 'saleable'
         ? AppAction.mtSaleableReturnCreate
-        : AppAction.mtNonSaleableReturnCreate;
+        : (widget.returnBucket == 'quality'
+            ? AppAction.mtQualityReturnCreate
+            : AppAction.mtNonSaleableReturnCreate);
     final specificScreenKey = widget.returnBucket == 'saleable'
         ? AppScreen.mtSaleableReturnsCreate
-        : AppScreen.mtNonSaleableReturnsCreate;
+        : (widget.returnBucket == 'quality'
+            ? AppScreen.mtQualityReturnsCreate
+            : AppScreen.mtNonSaleableReturnsCreate);
 
     final canCreate = auth.canDo(specificActionKey) ||
         (widget.createActionKey != null && auth.canDo(widget.createActionKey!)) ||
@@ -121,7 +125,7 @@ class _MtReturnsListScreenState extends State<MtReturnsListScreen> {
               backgroundColor: AppColors.primaryStrong,
               icon: const Icon(Icons.add, color: Colors.white),
               label: Text(
-                'New ${widget.returnBucket == "saleable" ? "Saleable" : "Non-Saleable"}',
+                'New ${widget.returnBucket == "saleable" ? "Saleable" : (widget.returnBucket == "quality" ? "Quality" : "Non-Saleable")}',
                 style: const TextStyle(fontWeight: FontWeight.w700, color: Colors.white),
               ),
             )

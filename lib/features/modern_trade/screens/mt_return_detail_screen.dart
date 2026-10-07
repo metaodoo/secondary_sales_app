@@ -607,9 +607,14 @@ class _MtReturnDetailScreenState extends State<MtReturnDetailScreen> {
                       if (isSaleable) ...[
                         _buildQtyChip('Saleable', line.saleableQty, Colors.teal),
                         _buildQtyChip('Non-Saleable', line.nonSaleableQty, Colors.orange),
+                      ] else if (rr.returnBucket == 'quality') ...[
+                        _buildQtyChip('Quality', line.qualityQty, Colors.purple),
+                        if (line.nonSaleableQty > 0)
+                          _buildQtyChip('Non-Saleable', line.nonSaleableQty, Colors.orange),
                       ] else ...[
                         _buildQtyChip('Non-Saleable', line.nonSaleableQty, Colors.orange),
-                        _buildQtyChip('Quality', line.qualityQty, Colors.purple),
+                        if (line.qualityQty > 0)
+                          _buildQtyChip('Quality', line.qualityQty, Colors.purple),
                       ],
                       _buildQtyChip('Total Qty', line.totalQty, AppColors.primaryStrong, isBold: true),
                     ],

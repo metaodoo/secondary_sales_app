@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:geolocator/geolocator.dart';
 
 class LocationService {
@@ -73,5 +74,88 @@ class LocationService {
     throw Exception(
       'Could not retrieve GPS location. Please check device location settings and try again.',
     );
+  }
+
+  /// Captures a high-accuracy GPS fix by streaming satellite positions and
+  /// sampling until an accurate reading is obtained (accuracy <= [desiredAccuracyInMeters])
+  /// or until [timeLimit] elapses, returning the highest precision fix recorded.
+  static Future<Position> getAccuratePosition({
+    double desiredAccuracyInMeters = 30.0,
+    Duration timeLimit = const Duration(seconds: 12),
+  }) async {
+    final bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+    if (!serviceEnabled) {
+      await Geolocator.openLocationSettings();
+      throw Exception(
+        'Location services are disabled. Please enable GPS in settings and try again.',
+      );
+    }
+
+    LocationPermission permission = await Geolocator.checkPermission();
+    if (permission == LocationPermission.denied) {
+      permission = await Geolocator.requestPermission();
+      if (permission == LocationPermission.denied) {
+        throw Exception('Location permissions are denied.');
+      }
+    }
+
+    if (permission == LocationPermission.deniedForever) {
+      throw Exception(
+        'Location permissions are permanently denied, cannot request permissions.',
+      );
+    }
+
+    Position? bestPosition;
+    final completer = Completer<Position>();
+    StreamSubscription<Position>? subscription;
+
+    void updateBest(Position pos) {
+      if (bestPosition == null || pos.accuracy < bestPosition!.accuracy) {
+        bestPosition = pos;
+      }
+      // Once we reach target accuracy (e.g. <= 30m), resolve immediately!
+      if (pos.accuracy <= desiredAccuracyInMeters && !completer.isCompleted) {
+        completer.complete(pos);
+      }
+    }
+
+    subscription = Geolocator.getPositionStream(
+      locationSettings: const LocationSettings(
+        accuracy: LocationAccuracy.best,
+        distanceFilter: 0,
+      ),
+    ).listen(
+      updateBest,
+      onError: (_) {},
+    );
+
+    // Concurrently trigger a high-precision one-shot query to prime the provider
+    Geolocator.getCurrentPosition(
+      locationSettings: const LocationSettings(
+        accuracy: LocationAccuracy.best,
+      ),
+    ).then(updateBest).catchError((_) {});
+
+    final timer = Timer(timeLimit, () {
+      if (!completer.isCompleted) {
+        if (bestPosition != null) {
+          completer.complete(bestPosition);
+        } else {
+          completer.completeError(
+            Exception(
+              'Could not get an accurate GPS fix. Please ensure you have a clear view of the sky and try again.',
+            ),
+          );
+        }
+      }
+    });
+
+    try {
+      final result = await completer.future;
+      return result;
+    } finally {
+      timer.cancel();
+      await subscription.cancel();
+    }
   }
 }

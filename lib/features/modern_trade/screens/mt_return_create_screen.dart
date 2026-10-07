@@ -207,6 +207,7 @@ class _MtReturnCreateScreenState extends State<MtReturnCreateScreen> {
   Widget build(BuildContext context) {
     final provider = context.watch<MtReturnProvider>();
     final isSaleable = _selectedBucket == 'saleable';
+    final isQuality = _selectedBucket == 'quality';
     final outlets = (provider.prepareData?['outlets'] as List?)?.cast<Map<String, dynamic>>() ?? [];
     final selectedOutlet = _getOutletById(outlets, _selectedOutletId);
 
@@ -314,18 +315,26 @@ class _MtReturnCreateScreenState extends State<MtReturnCreateScreen> {
                             Container(
                               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
                               decoration: BoxDecoration(
-                                color: isSaleable ? Colors.teal.shade50 : Colors.purple.shade50,
+                                color: isSaleable
+                                    ? Colors.teal.shade50
+                                    : (isQuality ? Colors.purple.shade50 : Colors.red.shade50),
                                 borderRadius: BorderRadius.circular(10),
                                 border: Border.all(
-                                  color: isSaleable ? Colors.teal.shade300 : Colors.purple.shade300,
+                                  color: isSaleable
+                                      ? Colors.teal.shade300
+                                      : (isQuality ? Colors.purple.shade300 : Colors.red.shade300),
                                 ),
                               ),
                               child: Text(
-                                isSaleable ? 'Saleable Return' : 'Non-Saleable Return',
+                                isSaleable
+                                    ? 'Saleable Return'
+                                    : (isQuality ? 'Quality Return' : 'Non-Saleable Return'),
                                 style: TextStyle(
                                   fontSize: 13,
                                   fontWeight: FontWeight.w700,
-                                  color: isSaleable ? Colors.teal.shade800 : Colors.purple.shade800,
+                                  color: isSaleable
+                                      ? Colors.teal.shade800
+                                      : (isQuality ? Colors.purple.shade800 : Colors.red.shade800),
                                 ),
                                 overflow: TextOverflow.ellipsis,
                               ),
@@ -497,9 +506,14 @@ class _MtReturnCreateScreenState extends State<MtReturnCreateScreen> {
                             if (isSaleable) ...[
                               _buildLineQtyBadge('Saleable', saleableQty, Colors.teal),
                               _buildLineQtyBadge('Non-Saleable', nonSaleableQty, Colors.orange),
+                            ] else if (_selectedBucket == 'quality') ...[
+                              _buildLineQtyBadge('Quality', qualityQty, Colors.purple),
+                              if (nonSaleableQty > 0)
+                                _buildLineQtyBadge('Non-Saleable', nonSaleableQty, Colors.orange),
                             ] else ...[
                               _buildLineQtyBadge('Non-Saleable', nonSaleableQty, Colors.orange),
-                              _buildLineQtyBadge('Quality', qualityQty, Colors.purple),
+                              if (qualityQty > 0)
+                                _buildLineQtyBadge('Quality', qualityQty, Colors.purple),
                             ],
                             _buildLineQtyBadge('Total Qty', totalLineQty, AppColors.primaryStrong, isBold: true),
                           ],

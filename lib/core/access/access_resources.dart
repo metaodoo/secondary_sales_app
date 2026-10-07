@@ -56,6 +56,10 @@ class AppScreen {
       'screen.modern_trade.non_saleable_returns.list';
   static const mtNonSaleableReturnsCreate =
       'screen.modern_trade.non_saleable_returns.create';
+  static const mtQualityReturnsList =
+      'screen.modern_trade.quality_returns.list';
+  static const mtQualityReturnsCreate =
+      'screen.modern_trade.quality_returns.create';
   static const mtReturnDetail = 'screen.modern_trade.returns.detail';
 
   // Modern Trade (MT - Secondary Sales) screens.
@@ -264,6 +268,8 @@ class AppAction {
       'action.modern_trade.saleable_returns.create';
   static const mtNonSaleableReturnCreate =
       'action.modern_trade.non_saleable_returns.create';
+  static const mtQualityReturnCreate =
+      'action.modern_trade.quality_returns.create';
   static const mtReturnsSave = 'action.modern_trade.returns.save';
   static const mtReturnsReset = 'action.modern_trade.returns.reset';
   static const mtReturnsSubmitDm = 'action.modern_trade.returns.submit_dm';
@@ -1360,6 +1366,20 @@ const List<AccessResource> accessCatalog = [
     _mt,
   ),
   AccessResource(
+    AppScreen.mtQualityReturnsList,
+    'screen',
+    'modern_trade',
+    'Modern Trade › Quality Returns › Open list',
+    _mt,
+  ),
+  AccessResource(
+    AppScreen.mtQualityReturnsCreate,
+    'screen',
+    'modern_trade',
+    'Modern Trade › Quality Returns › Open create screen',
+    _mt,
+  ),
+  AccessResource(
     AppScreen.mtReturnDetail,
     'screen',
     'modern_trade',
@@ -1437,6 +1457,13 @@ const List<AccessResource> accessCatalog = [
     'action',
     'modern_trade',
     'Modern Trade › Non-Saleable Returns › Create (button)',
+    _mt,
+  ),
+  AccessResource(
+    AppAction.mtQualityReturnCreate,
+    'action',
+    'modern_trade',
+    'Modern Trade › Quality Returns › Create (button)',
     _mt,
   ),
   AccessResource(

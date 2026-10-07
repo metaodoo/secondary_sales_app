@@ -290,6 +290,26 @@ class DashboardTab extends StatelessWidget {
                             );
                           },
                         ),
+                      if (auth.canView(AppScreen.mtQualityReturnsList))
+                        _buildModuleCard(
+                          title: 'Quality Return',
+                          icon: Icons.verified_outlined,
+                          iconColor: Colors.white,
+                          circleColor: const Color(0xFF7C3AED),
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => const MtReturnsListScreen(
+                                  returnBucket: 'quality',
+                                  title: 'Quality Returns',
+                                  createScreenKey: AppScreen.mtQualityReturnsCreate,
+                                  createActionKey: AppAction.mtQualityReturnCreate,
+                                ),
+                              ),
+                            );
+                          },
+                        ),
                     ] else if (moduleType == 'primary') ...[
                       if (showPrimarySalesModule)
                         _buildModuleCard(

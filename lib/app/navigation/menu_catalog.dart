@@ -20,6 +20,7 @@ import 'package:secondary_sales/features/hr/screens/attendance_screen.dart';
 import 'package:secondary_sales/features/hr/screens/leave_dashboard_screen.dart';
 import 'package:secondary_sales/features/hr/screens/expense_dashboard_screen.dart';
 import 'package:secondary_sales/features/hr/screens/location_buffer_screen.dart';
+import 'package:secondary_sales/features/settings/screens/offline_data_screen.dart';
 
 import 'package:secondary_sales/features/contacts/screens/dealers_tab.dart';
 import 'package:secondary_sales/features/routes/screens/officer_route_selection_screen.dart';
@@ -149,6 +150,17 @@ List<MenuSection> buildMenuSections(String moduleType) {
             title: 'Non-Saleable Returns',
             createScreenKey: AppScreen.mtNonSaleableReturnsCreate,
             createActionKey: AppAction.mtNonSaleableReturnCreate,
+          ),
+        ),
+        MenuDestination(
+          label: 'Quality Return',
+          icon: Icons.verified_outlined,
+          screenKey: AppScreen.mtQualityReturnsList,
+          builder: (_) => const MtReturnsListScreen(
+            returnBucket: 'quality',
+            title: 'Quality Returns',
+            createScreenKey: AppScreen.mtQualityReturnsCreate,
+            createActionKey: AppAction.mtQualityReturnCreate,
           ),
         ),
       ]),
@@ -365,6 +377,11 @@ List<MenuSection> buildMenuSections(String moduleType) {
         label: 'Location Buffer',
         icon: Icons.storage_outlined,
         builder: (_) => const LocationBufferScreen(),
+      ),
+      MenuDestination(
+        label: 'Offline & Sync Data',
+        icon: Icons.sync_alt_outlined,
+        builder: (_) => const OfflineDataScreen(),
       ),
     ]),
   );

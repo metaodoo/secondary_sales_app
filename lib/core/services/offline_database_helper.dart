@@ -34,9 +34,11 @@ class OfflineDatabaseHelper {
       version: _dbVersion,
       onConfigure: (db) async {
         // Enforce Write-Ahead Logging for high concurrency without UI stalls
-        await db.execute('PRAGMA journal_mode = WAL;');
-        await db.execute('PRAGMA busy_timeout = 5000;');
-        await db.execute('PRAGMA synchronous = NORMAL;');
+        try {
+          await db.rawQuery('PRAGMA journal_mode = WAL');
+          await db.rawQuery('PRAGMA busy_timeout = 5000');
+          await db.rawQuery('PRAGMA synchronous = NORMAL');
+        } catch (_) {}
       },
       onCreate: (db, version) async {
         // 1. Outbound Write Queue
@@ -170,6 +172,9 @@ class OfflineDatabaseHelper {
     // Attach UUID into payload for backend idempotency
     final enrichedPayload = Map<String, dynamic>.from(payload);
     enrichedPayload['client_uuid'] = opUuid;
+    if (entityType == 'order') {
+      enrichedPayload['client_order_uuid'] = opUuid;
+    }
     if (parentUuid != null && parentUuid.isNotEmpty) {
       enrichedPayload['parent_uuid'] = parentUuid;
     }
@@ -373,5 +378,67 @@ class OfflineDatabaseHelper {
     } else {
       await db.delete(tableMasterCache);
     }
+  }
+
+  /// Retrieves all outbox operations optionally filtered by status.
+  Future<List<Map<String, dynamic>>> getAllOutboxOperations({
+    String? status,
+  }) async {
+    final db = await database;
+    if (status != null && status.isNotEmpty) {
+      return db.query(
+        tableOutbox,
+        where: 'status = ?',
+        whereArgs: [status],
+        orderBy: 'id DESC',
+      );
+    }
+    return db.query(tableOutbox, orderBy: 'id DESC');
+  }
+
+  /// Retries a quarantined or failed operation by marking it PENDING and resetting retries.
+  Future<void> retryQuarantinedOperation(String operationUuid) async {
+    final db = await database;
+    await db.update(
+      tableOutbox,
+      {
+        'status': 'PENDING',
+        'retry_count': 0,
+        'error_code': null,
+        'error_message': null,
+      },
+      where: 'operation_uuid = ?',
+      whereArgs: [operationUuid],
+    );
+  }
+
+  /// Deletes a specific outbox operation permanently.
+  Future<void> deleteOutboxOperation(String operationUuid) async {
+    final db = await database;
+    await db.delete(
+      tableOutbox,
+      where: 'operation_uuid = ?',
+      whereArgs: [operationUuid],
+    );
+  }
+
+  /// Retrieves all cached master data metadata entries.
+  Future<List<Map<String, dynamic>>> getAllMasterData() async {
+    final db = await database;
+    return db.query(
+      tableMasterCache,
+      columns: ['entity_key', 'entity_type', 'updated_at', 'data_json'],
+      orderBy: 'updated_at DESC',
+    );
+  }
+
+  /// Deletes a specific cached master data key.
+  Future<void> deleteMasterDataKey(String entityKey) async {
+    final db = await database;
+    await db.delete(
+      tableMasterCache,
+      where: 'entity_key = ?',
+      whereArgs: [entityKey],
+    );
   }
 }

@@ -40,43 +40,48 @@ class _CreateOutletScreenState extends State<CreateOutletScreen> {
   String? _locationError;
   double? _capturedLatitude;
   double? _capturedLongitude;
+  double? _capturedAccuracy;
   bool _isResolvingAddress = false;
   bool _isSaving = false;
-  DateTime? _locationCapturedAt;
 
-  int? _selectedOutletClassId;
+  StreamSubscription<Position>? _warmupSubscription;
+  Position? _warmedPosition;
+
   int? _selectedOutletTypeId;
-
-  /// How long a fix stays usable. The rep is standing at the shop for the whole
-  /// form, so a fix taken when the screen opened is the same place as one taken
-  /// after the photo -- and reusing it saves the 5-10s the rep would otherwise
-  /// spend watching a spinner.
-  static const Duration _locationFreshFor = Duration(minutes: 3);
-
-  bool get _hasFreshLocation {
-    final at = _locationCapturedAt;
-    if (_capturedLatitude == null || _capturedLongitude == null || at == null) {
-      return false;
-    }
-    return DateTime.now().difference(at) < _locationFreshFor;
-  }
 
   @override
   void initState() {
     super.initState();
-    // Warm the fix while the rep is still typing the name. The GPS chipset
-    // needs seconds to settle; doing it here rather than after the photo means
-    // that cost overlaps with form filling instead of being dead wait.
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _captureLocation();
       final provider = Provider.of<RouteProvider>(context, listen: false);
-      provider.fetchOutletClasses();
       provider.fetchOutletTypes();
+      _startGpsWarmup();
     });
+  }
+
+  /// Silently wakes up the GPS satellite receiver in the background so that
+  /// satellite lock is established by the time the rep snaps the outlet photo.
+  void _startGpsWarmup() {
+    try {
+      _warmupSubscription = Geolocator.getPositionStream(
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.best,
+          distanceFilter: 0,
+        ),
+      ).listen(
+        (pos) {
+          if (_warmedPosition == null || pos.accuracy < _warmedPosition!.accuracy) {
+            _warmedPosition = pos;
+          }
+        },
+        onError: (_) {},
+      );
+    } catch (_) {}
   }
 
   @override
   void dispose() {
+    _warmupSubscription?.cancel();
     _nameController.dispose();
     _phoneController.dispose();
     _addressController.dispose();
@@ -102,9 +107,8 @@ class _CreateOutletScreenState extends State<CreateOutletScreen> {
 
       setState(() => _capturedPhoto = persistentFile ?? File(photo.path));
 
-      // A fix from the warm-up is the same shop, so don't make the rep wait
-      // for a second one. Only fix again if there isn't a usable position.
-      if (!_hasFreshLocation) await _captureLocation();
+      // Always capture GPS location freshly at the moment the photo is taken
+      await _captureLocation();
     } catch (e) {
       if (!mounted) return;
       setState(() => _isResolvingAddress = false);
@@ -114,14 +118,8 @@ class _CreateOutletScreenState extends State<CreateOutletScreen> {
     }
   }
 
-  /// Fixes the outlet's position, separately from the photo so a failed fix can
-  /// be retried without making the rep retake the picture.
-  ///
-  /// A fresh fix is required rather than falling back to the last known one:
-  /// this coordinate becomes the outlet's permanent geofence centre, so a stale
-  /// position taken at the previous outlet would break every future check-in
-  /// here. On a weak signal that means failing -- which is why the failure is
-  /// surfaced and blocks saving, instead of silently leaving nulls.
+  /// Fixes the outlet's position using high-precision satellite sampling.
+  /// Filters out coarse cell-tower / Wi-Fi triangulation to ensure accurate geofencing.
   Future<void> _captureLocation() async {
     if (_isResolvingAddress) return;
     setState(() {
@@ -130,30 +128,33 @@ class _CreateOutletScreenState extends State<CreateOutletScreen> {
     });
 
     try {
-      final position = await LocationService.getCurrentPosition(
-        requireFresh: true,
-        timeLimit: const Duration(seconds: 15),
-      );
+      Position position;
+      // If the background warmup already has a sharp satellite fix (<= 25m), use it
+      if (_warmedPosition != null && _warmedPosition!.accuracy <= 25.0) {
+        position = _warmedPosition!;
+      } else {
+        position = await LocationService.getAccuratePosition(
+          desiredAccuracyInMeters: 30.0,
+          timeLimit: const Duration(seconds: 12),
+        );
+      }
 
       if (!mounted) return;
       setState(() {
         _capturedLatitude = position.latitude;
         _capturedLongitude = position.longitude;
-        _locationCapturedAt = DateTime.now();
-        _isResolvingAddress = false;
+        _capturedAccuracy = position.accuracy;
+        _isResolvingAddress = true;
       });
 
-      // The address is a convenience, not a requirement -- resolving it is a
-      // network round trip that used to hold the spinner after the fix had
-      // already landed. Fill it in whenever it arrives.
-      unawaited(_resolveAddress(position.latitude, position.longitude));
+      await _resolveAddress(position.latitude, position.longitude);
     } catch (e) {
       if (!mounted) return;
       setState(() {
         _isResolvingAddress = false;
         _capturedLatitude = null;
         _capturedLongitude = null;
-        _locationCapturedAt = null;
+        _capturedAccuracy = null;
         _locationError = e.toString().replaceAll('Exception: ', '');
       });
     }
@@ -165,13 +166,21 @@ class _CreateOutletScreenState extends State<CreateOutletScreen> {
         context,
         listen: false,
       ).reverseGeocode(latitude: latitude, longitude: longitude);
-      if (!mounted || resolved == null || resolved.isEmpty) return;
-      // Never overwrite something the rep has typed themselves.
-      if (_addressController.text.trim().isEmpty) {
-        _addressController.text = resolved;
+      if (!mounted) return;
+      if (resolved != null && resolved.trim().isNotEmpty) {
+        // Never overwrite something the rep has typed themselves.
+        if (_addressController.text.trim().isEmpty) {
+          setState(() {
+            _addressController.text = resolved.trim();
+          });
+        }
       }
-    } catch (_) {
-      // Address is optional; the coordinates are what matter.
+    } catch (e) {
+      debugPrint('[CreateOutletScreen] Reverse geocode error: $e');
+    } finally {
+      if (mounted) {
+        setState(() => _isResolvingAddress = false);
+      }
     }
   }
 
@@ -229,7 +238,6 @@ class _CreateOutletScreenState extends State<CreateOutletScreen> {
         partnerLatitude: _capturedLatitude,
         partnerLongitude: _capturedLongitude,
         image1920: base64Image,
-        outletClassId: _selectedOutletClassId,
         outletTypeId: _selectedOutletTypeId,
       );
 
@@ -265,8 +273,12 @@ class _CreateOutletScreenState extends State<CreateOutletScreen> {
         reason.toLowerCase().contains('denied') ||
         reason.toLowerCase().contains('disabled');
 
+    final double? acc = _capturedAccuracy;
+    final bool isHighAcc = acc != null && acc <= 35.0;
+    final bool isLowAcc = acc != null && acc > 100.0;
+
     final Color accent = hasFix
-        ? AppColors.primary
+        ? (isLowAcc ? Colors.amber.shade800 : AppColors.primary)
         : (_isResolvingAddress ? AppColors.textSecondary : Colors.red.shade700);
 
     return Container(
@@ -276,13 +288,17 @@ class _CreateOutletScreenState extends State<CreateOutletScreen> {
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: hasFix ? AppColors.borderSoft : accent.withValues(alpha: 0.4),
+          color: hasFix
+              ? (isLowAcc ? Colors.amber.shade400 : AppColors.borderSoft)
+              : accent.withValues(alpha: 0.4),
         ),
       ),
       child: Row(
         children: [
           Icon(
-            hasFix ? Icons.my_location : Icons.location_disabled,
+            hasFix
+                ? (isLowAcc ? Icons.gps_not_fixed : Icons.my_location)
+                : Icons.location_disabled,
             size: 20,
             color: accent,
           ),
@@ -291,21 +307,64 @@ class _CreateOutletScreenState extends State<CreateOutletScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  hasFix ? 'Outlet Location Captured' : 'Outlet Location *',
-                  style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w700,
-                    color: hasFix ? AppColors.textPrimary : accent,
-                  ),
+                Row(
+                  children: [
+                    Text(
+                      hasFix ? 'Outlet Location Captured' : 'Outlet Location *',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                        color: hasFix ? AppColors.textPrimary : accent,
+                      ),
+                    ),
+                    if (hasFix && acc != null) ...[
+                      const SizedBox(width: 6),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 5,
+                          vertical: 1.5,
+                        ),
+                        decoration: BoxDecoration(
+                          color: isLowAcc
+                              ? Colors.amber.shade50
+                              : (isHighAcc
+                                  ? Colors.green.shade50
+                                  : Colors.blue.shade50),
+                          borderRadius: BorderRadius.circular(4),
+                          border: Border.all(
+                            color: isLowAcc
+                                ? Colors.amber.shade400
+                                : (isHighAcc
+                                    ? Colors.green.shade400
+                                    : Colors.blue.shade400),
+                            width: 0.5,
+                          ),
+                        ),
+                        child: Text(
+                          isLowAcc
+                              ? '±${acc.toStringAsFixed(0)}m (Low)'
+                              : '±${acc.toStringAsFixed(0)}m (Accurate)',
+                          style: TextStyle(
+                            fontSize: 9.5,
+                            fontWeight: FontWeight.w600,
+                            color: isLowAcc
+                                ? Colors.amber.shade900
+                                : (isHighAcc
+                                    ? Colors.green.shade800
+                                    : Colors.blue.shade800),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ],
                 ),
                 const SizedBox(height: 2),
                 Text(
                   hasFix
                       ? 'Lat: ${_capturedLatitude!.toStringAsFixed(6)}, Lon: ${_capturedLongitude!.toStringAsFixed(6)}'
                       : _isResolvingAddress
-                      ? 'Getting location…'
-                      : (reason.isEmpty ? 'Not captured yet' : reason),
+                      ? 'Acquiring high-accuracy GPS…'
+                      : (reason.isEmpty ? 'Will be captured when photo is taken' : reason),
                   style: const TextStyle(
                     fontSize: 11,
                     height: 1.3,
@@ -598,7 +657,7 @@ class _CreateOutletScreenState extends State<CreateOutletScreen> {
                     ),
                     const SizedBox(height: 16),
                     const Text(
-                      'Outlet Owner Name',
+                      'Outlet Owner Name *',
                       style: TextStyle(
                         fontWeight: FontWeight.w500,
                         fontSize: 14,
@@ -607,6 +666,9 @@ class _CreateOutletScreenState extends State<CreateOutletScreen> {
                     const SizedBox(height: 8),
                     TextFormField(
                       controller: _ownerNameController,
+                      validator: (v) => v == null || v.trim().isEmpty
+                          ? 'Enter owner name'
+                          : null,
                       decoration: InputDecoration(
                         hintText: 'Enter owner name',
                         filled: true,
@@ -620,97 +682,46 @@ class _CreateOutletScreenState extends State<CreateOutletScreen> {
                     const SizedBox(height: 16),
                     Consumer<RouteProvider>(
                       builder: (context, provider, _) {
-                        final classes = provider.outletClasses;
                         final types = provider.outletTypes;
 
-                        return Row(
+                        return Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  const Text(
-                                    'Outlet Class *',
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.w500,
-                                      fontSize: 14,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 8),
-                                  DropdownButtonFormField<int>(
-                                    value: _selectedOutletClassId,
-                                    validator: (val) => val == null
-                                        ? 'Outlet Class is required'
-                                        : null,
-                                    decoration: InputDecoration(
-                                      hintText: classes.isEmpty
-                                          ? 'No classes found'
-                                          : 'Select Class',
-                                      filled: true,
-                                      fillColor: AppColors.borderMuted,
-                                      border: OutlineInputBorder(
-                                        borderRadius: BorderRadius.circular(8),
-                                        borderSide: BorderSide.none,
-                                      ),
-                                    ),
-                                    items: classes.map((c) {
-                                      return DropdownMenuItem<int>(
-                                        value: c.id,
-                                        child: Text(c.name),
-                                      );
-                                    }).toList(),
-                                    onChanged: classes.isEmpty
-                                        ? null
-                                        : (val) {
-                                            setState(() => _selectedOutletClassId = val);
-                                          },
-                                  ),
-                                ],
+                            const Text(
+                              'Outlet Type *',
+                              style: TextStyle(
+                                fontWeight: FontWeight.w500,
+                                fontSize: 14,
                               ),
                             ),
-                            const SizedBox(width: 16),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  const Text(
-                                    'Outlet Type *',
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.w500,
-                                      fontSize: 14,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 8),
-                                  DropdownButtonFormField<int>(
-                                    value: _selectedOutletTypeId,
-                                    validator: (val) => val == null
-                                        ? 'Outlet Type is required'
-                                        : null,
-                                    decoration: InputDecoration(
-                                      hintText: types.isEmpty
-                                          ? 'No types found'
-                                          : 'Select Type',
-                                      filled: true,
-                                      fillColor: AppColors.borderMuted,
-                                      border: OutlineInputBorder(
-                                        borderRadius: BorderRadius.circular(8),
-                                        borderSide: BorderSide.none,
-                                      ),
-                                    ),
-                                    items: types.map((t) {
-                                      return DropdownMenuItem<int>(
-                                        value: t.id,
-                                        child: Text(t.name),
-                                      );
-                                    }).toList(),
-                                    onChanged: types.isEmpty
-                                        ? null
-                                        : (val) {
-                                            setState(() => _selectedOutletTypeId = val);
-                                          },
-                                  ),
-                                ],
+                            const SizedBox(height: 8),
+                            DropdownButtonFormField<int>(
+                              value: _selectedOutletTypeId,
+                              validator: (val) => val == null
+                                  ? 'Outlet Type is required'
+                                  : null,
+                              decoration: InputDecoration(
+                                hintText: types.isEmpty
+                                    ? 'No types found'
+                                    : 'Select Type',
+                                filled: true,
+                                fillColor: AppColors.borderMuted,
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(8),
+                                  borderSide: BorderSide.none,
+                                ),
                               ),
+                              items: types.map((t) {
+                                return DropdownMenuItem<int>(
+                                  value: t.id,
+                                  child: Text(t.name),
+                                );
+                              }).toList(),
+                              onChanged: types.isEmpty
+                                  ? null
+                                  : (val) {
+                                      setState(() => _selectedOutletTypeId = val);
+                                    },
                             ),
                           ],
                         );
@@ -918,6 +929,23 @@ class _CreateOutletScreenState extends State<CreateOutletScreen> {
                       maxLines: 4,
                       decoration: InputDecoration(
                         hintText: 'Street name, building, floor...',
+                        helperText: _isResolvingAddress
+                            ? 'Resolving address via Barikoi...'
+                            : null,
+                        helperStyle: const TextStyle(
+                          color: AppColors.primary,
+                          fontSize: 12,
+                        ),
+                        suffixIcon: _isResolvingAddress
+                            ? const Padding(
+                                padding: EdgeInsets.all(12),
+                                child: SizedBox(
+                                  width: 16,
+                                  height: 16,
+                                  child: CircularProgressIndicator(strokeWidth: 2),
+                                ),
+                              )
+                            : null,
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(8),
                           borderSide: const BorderSide(

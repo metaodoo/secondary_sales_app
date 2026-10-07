@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:secondary_sales/core/widgets/ss_ui.dart';
 import 'package:secondary_sales/core/theme/app_theme.dart';
 import 'package:provider/provider.dart';
-import 'package:secondary_sales/data/models/contacts/outlet_class.dart';
 import 'package:secondary_sales/data/models/contacts/outlet_type.dart';
 import 'package:secondary_sales/features/routes/route_provider.dart';
 import 'package:secondary_sales/core/util/dialog_helper.dart';
@@ -63,7 +62,6 @@ class _EditOutletScreenState extends State<EditOutletScreen> {
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final provider = Provider.of<RouteProvider>(context, listen: false);
-      provider.fetchOutletClasses();
       provider.fetchOutletTypes();
     });
   }
@@ -275,16 +273,6 @@ class _EditOutletScreenState extends State<EditOutletScreen> {
                     const SizedBox(height: 16),
                     Consumer<RouteProvider>(
                       builder: (context, provider, _) {
-                        final availableClasses = List<OutletClass>.from(provider.outletClasses);
-                        if (_selectedOutletClassId != null &&
-                            !availableClasses.any((c) => c.id == _selectedOutletClassId)) {
-                          String initialName = 'Class #$_selectedOutletClassId';
-                          if (widget.outlet['outlet_class'] is Map) {
-                            initialName = widget.outlet['outlet_class']['name']?.toString() ?? initialName;
-                          }
-                          availableClasses.insert(0, OutletClass(id: _selectedOutletClassId!, name: initialName));
-                        }
-
                         final availableTypes = List<OutletType>.from(provider.outletTypes);
                         if (_selectedOutletTypeId != null &&
                             !availableTypes.any((t) => t.id == _selectedOutletTypeId)) {
@@ -295,94 +283,44 @@ class _EditOutletScreenState extends State<EditOutletScreen> {
                           availableTypes.insert(0, OutletType(id: _selectedOutletTypeId!, name: initialName));
                         }
 
-                        return Row(
+                        return Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  const Text(
-                                    'Outlet Class *',
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.w500,
-                                      fontSize: 14,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 8),
-                                  DropdownButtonFormField<int>(
-                                    value: _selectedOutletClassId,
-                                    validator: (val) => val == null
-                                        ? 'Outlet Class is required'
-                                        : null,
-                                    decoration: InputDecoration(
-                                      hintText: availableClasses.isEmpty
-                                          ? 'No classes found'
-                                          : 'Select Class',
-                                      filled: true,
-                                      fillColor: AppColors.borderMuted,
-                                      border: OutlineInputBorder(
-                                        borderRadius: BorderRadius.circular(8),
-                                        borderSide: BorderSide.none,
-                                      ),
-                                    ),
-                                    items: availableClasses.map((c) {
-                                      return DropdownMenuItem<int>(
-                                        value: c.id,
-                                        child: Text(c.name),
-                                      );
-                                    }).toList(),
-                                    onChanged: availableClasses.isEmpty
-                                        ? null
-                                        : (val) {
-                                            setState(() => _selectedOutletClassId = val);
-                                          },
-                                  ),
-                                ],
+                            const Text(
+                              'Outlet Type *',
+                              style: TextStyle(
+                                fontWeight: FontWeight.w500,
+                                fontSize: 14,
                               ),
                             ),
-                            const SizedBox(width: 16),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  const Text(
-                                    'Outlet Type *',
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.w500,
-                                      fontSize: 14,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 8),
-                                  DropdownButtonFormField<int>(
-                                    value: _selectedOutletTypeId,
-                                    validator: (val) => val == null
-                                        ? 'Outlet Type is required'
-                                        : null,
-                                    decoration: InputDecoration(
-                                      hintText: availableTypes.isEmpty
-                                          ? 'No types found'
-                                          : 'Select Type',
-                                      filled: true,
-                                      fillColor: AppColors.borderMuted,
-                                      border: OutlineInputBorder(
-                                        borderRadius: BorderRadius.circular(8),
-                                        borderSide: BorderSide.none,
-                                      ),
-                                    ),
-                                    items: availableTypes.map((t) {
-                                      return DropdownMenuItem<int>(
-                                        value: t.id,
-                                        child: Text(t.name),
-                                      );
-                                    }).toList(),
-                                    onChanged: availableTypes.isEmpty
-                                        ? null
-                                        : (val) {
-                                            setState(() => _selectedOutletTypeId = val);
-                                          },
-                                  ),
-                                ],
+                            const SizedBox(height: 8),
+                            DropdownButtonFormField<int>(
+                              value: _selectedOutletTypeId,
+                              validator: (val) => val == null
+                                  ? 'Outlet Type is required'
+                                  : null,
+                              decoration: InputDecoration(
+                                hintText: availableTypes.isEmpty
+                                    ? 'No types found'
+                                    : 'Select Type',
+                                filled: true,
+                                fillColor: AppColors.borderMuted,
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(8),
+                                  borderSide: BorderSide.none,
+                                ),
                               ),
+                              items: availableTypes.map((t) {
+                                return DropdownMenuItem<int>(
+                                  value: t.id,
+                                  child: Text(t.name),
+                                );
+                              }).toList(),
+                              onChanged: availableTypes.isEmpty
+                                  ? null
+                                  : (val) {
+                                      setState(() => _selectedOutletTypeId = val);
+                                    },
                             ),
                           ],
                         );
