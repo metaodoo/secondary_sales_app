@@ -280,7 +280,7 @@ class MasterDataSyncService with ChangeNotifier {
 
       dynamic visitReasonsData;
       try {
-        final reasonsRes = await _apiService.executeRawPost('/api/v1/visits/reasons', {});
+        final reasonsRes = await _apiService.executeRawPost('/api/v1/visit-reasons', {});
         step26Sw.stop();
         if (reasonsRes['success'] == true) {
           visitReasonsData = reasonsRes['data'] ?? reasonsRes['reasons'];
