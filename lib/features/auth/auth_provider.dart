@@ -338,7 +338,9 @@ class AuthProvider with ChangeNotifier {
           ),
         );
       }
+      debugPrint('[AuthProvider] Session restored for user "${_session!.user.name}" (Employee ID: ${_session!.user.employeeId}).');
       unawaited(refreshAccessControl());
+      unawaited(MasterDataSyncService.instance.triggerDailySync());
     } catch (e) {
       _error = e.toString();
       _session = null;
@@ -369,6 +371,8 @@ class AuthProvider with ChangeNotifier {
       ApiService.lastAuthFailureReason = null;
       _authService.updateSessionId(session.sessionId);
       await _storeSession(session);
+      debugPrint('[AuthProvider] Login successful for user "${session.user.name}" (login: $login, Employee ID: ${session.user.employeeId}, Session: ${session.sessionId}).');
+      debugPrint('[AuthProvider] Triggering initial master data cache pull (force=true)...');
       unawaited(
         PushNotificationService.bindAuthenticatedSession(
           accessToken: session.accessToken,
@@ -377,7 +381,7 @@ class AuthProvider with ChangeNotifier {
       );
       unawaited(refreshAccessControl());
       unawaited(_autoSyncCatalogIfAllowed());
-      unawaited(MasterDataSyncService.instance.triggerDailySync());
+      unawaited(MasterDataSyncService.instance.triggerDailySync(force: true));
       return true;
     } catch (e) {
       _error = e.toString();
