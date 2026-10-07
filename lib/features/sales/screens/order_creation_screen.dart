@@ -317,25 +317,69 @@ class _OrderCreationScreenState extends State<OrderCreationScreen> {
         // Soft Warning: Check if any ordered quantity exceeds recorded stock
         final stockExceededLines = lines.where((l) => l.dbStock > 0 && l.orderQty > l.dbStock).toList();
         if (stockExceededLines.isNotEmpty) {
-          final proceed = await showDialog<bool>(
+          final proceed = await showModalBottomSheet<bool>(
             context: context,
-            builder: (ctx) => AlertDialog(
-              title: const Text('Stock Exceeded'),
-              content: Text(
-                'The following items exceed recorded distributor stock:\n\n' +
-                stockExceededLines.map((e) => '• ${e.productName}: Ordered ${e.orderQty}, Available ${e.dbStock}').join('\n') +
-                '\n\nDo you want to proceed with order booking anyway?',
+            shape: const RoundedRectangleBorder(
+              borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+            ),
+            builder: (ctx) => Padding(
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      const Icon(Icons.warning_amber_rounded, color: Colors.orange, size: 28),
+                      const SizedBox(width: 8),
+                      const Text(
+                        'Stock Warning',
+                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  const Text(
+                    'Dealer stock is lower than order quantity:',
+                    style: TextStyle(fontSize: 14, color: Colors.black87),
+                  ),
+                  const SizedBox(height: 12),
+                  ...stockExceededLines.map((e) => Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 2),
+                    child: Text(
+                      '• ${e.productName} (Order: ${e.orderQty}, Stock: ${e.dbStock})',
+                      style: const TextStyle(fontSize: 13, color: Colors.black54),
+                    ),
+                  )),
+                  const SizedBox(height: 16),
+                  const Text(
+                    'Do you still want to place this order?',
+                    style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+                  ),
+                  const SizedBox(height: 20),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton(
+                          onPressed: () => Navigator.pop(ctx, false),
+                          child: const Text('Change Qty'),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: ElevatedButton(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.green[700],
+                            foregroundColor: Colors.white,
+                          ),
+                          onPressed: () => Navigator.pop(ctx, true),
+                          child: const Text('Yes, Place Order'),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
               ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(ctx, false),
-                  child: const Text('Review Cart'),
-                ),
-                ElevatedButton(
-                  onPressed: () => Navigator.pop(ctx, true),
-                  child: const Text('Proceed'),
-                ),
-              ],
             ),
           );
           if (proceed != true) return;
@@ -439,8 +483,12 @@ class _OrderCreationScreenState extends State<OrderCreationScreen> {
       }
     } catch (e) {
       if (mounted) {
+        String msg = e.toString().replaceFirst(RegExp(r'^(Exception:\s*|Error:\s*)'), '');
+        if (msg.contains('SocketException') || msg.contains('Failed host lookup') || msg.contains('Network is unreachable')) {
+          msg = 'Network issue. Please try again.';
+        }
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+          SnackBar(content: Text(msg), backgroundColor: Colors.red),
         );
       }
     } finally {

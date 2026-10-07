@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:path/path.dart' as p;
+import 'package:secondary_sales/data/api/api_service.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:uuid/uuid.dart';
 
@@ -14,7 +15,7 @@ class OfflineDatabaseHelper {
   static final OfflineDatabaseHelper instance = OfflineDatabaseHelper._();
 
   static const String _dbName = 'offline_store.db';
-  static const int _dbVersion = 2;
+  static const int _dbVersion = 3;
 
   static const String tableOutbox = 'outbox_operations';
   static const String tableMasterCache = 'cached_master_data';
@@ -59,6 +60,7 @@ class OfflineDatabaseHelper {
             endpoint TEXT NOT NULL,
             payload_json TEXT NOT NULL,
             parent_uuid TEXT,
+            employee_id INTEGER NOT NULL DEFAULT 0,
             created_at TEXT NOT NULL,
             status TEXT NOT NULL DEFAULT 'PENDING',
             retry_count INTEGER NOT NULL DEFAULT 0,
@@ -77,6 +79,9 @@ class OfflineDatabaseHelper {
         await db.execute(
           'CREATE INDEX idx_outbox_created ON $tableOutbox(created_at);',
         );
+        await db.execute(
+          'CREATE INDEX idx_outbox_emp ON $tableOutbox(employee_id, status);',
+        );
 
         // 2. Inbound Document Master Data Cache
         await db.execute('''
@@ -92,12 +97,16 @@ class OfflineDatabaseHelper {
           'CREATE INDEX idx_cache_type ON $tableMasterCache(entity_type);',
         );
 
-        // 3. Relational Master Tables (v2)
+        // 3. Relational Master Tables (v2 & v3)
         await _createV2Tables(db);
+        await _upgradeToV3(db);
       },
       onUpgrade: (db, oldVersion, newVersion) async {
         if (oldVersion < 2) {
           await _createV2Tables(db);
+        }
+        if (oldVersion < 3) {
+          await _upgradeToV3(db);
         }
       },
     );
@@ -196,6 +205,16 @@ class OfflineDatabaseHelper {
       enrichedPayload['parent_uuid'] = parentUuid;
     }
 
+    int empId = 0;
+    if (payload['employee_id'] is int) {
+      empId = payload['employee_id'] as int;
+    } else if (payload['employee_id'] != null) {
+      empId = int.tryParse(payload['employee_id'].toString()) ?? 0;
+    }
+    if (empId == 0) {
+      empId = ApiService.instance.activeEmployeeId ?? 0;
+    }
+
     await db.insert(
       tableOutbox,
       {
@@ -204,6 +223,7 @@ class OfflineDatabaseHelper {
         'endpoint': endpoint,
         'payload_json': jsonEncode(enrichedPayload),
         'parent_uuid': parentUuid,
+        'employee_id': empId,
         'created_at': nowIso,
         'status': 'PENDING',
         'retry_count': 0,
@@ -244,8 +264,18 @@ class OfflineDatabaseHelper {
   /// Retrieves pending operations sorted chronologically (FIFO).
   Future<List<Map<String, dynamic>>> getPendingOperations({
     int limit = 50,
+    int? employeeId,
   }) async {
     final db = await database;
+    if (employeeId != null && employeeId > 0) {
+      return db.query(
+        tableOutbox,
+        where: 'status = ? AND employee_id = ?',
+        whereArgs: ['PENDING', employeeId],
+        orderBy: 'id ASC',
+        limit: limit,
+      );
+    }
     return db.query(
       tableOutbox,
       where: 'status = ?',
@@ -497,6 +527,7 @@ class OfflineDatabaseHelper {
       CREATE TABLE IF NOT EXISTS $tableOutlets (
         id INTEGER PRIMARY KEY,
         route_id INTEGER NOT NULL,
+        distributor_id INTEGER,
         name TEXT NOT NULL,
         code TEXT,
         owner_name TEXT,
@@ -511,6 +542,9 @@ class OfflineDatabaseHelper {
     ''');
     await db.execute(
       'CREATE INDEX IF NOT EXISTS idx_outlets_route ON $tableOutlets(route_id);',
+    );
+    await db.execute(
+      'CREATE INDEX IF NOT EXISTS idx_outlets_dist ON $tableOutlets(distributor_id);',
     );
     await db.execute(
       'CREATE INDEX IF NOT EXISTS idx_outlets_name ON $tableOutlets(name);',
@@ -582,6 +616,17 @@ class OfflineDatabaseHelper {
     await db.execute(
       'CREATE INDEX IF NOT EXISTS idx_ref_group ON $tableReferenceMetadata(group_name);',
     );
+  }
+
+  Future<void> _upgradeToV3(Database db) async {
+    try {
+      await db.execute('ALTER TABLE $tableOutbox ADD COLUMN employee_id INTEGER NOT NULL DEFAULT 0;');
+      await db.execute('CREATE INDEX IF NOT EXISTS idx_outbox_emp ON $tableOutbox(employee_id, status);');
+    } catch (_) {}
+    try {
+      await db.execute('ALTER TABLE $tableOutlets ADD COLUMN distributor_id INTEGER;');
+      await db.execute('CREATE INDEX IF NOT EXISTS idx_outlets_dist ON $tableOutlets(distributor_id);');
+    } catch (_) {}
   }
 
   /// Runs an atomic batch transaction across SQLite tables.
@@ -677,6 +722,7 @@ class OfflineDatabaseHelper {
   Future<void> saveLocalOutlets(
     List<Map<String, dynamic>> outlets, {
     required int routeId,
+    int? distributorId,
     Transaction? txn,
   }) async {
     final executor = txn ?? await database;
@@ -686,11 +732,22 @@ class OfflineDatabaseHelper {
       final id = o['id'] is int ? o['id'] as int : int.tryParse(o['id'].toString()) ?? 0;
       if (id <= 0) continue;
 
+      int? distId = distributorId;
+      if (distId == null && o['distributor_id'] != null) {
+        distId = o['distributor_id'] is int
+            ? o['distributor_id'] as int
+            : int.tryParse(o['distributor_id'].toString());
+      }
+      if (distId == null && o['distributor'] is Map) {
+        distId = int.tryParse(o['distributor']['id']?.toString() ?? '');
+      }
+
       await executor.insert(
         tableOutlets,
         {
           'id': id,
           'route_id': routeId,
+          'distributor_id': distId,
           'name': o['name']?.toString() ?? '',
           'code': o['code']?.toString() ?? o['ss_code']?.toString(),
           'owner_name': o['owner_name']?.toString(),

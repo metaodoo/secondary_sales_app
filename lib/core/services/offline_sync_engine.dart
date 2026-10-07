@@ -148,7 +148,13 @@ class OfflineSyncEngine with WidgetsBindingObserver {
         // Rate Limiter: 500ms delay between requests (max 2 req/s)
         await Future.delayed(const Duration(milliseconds: 500));
 
-        final success = await _dispatchOperation(opUuid, endpoint, payload);
+        final retries = op['retry_count'] is int ? op['retry_count'] as int : 0;
+        final success = await _dispatchOperation(
+          opUuid,
+          endpoint,
+          payload,
+          currentRetries: retries,
+        );
         if (!success) {
           // If a transient failure occurred (network drop / server down),
           // stop current sync cycle to avoid hammering the server.
@@ -167,14 +173,17 @@ class OfflineSyncEngine with WidgetsBindingObserver {
     }
   }
 
+  static const int kMaxOutboxRetries = 5;
+
   /// Dispatches a single operation directly via raw network call.
   /// Returns `true` if operation was processed (success or quarantined),
   /// or `false` if transient error occurred and sync loop should pause.
   Future<bool> _dispatchOperation(
     String opUuid,
     String endpoint,
-    Map<String, dynamic> payload,
-  ) async {
+    Map<String, dynamic> payload, {
+    int currentRetries = 0,
+  }) async {
     await _dbHelper.updateOperationStatus(opUuid, 'SYNCING');
 
     try {
@@ -196,11 +205,14 @@ class OfflineSyncEngine with WidgetsBindingObserver {
             response['message']?.toString() ?? 'Unknown server rejection';
         final isFatalBusinessError = _isNonTransientError(errorMsg);
 
-        if (isFatalBusinessError) {
-          // Non-transient business conflict -> quarantine so queue doesn't stall
-          await _dbHelper.markOperationQuarantined(opUuid, reason: errorMsg);
+        if (isFatalBusinessError || currentRetries >= kMaxOutboxRetries) {
+          // Non-transient business conflict or retry threshold exceeded -> quarantine so queue doesn't stall
+          final reason = currentRetries >= kMaxOutboxRetries
+              ? 'Exceeded max retries ($kMaxOutboxRetries). Error: $errorMsg'
+              : errorMsg;
+          await _dbHelper.markOperationQuarantined(opUuid, reason: reason);
           debugPrint(
-            '[OfflineSyncEngine] Quarantined non-transient op $opUuid: $errorMsg',
+            '[OfflineSyncEngine] Quarantined op $opUuid: $reason',
           );
           return true; // continue next item
         } else {
@@ -219,8 +231,11 @@ class OfflineSyncEngine with WidgetsBindingObserver {
         '[OfflineSyncEngine] Network/server exception on $opUuid: $errStr',
       );
 
-      if (_isNonTransientError(errStr)) {
-        await _dbHelper.markOperationQuarantined(opUuid, reason: errStr);
+      if (_isNonTransientError(errStr) || currentRetries >= kMaxOutboxRetries) {
+        final reason = currentRetries >= kMaxOutboxRetries
+            ? 'Exceeded max retries ($kMaxOutboxRetries). Error: $errStr'
+            : errStr;
+        await _dbHelper.markOperationQuarantined(opUuid, reason: reason);
         return true; // continue next item
       } else {
         // Transient network error (timeout, socket exception, 502/503)
@@ -243,6 +258,8 @@ class OfflineSyncEngine with WidgetsBindingObserver {
         lower.contains('timeout') ||
         lower.contains('timed out') ||
         lower.contains('connection refused') ||
+        lower.contains('network is unreachable') ||
+        lower.contains('handshake') ||
         lower.contains('502') ||
         lower.contains('503') ||
         lower.contains('504') ||
@@ -256,7 +273,12 @@ class OfflineSyncEngine with WidgetsBindingObserver {
         lower.contains('validation') ||
         lower.contains('constraint') ||
         lower.contains('not found') ||
-        lower.contains('forbidden')) {
+        lower.contains('forbidden') ||
+        lower.contains('credit limit') ||
+        lower.contains('insufficient stock') ||
+        lower.contains('locked') ||
+        lower.contains('permission') ||
+        lower.contains('unauthorized')) {
       return true; // Permanent business conflict
     }
 

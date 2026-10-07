@@ -244,9 +244,18 @@ class MasterDataSyncService with ChangeNotifier {
         }
 
         for (final entry in routeOutletsMap.entries) {
+          final rId = entry.key;
+          final r = rawRoutes.firstWhere((route) => route['id'] == rId, orElse: () => {});
+          int? distId;
+          if (r['distributor'] is Map) {
+            distId = int.tryParse(r['distributor']['id']?.toString() ?? '');
+          } else if (r['distributor_id'] != null) {
+            distId = int.tryParse(r['distributor_id'].toString());
+          }
           await _dbHelper.saveLocalOutlets(
             entry.value,
-            routeId: entry.key,
+            routeId: rId,
+            distributorId: distId,
             txn: txn,
           );
         }

@@ -823,11 +823,53 @@ class ProductSelectionCard extends StatelessWidget {
     // GT Business Type
     final stock = product.stock?.toInt() ?? 0;
     if (saleType == 'secondary') {
-      return 'Van Stock: $stock   |   DB Stock: ${product.distributorStock?.toInt() ?? 0}';
+      final dbStock = product.distributorStock?.toInt() ?? 0;
+      return 'Van Stock: $stock   |   Dealer Stock: $dbStock';
     } else {
       // GT Primary
       return 'Warehouse Stock: $stock';
     }
+  }
+
+  Widget _stockBadge() {
+    if (saleType == 'secondary') {
+      final dbStock = product.distributorStock?.toInt() ?? 0;
+      final Color badgeColor;
+      final Color textColor;
+      final String label;
+
+      if (dbStock <= 0) {
+        badgeColor = const Color(0xFFFFEBEE);
+        textColor = const Color(0xFFC62828);
+        label = 'Out of Stock';
+      } else if (dbStock < 10) {
+        badgeColor = const Color(0xFFFFF3E0);
+        textColor = const Color(0xFFEF6C00);
+        label = 'Low Stock ($dbStock)';
+      } else {
+        badgeColor = const Color(0xFFE8F5E9);
+        textColor = const Color(0xFF2E7D32);
+        label = 'In Stock ($dbStock)';
+      }
+
+      return Container(
+        margin: const EdgeInsets.only(top: 4),
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+        decoration: BoxDecoration(
+          color: badgeColor,
+          borderRadius: BorderRadius.circular(6),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            color: textColor,
+            fontSize: 11,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      );
+    }
+    return const SizedBox.shrink();
   }
 
   @override
@@ -889,6 +931,7 @@ class ProductSelectionCard extends StatelessWidget {
                             fontSize: 12,
                           ),
                         ),
+                        _stockBadge(),
                         if (product.categoryName != null) ...[
                           const SizedBox(height: 2),
                           Text(

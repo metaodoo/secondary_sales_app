@@ -12,6 +12,18 @@ import 'package:secondary_sales/data/api/api_service.dart';
 import 'package:secondary_sales/data/models/notifications/app_notification.dart';
 import 'package:secondary_sales/features/notifications/notification_router.dart';
 
+@pragma('vm:entry-point')
+Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
+  try {
+    final data = message.data;
+    if (data['type'] == 'distributor_stock_delta') {
+      await PushNotificationService.processStockDeltaMessage(data);
+    }
+  } catch (e) {
+    debugPrint('[PushNotificationService] Background message handler error: $e');
+  }
+}
+
 class PushNotificationService {
   PushNotificationService._();
 
@@ -36,6 +48,7 @@ class PushNotificationService {
       await Firebase.initializeApp();
       await _messaging.requestPermission(alert: true, badge: true, sound: true);
 
+      FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
       FirebaseMessaging.onMessage.listen(_handleForegroundMessage);
       FirebaseMessaging.onMessageOpenedApp.listen(_handleNotificationTap);
 
@@ -204,11 +217,11 @@ class PushNotificationService {
   static Future<void> _handleForegroundMessage(RemoteMessage message) async {
     final data = message.data;
     if (data['type'] == 'distributor_stock_delta') {
-      await _processStockDeltaMessage(data);
+      await processStockDeltaMessage(data);
     }
   }
 
-  static Future<void> _processStockDeltaMessage(Map<String, dynamic> data) async {
+  static Future<void> processStockDeltaMessage(Map<String, dynamic> data) async {
     try {
       final distributorId = int.tryParse(data['distributor_id']?.toString() ?? '');
       final updatesStr = data['updates']?.toString();

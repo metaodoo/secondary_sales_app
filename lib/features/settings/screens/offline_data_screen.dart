@@ -271,7 +271,7 @@ class _OfflineDataScreenState extends State<OfflineDataScreen>
                 const SizedBox(width: 8),
                 _filterChip('PENDING', 'Pending ($_pendingCount)'),
                 const SizedBox(width: 8),
-                _filterChip('QUARANTINED', 'Quarantined ($_quarantinedCount)'),
+                _filterChip('QUARANTINED', 'Sync Issues ($_quarantinedCount)'),
               ],
             ),
           ),

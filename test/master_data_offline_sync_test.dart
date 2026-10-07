@@ -1,4 +1,3 @@
-import 'dart:convert';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:secondary_sales/core/services/offline_database_helper.dart';
@@ -69,6 +68,7 @@ void main() {
       final singleOutlet = await dbHelper.getLocalOutletById(101);
       expect(singleOutlet, isNotNull);
       expect(singleOutlet!['name'], equals('Store 1'));
+      expect(singleOutlet['distributor_id'], equals(10));
 
       // Vans
       await dbHelper.saveLocalVans([
@@ -203,6 +203,27 @@ void main() {
       // Attempting triggerDailySync should abort phase 2
       final syncResult = await MasterDataSyncService.instance.triggerDailySync(force: true);
       expect(syncResult, isFalse);
+    });
+
+    test('7. Outbox Operations Store Employee ID and Support Filtering', () async {
+      await dbHelper.enqueueOperation(
+        entityType: 'order',
+        endpoint: '/api/v1/sale-orders/create',
+        payload: {'client_order_ref': 'ORD-EMP-101', 'employee_id': 101},
+      );
+      await dbHelper.enqueueOperation(
+        entityType: 'order',
+        endpoint: '/api/v1/sale-orders/create',
+        payload: {'client_order_ref': 'ORD-EMP-202', 'employee_id': 202},
+      );
+
+      final ops101 = await dbHelper.getPendingOperations(employeeId: 101);
+      expect(ops101.length, equals(1));
+      expect(ops101.first['employee_id'], equals(101));
+
+      final ops202 = await dbHelper.getPendingOperations(employeeId: 202);
+      expect(ops202.length, equals(1));
+      expect(ops202.first['employee_id'], equals(202));
     });
   });
 }

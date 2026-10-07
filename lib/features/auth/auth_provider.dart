@@ -10,6 +10,7 @@ import 'package:secondary_sales/core/access/access_resources.dart';
 import 'package:secondary_sales/core/app_navigator.dart';
 import 'package:secondary_sales/core/constants.dart';
 import 'package:secondary_sales/core/services/master_data_sync_service.dart';
+import 'package:secondary_sales/core/services/offline_database_helper.dart';
 import 'package:secondary_sales/core/services/push_notification_service.dart';
 import 'package:secondary_sales/data/models/auth/mobile_auth_session.dart';
 import 'package:secondary_sales/data/api/api_service.dart';
@@ -542,6 +543,19 @@ class AuthProvider with ChangeNotifier {
   /// session) so the login screen can explain what happened; leave it null for
   /// a sign-out the user asked for.
   Future<void> logout({bool callServer = true, String? reason}) async {
+    // Shift-Lock Guard: Prevent involuntary logouts from stranding un-synced offline orders
+    if (reason != null) {
+      final pendingCount = await OfflineDatabaseHelper.instance.getPendingCount();
+      if (pendingCount > 0) {
+        debugPrint(
+          '[AuthProvider] Involuntary logout suppressed: $pendingCount pending offline operations exist.',
+        );
+        _tokenRefreshFailed = true;
+        notifyListeners();
+        return;
+      }
+    }
+
     final accessToken = _session?.accessToken;
     final sessionId = _session?.sessionId ?? _odooSessionId;
     _authService.updateSessionId(sessionId);
