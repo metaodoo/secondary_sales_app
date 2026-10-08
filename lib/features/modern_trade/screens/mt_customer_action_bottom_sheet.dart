@@ -661,7 +661,7 @@ class _MtCustomerActionBottomSheetState extends State<MtCustomerActionBottomShee
       actionButtons.add(
         _buildActionBtn(
           Icons.inventory_2_outlined,
-          'Stock\nAudit',
+          'Stock Audit',
           onTap: () => _handleStockAuditAction(directCreate: false),
         ),
       );
@@ -695,7 +695,7 @@ class _MtCustomerActionBottomSheetState extends State<MtCustomerActionBottomShee
     actionButtons.add(
       _buildActionBtn(
         Icons.history,
-        'Visit\nHistory',
+        'Visit History',
         onTap: () {
           Navigator.push(
             context,
@@ -714,7 +714,7 @@ class _MtCustomerActionBottomSheetState extends State<MtCustomerActionBottomShee
       actionButtons.add(
         _buildActionBtn(
           Icons.logout,
-          'Check\nOut',
+          'Check Out',
           iconColor: const Color(0xFFDC2626),
           onTap: _handleCheckOut,
         ),
@@ -723,7 +723,7 @@ class _MtCustomerActionBottomSheetState extends State<MtCustomerActionBottomShee
       actionButtons.add(
         _buildActionBtn(
           Icons.login,
-          'Check\nIn',
+          'Check In',
           iconColor: const Color(0xFF10B981),
           onTap: _handleCheckIn,
         ),
@@ -912,16 +912,19 @@ class _MtCustomerActionBottomSheetState extends State<MtCustomerActionBottomShee
           children: [
             Icon(icon, color: iconColor ?? AppColors.primaryStrong, size: 24),
             const SizedBox(height: 6),
-            Text(
-              label,
-              textAlign: TextAlign.center,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                color: AppColors.textPrimary,
-                fontSize: 11,
-                fontWeight: FontWeight.w500,
-                height: 1.15,
+            FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Text(
+                label,
+                textAlign: TextAlign.center,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  color: AppColors.textPrimary,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w500,
+                  height: 1.15,
+                ),
               ),
             ),
           ],

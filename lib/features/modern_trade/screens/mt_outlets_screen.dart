@@ -311,39 +311,43 @@ class _MtOutletsScreenState extends State<MtOutletsScreen> with WidgetsBindingOb
                                           child: Column(
                                             crossAxisAlignment: CrossAxisAlignment.start,
                                             children: [
-                                              Row(
+                                              // Primary: Outlet Name
+                                              Text(
+                                                outlet.name,
+                                                maxLines: 2,
+                                                overflow: TextOverflow.ellipsis,
+                                                style: const TextStyle(
+                                                  fontWeight: FontWeight.bold,
+                                                  fontSize: 15,
+                                                  height: 1.25,
+                                                  color: AppColors.textPrimary,
+                                                ),
+                                              ),
+                                              const SizedBox(height: 4),
+                                              // Secondary: Code & Badges
+                                              Wrap(
+                                                spacing: 6,
+                                                runSpacing: 4,
+                                                crossAxisAlignment: WrapCrossAlignment.center,
                                                 children: [
-                                                  Expanded(
-                                                    child: Text(
-                                                      outlet.name,
+                                                  if (outlet.ssCode != null && outlet.ssCode!.trim().isNotEmpty)
+                                                    Text(
+                                                      'Code: ${outlet.ssCode!.trim()}',
                                                       style: const TextStyle(
-                                                        fontWeight: FontWeight.bold,
-                                                        fontSize: 15,
-                                                        color: AppColors.textPrimary,
+                                                        fontSize: 12,
+                                                        fontWeight: FontWeight.w600,
+                                                        color: AppColors.primary,
                                                       ),
                                                     ),
-                                                  ),
-                                                  if (distanceMeters != null) ...[
+                                                  if (distanceMeters != null)
                                                     _buildDistanceBadge(
                                                       distanceMeters,
                                                       outlet: outlet,
                                                       userPosition: provider.currentPosition,
                                                     ),
-                                                    const SizedBox(width: 6),
-                                                  ],
                                                   _buildBadge(outlet),
                                                 ],
                                               ),
-                                              if (outlet.ssCode != null && outlet.ssCode!.trim().isNotEmpty) ...[
-                                                const SizedBox(height: 2),
-                                                Text(
-                                                  'Code: ${outlet.ssCode!.trim()}',
-                                                  style: const TextStyle(
-                                                    fontSize: 13,
-                                                    color: AppColors.textSecondary,
-                                                  ),
-                                                ),
-                                              ],
                                               if (outlet.street != null && outlet.street!.trim().isNotEmpty) ...[
                                                 const SizedBox(height: 4),
                                                 Row(

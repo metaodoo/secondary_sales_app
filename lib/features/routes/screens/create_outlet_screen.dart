@@ -485,13 +485,13 @@ class _CreateOutletScreenState extends State<CreateOutletScreen> {
                 const SizedBox(height: 2),
                 Text(
                   hasFix
-                      ? 'Lat: ${_capturedLatitude!.toStringAsFixed(6)}, Lon: ${_capturedLongitude!.toStringAsFixed(6)}'
+                      ? 'Lat: ${_capturedLatitude!.toStringAsFixed(5)}, Lon: ${_capturedLongitude!.toStringAsFixed(5)}'
                       : _isResolvingAddress
                       ? 'Acquiring high-accuracy GPS…'
                       : (reason.isEmpty ? 'Will be captured when photo is taken' : reason),
                   style: const TextStyle(
                     fontSize: 11,
-                    height: 1.3,
+                    height: 1.25,
                     color: AppColors.textSecondary,
                   ),
                 ),
@@ -506,13 +506,15 @@ class _CreateOutletScreenState extends State<CreateOutletScreen> {
             )
           else
             TextButton(
+              style: TextButton.styleFrom(
+                foregroundColor: AppColors.primaryStrong,
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                minimumSize: Size.zero,
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              ),
               onPressed: needsSettings
                   ? () => Geolocator.openAppSettings()
                   : _captureLocation,
-              style: TextButton.styleFrom(
-                foregroundColor: AppColors.primaryStrong,
-                padding: const EdgeInsets.symmetric(horizontal: 8),
-              ),
               child: Text(
                 needsSettings
                     ? 'SETTINGS'
@@ -889,16 +891,20 @@ class _CreateOutletScreenState extends State<CreateOutletScreen> {
                                 ),
                               ),
                               const SizedBox(width: 8),
-                              const Text(
-                                'ASSIGNED ROUTE & DISTRIBUTOR',
-                                style: TextStyle(
-                                  color: AppColors.primaryStrong,
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w700,
-                                  letterSpacing: 0.8,
+                              const Expanded(
+                                child: Text(
+                                  'ASSIGNED ROUTE & DISTRIBUTOR',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    color: AppColors.primaryStrong,
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w700,
+                                    letterSpacing: 0.8,
+                                  ),
                                 ),
                               ),
-                              const Spacer(),
+                              const SizedBox(width: 8),
                               Container(
                                 padding: const EdgeInsets.symmetric(
                                   horizontal: 8,
@@ -937,66 +943,80 @@ class _CreateOutletScreenState extends State<CreateOutletScreen> {
                           const SizedBox(height: 14),
                           const Divider(height: 1, color: Color(0xFFE2E8F0)),
                           const SizedBox(height: 12),
-                          // Route Row
-                          Row(
+                          // Route & Distributor Details
+                          Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              const SizedBox(
-                                width: 95,
-                                child: Text(
-                                  'Route Name',
-                                  style: TextStyle(
-                                    color: AppColors.textSecondary,
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w600,
+                              Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Icon(
+                                    Icons.alt_route_rounded,
+                                    size: 15,
+                                    color: AppColors.primaryStrong,
                                   ),
-                                ),
+                                  const SizedBox(width: 6),
+                                  const Text(
+                                    'ROUTE: ',
+                                    style: TextStyle(
+                                      color: AppColors.textSecondary,
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.bold,
+                                      letterSpacing: 0.6,
+                                    ),
+                                  ),
+                                  Expanded(
+                                    child: Text(
+                                      widget.routeName.isNotEmpty
+                                          ? widget.routeName
+                                          : 'Unassigned Route',
+                                      maxLines: 2,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(
+                                        color: Color(0xFF1E293B),
+                                        fontSize: 13.5,
+                                        fontWeight: FontWeight.w700,
+                                        height: 1.25,
+                                      ),
+                                    ),
+                                  ),
+                                ],
                               ),
-                              const SizedBox(width: 8),
-                              Expanded(
-                                child: Text(
-                                  widget.routeName.isNotEmpty
-                                      ? widget.routeName
-                                      : 'Unassigned Route',
-                                  style: const TextStyle(
-                                    color: Color(0xFF1E293B),
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.bold,
-                                    height: 1.3,
+                              const SizedBox(height: 8),
+                              Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Icon(
+                                    Icons.business_outlined,
+                                    size: 15,
+                                    color: Color(0xFF0D9488),
                                   ),
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 10),
-                          // DB / Distributor Row
-                          Row(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const SizedBox(
-                                width: 95,
-                                child: Text(
-                                  'Distributor (DB)',
-                                  style: TextStyle(
-                                    color: AppColors.textSecondary,
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w600,
+                                  const SizedBox(width: 6),
+                                  const Text(
+                                    'DISTRIBUTOR: ',
+                                    style: TextStyle(
+                                      color: AppColors.textSecondary,
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.bold,
+                                      letterSpacing: 0.6,
+                                    ),
                                   ),
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                              Expanded(
-                                child: Text(
-                                  widget.distributorName.isNotEmpty
-                                      ? widget.distributorName
-                                      : 'Unassigned Distributor',
-                                  style: const TextStyle(
-                                    color: Color(0xFF1E293B),
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.bold,
-                                    height: 1.3,
+                                  Expanded(
+                                    child: Text(
+                                      widget.distributorName.isNotEmpty
+                                          ? widget.distributorName
+                                          : 'Unassigned Distributor',
+                                      maxLines: 2,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(
+                                        color: Color(0xFF1E293B),
+                                        fontSize: 13.5,
+                                        fontWeight: FontWeight.w700,
+                                        height: 1.25,
+                                      ),
+                                    ),
                                   ),
-                                ),
+                                ],
                               ),
                             ],
                           ),

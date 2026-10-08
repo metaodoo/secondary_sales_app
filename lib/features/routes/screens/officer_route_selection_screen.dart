@@ -225,9 +225,12 @@ class OfficerRouteSelectionScreen extends StatelessWidget {
             const SizedBox(height: 16),
             Text(
               title,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
               style: const TextStyle(
                 fontWeight: FontWeight.bold,
-                fontSize: 18,
+                fontSize: 16,
+                height: 1.25,
                 color: AppColors.textPrimary,
               ),
             ),

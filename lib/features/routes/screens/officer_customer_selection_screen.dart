@@ -202,10 +202,12 @@ class _OfficerCustomerSelectionScreenState
         ),
         title: Text(
           widget.routeName,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
           style: const TextStyle(
             color: AppColors.textPrimary,
             fontWeight: FontWeight.bold,
-            fontSize: 20,
+            fontSize: 18,
           ),
         ),
         actions: const [
@@ -598,10 +600,10 @@ class _OfficerCustomerSelectionScreenState
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Container(
-                                    padding: const EdgeInsets.all(12),
+                                    padding: const EdgeInsets.all(10),
                                     decoration: BoxDecoration(
                                       color: AppColors.primarySoft,
-                                      borderRadius: BorderRadius.circular(24),
+                                      borderRadius: BorderRadius.circular(20),
                                     ),
                                     child: const Icon(
                                       Icons.storefront,
@@ -609,51 +611,59 @@ class _OfficerCustomerSelectionScreenState
                                       size: 20,
                                     ),
                                   ),
-                                  const SizedBox(width: 16),
+                                  const SizedBox(width: 12),
                                   Expanded(
                                     child: Column(
                                       crossAxisAlignment:
                                           CrossAxisAlignment.start,
                                       children: [
+                                        // Primary: Outlet Name with full column width
+                                        Text(
+                                          outlet.name,
+                                          maxLines: 2,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: const TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 15,
+                                            height: 1.25,
+                                            color: AppColors.textPrimary,
+                                          ),
+                                        ),
+                                        // Secondary: SS Code + Distance Badge on their own row
+                                        const SizedBox(height: 3),
                                         Row(
                                           children: [
-                                            Expanded(
-                                              child: Text(
-                                                outlet.name,
-                                                style: const TextStyle(
-                                                  fontWeight: FontWeight.bold,
-                                                  fontSize: 15,
-                                                  color: AppColors.textPrimary,
+                                            if (outlet.code != null &&
+                                                outlet.code!.trim().isNotEmpty) ...[
+                                              Flexible(
+                                                child: Text(
+                                                  'SS Code: ${outlet.code!.trim()}',
+                                                  maxLines: 1,
+                                                  overflow: TextOverflow.ellipsis,
+                                                  style: const TextStyle(
+                                                    color: AppColors.primary,
+                                                    fontWeight: FontWeight.w600,
+                                                    fontSize: 12,
+                                                  ),
                                                 ),
                                               ),
-                                            ),
-                                            if (distanceMeters != null) ...[
+                                              if (distanceMeters != null) const SizedBox(width: 6),
+                                            ],
+                                            if (distanceMeters != null)
                                               _buildDistanceBadge(
                                                 distanceMeters,
                                                 outlet: outlet,
                                                 userPosition: routeProvider.currentPosition,
                                               ),
-                                              const SizedBox(width: 6),
-                                            ],
                                           ],
                                         ),
-                                        if (outlet.code != null &&
-                                            outlet.code!.trim().isNotEmpty) ...[
-                                          const SizedBox(height: 2),
-                                          Text(
-                                            'SS Code: ${outlet.code!.trim()}',
-                                            style: const TextStyle(
-                                              color: AppColors.primary,
-                                              fontWeight: FontWeight.w600,
-                                              fontSize: 12,
-                                            ),
-                                          ),
-                                        ],
                                         if (outlet.ownerName != null &&
                                             outlet.ownerName!.trim().isNotEmpty) ...[
                                           const SizedBox(height: 2),
                                           Text(
                                             'Owner: ${outlet.ownerName!.trim()}',
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
                                             style: const TextStyle(
                                               color: AppColors.textSecondary,
                                               fontWeight: FontWeight.w500,
@@ -668,34 +678,38 @@ class _OfficerCustomerSelectionScreenState
                                           const SizedBox(height: 2),
                                           Text(
                                             'Phone: ${outlet.mobile ?? outlet.phone}',
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
                                             style: const TextStyle(
                                               color: AppColors.textSecondary,
                                               fontSize: 12,
                                             ),
                                           ),
                                         ],
-                                        const SizedBox(height: 4),
+                                        const SizedBox(height: 3),
                                         Text(
                                           outlet.street ??
                                               'No address provided',
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
                                           style: const TextStyle(
                                             color: AppColors.textSecondary,
                                             fontSize: 12,
                                           ),
                                         ),
                                         if (isCheckedIn) ...[
-                                          const SizedBox(height: 6),
+                                          const SizedBox(height: 5),
                                           Row(
                                             children: [
                                               Container(
-                                                width: 8,
-                                                height: 8,
+                                                width: 7,
+                                                height: 7,
                                                 decoration: const BoxDecoration(
                                                   color: Color(0xFF10B981),
                                                   shape: BoxShape.circle,
                                                 ),
                                               ),
-                                              const SizedBox(width: 6),
+                                              const SizedBox(width: 5),
                                               Expanded(
                                                 child: Text(
                                                   routeProv.checkInTime != null
@@ -705,7 +719,7 @@ class _OfficerCustomerSelectionScreenState
                                                   overflow: TextOverflow.ellipsis,
                                                   style: const TextStyle(
                                                     color: Color(0xFF10B981),
-                                                    fontSize: 12,
+                                                    fontSize: 11.5,
                                                     fontWeight: FontWeight.w600,
                                                   ),
                                                 ),
@@ -713,19 +727,19 @@ class _OfficerCustomerSelectionScreenState
                                             ],
                                           ),
                                         ] else if (isCheckedOut) ...[
-                                          const SizedBox(height: 6),
+                                          const SizedBox(height: 5),
                                           Row(
                                             children: [
                                               Container(
-                                                width: 8,
-                                                height: 8,
+                                                width: 7,
+                                                height: 7,
                                                 decoration: const BoxDecoration(
                                                   color:
                                                       AppColors.textSecondary,
                                                   shape: BoxShape.circle,
                                                 ),
                                               ),
-                                              const SizedBox(width: 6),
+                                              const SizedBox(width: 5),
                                               const Expanded(
                                                 child: Text(
                                                   'Checked Out',
@@ -734,7 +748,7 @@ class _OfficerCustomerSelectionScreenState
                                                   style: TextStyle(
                                                     color:
                                                         AppColors.textSecondary,
-                                                    fontSize: 12,
+                                                    fontSize: 11.5,
                                                     fontWeight: FontWeight.w600,
                                                   ),
                                                 ),
@@ -745,7 +759,7 @@ class _OfficerCustomerSelectionScreenState
                                       ],
                                     ),
                                   ),
-                                  const SizedBox(width: 12),
+                                  const SizedBox(width: 10),
                                   if (isCheckedIn) ...[
                                     ElevatedButton.icon(
                                       onPressed: _checkingOutOutletId != null
@@ -821,7 +835,7 @@ class _OfficerCustomerSelectionScreenState
                                       label: const Text(
                                         'Check Out',
                                         style: TextStyle(
-                                          fontSize: 12,
+                                          fontSize: 11.5,
                                           fontWeight: FontWeight.w700,
                                         ),
                                       ),
@@ -831,7 +845,7 @@ class _OfficerCustomerSelectionScreenState
                                         ),
                                         foregroundColor: Colors.white,
                                         padding: const EdgeInsets.symmetric(
-                                          horizontal: 14,
+                                          horizontal: 10,
                                           vertical: 8,
                                         ),
                                         elevation: 2,
@@ -981,7 +995,7 @@ class _OfficerCustomerSelectionScreenState
                                       label: const Text(
                                         'Check In',
                                         style: TextStyle(
-                                          fontSize: 12,
+                                          fontSize: 11.5,
                                           fontWeight: FontWeight.w700,
                                         ),
                                       ),
@@ -991,7 +1005,7 @@ class _OfficerCustomerSelectionScreenState
                                         ),
                                         foregroundColor: Colors.white,
                                         padding: const EdgeInsets.symmetric(
-                                          horizontal: 14,
+                                          horizontal: 10,
                                           vertical: 8,
                                         ),
                                         elevation: 2,

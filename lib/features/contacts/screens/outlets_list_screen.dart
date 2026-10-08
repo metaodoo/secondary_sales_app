@@ -535,18 +535,37 @@ class _OutletsListScreenState extends State<OutletsListScreen> {
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
+                                  // Primary: Outlet Name
+                                  Text(
+                                    name,
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 15,
+                                      height: 1.25,
+                                      color: AppColors.textPrimary,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 3),
+                                  // Secondary: Code + Distance Badge
                                   Row(
                                     children: [
-                                      Expanded(
-                                        child: Text(
-                                          name,
-                                          style: const TextStyle(
-                                            fontWeight: FontWeight.bold,
-                                            fontSize: 16,
-                                            color: AppColors.textPrimary,
+                                      if (codeStr != null) ...[
+                                        Flexible(
+                                          child: Text(
+                                            'Code: $codeStr',
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                            style: const TextStyle(
+                                              color: AppColors.primary,
+                                              fontWeight: FontWeight.w600,
+                                              fontSize: 12,
+                                            ),
                                           ),
                                         ),
-                                      ),
+                                        if (distanceMeters != null) const SizedBox(width: 6),
+                                      ],
                                       if (distanceMeters != null)
                                         _buildDistanceBadge(
                                           distanceMeters,
@@ -554,23 +573,14 @@ class _OutletsListScreenState extends State<OutletsListScreen> {
                                         ),
                                     ],
                                   ),
-                                  if (codeStr != null) ...[
-                                    const SizedBox(height: 2),
-                                    Text(
-                                      'Code: $codeStr',
-                                      style: const TextStyle(
-                                        color: AppColors.primary,
-                                        fontWeight: FontWeight.w600,
-                                        fontSize: 13,
-                                      ),
-                                    ),
-                                  ],
-                                  const SizedBox(height: 4),
+                                  const SizedBox(height: 3),
                                   Text(
                                     street,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
                                     style: const TextStyle(
                                       color: AppColors.textSecondary,
-                                      fontSize: 13,
+                                      fontSize: 12,
                                     ),
                                   ),
                                 ],
