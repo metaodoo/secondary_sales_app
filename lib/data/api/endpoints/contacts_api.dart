@@ -161,7 +161,9 @@ extension ContactsApi on ApiService {
 
     final result = await _post(AppConstants.createContactEndpoint, params);
     if (result['success'] == true) {
-      return Map<String, dynamic>.from(result['data'] ?? <String, dynamic>{});
+      final data = result['data'];
+      if (data is Map) return Map<String, dynamic>.from(data);
+      return <String, dynamic>{};
     }
     throw Exception(result['message'] ?? 'Failed to create outlet');
   }
@@ -201,7 +203,9 @@ extension ContactsApi on ApiService {
       params,
     );
     if (result['success'] == true) {
-      return Map<String, dynamic>.from(result['data'] ?? <String, dynamic>{});
+      final data = result['data'];
+      if (data is Map) return Map<String, dynamic>.from(data);
+      return <String, dynamic>{};
     }
     throw Exception(result['message'] ?? 'Failed to update outlet');
   }

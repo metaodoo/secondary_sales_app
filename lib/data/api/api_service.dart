@@ -252,7 +252,13 @@ class ApiService {
         path.contains('/hr/attendance/action') ||
         path.contains('/hr/expense/sheet/create') ||
         path.contains('/contacts/create') ||
-        path.contains('/ss/routes/create');
+        (path.contains('/contacts/') && path.contains('/update')) ||
+        (path.contains('/contacts/') && path.contains('/archive')) ||
+        path.contains('/ss/routes/create') ||
+        (path.contains('/ss/routes/') && path.contains('/update')) ||
+        path.contains('/outlets/add') ||
+        path.contains('/outlets/create') ||
+        (path.contains('/outlets/') && path.contains('/remove'));
   }
 
   String _resolveEntityType(String path) {
@@ -263,7 +269,15 @@ class ApiService {
     if (path.contains('/scraps')) return 'scrap';
     if (path.contains('/hr/attendance/action')) return 'attendance';
     if (path.contains('/hr/expense/sheet/create')) return 'expense';
-    if (path.contains('/contacts/create')) return 'outlet';
+    if (path.contains('/contacts/create') ||
+        path.contains('/outlets/add') ||
+        path.contains('/outlets/create')) {
+      return 'outlet';
+    }
+    if (path.contains('/outlets/') && path.contains('/remove')) return 'outlet_remove';
+    if (path.contains('/contacts/') && path.contains('/update')) return 'outlet_update';
+    if (path.contains('/ss/routes/create')) return 'route_create';
+    if (path.contains('/ss/routes/') && path.contains('/update')) return 'route_update';
     return 'generic_write';
   }
 
@@ -286,6 +300,13 @@ class ApiService {
       parentUuid = await OfflineDatabaseHelper.instance.getActiveVisitUuid();
     }
 
+    final nowEpoch = DateTime.now().millisecondsSinceEpoch;
+    final nowIso = DateTime.now().toUtc().toIso8601String();
+
+    if (entityType == 'outlet') {
+      params['_temp_outlet_id'] = nowEpoch ~/ 1000;
+    }
+
     final clientUuid = params['client_uuid']?.toString();
     final opUuid = await OfflineDatabaseHelper.instance.enqueueOperation(
       entityType: entityType,
@@ -294,9 +315,6 @@ class ApiService {
       parentUuid: parentUuid,
       clientUuid: clientUuid,
     );
-
-    final nowEpoch = DateTime.now().millisecondsSinceEpoch;
-    final nowIso = DateTime.now().toUtc().toIso8601String();
 
     Map<String, dynamic> data = {
       'id': nowEpoch ~/ 1000,
@@ -321,6 +339,85 @@ class ApiService {
     } else if (entityType == 'attendance') {
       data['action'] = params['action'] ?? 'check_in';
       data['timestamp'] = nowIso;
+    } else if (entityType == 'outlet') {
+      final routeIdMatch = RegExp(r'/routes/(\d+)').firstMatch(path);
+      final rId = int.tryParse(params['route_id']?.toString() ?? '') ??
+          (routeIdMatch != null ? int.tryParse(routeIdMatch.group(1)!) ?? 0 : 0);
+      final fakeId = nowEpoch ~/ 1000;
+      final code = 'OFF-$fakeId';
+
+      data['id'] = fakeId;
+      data['line_id'] = fakeId;
+      data['name'] = params['name'] ?? 'New Outlet';
+      data['code'] = code;
+      data['ss_code'] = code;
+      data['owner_name'] = params['outlet_owner_name'] ?? params['owner_name'] ?? '';
+      data['phone'] = params['phone'] ?? params['mobile'] ?? '';
+      data['mobile'] = params['mobile'] ?? params['phone'] ?? '';
+      data['email'] = params['email'] ?? '';
+      data['street'] = params['street'] ?? '';
+      data['street2'] = params['street2'] ?? '';
+      data['city'] = params['city'] ?? '';
+      data['zip'] = params['zip'] ?? '';
+      data['vat'] = params['vat'] ?? '';
+      data['active'] = true;
+      data['sequence'] = (params['sequence'] as num?)?.toInt() ?? 10;
+      data['expected_visit_time'] = (params['expected_visit_time'] as num?)?.toDouble() ?? 15.0;
+      data['partner_latitude'] = (params['partner_latitude'] as num?)?.toDouble() ?? 0.0;
+      data['partner_longitude'] = (params['partner_longitude'] as num?)?.toDouble() ?? 0.0;
+      data['outlet_radius'] = 150.0;
+      data['route_id'] = rId;
+
+      if (params['outlet_type_id'] != null) {
+        data['outlet_type_id'] = params['outlet_type_id'];
+      }
+      if (params['outlet_class_id'] != null) {
+        data['outlet_class_id'] = params['outlet_class_id'];
+      }
+
+      // Persist into local_outlets table so it immediately appears in offline route queries
+      if (rId > 0) {
+        await OfflineDatabaseHelper.instance.saveLocalOutlets([
+          {
+            'id': fakeId,
+            'route_id': rId,
+            'name': data['name'],
+            'code': code,
+            'owner_name': data['owner_name'],
+            'phone': data['phone'],
+            'street': data['street'],
+            'partner_latitude': data['partner_latitude'],
+            'partner_longitude': data['partner_longitude'],
+            'outlet_radius': 150.0,
+            'sequence': data['sequence'],
+          }
+        ], routeId: rId);
+      }
+    } else if (entityType == 'outlet_remove') {
+      final outletIdMatch = RegExp(r'/outlets/(\d+)').firstMatch(path);
+      final oId = outletIdMatch != null ? int.tryParse(outletIdMatch.group(1)!) : null;
+      if (oId != null) {
+        await OfflineDatabaseHelper.instance.deleteLocalOutlet(oId);
+      }
+      data['removed'] = true;
+    } else if (entityType == 'route_create') {
+      final fakeId = nowEpoch ~/ 1000;
+      data['id'] = fakeId;
+      data['name'] = params['name'] ?? 'OFFLINE ROUTE';
+      data['active'] = true;
+      data['outlet_count'] = 0;
+      data['outlets'] = [];
+      data['employees'] = [];
+      data['distributor_id'] = params['distributor_id'];
+      await OfflineDatabaseHelper.instance.saveLocalRoutes([
+        {
+          'id': fakeId,
+          'name': data['name'],
+          'distributor_id': data['distributor_id'] ?? 0,
+          'outlet_count': 0,
+          'sequence': 10,
+        }
+      ]);
     }
 
     return {

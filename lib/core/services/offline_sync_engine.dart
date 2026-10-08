@@ -149,10 +149,12 @@ class OfflineSyncEngine with WidgetsBindingObserver {
         await Future.delayed(const Duration(milliseconds: 500));
 
         final retries = op['retry_count'] is int ? op['retry_count'] as int : 0;
+        final entityType = op['entity_type']?.toString() ?? '';
         final success = await _dispatchOperation(
           opUuid,
           endpoint,
           payload,
+          entityType: entityType,
           currentRetries: retries,
         );
         if (!success) {
@@ -182,15 +184,18 @@ class OfflineSyncEngine with WidgetsBindingObserver {
     String opUuid,
     String endpoint,
     Map<String, dynamic> payload, {
+    String entityType = '',
     int currentRetries = 0,
   }) async {
     await _dbHelper.updateOperationStatus(opUuid, 'SYNCING');
 
     try {
-      // Direct raw execution without triggering offline capture interception
+      // Direct raw execution without triggering offline capture interception.
+      // Clean internal routing metadata (e.g. _temp_outlet_id) before transmission.
+      final networkPayload = Map<String, dynamic>.from(payload)..remove('_temp_outlet_id');
       final response = await ApiService.instance.executeRawPost(
         endpoint,
-        payload,
+        networkPayload,
       );
 
       final respSuccess = response['success'] == true;
@@ -216,10 +221,19 @@ class OfflineSyncEngine with WidgetsBindingObserver {
         // If this operation returned a server-assigned ID (e.g. visit create returned data.id),
         // cascade and patch any pending child operations in the outbox queue.
         final respData = response['data'];
-        if (respData is Map && respData['id'] != null) {
-          final serverId = int.tryParse(respData['id'].toString());
+        if (respData is Map) {
+          final serverId = int.tryParse(respData['id']?.toString() ?? respData['outlet_id']?.toString() ?? '');
           if (serverId != null && serverId > 0) {
-            await _dbHelper.patchChildVisitId(opUuid, serverId);
+            if (entityType == 'visit') {
+              await _dbHelper.patchChildVisitId(opUuid, serverId);
+            } else if (entityType == 'outlet') {
+              final tempId = payload['_temp_outlet_id'] is int
+                  ? payload['_temp_outlet_id'] as int
+                  : int.tryParse(payload['_temp_outlet_id']?.toString() ?? '');
+              if (tempId != null && tempId > 0) {
+                await _dbHelper.patchOutletId(tempId, serverId);
+              }
+            }
           }
         }
 

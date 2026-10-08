@@ -80,7 +80,9 @@ extension RoutesApi on ApiService {
 
     final result = await _post('/api/v1/ss/routes/create', params);
     if (result['success'] == true) {
-      return Map<String, dynamic>.from(result['data'] ?? <String, dynamic>{});
+      final data = result['data'];
+      if (data is Map) return Map<String, dynamic>.from(data);
+      return <String, dynamic>{};
     }
     throw Exception(result['message'] ?? 'Failed to create route');
   }
@@ -90,7 +92,9 @@ extension RoutesApi on ApiService {
 
     final result = await _post('/api/v1/ss/routes/$routeId', params);
     if (result['success'] == true) {
-      return Map<String, dynamic>.from(result['data'] ?? <String, dynamic>{});
+      final data = result['data'];
+      if (data is Map) return Map<String, dynamic>.from(data);
+      return <String, dynamic>{};
     }
     throw Exception(result['message'] ?? 'Failed to load route details');
   }
@@ -114,7 +118,9 @@ extension RoutesApi on ApiService {
 
     final result = await _post('/api/v1/ss/routes/$routeId/update', params);
     if (result['success'] == true) {
-      return Map<String, dynamic>.from(result['data'] ?? <String, dynamic>{});
+      final data = result['data'];
+      if (data is Map) return Map<String, dynamic>.from(data);
+      return <String, dynamic>{};
     }
     throw Exception(result['message'] ?? 'Failed to update route');
   }
@@ -168,7 +174,13 @@ extension RoutesApi on ApiService {
       params,
     );
     if (result['success'] == true) {
-      return Map<String, dynamic>.from(result['data'] ?? <String, dynamic>{});
+      final data = result['data'];
+      if (data is Map) {
+        return Map<String, dynamic>.from(data);
+      } else if (data is List && data.isNotEmpty && data.first is Map) {
+        return Map<String, dynamic>.from(data.first as Map);
+      }
+      return <String, dynamic>{};
     }
     throw Exception(result['message'] ?? 'Failed to add outlet to route');
   }

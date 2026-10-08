@@ -982,6 +982,60 @@ class OfflineDatabaseHelper {
     return rows.isNotEmpty ? rows.first : null;
   }
 
+  Future<void> deleteLocalOutlet(int outletId) async {
+    final db = await database;
+    await db.delete(
+      tableOutlets,
+      where: 'id = ?',
+      whereArgs: [outletId],
+    );
+  }
+
+  /// When an offline-created outlet syncs and receives a server-assigned outlet ID,
+  /// this method cascades and patches all pending child operations (e.g. visits, orders)
+  /// that reference this temporary fake ID, replacing it with the real serverOutletId.
+  Future<void> patchOutletId(int temporaryOutletId, int serverOutletId) async {
+    final db = await database;
+    // 1. Update pending operations in outbox
+    final pending = await db.query(
+      tableOutbox,
+      where: 'status = ?',
+      whereArgs: ['PENDING'],
+    );
+
+    for (final op in pending) {
+      final opUuid = op['operation_uuid'] as String;
+      final payloadJsonStr = op['payload_json'] as String;
+      try {
+        final payload = jsonDecode(payloadJsonStr) as Map<String, dynamic>;
+        bool modified = false;
+        if (payload['outlet_id'] == temporaryOutletId ||
+            payload['outlet_id']?.toString() == temporaryOutletId.toString()) {
+          payload['outlet_id'] = serverOutletId;
+          modified = true;
+        }
+        if (modified) {
+          await db.update(
+            tableOutbox,
+            {'payload_json': jsonEncode(payload)},
+            where: 'operation_uuid = ?',
+            whereArgs: [opUuid],
+          );
+          debugPrint('[OfflineDB] Patched outlet_id=$serverOutletId on op $opUuid');
+        }
+      } catch (e) {
+        debugPrint('[OfflineDB] Failed to patch op $opUuid: $e');
+      }
+    }
+
+    // 2. Update local_outlets table
+    await db.rawUpdate('''
+      UPDATE $tableOutlets
+      SET id = ?
+      WHERE id = ?
+    ''', [serverOutletId, temporaryOutletId]);
+  }
+
   // --- PRODUCTS & STOCK ---
 
   Future<void> saveLocalProducts(

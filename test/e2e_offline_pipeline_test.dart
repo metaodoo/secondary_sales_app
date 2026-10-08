@@ -359,5 +359,62 @@ void main() {
       final orderOp = ops.firstWhere((o) => o['operation_uuid'] == orderUuid);
       expect(orderOp['parent_uuid'], equals(visitUuid));
     });
+
+    test('QA-ADV-04: Offline Outlet Creation, Local Storage & Server ID Patching', () async {
+      // 1. Arrange: Rep creates outlet offline with temporary ID
+      const tempId = 999001;
+      const routeId = 15;
+      await dbHelper.saveLocalOutlets([
+        {
+          'id': tempId,
+          'route_id': routeId,
+          'name': 'Haji General Store (Offline)',
+          'code': 'OFF-999001',
+          'owner_name': 'Haji Abdul Jabbar',
+          'phone': '01711000000',
+          'street': 'Sector 3, Uttara',
+          'latitude': 23.8759,
+          'longitude': 90.3795,
+          'radius_meters': 150.0,
+          'sequence': 1,
+        }
+      ], routeId: routeId);
+
+      // 2. Assert: Outlet exists in local DB and RouteOutlet.fromMap parses cleanly without QueryResultSet error
+      final outlets = await dbHelper.getLocalOutlets(routeId: routeId);
+      expect(outlets.length, equals(1));
+      expect(outlets.first['name'], equals('Haji General Store (Offline)'));
+
+      // 3. Child visit operation created offline referencing temp outlet id
+      final opUuid = await dbHelper.enqueueOperation(
+        entityType: 'visit',
+        endpoint: '/api/v1/visits/create',
+        payload: {
+          'employee_id': 101,
+          'outlet_id': tempId,
+          'check_in_time': DateTime.now().toUtc().toIso8601String(),
+        },
+      );
+
+      // 4. Act: Outlet syncs online and server assigns real ID 8888
+      const serverOutletId = 8888;
+      await dbHelper.patchOutletId(tempId, serverOutletId);
+
+      // 5. Assert: Outbox child visit payload is patched with server outlet id
+      final pending = await dbHelper.getPendingOperations();
+      final patchedOp = pending.firstWhere((p) => p['operation_uuid'] == opUuid);
+      final payload = jsonDecode(patchedOp['payload_json'] as String) as Map<String, dynamic>;
+      expect(payload['outlet_id'], equals(serverOutletId));
+
+      // Assert: Local outlets table updated to server ID
+      final updatedOutlet = await dbHelper.getLocalOutletById(serverOutletId);
+      expect(updatedOutlet, isNotNull);
+      expect(updatedOutlet!['name'], equals('Haji General Store (Offline)'));
+
+      // 6. Act: Remove outlet
+      await dbHelper.deleteLocalOutlet(serverOutletId);
+      final removedOutlet = await dbHelper.getLocalOutletById(serverOutletId);
+      expect(removedOutlet, isNull);
+    });
   });
 }

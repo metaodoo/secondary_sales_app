@@ -148,9 +148,15 @@ class RouteOutlet {
       zip: map['zip'],
       vat: map['vat'],
       active: map['active'] != false,
-      partnerLatitude: map['partner_latitude'] != null ? asDouble(map['partner_latitude']) : null,
-      partnerLongitude: map['partner_longitude'] != null ? asDouble(map['partner_longitude']) : null,
-      outletRadius: map['outlet_radius'] != null ? asDouble(map['outlet_radius']) : null,
+      partnerLatitude: map['partner_latitude'] != null
+          ? asDouble(map['partner_latitude'])
+          : (map['latitude'] != null ? asDouble(map['latitude']) : null),
+      partnerLongitude: map['partner_longitude'] != null
+          ? asDouble(map['partner_longitude'])
+          : (map['longitude'] != null ? asDouble(map['longitude']) : null),
+      outletRadius: map['outlet_radius'] != null
+          ? asDouble(map['outlet_radius'])
+          : (map['radius_meters'] != null ? asDouble(map['radius_meters']) : null),
       outletClassId: map['outlet_class_id'] != null
           ? asInt(map['outlet_class_id'])
           : (rawClass is Map ? asInt(rawClass['id']) : null),
