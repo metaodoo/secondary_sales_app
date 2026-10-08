@@ -101,15 +101,15 @@ class MtStockAuditLine {
 
     return MtStockAuditLine(
       id: asInt(map['id']),
-      productId: prod != null ? asInt(prod['id']) : 0,
-      productName: prod?['name']?.toString() ?? 'Unknown Product',
-      defaultCode: prod?['default_code']?.toString(),
-      uomName: uom?['name']?.toString(),
-      lotId: lot != null ? asInt(lot['id']) : null,
-      lotName: lot?['name']?.toString(),
-      expirationDate: asDateTime(lot?['expiration_date']),
-      tracking: prod?['tracking']?.toString(),
-      stockCount: asDouble(map['stock_count']),
+      productId: prod != null ? asInt(prod['id']) : asInt(map['product_id']),
+      productName: prod?['name']?.toString() ?? (map['product_name'] ?? 'Unknown Product').toString(),
+      defaultCode: prod?['default_code']?.toString() ?? map['default_code']?.toString(),
+      uomName: uom?['name']?.toString() ?? map['uom_name']?.toString(),
+      lotId: lot != null ? asInt(lot['id']) : asIntOrNull(map['lot_id']),
+      lotName: lot?['name']?.toString() ?? map['lot_name']?.toString(),
+      expirationDate: asDateTime(lot?['expiration_date'] ?? map['expiration_date']),
+      tracking: prod?['tracking']?.toString() ?? map['tracking']?.toString(),
+      stockCount: asDouble(map['stock_count'] ?? map['count']),
     );
   }
 

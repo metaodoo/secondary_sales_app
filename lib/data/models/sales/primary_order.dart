@@ -32,16 +32,25 @@ class PrimaryOrder {
     final hub = map['distributor'] ?? map['customer'];
     final dt = asDateTime(map['date_order']);
     final formattedDate = dt != null ? ssFormatDateTime(dt) : (map['date_order'] ?? '').toString();
+    final hName = hub is Map
+        ? (hub['name'] ?? 'Unknown Hub').toString()
+        : (map['partner_name'] != null && map['partner_name'] != false
+            ? map['partner_name'].toString()
+            : 'Unknown Hub');
+    final hId = hub is Map ? asInt(hub['id']) : asInt(map['partner_id']);
+
     return PrimaryOrder(
       id: asInt(map['id']),
-      name: map['name'] ?? '',
+      name: (map['name'] ?? '').toString(),
       dateTime: dt,
       date: formattedDate,
-      hubName: hub is Map ? (hub['name'] ?? 'Unknown Hub') : 'Unknown Hub',
-      hubId: hub is Map ? asInt(hub['id']) : 0,
-      amount: asDouble(map['amount_total']),
-      state: map['state'] ?? 'draft',
-      lineCount: map['lines'] is List ? (map['lines'] as List).length : 0,
+      hubName: hName,
+      hubId: hId,
+      amount: asDouble(map['amount_total'] ?? map['amount']),
+      state: (map['state'] ?? 'draft').toString(),
+      lineCount: map['lines'] is List
+          ? (map['lines'] as List).length
+          : asInt(map['line_count'] ?? map['total_lines']),
       deliveryStatus:
           (map['delivery_status'] == null || map['delivery_status'] == false)
           ? 'no'
