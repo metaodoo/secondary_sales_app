@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:secondary_sales/core/services/offline_database_helper.dart';
+import 'package:secondary_sales/data/models/routes/route.dart';
 
 void main() {
   // Initialize FFI for headless desktop/VM SQLite testing
@@ -415,6 +416,63 @@ void main() {
       await dbHelper.deleteLocalOutlet(serverOutletId);
       final removedOutlet = await dbHelper.getLocalOutletById(serverOutletId);
       expect(removedOutlet, isNull);
+    });
+
+    test('QA-ADV-05: Offline Route Detail Query & Dynamic Reconstruction', () async {
+      // 1. Arrange: Store local route & distributors
+      const distId = 77;
+      const routeId = 88;
+      await dbHelper.saveLocalDistributors([
+        {'id': distId, 'name': 'Apex Distributors'}
+      ]);
+      await dbHelper.saveLocalRoutes([
+        {'id': routeId, 'name': 'Uttara Beat #1', 'distributor_id': distId, 'outlet_count': 2}
+      ]);
+      await dbHelper.saveLocalOutlets([
+        {
+          'id': 1001,
+          'route_id': routeId,
+          'name': 'Store Alpha',
+          'code': 'NART0001',
+          'latitude': 23.87,
+          'longitude': 90.38,
+        },
+        {
+          'id': 1002,
+          'route_id': routeId,
+          'name': 'Store Beta',
+          'code': 'NART0002',
+          'latitude': 23.88,
+          'longitude': 90.39,
+        },
+      ], routeId: routeId);
+
+      // 2. Query route and outlets independently
+      final route = await dbHelper.getLocalRouteById(routeId);
+      final dist = await dbHelper.getLocalDistributorById(distId);
+      final outlets = await dbHelper.getLocalOutlets(routeId: routeId);
+
+      // 3. Assert
+      expect(route, isNotNull);
+      expect(route!['name'], equals('Uttara Beat #1'));
+      expect(dist, isNotNull);
+      expect(dist!['name'], equals('Apex Distributors'));
+      expect(outlets.length, equals(2));
+
+      // 4. Test RouteModel reconstruction
+      final reconstructed = RouteModel(
+        id: routeId,
+        name: route['name'] as String,
+        active: true,
+        distributorId: distId,
+        distributorName: dist['name'] as String,
+        employees: [],
+        outlets: outlets.map((m) => RouteOutlet.fromMap(m)).toList(),
+        outletCount: outlets.length,
+      );
+      expect(reconstructed.outlets.length, equals(2));
+      expect(reconstructed.outlets.first.name, equals('Store Alpha'));
+      expect(reconstructed.distributorName, equals('Apex Distributors'));
     });
   });
 }

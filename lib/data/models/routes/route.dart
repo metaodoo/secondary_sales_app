@@ -29,15 +29,15 @@ class RouteModel {
       id: asInt(map['id']),
       name: map['name'] ?? '',
       active: map['active'] != false,
-      distributorId: dist != null ? asInt(dist['id']) : null,
-      distributorName: dist != null ? dist['name'] : null,
+      distributorId: dist != null ? asInt(dist['id']) : (map['distributor_id'] != null ? asInt(map['distributor_id']) : null),
+      distributorName: dist != null ? dist['name'] : (map['distributor_name']?.toString()),
       employees: emps
           .map((e) => RouteEmployee.fromMap(Map<String, dynamic>.from(e)))
           .toList(),
       outlets: outs
           .map((o) => RouteOutlet.fromMap(Map<String, dynamic>.from(o)))
           .toList(),
-      outletCount: asInt(map['outlet_count'] ?? map['outletCount']),
+      outletCount: asInt(map['outlet_count'] ?? map['outletCount'] ?? outs.length),
     );
   }
 

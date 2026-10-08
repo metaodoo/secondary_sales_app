@@ -440,6 +440,8 @@ class ApiService {
   }
 
   String _resolveCacheKey(String path, Map<String, dynamic> params) {
+    final routeDetailMatch = RegExp(r'/ss/routes/(\d+)$').firstMatch(path);
+    if (routeDetailMatch != null) return 'route_detail_${routeDetailMatch.group(1)}';
     if (path.contains('/ss/routes')) return 'routes_${params['employee_id'] ?? _employeeId ?? 0}';
     if (path.contains('/contacts')) return 'contacts_route_${params['route_id'] ?? 'all'}';
     if (path.contains('/products/categories')) return 'catalog_categories';
@@ -451,6 +453,7 @@ class ApiService {
   }
 
   String _resolveCacheType(String path) {
+    if (RegExp(r'/ss/routes/\d+').hasMatch(path)) return 'route_detail';
     if (path.contains('/ss/routes')) return 'routes';
     if (path.contains('/contacts')) return 'contacts';
     if (path.contains('/products')) return 'products';
@@ -471,6 +474,52 @@ class ApiService {
       entityType: cacheType,
       data: dataToCache,
     );
+  }
+
+  Future<Map<String, dynamic>?> _tryResolveOfflineRouteDetail(String path) async {
+    final routeDetailMatch = RegExp(r'/ss/routes/(\d+)$').firstMatch(path);
+    if (routeDetailMatch == null) return null;
+    final rId = int.tryParse(routeDetailMatch.group(1)!) ?? 0;
+    if (rId <= 0) return null;
+
+    final localRoute = await OfflineDatabaseHelper.instance.getLocalRouteById(rId);
+    final localOutlets = await OfflineDatabaseHelper.instance.getLocalOutlets(routeId: rId);
+    if (localRoute != null || localOutlets.isNotEmpty) {
+      String? distName;
+      final distId = localRoute?['distributor_id'] as int?;
+      if (distId != null && distId > 0) {
+        final dist = await OfflineDatabaseHelper.instance.getLocalDistributorById(distId);
+        distName = dist?['name'] as String?;
+      }
+
+      final formattedOutlets = localOutlets.map((o) => {
+        'id': o['id'],
+        'line_id': o['id'],
+        'name': o['name'],
+        'code': o['code'],
+        'owner_name': o['owner_name'],
+        'phone': o['phone'],
+        'mobile': o['phone'],
+        'street': o['street'],
+        'partner_latitude': o['latitude'],
+        'partner_longitude': o['longitude'],
+        'outlet_radius': o['radius_meters'] ?? 150.0,
+        'sequence': o['sequence'] ?? 10,
+      }).toList();
+
+      return {
+        'id': rId,
+        'name': localRoute?['name'] ?? 'Route #$rId',
+        'active': true,
+        'distributor_id': distId,
+        'distributor_name': distName,
+        'distributor': distId != null ? {'id': distId, 'name': distName ?? ''} : null,
+        'outlet_count': formattedOutlets.length,
+        'outlets': formattedOutlets,
+        'employees': [],
+      };
+    }
+    return null;
   }
 
   Future<Map<String, dynamic>> _post(
@@ -502,6 +551,16 @@ class ApiService {
         );
       }
       if (isCacheableRead) {
+        final reconstructedRoute = await _tryResolveOfflineRouteDetail(path);
+        if (reconstructedRoute != null) {
+          debugPrint('[ApiService] Immediate offline route reconstruction for $path (${(reconstructedRoute['outlets'] as List).length} outlets)');
+          return {
+            'success': true,
+            'offline': true,
+            'data': reconstructedRoute,
+          };
+        }
+
         final cached = await OfflineDatabaseHelper.instance.getMasterData(
           _resolveCacheKey(path, params),
         );
@@ -548,6 +607,16 @@ class ApiService {
 
         // Fallback for reads: Load from SQLite master cache
         if (isCacheableRead) {
+          final reconstructedRoute = await _tryResolveOfflineRouteDetail(path);
+          if (reconstructedRoute != null) {
+            debugPrint('[ApiService] Network failed, reconstructed route detail from SQLite: $path');
+            return {
+              'success': true,
+              'offline': true,
+              'data': reconstructedRoute,
+            };
+          }
+
           final cached = await OfflineDatabaseHelper.instance.getMasterData(
             _resolveCacheKey(path, params),
           );

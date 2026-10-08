@@ -848,6 +848,17 @@ class OfflineDatabaseHelper {
     return db.query(tableDistributors, orderBy: 'name ASC');
   }
 
+  Future<Map<String, dynamic>?> getLocalDistributorById(int distributorId) async {
+    final db = await database;
+    final rows = await db.query(
+      tableDistributors,
+      where: 'id = ?',
+      whereArgs: [distributorId],
+      limit: 1,
+    );
+    return rows.isNotEmpty ? rows.first : null;
+  }
+
   // --- ROUTES ---
 
   Future<void> saveLocalRoutes(
@@ -894,6 +905,17 @@ class OfflineDatabaseHelper {
       );
     }
     return db.query(tableRoutes, orderBy: 'sequence ASC, name ASC');
+  }
+
+  Future<Map<String, dynamic>?> getLocalRouteById(int routeId) async {
+    final db = await database;
+    final rows = await db.query(
+      tableRoutes,
+      where: 'id = ?',
+      whereArgs: [routeId],
+      limit: 1,
+    );
+    return rows.isNotEmpty ? rows.first : null;
   }
 
   // --- OUTLETS ---

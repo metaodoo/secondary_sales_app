@@ -7,6 +7,7 @@ import 'package:secondary_sales/data/api/api_service.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:secondary_sales/core/services/location_service.dart';
 import 'package:secondary_sales/core/services/offline_database_helper.dart';
+import 'package:secondary_sales/core/services/offline_sync_engine.dart';
 import 'package:secondary_sales/core/util/proximity_helper.dart';
 
 class RouteProvider with ChangeNotifier {
@@ -270,17 +271,20 @@ class RouteProvider with ChangeNotifier {
     notifyListeners();
 
     try {
-      if (_lastEmployeeId != null) {
+      if (_lastEmployeeId != null && OfflineSyncEngine.instance.isOnline) {
         await fetchTodayVisits(_lastEmployeeId!);
       }
       final map = await _apiService.getRouteDetail(routeId);
-      final detail = RouteModel.fromMap(map);
-      _activeRoute = detail;
-      final idx = _routes.indexWhere((r) => r.id == routeId);
-      if (idx != -1) {
-        _routes[idx] = detail;
+      if (map.isNotEmpty && (map['id'] != null && map['id'] != 0)) {
+        final detail = RouteModel.fromMap(map);
+        _activeRoute = detail;
+        final idx = _routes.indexWhere((r) => r.id == routeId);
+        if (idx != -1) {
+          _routes[idx] = detail;
+        }
+        return detail;
       }
-      return detail;
+      throw Exception('Route detail map empty');
     } catch (e) {
       final localOutlets = await OfflineDatabaseHelper.instance.getLocalOutlets(
         routeId: routeId,
@@ -309,6 +313,10 @@ class RouteProvider with ChangeNotifier {
           outlets: outletsList,
         );
         _activeRoute = detail;
+        final idx = _routes.indexWhere((r) => r.id == routeId);
+        if (idx != -1) {
+          _routes[idx] = detail;
+        }
         return detail;
       }
       _error = e.toString();
@@ -434,6 +442,25 @@ class RouteProvider with ChangeNotifier {
       );
 
       final newOutlet = RouteOutlet.fromMap(result);
+
+      if (_activeRoute != null && _activeRoute!.id == routeId) {
+        final currentOutlets = List<RouteOutlet>.from(_activeRoute!.outlets);
+        final exists = currentOutlets.any((o) => o.id == newOutlet.id);
+        if (!exists) {
+          currentOutlets.add(newOutlet);
+          _activeRoute = RouteModel(
+            id: _activeRoute!.id,
+            name: _activeRoute!.name,
+            active: _activeRoute!.active,
+            distributorId: _activeRoute!.distributorId,
+            distributorName: _activeRoute!.distributorName,
+            employees: _activeRoute!.employees,
+            outlets: currentOutlets,
+            outletCount: currentOutlets.length,
+          );
+          notifyListeners();
+        }
+      }
 
       // Refresh active route detail to keep UI correctly updated with full list
       await fetchRouteDetail(routeId);
