@@ -605,7 +605,10 @@ class _MtStockAuditCreateScreenState extends State<MtStockAuditCreateScreen> {
             // Product Count Bar
             Padding(
               padding: const EdgeInsets.only(left: 16, right: 16, top: 10, bottom: 6),
-              child: Row(
+              child: Wrap(
+                spacing: 8,
+                runSpacing: 6,
+                crossAxisAlignment: WrapCrossAlignment.center,
                 children: [
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
@@ -622,8 +625,7 @@ class _MtStockAuditCreateScreenState extends State<MtStockAuditCreateScreen> {
                       ),
                     ),
                   ),
-                  if (_selectedProductsCount > 0) ...[
-                    const SizedBox(width: 8),
+                  if (_selectedProductsCount > 0)
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                       decoration: BoxDecoration(
@@ -647,9 +649,7 @@ class _MtStockAuditCreateScreenState extends State<MtStockAuditCreateScreen> {
                         ],
                       ),
                     ),
-                  ],
-                  if (_selectedCategoryId != null || _searchController.text.trim().isNotEmpty) ...[
-                    const SizedBox(width: 8),
+                  if (_selectedCategoryId != null || _searchController.text.trim().isNotEmpty)
                     InkWell(
                       onTap: () {
                         setState(() {
@@ -659,6 +659,7 @@ class _MtStockAuditCreateScreenState extends State<MtStockAuditCreateScreen> {
                         _loadProducts();
                       },
                       child: const Row(
+                        mainAxisSize: MainAxisSize.min,
                         children: [
                           Icon(Icons.clear, size: 14, color: AppColors.textSecondary),
                           SizedBox(width: 2),
@@ -669,7 +670,6 @@ class _MtStockAuditCreateScreenState extends State<MtStockAuditCreateScreen> {
                         ],
                       ),
                     ),
-                  ],
                 ],
               ),
             ),

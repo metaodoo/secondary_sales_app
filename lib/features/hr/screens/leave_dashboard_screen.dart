@@ -515,41 +515,46 @@ class _LeaveDashboardContentState extends State<_LeaveDashboardContent> with Sin
                 ),
               ],
               const SizedBox(height: 8),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    'Applied: ${leave['applied_on']}',
-                    style: const TextStyle(color: AppColors.textSecondary, fontSize: 11),
-                  ),
-                  if (canApprove)
-                    Row(
-                      children: [
-                        OutlinedButton.icon(
-                          style: OutlinedButton.styleFrom(
-                            side: const BorderSide(color: Colors.red),
-                            foregroundColor: Colors.red,
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                          ),
-                          icon: const Icon(Icons.close, size: 16),
-                          label: const Text('Reject', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
-                          onPressed: () => provider.submitLeaveAction(leave['leave_id'], 'reject'),
+              if (canApprove) ...[
+                Text(
+                  'Applied: ${leave['applied_on']}',
+                  style: const TextStyle(color: AppColors.textSecondary, fontSize: 11),
+                ),
+                const SizedBox(height: 10),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        style: OutlinedButton.styleFrom(
+                          side: const BorderSide(color: Colors.red),
+                          foregroundColor: Colors.red,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                         ),
-                        const SizedBox(width: 8),
-                        ElevatedButton.icon(
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.green,
-                            foregroundColor: Colors.white,
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                          ),
-                          icon: const Icon(Icons.check, size: 16),
-                          label: const Text('Approve', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
-                          onPressed: () => provider.submitLeaveAction(leave['leave_id'], 'approve'),
-                        ),
-                      ],
+                        icon: const Icon(Icons.close, size: 16),
+                        label: const Text('Reject', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                        onPressed: () => provider.submitLeaveAction(leave['leave_id'], 'reject'),
+                      ),
                     ),
-                ],
-              ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: ElevatedButton.icon(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.green,
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                        ),
+                        icon: const Icon(Icons.check, size: 16),
+                        label: const Text('Approve', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                        onPressed: () => provider.submitLeaveAction(leave['leave_id'], 'approve'),
+                      ),
+                    ),
+                  ],
+                ),
+              ] else
+                Text(
+                  'Applied: ${leave['applied_on']}',
+                  style: const TextStyle(color: AppColors.textSecondary, fontSize: 11),
+                ),
             ],
           ),
         ),

@@ -10,12 +10,14 @@ import 'package:secondary_sales/features/modern_trade/mt_return_provider.dart';
 import 'package:secondary_sales/features/modern_trade/screens/mt_return_product_selection_sheet.dart';
 
 class MtReturnCreateScreen extends StatefulWidget {
-  final String returnBucket; // 'saleable' or 'non_saleable'
+  final String returnBucket; // 'saleable', 'non_saleable', 'quality'
+  final String returnType; // 'return' or 'replacement'
   final String title;
 
   const MtReturnCreateScreen({
     super.key,
     required this.returnBucket,
+    this.returnType = 'replacement',
     required this.title,
   });
 
@@ -25,6 +27,7 @@ class MtReturnCreateScreen extends StatefulWidget {
 
 class _MtReturnCreateScreenState extends State<MtReturnCreateScreen> {
   late String _selectedBucket;
+  late String _selectedReturnType;
   int? _selectedOutletId;
   DateTime _selectedDate = DateTime.now();
   final List<Map<String, dynamic>> _lines = [];
@@ -37,6 +40,7 @@ class _MtReturnCreateScreenState extends State<MtReturnCreateScreen> {
   void initState() {
     super.initState();
     _selectedBucket = widget.returnBucket;
+    _selectedReturnType = widget.returnBucket == 'saleable' ? 'return' : widget.returnType;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<MtReturnProvider>().fetchPrepareContext();
     });
@@ -93,10 +97,26 @@ class _MtReturnCreateScreenState extends State<MtReturnCreateScreen> {
     final result = await MtReturnProductSelectionSheet.show(
       context,
       returnBucket: _selectedBucket,
+      state: 'kao',
     );
     if (result != null) {
       setState(() {
         _lines.add(result);
+      });
+    }
+  }
+
+  void _onEditLine(int index) async {
+    final currentLine = _lines[index];
+    final result = await MtReturnProductSelectionSheet.show(
+      context,
+      returnBucket: _selectedBucket,
+      initialLine: currentLine,
+      state: 'kao',
+    );
+    if (result != null) {
+      setState(() {
+        _lines[index] = result;
       });
     }
   }
@@ -190,6 +210,7 @@ class _MtReturnCreateScreenState extends State<MtReturnCreateScreen> {
     final result = await provider.createReturn(
       partnerId: selectedOutlet['id'] as int,
       returnBucket: _selectedBucket,
+      returnType: _selectedReturnType,
       date: dateStr,
       lines: linesPayload,
       attachmentBase64: _challanImageBase64,
@@ -355,6 +376,100 @@ class _MtReturnCreateScreenState extends State<MtReturnCreateScreen> {
                       ),
                     ],
                   ),
+                  if (!isSaleable) ...[
+                    const SizedBox(height: 16),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text('Return Type', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                        const SizedBox(height: 6),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: InkWell(
+                                onTap: () => setState(() => _selectedReturnType = 'return'),
+                                borderRadius: BorderRadius.circular(10),
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(vertical: 10),
+                                  decoration: BoxDecoration(
+                                    color: _selectedReturnType == 'return' ? const Color(0xFFFFF3E0) : Colors.grey.shade50,
+                                    borderRadius: BorderRadius.circular(10),
+                                    border: Border.all(
+                                      color: _selectedReturnType == 'return' ? const Color(0xFFE65100) : Colors.grey.shade300,
+                                      width: _selectedReturnType == 'return' ? 1.5 : 1.0,
+                                    ),
+                                  ),
+                                  child: Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Icon(
+                                        Icons.assignment_return_outlined,
+                                        size: 16,
+                                        color: _selectedReturnType == 'return' ? const Color(0xFFE65100) : Colors.grey.shade600,
+                                      ),
+                                      const SizedBox(width: 6),
+                                      Text(
+                                        'Return (Scrap)',
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.w700,
+                                          color: _selectedReturnType == 'return' ? const Color(0xFFE65100) : Colors.grey.shade700,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: InkWell(
+                                onTap: () => setState(() => _selectedReturnType = 'replacement'),
+                                borderRadius: BorderRadius.circular(10),
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(vertical: 10),
+                                  decoration: BoxDecoration(
+                                    color: _selectedReturnType == 'replacement' ? const Color(0xFFE1F5FE) : Colors.grey.shade50,
+                                    borderRadius: BorderRadius.circular(10),
+                                    border: Border.all(
+                                      color: _selectedReturnType == 'replacement' ? const Color(0xFF0288D1) : Colors.grey.shade300,
+                                      width: _selectedReturnType == 'replacement' ? 1.5 : 1.0,
+                                    ),
+                                  ),
+                                  child: Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Icon(
+                                        Icons.published_with_changes_outlined,
+                                        size: 16,
+                                        color: _selectedReturnType == 'replacement' ? const Color(0xFF0288D1) : Colors.grey.shade600,
+                                      ),
+                                      const SizedBox(width: 6),
+                                      Text(
+                                        'Replacement',
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.w700,
+                                          color: _selectedReturnType == 'replacement' ? const Color(0xFF0288D1) : Colors.grey.shade700,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          _selectedReturnType == 'return'
+                              ? '• Items sent to scrap only. No replacement delivery will be generated.'
+                              : '• Items sent to scrap AND replacement goods will be delivered to outlet.',
+                          style: TextStyle(fontSize: 11, color: Colors.grey.shade600, fontStyle: FontStyle.italic),
+                        ),
+                      ],
+                    ),
+                  ],
                 ],
               ),
             ),
@@ -433,103 +548,125 @@ class _MtReturnCreateScreenState extends State<MtReturnCreateScreen> {
                   final price = (product['list_price'] as num?)?.toDouble() ?? 0.0;
                   final subtotal = price * totalLineQty;
 
-                  return Container(
-                    padding: const EdgeInsets.all(14),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
+                  return Material(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(12),
+                    child: InkWell(
+                      onTap: () => _onEditLine(index),
                       borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: Colors.grey.shade200),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
+                      child: Container(
+                        padding: const EdgeInsets.all(14),
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: Colors.grey.shade200),
+                        ),
+                        child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    prodName,
-                                    style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
-                                  ),
-                                  const SizedBox(height: 2),
-                                  Text(
-                                    prodCode.isNotEmpty ? 'Code: $prodCode • UoM: $uom' : 'UoM: $uom',
-                                    style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
-                                  ),
-                                  if (lot != null) ...[
-                                    const SizedBox(height: 4),
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                      decoration: BoxDecoration(
-                                        color: Colors.grey.shade100,
-                                        borderRadius: BorderRadius.circular(4),
-                                        border: Border.all(color: Colors.grey.shade300),
+                            Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        prodName,
+                                        style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
                                       ),
-                                      child: Text(
-                                        'Lot: ${lot['name']}',
-                                        style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Colors.grey.shade700),
+                                      const SizedBox(height: 2),
+                                      Text(
+                                        prodCode.isNotEmpty ? 'Code: $prodCode • UoM: $uom' : 'UoM: $uom',
+                                        style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
                                       ),
+                                      if (lot != null) ...[
+                                        const SizedBox(height: 4),
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                          decoration: BoxDecoration(
+                                            color: Colors.grey.shade100,
+                                            borderRadius: BorderRadius.circular(4),
+                                            border: Border.all(color: Colors.grey.shade300),
+                                          ),
+                                          child: Text(
+                                            'Lot: ${lot['name']}',
+                                            style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Colors.grey.shade700),
+                                          ),
+                                        ),
+                                      ],
+                                    ],
+                                  ),
+                                ),
+                                Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    IconButton(
+                                      onPressed: () => _onEditLine(index),
+                                      icon: const Icon(Icons.edit_outlined, color: AppColors.primaryStrong, size: 20),
+                                      padding: const EdgeInsets.all(4),
+                                      constraints: const BoxConstraints(),
+                                      tooltip: 'Edit quantity & lot',
+                                    ),
+                                    const SizedBox(width: 8),
+                                    IconButton(
+                                      onPressed: () => _onRemoveLine(index),
+                                      icon: const Icon(Icons.delete_outline, color: Colors.red, size: 20),
+                                      padding: const EdgeInsets.all(4),
+                                      constraints: const BoxConstraints(),
+                                      tooltip: 'Remove',
                                     ),
                                   ],
+                                ),
+                              ],
+                            ),
+                            if (price > 0) ...[
+                              const SizedBox(height: 6),
+                              Row(
+                                children: [
+                                  Text(
+                                    'Price: ৳${price.toStringAsFixed(2)}',
+                                    style: const TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w600,
+                                      color: AppColors.primaryStrong,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Text(
+                                    'Subtotal: ৳${subtotal.toStringAsFixed(2)}',
+                                    style: const TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.bold,
+                                      color: AppColors.textPrimary,
+                                    ),
+                                  ),
                                 ],
                               ),
-                            ),
-                            IconButton(
-                              onPressed: () => _onRemoveLine(index),
-                              icon: const Icon(Icons.delete_outline, color: Colors.red),
-                              padding: EdgeInsets.zero,
-                              constraints: const BoxConstraints(),
+                            ],
+                            const Divider(height: 16),
+                            Wrap(
+                              spacing: 8,
+                              runSpacing: 4,
+                              children: [
+                                if (isSaleable) ...[
+                                  _buildLineQtyBadge('Saleable', saleableQty, Colors.teal),
+                                  if (nonSaleableQty > 0)
+                                    _buildLineQtyBadge('Non-Saleable', nonSaleableQty, Colors.orange),
+                                ] else if (_selectedBucket == 'quality') ...[
+                                  _buildLineQtyBadge('Quality', qualityQty, Colors.purple),
+                                  if (nonSaleableQty > 0)
+                                    _buildLineQtyBadge('Non-Saleable', nonSaleableQty, Colors.orange),
+                                ] else ...[
+                                  _buildLineQtyBadge('Non-Saleable', nonSaleableQty, Colors.orange),
+                                  if (qualityQty > 0)
+                                    _buildLineQtyBadge('Quality', qualityQty, Colors.purple),
+                                ],
+                                _buildLineQtyBadge('Total Qty', totalLineQty, AppColors.primaryStrong, isBold: true),
+                              ],
                             ),
                           ],
                         ),
-                        if (price > 0) ...[
-                          const SizedBox(height: 6),
-                          Row(
-                            children: [
-                              Text(
-                                'Price: ৳${price.toStringAsFixed(2)}',
-                                style: const TextStyle(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w600,
-                                  color: AppColors.primaryStrong,
-                                ),
-                              ),
-                              const SizedBox(width: 12),
-                              Text(
-                                'Subtotal: ৳${subtotal.toStringAsFixed(2)}',
-                                style: const TextStyle(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.bold,
-                                  color: AppColors.textPrimary,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
-                        const Divider(height: 16),
-                        Wrap(
-                          spacing: 8,
-                          runSpacing: 4,
-                          children: [
-                            if (isSaleable) ...[
-                              _buildLineQtyBadge('Saleable', saleableQty, Colors.teal),
-                              _buildLineQtyBadge('Non-Saleable', nonSaleableQty, Colors.orange),
-                            ] else if (_selectedBucket == 'quality') ...[
-                              _buildLineQtyBadge('Quality', qualityQty, Colors.purple),
-                              if (nonSaleableQty > 0)
-                                _buildLineQtyBadge('Non-Saleable', nonSaleableQty, Colors.orange),
-                            ] else ...[
-                              _buildLineQtyBadge('Non-Saleable', nonSaleableQty, Colors.orange),
-                              if (qualityQty > 0)
-                                _buildLineQtyBadge('Quality', qualityQty, Colors.purple),
-                            ],
-                            _buildLineQtyBadge('Total Qty', totalLineQty, AppColors.primaryStrong, isBold: true),
-                          ],
-                        ),
-                      ],
+                      ),
                     ),
                   );
                 },

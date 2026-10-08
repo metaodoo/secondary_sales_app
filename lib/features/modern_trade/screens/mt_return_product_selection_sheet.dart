@@ -1,27 +1,39 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:secondary_sales/core/access/access_resources.dart';
 import 'package:secondary_sales/core/theme/app_theme.dart';
 import 'package:secondary_sales/core/widgets/searchable_lot_selector.dart';
+import 'package:secondary_sales/features/auth/auth_provider.dart';
 import 'package:secondary_sales/features/modern_trade/mt_return_provider.dart';
 
 class MtReturnProductSelectionSheet extends StatefulWidget {
   final String returnBucket;
+  final Map<String, dynamic>? initialLine;
+  final String? state;
 
   const MtReturnProductSelectionSheet({
     super.key,
     required this.returnBucket,
+    this.initialLine,
+    this.state,
   });
 
   static Future<Map<String, dynamic>?> show(
     BuildContext context, {
     required String returnBucket,
+    Map<String, dynamic>? initialLine,
+    String? state,
   }) {
     return showModalBottomSheet<Map<String, dynamic>>(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (_) => MtReturnProductSelectionSheet(returnBucket: returnBucket),
+      builder: (_) => MtReturnProductSelectionSheet(
+        returnBucket: returnBucket,
+        initialLine: initialLine,
+        state: state,
+      ),
     );
   }
 
@@ -42,9 +54,36 @@ class _MtReturnProductSelectionSheetState extends State<MtReturnProductSelection
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<MtReturnProvider>().fetchReturnProducts();
-    });
+    if (widget.initialLine != null) {
+      final line = widget.initialLine!;
+      _selectedProduct = line['product'] as Map<String, dynamic>?;
+      _selectedLotId = line['lot_id'] as int?;
+
+      final sQty = (line['saleable_qty'] as num?)?.toDouble() ?? 0.0;
+      final nsQty = (line['non_saleable_qty'] as num?)?.toDouble() ?? 0.0;
+      final qQty = (line['quality_qty'] as num?)?.toDouble() ?? 0.0;
+
+      _saleableQtyController.text = sQty > 0
+          ? sQty.toStringAsFixed(sQty.truncateToDouble() == sQty ? 0 : 2)
+          : '0';
+      _nonSaleableQtyController.text = nsQty > 0
+          ? nsQty.toStringAsFixed(nsQty.truncateToDouble() == nsQty ? 0 : 2)
+          : '0';
+      _qualityQtyController.text = qQty > 0
+          ? qQty.toStringAsFixed(qQty.truncateToDouble() == qQty ? 0 : 2)
+          : '0';
+
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        final prodId = _selectedProduct?['id'] as int?;
+        if (prodId != null) {
+          context.read<MtReturnProvider>().fetchProductLots(prodId);
+        }
+      });
+    } else {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        context.read<MtReturnProvider>().fetchReturnProducts();
+      });
+    }
   }
 
   @override
@@ -85,21 +124,44 @@ class _MtReturnProductSelectionSheetState extends State<MtReturnProductSelection
       return;
     }
 
-    final saleableQty = double.tryParse(_saleableQtyController.text) ?? 0.0;
-    final nonSaleableQty = double.tryParse(_nonSaleableQtyController.text) ?? 0.0;
-    final qualityQty = double.tryParse(_qualityQtyController.text) ?? 0.0;
+    final isSaleable = widget.returnBucket == 'saleable';
+    final isNonSaleable = widget.returnBucket == 'non_saleable';
+    final isQuality = widget.returnBucket == 'quality';
 
-    if (widget.returnBucket == 'saleable') {
-      if (saleableQty <= 0 && nonSaleableQty <= 0) {
+    final auth = context.read<AuthProvider>();
+    final isSegregationStage = widget.state != null &&
+        widget.state!.toLowerCase() != 'kao' &&
+        widget.state!.toLowerCase() != 'dm';
+
+    final showSaleable = isSaleable;
+    final showNonSaleable = (isSaleable && isSegregationStage && auth.canDo(AppAction.mtReturnsSegregateSaleable)) ||
+        isNonSaleable ||
+        (isQuality && isSegregationStage && auth.canDo(AppAction.mtReturnsSegregateQuality));
+    final showQuality = (isNonSaleable && isSegregationStage && auth.canDo(AppAction.mtReturnsSegregateNonSaleable)) ||
+        isQuality;
+
+    final saleableQty = showSaleable ? (double.tryParse(_saleableQtyController.text) ?? 0.0) : 0.0;
+    final nonSaleableQty = showNonSaleable ? (double.tryParse(_nonSaleableQtyController.text) ?? 0.0) : 0.0;
+    final qualityQty = showQuality ? (double.tryParse(_qualityQtyController.text) ?? 0.0) : 0.0;
+
+    if (isSaleable) {
+      if (saleableQty <= 0 && (!showNonSaleable || nonSaleableQty <= 0)) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Please enter at least Saleable or Non-Saleable quantity')),
+          const SnackBar(content: Text('Please enter a valid Saleable quantity')),
+        );
+        return;
+      }
+    } else if (isQuality) {
+      if (qualityQty <= 0 && (!showNonSaleable || nonSaleableQty <= 0)) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Please enter a valid Quality quantity')),
         );
         return;
       }
     } else {
-      if (nonSaleableQty <= 0 && qualityQty <= 0) {
+      if (nonSaleableQty <= 0 && (!showQuality || qualityQty <= 0)) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Please enter at least Non-Saleable or Quality quantity')),
+          const SnackBar(content: Text('Please enter a valid Non-Saleable quantity')),
         );
         return;
       }
@@ -141,8 +203,8 @@ class _MtReturnProductSelectionSheetState extends State<MtReturnProductSelection
 
   @override
   Widget build(BuildContext context) {
-    final isSaleable = widget.returnBucket == 'saleable';
     final provider = context.watch<MtReturnProvider>();
+    final auth = context.watch<AuthProvider>();
 
     return Container(
       constraints: BoxConstraints(
@@ -177,7 +239,9 @@ class _MtReturnProductSelectionSheetState extends State<MtReturnProductSelection
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text(
-                  _selectedProduct == null ? 'Select Product' : 'Configure Quantities',
+                  _selectedProduct == null
+                      ? 'Select Product'
+                      : (widget.initialLine != null ? 'Edit Return Product' : 'Configure Quantities'),
                   style: const TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.w700,
@@ -198,7 +262,7 @@ class _MtReturnProductSelectionSheetState extends State<MtReturnProductSelection
           Expanded(
             child: _selectedProduct == null
                 ? _buildProductPicker(provider)
-                : _buildQuantityConfigurator(provider, isSaleable),
+                : _buildQuantityConfigurator(provider, auth),
           ),
         ],
       ),
@@ -275,11 +339,26 @@ class _MtReturnProductSelectionSheetState extends State<MtReturnProductSelection
     );
   }
 
-  Widget _buildQuantityConfigurator(MtReturnProvider provider, bool isSaleable) {
+  Widget _buildQuantityConfigurator(MtReturnProvider provider, AuthProvider auth) {
     final p = _selectedProduct!;
     final name = p['name']?.toString() ?? '';
     final code = p['default_code']?.toString() ?? '';
     final uom = p['uom'] is Map ? p['uom']['name']?.toString() ?? 'Unit' : 'Unit';
+
+    final isSaleable = widget.returnBucket == 'saleable';
+    final isNonSaleable = widget.returnBucket == 'non_saleable';
+    final isQuality = widget.returnBucket == 'quality';
+
+    final isSegregationStage = widget.state != null &&
+        widget.state!.toLowerCase() != 'kao' &&
+        widget.state!.toLowerCase() != 'dm';
+
+    final showSaleable = isSaleable;
+    final showNonSaleable = (isSaleable && isSegregationStage && auth.canDo(AppAction.mtReturnsSegregateSaleable)) ||
+        isNonSaleable ||
+        (isQuality && isSegregationStage && auth.canDo(AppAction.mtReturnsSegregateQuality));
+    final showQuality = (isNonSaleable && isSegregationStage && auth.canDo(AppAction.mtReturnsSegregateNonSaleable)) ||
+        isQuality;
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(20),
@@ -394,44 +473,27 @@ class _MtReturnProductSelectionSheetState extends State<MtReturnProductSelection
           const SizedBox(height: 20),
 
           // Quantities Fields
-          if (isSaleable) ...[
+          if (showSaleable) ...[
             _buildQtyInput(
               label: 'Saleable Quantity',
               controller: _saleableQtyController,
               color: Colors.teal,
               hint: 'Good condition units for restock',
             ),
-            const SizedBox(height: 14),
+          ],
+          if (showSaleable && showNonSaleable) const SizedBox(height: 14),
+          if (showNonSaleable) ...[
             _buildQtyInput(
-              label: 'Non-Saleable Quantity',
-              controller: _nonSaleableQtyController,
-              color: Colors.orange,
-              hint: 'Damaged/Scrap units',
-            ),
-          ] else if (widget.returnBucket == 'quality') ...[
-            _buildQtyInput(
-              label: 'Quality Defect Quantity',
-              controller: _qualityQtyController,
-              color: Colors.purple,
-              hint: 'Units returned for quality inspection',
-            ),
-            const SizedBox(height: 14),
-            _buildQtyInput(
-              label: 'Non-Saleable Quantity (Optional)',
+              label: isSaleable ? 'Non-Saleable (Segregation)' : 'Non-Saleable Quantity',
               controller: _nonSaleableQtyController,
               color: Colors.orange,
               hint: 'Damaged/Broken units for scrap',
             ),
-          ] else ...[
+          ],
+          if ((showSaleable || showNonSaleable) && showQuality) const SizedBox(height: 14),
+          if (showQuality) ...[
             _buildQtyInput(
-              label: 'Non-Saleable Quantity',
-              controller: _nonSaleableQtyController,
-              color: Colors.orange,
-              hint: 'Damaged/Broken units for scrap',
-            ),
-            const SizedBox(height: 14),
-            _buildQtyInput(
-              label: 'Quality Defect Quantity',
+              label: isNonSaleable ? 'Quality Defect (Segregation)' : 'Quality Defect Quantity',
               controller: _qualityQtyController,
               color: Colors.purple,
               hint: 'Units returned for quality inspection',
@@ -450,9 +512,9 @@ class _MtReturnProductSelectionSheetState extends State<MtReturnProductSelection
                 backgroundColor: AppColors.primaryStrong,
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
               ),
-              child: const Text(
-                'Add Line to Return',
-                style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: Colors.white),
+              child: Text(
+                widget.initialLine != null ? 'Update Return Line' : 'Add Line to Return',
+                style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: Colors.white),
               ),
             ),
           ),

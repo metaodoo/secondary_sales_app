@@ -7,6 +7,10 @@ class MtReturnRequest {
   final String businessType;
   final String returnBucket;
   final String returnBucketDisplay;
+  final String returnType;
+  final String returnTypeDisplay;
+  final bool canConvertToReplacement;
+  final bool canConvertToReturn;
   final String state;
   final String stateDisplay;
   final int? partnerId;
@@ -29,6 +33,7 @@ class MtReturnRequest {
   final double totalQty;
   final double totalAmount;
   final int pickingCount;
+  final bool requiresQc;
   final MtAllowedActions allowedActions;
   final List<MtReturnRequestLine> lines;
   final List<MtReturnTransfer> transfers;
@@ -40,6 +45,10 @@ class MtReturnRequest {
     this.businessType = 'mt',
     required this.returnBucket,
     required this.returnBucketDisplay,
+    this.returnType = 'replacement',
+    this.returnTypeDisplay = 'Replacement',
+    this.canConvertToReplacement = false,
+    this.canConvertToReturn = false,
     required this.state,
     required this.stateDisplay,
     this.partnerId,
@@ -62,6 +71,7 @@ class MtReturnRequest {
     this.totalQty = 0.0,
     this.totalAmount = 0.0,
     this.pickingCount = 0,
+    this.requiresQc = true,
     required this.allowedActions,
     this.lines = const [],
     this.transfers = const [],
@@ -70,8 +80,11 @@ class MtReturnRequest {
   bool get isSaleable => returnBucket == 'saleable';
   bool get isNonSaleable => returnBucket == 'non_saleable';
   bool get isQuality => returnBucket == 'quality';
+  bool get isDirectReturn => returnType == 'return';
+  bool get isReplacement => returnType == 'replacement';
   bool get isConfirmed => state.toLowerCase() == 'confirmed';
   bool get isDraft => state.toLowerCase() == 'kao';
+  bool get isSegregationStage => state.toLowerCase() != 'kao' && state.toLowerCase() != 'dm';
 
   factory MtReturnRequest.fromMap(Map<String, dynamic> map) {
     final partner = map['partner'] is Map ? map['partner'] as Map : null;
@@ -84,13 +97,22 @@ class MtReturnRequest {
     final rawLines = map['lines'] as List? ?? [];
     final rawTransfers = map['transfers'] as List? ?? [];
 
+    final bucket = map['return_bucket']?.toString() ?? 'saleable';
+    final parsedReturnType = map['return_type']?.toString() ?? (bucket == 'saleable' ? 'return' : 'replacement');
+    final parsedReturnTypeDisplay = map['return_type_display']?.toString() ??
+        (parsedReturnType == 'return' ? 'Return' : 'Replacement');
+
     return MtReturnRequest(
       id: asInt(map['id']),
       name: map['name']?.toString() ?? '',
       date: map['date']?.toString(),
       businessType: map['business_type']?.toString() ?? 'mt',
-      returnBucket: map['return_bucket']?.toString() ?? 'saleable',
-      returnBucketDisplay: map['return_bucket_display']?.toString() ?? map['return_bucket']?.toString() ?? '',
+      returnBucket: bucket,
+      returnBucketDisplay: map['return_bucket_display']?.toString() ?? bucket,
+      returnType: parsedReturnType,
+      returnTypeDisplay: parsedReturnTypeDisplay,
+      canConvertToReplacement: map['can_convert_to_replacement'] == true,
+      canConvertToReturn: map['can_convert_to_return'] == true,
       state: map['state']?.toString() ?? 'kao',
       stateDisplay: map['state_display']?.toString() ?? map['state']?.toString() ?? '',
       partnerId: partner != null ? asInt(partner['id']) : null,
@@ -113,6 +135,9 @@ class MtReturnRequest {
       totalQty: asDouble(map['total_qty']),
       totalAmount: asDouble(map['total_amount']),
       pickingCount: asInt(map['picking_count']),
+      requiresQc: map['requires_qc'] == true ||
+          (bucket == 'quality') ||
+          (bucket == 'non_saleable' && asDouble(map['total_quality_qty']) > 0),
       allowedActions: MtAllowedActions.fromMap(actMap),
       lines: rawLines
           .map((l) => MtReturnRequestLine.fromMap(Map<String, dynamic>.from(l as Map)))
@@ -129,6 +154,7 @@ class MtAllowedActions {
   final bool canSubmit;
   final bool canConfirm;
   final bool canReset;
+  final bool requiresQc;
   final String? nextState;
   final String? nextAction;
   final String? nextActionLabel;
@@ -138,6 +164,7 @@ class MtAllowedActions {
     this.canSubmit = false,
     this.canConfirm = false,
     this.canReset = false,
+    this.requiresQc = true,
     this.nextState,
     this.nextAction,
     this.nextActionLabel,
@@ -149,6 +176,7 @@ class MtAllowedActions {
       canSubmit: map['can_submit'] == true,
       canConfirm: map['can_confirm'] == true,
       canReset: map['can_reset'] == true,
+      requiresQc: map['requires_qc'] != false,
       nextState: map['next_state']?.toString(),
       nextAction: map['next_action']?.toString(),
       nextActionLabel: map['next_action_label']?.toString(),

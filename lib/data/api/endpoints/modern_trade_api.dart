@@ -401,6 +401,7 @@ extension ModernTradeApi on ApiService {
   Future<MtReturnRequest> createMtReturn({
     required int partnerId,
     required String returnBucket,
+    String? returnType,
     String? date,
     bool autoSubmit = false,
     required List<Map<String, dynamic>> lines,
@@ -411,6 +412,7 @@ extension ModernTradeApi on ApiService {
       'employee_id': _activeEmployeeId,
       'partner_id': partnerId,
       'return_bucket': returnBucket,
+      if (returnType != null) 'return_type': returnType,
       'auto_submit': autoSubmit,
       'lines': lines,
       if (date != null) 'date': date,
@@ -428,14 +430,16 @@ extension ModernTradeApi on ApiService {
     throw Exception(result['message'] ?? 'Failed to create return request');
   }
 
-  /// Update lines of an active Return Request
+  /// Update lines or return type of an active Return Request
   Future<MtReturnRequest> updateMtReturn(
     int returnId, {
-    required List<Map<String, dynamic>> lines,
+    List<Map<String, dynamic>>? lines,
+    String? returnType,
   }) async {
     final params = <String, dynamic>{
       'employee_id': _activeEmployeeId,
-      'lines': lines,
+      if (lines != null) 'lines': lines,
+      if (returnType != null) 'return_type': returnType,
     };
 
     final result = await _post(

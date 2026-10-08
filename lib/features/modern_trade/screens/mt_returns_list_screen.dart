@@ -8,6 +8,7 @@ import 'package:secondary_sales/features/auth/auth_provider.dart';
 import 'package:secondary_sales/features/modern_trade/mt_return_provider.dart';
 import 'package:secondary_sales/features/modern_trade/screens/mt_return_create_screen.dart';
 import 'package:secondary_sales/features/modern_trade/screens/mt_return_detail_screen.dart';
+import 'package:secondary_sales/features/modern_trade/screens/mt_return_type_sheet.dart';
 
 class MtReturnsListScreen extends StatefulWidget {
   final String returnBucket; // 'saleable' or 'non_saleable'
@@ -79,12 +80,34 @@ class _MtReturnsListScreenState extends State<MtReturnsListScreen> {
     }
   }
 
-  void _onCreate() {
+  void _onCreate() async {
+    if (widget.returnBucket == 'saleable') {
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => MtReturnCreateScreen(
+            returnBucket: widget.returnBucket,
+            returnType: 'return',
+            title: 'New ${widget.title.replaceAll("Returns", "Return")}',
+          ),
+        ),
+      );
+      return;
+    }
+
+    final selectedType = await showMtReturnTypePicker(
+      context,
+      returnBucket: widget.returnBucket,
+    );
+
+    if (selectedType == null || !mounted) return;
+
+    final typeLabel = selectedType == 'return' ? 'Return' : 'Replacement';
     Navigator.of(context).push(
       MaterialPageRoute(
         builder: (_) => MtReturnCreateScreen(
           returnBucket: widget.returnBucket,
-          title: 'New ${widget.title.replaceAll("Returns", "Return")}',
+          returnType: selectedType,
+          title: 'New ${widget.returnBucket == "quality" ? "Quality" : "Non-Saleable"} ($typeLabel)',
         ),
       ),
     );
@@ -275,13 +298,43 @@ class _MtReturnsListScreenState extends State<MtReturnsListScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(
-                  rr.name,
-                  style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: AppColors.textPrimary),
+                Expanded(
+                  child: Text(
+                    rr.name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: AppColors.textPrimary),
+                  ),
                 ),
-                _buildStatusBadge(rr.state, rr.stateDisplay),
+                const SizedBox(width: 8),
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (!rr.isSaleable) ...[
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        margin: const EdgeInsets.only(right: 6),
+                        decoration: BoxDecoration(
+                          color: rr.isDirectReturn ? Colors.deepOrange.shade50 : Colors.blue.shade50,
+                          borderRadius: BorderRadius.circular(4),
+                          border: Border.all(
+                            color: rr.isDirectReturn ? Colors.deepOrange.shade300 : Colors.blue.shade300,
+                          ),
+                        ),
+                        child: Text(
+                          rr.returnTypeDisplay,
+                          style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w700,
+                            color: rr.isDirectReturn ? Colors.deepOrange.shade800 : Colors.blue.shade800,
+                          ),
+                        ),
+                      ),
+                    ],
+                    _buildStatusBadge(rr.state, rr.stateDisplay),
+                  ],
+                ),
               ],
             ),
             const SizedBox(height: 8),

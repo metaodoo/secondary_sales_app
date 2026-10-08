@@ -384,11 +384,12 @@ class _CustomerActionBottomSheetState extends State<CustomerActionBottomSheet> {
         color: AppColors.background,
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      padding: const EdgeInsets.all(24),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
+      padding: EdgeInsets.fromLTRB(20, 20, 20, MediaQuery.of(context).viewInsets.bottom + 20),
+      child: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
           // Header
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -534,10 +535,10 @@ class _CustomerActionBottomSheetState extends State<CustomerActionBottomSheet> {
           const SizedBox(height: 20),
 
           // Action Grid
-          Row(
-            children: [
-              Expanded(
-                child: _buildActionBtn(
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final actionButtons = <Widget>[
+                _buildActionBtn(
                   Icons.shopping_cart_outlined,
                   'Orders',
                   onTap: () {
@@ -552,10 +553,7 @@ class _CustomerActionBottomSheetState extends State<CustomerActionBottomSheet> {
                     );
                   },
                 ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: _buildActionBtn(
+                _buildActionBtn(
                   Icons.directions_outlined,
                   'Directions',
                   onTap: () {
@@ -570,18 +568,12 @@ class _CustomerActionBottomSheetState extends State<CustomerActionBottomSheet> {
                     );
                   },
                 ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: _buildActionBtn(
+                _buildActionBtn(
                   Icons.phone_outlined,
                   'Call',
                   onTap: _makeCall,
                 ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: _buildActionBtn(
+                _buildActionBtn(
                   Icons.history,
                   'Visit\nHistory',
                   onTap: () {
@@ -596,27 +588,33 @@ class _CustomerActionBottomSheetState extends State<CustomerActionBottomSheet> {
                     );
                   },
                 ),
-              ),
-              const SizedBox(width: 8),
-              if (isCheckedIn)
-                Expanded(
-                  child: _buildActionBtn(
+                if (isCheckedIn)
+                  _buildActionBtn(
                     Icons.logout,
                     'Check\nOut',
                     iconColor: const Color(0xFFDC2626),
                     onTap: _handleCheckOut,
-                  ),
-                )
-              else
-                Expanded(
-                  child: _buildActionBtn(
+                  )
+                else
+                  _buildActionBtn(
                     Icons.login,
                     'Check\nIn',
                     iconColor: const Color(0xFF10B981),
                     onTap: _handleCheckIn,
                   ),
-                ),
-            ],
+              ];
+
+              final cols = constraints.maxWidth >= 420 ? actionButtons.length : 3;
+              final spacing = 8.0;
+              final itemWidth = ((constraints.maxWidth - (cols - 1) * spacing) / cols).floorToDouble();
+              return Wrap(
+                spacing: spacing,
+                runSpacing: spacing,
+                children: actionButtons
+                    .map((btn) => SizedBox(width: itemWidth, child: btn))
+                    .toList(),
+              );
+            },
           ),
           const SizedBox(height: 32),
 
@@ -751,8 +749,9 @@ class _CustomerActionBottomSheetState extends State<CustomerActionBottomSheet> {
               ],
             ),
           ),
-          const SizedBox(height: 20),
-        ],
+            const SizedBox(height: 20),
+          ],
+        ),
       ),
     );
   }
@@ -766,23 +765,27 @@ class _CustomerActionBottomSheetState extends State<CustomerActionBottomSheet> {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 4),
+        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 4),
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(color: AppColors.borderSoft),
         ),
         child: Column(
+          mainAxisSize: MainAxisSize.min,
           children: [
             Icon(icon, color: iconColor ?? AppColors.primaryStrong, size: 24),
-            const SizedBox(height: 12),
+            const SizedBox(height: 6),
             Text(
               label,
               textAlign: TextAlign.center,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
               style: const TextStyle(
                 color: AppColors.textPrimary,
                 fontSize: 11,
                 fontWeight: FontWeight.w500,
+                height: 1.15,
               ),
             ),
           ],

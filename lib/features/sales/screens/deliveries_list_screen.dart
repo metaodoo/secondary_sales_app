@@ -392,17 +392,18 @@ class _DeliveriesListScreenState extends State<DeliveriesListScreen>
       builder: (ctx) {
         return StatefulBuilder(
           builder: (context, setSheetState) {
-            return Padding(
-              padding: EdgeInsets.only(
-                left: 20,
-                right: 20,
-                top: 20,
-                bottom: MediaQuery.of(context).viewInsets.bottom + 24,
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
+            return SafeArea(
+              child: SingleChildScrollView(
+                padding: EdgeInsets.only(
+                  left: 20,
+                  right: 20,
+                  top: 20,
+                  bottom: MediaQuery.of(context).viewInsets.bottom + 24,
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
                   // Header
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -598,11 +599,12 @@ class _DeliveriesListScreenState extends State<DeliveriesListScreen>
                   ),
                 ],
               ),
-            );
-          },
-        );
-      },
-    );
+            ),
+          );
+        },
+      );
+    },
+  );
   }
 
   @override
@@ -1124,12 +1126,16 @@ class _DeliveriesListScreenState extends State<DeliveriesListScreen>
                   children: [
                     const Icon(Icons.person_pin_outlined, size: 14, color: AppColors.textSecondary),
                     const SizedBox(width: 4),
-                    Text(
-                      'Delivery Man: ${delivery.deliveryManName}',
-                      style: const TextStyle(
-                        fontSize: 12,
-                        color: AppColors.textSecondary,
-                        fontWeight: FontWeight.w500,
+                    Expanded(
+                      child: Text(
+                        'Delivery Man: ${delivery.deliveryManName}',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: AppColors.textSecondary,
+                          fontWeight: FontWeight.w500,
+                        ),
                       ),
                     ),
                   ],
@@ -1141,11 +1147,15 @@ class _DeliveriesListScreenState extends State<DeliveriesListScreen>
                   children: [
                     const Icon(Icons.location_on_outlined, size: 14, color: AppColors.textSecondary),
                     const SizedBox(width: 4),
-                    Text(
-                      'Zone: ${delivery.zoneName}',
-                      style: const TextStyle(
-                        fontSize: 12,
-                        color: AppColors.textSecondary,
+                    Expanded(
+                      child: Text(
+                        'Zone: ${delivery.zoneName}',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: AppColors.textSecondary,
+                        ),
                       ),
                     ),
                   ],

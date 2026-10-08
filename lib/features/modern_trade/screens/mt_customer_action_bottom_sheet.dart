@@ -637,109 +637,95 @@ class _MtCustomerActionBottomSheetState extends State<MtCustomerActionBottomShee
 
     if (canViewOrders) {
       actionButtons.add(
-        Expanded(
-          child: _buildActionBtn(
-            Icons.shopping_cart_outlined,
-            'Orders',
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => SecondaryOrdersListScreen(
-                    outletId: widget.outlet.id,
-                    outletName: widget.outlet.name,
-                    saleType: 'primary',
-                    businessType: 'mt',
-                  ),
+        _buildActionBtn(
+          Icons.shopping_cart_outlined,
+          'Orders',
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => SecondaryOrdersListScreen(
+                  outletId: widget.outlet.id,
+                  outletName: widget.outlet.name,
+                  saleType: 'primary',
+                  businessType: 'mt',
                 ),
-              );
-            },
-          ),
+              ),
+            );
+          },
         ),
       );
     }
 
     if (canViewStockAudits) {
       actionButtons.add(
-        Expanded(
-          child: _buildActionBtn(
-            Icons.inventory_2_outlined,
-            'Stock\nAudit',
-            onTap: () => _handleStockAuditAction(directCreate: false),
-          ),
+        _buildActionBtn(
+          Icons.inventory_2_outlined,
+          'Stock\nAudit',
+          onTap: () => _handleStockAuditAction(directCreate: false),
         ),
       );
     }
 
     actionButtons.add(
-      Expanded(
-        child: _buildActionBtn(
-          Icons.directions_outlined,
-          'Directions',
-          onTap: () {
-            ProximityHelper.openGoogleMapsDirections(
-              context: context,
-              destinationLat: widget.outlet.latitude,
-              destinationLng: widget.outlet.longitude,
-              originLat: provider.currentPosition?.latitude,
-              originLng: provider.currentPosition?.longitude,
-              destinationTitle: widget.outlet.name,
-            );
-          },
-        ),
+      _buildActionBtn(
+        Icons.directions_outlined,
+        'Directions',
+        onTap: () {
+          ProximityHelper.openGoogleMapsDirections(
+            context: context,
+            destinationLat: widget.outlet.latitude,
+            destinationLng: widget.outlet.longitude,
+            originLat: provider.currentPosition?.latitude,
+            originLng: provider.currentPosition?.longitude,
+            destinationTitle: widget.outlet.name,
+          );
+        },
       ),
     );
 
     actionButtons.add(
-      Expanded(
-        child: _buildActionBtn(
-          Icons.phone_outlined,
-          'Call',
-          onTap: _makeCall,
-        ),
+      _buildActionBtn(
+        Icons.phone_outlined,
+        'Call',
+        onTap: _makeCall,
       ),
     );
 
     actionButtons.add(
-      Expanded(
-        child: _buildActionBtn(
-          Icons.history,
-          'Visit\nHistory',
-          onTap: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) => OutletVisitHistoryScreen(
-                  outletId: widget.outlet.id,
-                  outletName: widget.outlet.name,
-                ),
+      _buildActionBtn(
+        Icons.history,
+        'Visit\nHistory',
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => OutletVisitHistoryScreen(
+                outletId: widget.outlet.id,
+                outletName: widget.outlet.name,
               ),
-            );
-          },
-        ),
+            ),
+          );
+        },
       ),
     );
 
     if (isCheckedIn) {
       actionButtons.add(
-        Expanded(
-          child: _buildActionBtn(
-            Icons.logout,
-            'Check\nOut',
-            iconColor: const Color(0xFFDC2626),
-            onTap: _handleCheckOut,
-          ),
+        _buildActionBtn(
+          Icons.logout,
+          'Check\nOut',
+          iconColor: const Color(0xFFDC2626),
+          onTap: _handleCheckOut,
         ),
       );
     } else {
       actionButtons.add(
-        Expanded(
-          child: _buildActionBtn(
-            Icons.login,
-            'Check\nIn',
-            iconColor: const Color(0xFF10B981),
-            onTap: _handleCheckIn,
-          ),
+        _buildActionBtn(
+          Icons.login,
+          'Check\nIn',
+          iconColor: const Color(0xFF10B981),
+          onTap: _handleCheckIn,
         ),
       );
     }
@@ -749,149 +735,159 @@ class _MtCustomerActionBottomSheetState extends State<MtCustomerActionBottomShee
         color: AppColors.background,
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      padding: const EdgeInsets.all(24),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Header
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        const Text(
-                          'MODERN TRADE OUTLET',
-                          style: TextStyle(
-                            color: AppColors.primaryStrong,
-                            fontSize: 11,
-                            fontWeight: FontWeight.bold,
-                            letterSpacing: 1,
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: widget.outlet.isRecommended
-                                ? const Color(0xFF10B981).withValues(alpha: 0.15)
-                                : const Color(0xFF0284C7).withValues(alpha: 0.15),
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                          child: Text(
-                            widget.outlet.isRecommended ? 'Recommended' : 'Allowed',
-                            style: TextStyle(
-                              fontSize: 10,
-                              fontWeight: FontWeight.bold,
-                              color: widget.outlet.isRecommended
-                                  ? const Color(0xFF10B981)
-                                  : const Color(0xFF0284C7),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      widget.outlet.name,
-                      style: const TextStyle(
-                        color: AppColors.textPrimary,
-                        fontSize: 22,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    if (widget.outlet.ssCode != null && widget.outlet.ssCode!.trim().isNotEmpty) ...[
-                      const SizedBox(height: 2),
-                      Text(
-                        'Code: ${widget.outlet.ssCode!.trim()}',
-                        style: const TextStyle(
-                          color: AppColors.primary,
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ],
-                    if (widget.outlet.street != null && widget.outlet.street!.trim().isNotEmpty) ...[
-                      const SizedBox(height: 2),
+      padding: EdgeInsets.fromLTRB(20, 20, 20, MediaQuery.of(context).viewInsets.bottom + 20),
+      child: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Header
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
                       Row(
                         children: [
-                          const Icon(Icons.location_on_outlined, size: 13, color: AppColors.textSecondary),
-                          const SizedBox(width: 4),
-                          Expanded(
+                          const Text(
+                            'MODERN TRADE OUTLET',
+                            style: TextStyle(
+                              color: AppColors.primaryStrong,
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                              letterSpacing: 1,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: widget.outlet.isRecommended
+                                  ? const Color(0xFF10B981).withValues(alpha: 0.15)
+                                  : const Color(0xFF0284C7).withValues(alpha: 0.15),
+                              borderRadius: BorderRadius.circular(4),
+                            ),
                             child: Text(
-                              widget.outlet.street!.trim(),
-                              style: const TextStyle(
-                                fontSize: 12,
-                                color: AppColors.textSecondary,
+                              widget.outlet.isRecommended ? 'Recommended' : 'Allowed',
+                              style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                                color: widget.outlet.isRecommended
+                                    ? const Color(0xFF10B981)
+                                    : const Color(0xFF0284C7),
                               ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
                             ),
                           ),
                         ],
                       ),
+                      const SizedBox(height: 4),
+                      Text(
+                        widget.outlet.name,
+                        style: const TextStyle(
+                          color: AppColors.textPrimary,
+                          fontSize: 22,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      if (widget.outlet.ssCode != null && widget.outlet.ssCode!.trim().isNotEmpty) ...[
+                        const SizedBox(height: 2),
+                        Text(
+                          'Code: ${widget.outlet.ssCode!.trim()}',
+                          style: const TextStyle(
+                            color: AppColors.primary,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                      if (widget.outlet.street != null && widget.outlet.street!.trim().isNotEmpty) ...[
+                        const SizedBox(height: 2),
+                        Row(
+                          children: [
+                            const Icon(Icons.location_on_outlined, size: 13, color: AppColors.textSecondary),
+                            const SizedBox(width: 4),
+                            Expanded(
+                              child: Text(
+                                widget.outlet.street!.trim(),
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  color: AppColors.textSecondary,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
                     ],
-                  ],
-                ),
-              ),
-              IconButton(
-                icon: const Icon(Icons.close, color: AppColors.textSecondary),
-                onPressed: () => Navigator.pop(context),
-              ),
-            ],
-          ),
-          const SizedBox(height: 20),
-
-          // Action Grid
-          Row(
-            children: [
-              for (int i = 0; i < actionButtons.length; i++) ...[
-                if (i > 0) const SizedBox(width: 8),
-                actionButtons[i],
-              ],
-            ],
-          ),
-
-          if (canCreateOrder || canCreateAudit) ...[
-            const SizedBox(height: 24),
-            _buildBottomCta(
-              canCreateOrder: canCreateOrder,
-              canCreateAudit: canCreateAudit,
-            ),
-          ],
-
-          const SizedBox(height: 16),
-
-          // Arrival Time / Countdown
-          Center(
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(
-                  isCheckedIn ? Icons.timer_outlined : Icons.access_time,
-                  color: AppColors.textSecondary,
-                  size: 14,
-                ),
-                const SizedBox(width: 4),
-                Text(
-                  isCheckedIn
-                      ? 'Checked in: ${_formatDuration(_duration)}'
-                      : 'Ready to check in',
-                  style: const TextStyle(
-                    color: AppColors.textSecondary,
-                    fontSize: 12,
                   ),
                 ),
+                IconButton(
+                  icon: const Icon(Icons.close, color: AppColors.textSecondary),
+                  onPressed: () => Navigator.pop(context),
+                ),
               ],
             ),
-          ),
-          const SizedBox(height: 12),
-        ],
+            const SizedBox(height: 20),
+
+            // Action Grid
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final cols = (constraints.maxWidth >= 380 && actionButtons.length <= 4)
+                    ? actionButtons.length
+                    : 3;
+                final spacing = 8.0;
+                final itemWidth = ((constraints.maxWidth - (cols - 1) * spacing) / cols).floorToDouble();
+                return Wrap(
+                  spacing: spacing,
+                  runSpacing: spacing,
+                  children: actionButtons
+                      .map((btn) => SizedBox(width: itemWidth, child: btn))
+                      .toList(),
+                );
+              },
+            ),
+
+            if (canCreateOrder || canCreateAudit) ...[
+              const SizedBox(height: 24),
+              _buildBottomCta(
+                canCreateOrder: canCreateOrder,
+                canCreateAudit: canCreateAudit,
+              ),
+            ],
+
+            const SizedBox(height: 16),
+
+            // Arrival Time / Countdown
+            Center(
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    isCheckedIn ? Icons.timer_outlined : Icons.access_time,
+                    color: AppColors.textSecondary,
+                    size: 14,
+                  ),
+                  const SizedBox(width: 4),
+                  Text(
+                    isCheckedIn
+                        ? 'Checked in: ${_formatDuration(_duration)}'
+                        : 'Ready to check in',
+                    style: const TextStyle(
+                      color: AppColors.textSecondary,
+                      fontSize: 12,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
+          ],
+        ),
       ),
     );
   }
@@ -905,23 +901,27 @@ class _MtCustomerActionBottomSheetState extends State<MtCustomerActionBottomShee
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 18, horizontal: 4),
+        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 4),
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(color: AppColors.borderSoft),
         ),
         child: Column(
+          mainAxisSize: MainAxisSize.min,
           children: [
             Icon(icon, color: iconColor ?? AppColors.primaryStrong, size: 24),
-            const SizedBox(height: 8),
+            const SizedBox(height: 6),
             Text(
               label,
               textAlign: TextAlign.center,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
               style: const TextStyle(
                 color: AppColors.textPrimary,
                 fontSize: 11,
                 fontWeight: FontWeight.w500,
+                height: 1.15,
               ),
             ),
           ],

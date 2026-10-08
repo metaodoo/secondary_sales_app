@@ -174,6 +174,7 @@ class MtReturnProvider extends ChangeNotifier {
   Future<MtReturnRequest?> createReturn({
     required int partnerId,
     required String returnBucket,
+    String? returnType,
     String? date,
     bool autoSubmit = false,
     required List<Map<String, dynamic>> lines,
@@ -188,6 +189,7 @@ class MtReturnProvider extends ChangeNotifier {
       final res = await _api.createMtReturn(
         partnerId: partnerId,
         returnBucket: returnBucket,
+        returnType: returnType,
         date: date,
         autoSubmit: autoSubmit,
         lines: lines,
@@ -214,6 +216,28 @@ class MtReturnProvider extends ChangeNotifier {
 
     try {
       final updated = await _api.updateMtReturn(returnId, lines: lines);
+      _selectedReturn = updated;
+      final idx = _returns.indexWhere((r) => r.id == returnId);
+      if (idx != -1) {
+        _returns[idx] = updated;
+      }
+      return true;
+    } catch (e) {
+      _errorMessage = e.toString().replaceAll('Exception: ', '');
+      return false;
+    } finally {
+      _isActionLoading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<bool> changeReturnType(int returnId, String returnType) async {
+    _isActionLoading = true;
+    _errorMessage = null;
+    notifyListeners();
+
+    try {
+      final updated = await _api.updateMtReturn(returnId, returnType: returnType);
       _selectedReturn = updated;
       final idx = _returns.indexWhere((r) => r.id == returnId);
       if (idx != -1) {

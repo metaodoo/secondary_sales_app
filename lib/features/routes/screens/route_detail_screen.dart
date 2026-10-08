@@ -207,26 +207,31 @@ class _RouteDetailScreenState extends State<RouteDetailScreen> with WidgetsBindi
 
                   // Assigned Outlets Section Header
                   Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Row(
-                        children: [
-                          const Icon(
-                            Icons.storefront_outlined,
-                            color: AppColors.textPrimary,
-                            size: 20,
-                          ),
-                          const SizedBox(width: 8),
-                          Text(
-                            'ASSIGNED OUTLETS (${route.outlets.length})',
-                            style: const TextStyle(
+                      Expanded(
+                        child: Row(
+                          children: [
+                            const Icon(
+                              Icons.storefront_outlined,
                               color: AppColors.textPrimary,
-                              fontWeight: FontWeight.w800,
-                              letterSpacing: 0.5,
-                              fontSize: 13,
+                              size: 20,
                             ),
-                          ),
-                        ],
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                'ASSIGNED OUTLETS (${route.outlets.length})',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  color: AppColors.textPrimary,
+                                  fontWeight: FontWeight.w800,
+                                  letterSpacing: 0.5,
+                                  fontSize: 13,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                       if (context.watch<AuthProvider>().canDo(
                         AppAction.routeAddOutlet,

@@ -546,14 +546,21 @@ class DashboardTab extends StatelessWidget {
                     );
                   }
 
-                  return GridView.count(
-                    crossAxisCount: 2,
-                    crossAxisSpacing: 20,
-                    mainAxisSpacing: 20,
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
-                    childAspectRatio: 1.05,
-                    children: cards,
+                  return LayoutBuilder(
+                    builder: (context, constraints) {
+                      final textScale = MediaQuery.textScalerOf(context).scale(1);
+                      final isNarrow = constraints.maxWidth < 340;
+                      final aspectRatio = isNarrow || textScale > 1.1 ? 0.92 : 1.02;
+                      return GridView.count(
+                        crossAxisCount: 2,
+                        crossAxisSpacing: isNarrow ? 12 : 16,
+                        mainAxisSpacing: isNarrow ? 12 : 16,
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        childAspectRatio: aspectRatio,
+                        children: cards,
+                      );
+                    },
                   );
                 },
               ),
@@ -589,31 +596,34 @@ class DashboardTab extends StatelessWidget {
         child: InkWell(
           onTap: onTap,
           borderRadius: BorderRadius.circular(20),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Container(
-                width: 68,
-                height: 68,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: circleColor,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Container(
+                  width: 58,
+                  height: 58,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: circleColor,
+                  ),
+                  child: Icon(icon, color: iconColor, size: 28),
                 ),
-                child: Icon(icon, color: iconColor, size: 32),
-              ),
-              const SizedBox(height: 16),
-              Text(
-                title,
-                textAlign: TextAlign.center,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  color: AppColors.textPrimary,
-                  fontWeight: FontWeight.w600,
-                  fontSize: 16,
+                const SizedBox(height: 12),
+                Text(
+                  title,
+                  textAlign: TextAlign.center,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: AppColors.textPrimary,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 15,
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),

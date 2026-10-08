@@ -319,66 +319,74 @@ class _OrderCreationScreenState extends State<OrderCreationScreen> {
         if (stockExceededLines.isNotEmpty) {
           final proceed = await showModalBottomSheet<bool>(
             context: context,
+            isScrollControlled: true,
             shape: const RoundedRectangleBorder(
               borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
             ),
-            builder: (ctx) => Padding(
-              padding: const EdgeInsets.all(20),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      const Icon(Icons.warning_amber_rounded, color: Colors.orange, size: 28),
-                      const SizedBox(width: 8),
-                      const Text(
-                        'Stock Warning',
-                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  const Text(
-                    'Dealer stock is lower than order quantity:',
-                    style: TextStyle(fontSize: 14, color: Colors.black87),
-                  ),
-                  const SizedBox(height: 12),
-                  ...stockExceededLines.map((e) => Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 2),
-                    child: Text(
-                      '• ${e.productName} (Order: ${e.orderQty}, Stock: ${e.dbStock})',
-                      style: const TextStyle(fontSize: 13, color: Colors.black54),
+            builder: (ctx) => SafeArea(
+              child: SingleChildScrollView(
+                padding: EdgeInsets.fromLTRB(
+                  20,
+                  20,
+                  20,
+                  MediaQuery.of(ctx).viewInsets.bottom + 20,
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        const Icon(Icons.warning_amber_rounded, color: Colors.orange, size: 28),
+                        const SizedBox(width: 8),
+                        const Text(
+                          'Stock Warning',
+                          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                        ),
+                      ],
                     ),
-                  )),
-                  const SizedBox(height: 16),
-                  const Text(
-                    'Do you still want to place this order?',
-                    style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
-                  ),
-                  const SizedBox(height: 20),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: OutlinedButton(
-                          onPressed: () => Navigator.pop(ctx, false),
-                          child: const Text('Change Qty'),
-                        ),
+                    const SizedBox(height: 8),
+                    const Text(
+                      'Dealer stock is lower than order quantity:',
+                      style: TextStyle(fontSize: 14, color: Colors.black87),
+                    ),
+                    const SizedBox(height: 12),
+                    ...stockExceededLines.map((e) => Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 2),
+                      child: Text(
+                        '• ${e.productName} (Order: ${e.orderQty}, Stock: ${e.dbStock})',
+                        style: const TextStyle(fontSize: 13, color: Colors.black54),
                       ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: ElevatedButton(
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.green[700],
-                            foregroundColor: Colors.white,
+                    )),
+                    const SizedBox(height: 16),
+                    const Text(
+                      'Do you still want to place this order?',
+                      style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+                    ),
+                    const SizedBox(height: 20),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton(
+                            onPressed: () => Navigator.pop(ctx, false),
+                            child: const Text('Change Qty'),
                           ),
-                          onPressed: () => Navigator.pop(ctx, true),
-                          child: const Text('Yes, Place Order'),
                         ),
-                      ),
-                    ],
-                  ),
-                ],
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: ElevatedButton(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.green[700],
+                              foregroundColor: Colors.white,
+                            ),
+                            onPressed: () => Navigator.pop(ctx, true),
+                            child: const Text('Yes, Place Order'),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
               ),
             ),
           );

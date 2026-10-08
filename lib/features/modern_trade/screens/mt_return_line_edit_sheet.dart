@@ -1,24 +1,29 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:secondary_sales/core/access/access_resources.dart';
 import 'package:secondary_sales/core/theme/app_theme.dart';
 import 'package:secondary_sales/core/widgets/searchable_lot_selector.dart';
 import 'package:secondary_sales/data/models/modern_trade/mt_return_request.dart';
+import 'package:secondary_sales/features/auth/auth_provider.dart';
 import 'package:secondary_sales/features/modern_trade/mt_return_provider.dart';
 
 class MtReturnLineEditSheet extends StatefulWidget {
   final MtReturnRequestLine line;
   final String returnBucket;
+  final String? state;
 
   const MtReturnLineEditSheet({
     super.key,
     required this.line,
     required this.returnBucket,
+    this.state,
   });
 
   static Future<List<Map<String, dynamic>>?> show(
     BuildContext context, {
     required MtReturnRequestLine line,
     required String returnBucket,
+    String? state,
   }) {
     return showModalBottomSheet<List<Map<String, dynamic>>>(
       context: context,
@@ -27,6 +32,7 @@ class MtReturnLineEditSheet extends StatefulWidget {
       builder: (_) => MtReturnLineEditSheet(
         line: line,
         returnBucket: returnBucket,
+        state: state,
       ),
     );
   }
@@ -136,6 +142,21 @@ class _MtReturnLineEditSheetState extends State<MtReturnLineEditSheet> {
     }
 
     final isSaleable = widget.returnBucket == 'saleable';
+    final isNonSaleable = widget.returnBucket == 'non_saleable';
+    final isQuality = widget.returnBucket == 'quality';
+
+    final auth = context.read<AuthProvider>();
+    final isSegregationStage = widget.state != null &&
+        widget.state!.toLowerCase() != 'kao' &&
+        widget.state!.toLowerCase() != 'dm';
+
+    final showSaleable = isSaleable;
+    final showNonSaleable = (isSaleable && isSegregationStage && auth.canDo(AppAction.mtReturnsSegregateSaleable)) ||
+        isNonSaleable ||
+        (isQuality && isSegregationStage && auth.canDo(AppAction.mtReturnsSegregateQuality));
+    final showQuality = (isNonSaleable && isSegregationStage && auth.canDo(AppAction.mtReturnsSegregateNonSaleable)) ||
+        isQuality;
+
     final List<Map<String, dynamic>> results = [];
 
     // Collect active entries
@@ -150,17 +171,23 @@ class _MtReturnLineEditSheetState extends State<MtReturnLineEditSheet> {
         return;
       }
 
-      final sQty = double.tryParse(entry.saleableCtrl.text) ?? 0.0;
-      final nsQty = double.tryParse(entry.nonSaleableCtrl.text) ?? 0.0;
-      final qQty = double.tryParse(entry.qualityCtrl.text) ?? 0.0;
+      final sQty = showSaleable ? (double.tryParse(entry.saleableCtrl.text) ?? 0.0) : 0.0;
+      final nsQty = showNonSaleable ? (double.tryParse(entry.nonSaleableCtrl.text) ?? 0.0) : 0.0;
+      final qQty = showQuality ? (double.tryParse(entry.qualityCtrl.text) ?? 0.0) : 0.0;
 
-      if (isSaleable && sQty <= 0 && nsQty <= 0) {
+      if (isSaleable && sQty <= 0 && (!showNonSaleable || nsQty <= 0)) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Each line must have a valid quantity > 0.')),
         );
         return;
       }
-      if (!isSaleable && nsQty <= 0 && qQty <= 0) {
+      if (isQuality && qQty <= 0 && (!showNonSaleable || nsQty <= 0)) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Each line must have a valid quantity > 0.')),
+        );
+        return;
+      }
+      if (isNonSaleable && nsQty <= 0 && (!showQuality || qQty <= 0)) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Each line must have a valid quantity > 0.')),
         );
@@ -170,9 +197,9 @@ class _MtReturnLineEditSheetState extends State<MtReturnLineEditSheet> {
       final Map<String, dynamic> item = {
         'product_id': widget.line.productId,
         'lot_id': entry.lotId,
-        'saleable_qty': isSaleable ? sQty : 0.0,
-        'non_saleable_qty': nsQty,
-        'quality_qty': !isSaleable ? qQty : 0.0,
+        'saleable_qty': showSaleable ? sQty : 0.0,
+        'non_saleable_qty': showNonSaleable ? nsQty : 0.0,
+        'quality_qty': showQuality ? qQty : 0.0,
       };
       if (entry.lineId != null) {
         item['id'] = entry.lineId;
@@ -194,8 +221,21 @@ class _MtReturnLineEditSheetState extends State<MtReturnLineEditSheet> {
   @override
   Widget build(BuildContext context) {
     final isSaleable = widget.returnBucket == 'saleable';
+    final isNonSaleable = widget.returnBucket == 'non_saleable';
+    final isQuality = widget.returnBucket == 'quality';
     final provider = context.watch<MtReturnProvider>();
+    final auth = context.watch<AuthProvider>();
     final lots = provider.availableLots;
+
+    final isSegregationStage = widget.state != null &&
+        widget.state!.toLowerCase() != 'kao' &&
+        widget.state!.toLowerCase() != 'dm';
+
+    final showNonSaleable = (isSaleable && isSegregationStage && auth.canDo(AppAction.mtReturnsSegregateSaleable)) ||
+        isNonSaleable ||
+        (isQuality && isSegregationStage && auth.canDo(AppAction.mtReturnsSegregateQuality));
+    final showQuality = (isNonSaleable && isSegregationStage && auth.canDo(AppAction.mtReturnsSegregateNonSaleable)) ||
+        isQuality;
 
     return Container(
       constraints: BoxConstraints(
@@ -392,73 +432,149 @@ class _MtReturnLineEditSheetState extends State<MtReturnLineEditSheet> {
 
                       // Quantities
                       if (isSaleable) ...[
-                        Row(
-                          children: [
-                            Expanded(
-                              child: TextField(
-                                controller: entry.saleableCtrl,
-                                keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                                decoration: InputDecoration(
-                                  labelText: 'Saleable Qty',
-                                  suffixText: widget.line.uomName,
-                                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                                  filled: true,
-                                  fillColor: Colors.white,
-                                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                        if (showNonSaleable)
+                          Row(
+                            children: [
+                              Expanded(
+                                child: TextField(
+                                  controller: entry.saleableCtrl,
+                                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                                  decoration: InputDecoration(
+                                    labelText: 'Saleable Qty',
+                                    suffixText: widget.line.uomName,
+                                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                                    filled: true,
+                                    fillColor: Colors.white,
+                                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                                  ),
                                 ),
                               ),
-                            ),
-                            const SizedBox(width: 10),
-                            Expanded(
-                              child: TextField(
-                                controller: entry.nonSaleableCtrl,
-                                keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                                decoration: InputDecoration(
-                                  labelText: 'Non-Saleable Qty',
-                                  suffixText: widget.line.uomName,
-                                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                                  filled: true,
-                                  fillColor: Colors.white,
-                                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: TextField(
+                                  controller: entry.nonSaleableCtrl,
+                                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                                  decoration: InputDecoration(
+                                    labelText: 'Non-Saleable (Segregation)',
+                                    suffixText: widget.line.uomName,
+                                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                                    filled: true,
+                                    fillColor: Colors.white,
+                                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                                  ),
                                 ),
                               ),
+                            ],
+                          )
+                        else
+                          TextField(
+                            controller: entry.saleableCtrl,
+                            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                            decoration: InputDecoration(
+                              labelText: 'Saleable Qty',
+                              suffixText: widget.line.uomName,
+                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                              filled: true,
+                              fillColor: Colors.white,
+                              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                             ),
-                          ],
-                        ),
+                          ),
+                      ] else if (isQuality) ...[
+                        if (showNonSaleable)
+                          Row(
+                            children: [
+                              Expanded(
+                                child: TextField(
+                                  controller: entry.qualityCtrl,
+                                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                                  decoration: InputDecoration(
+                                    labelText: 'Quality Qty',
+                                    suffixText: widget.line.uomName,
+                                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                                    filled: true,
+                                    fillColor: Colors.white,
+                                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: TextField(
+                                  controller: entry.nonSaleableCtrl,
+                                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                                  decoration: InputDecoration(
+                                    labelText: 'Non-Saleable (Segregation)',
+                                    suffixText: widget.line.uomName,
+                                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                                    filled: true,
+                                    fillColor: Colors.white,
+                                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          )
+                        else
+                          TextField(
+                            controller: entry.qualityCtrl,
+                            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                            decoration: InputDecoration(
+                              labelText: 'Quality Defect Qty',
+                              suffixText: widget.line.uomName,
+                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                              filled: true,
+                              fillColor: Colors.white,
+                              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                            ),
+                          ),
                       ] else ...[
-                        Row(
-                          children: [
-                            Expanded(
-                              child: TextField(
-                                controller: entry.nonSaleableCtrl,
-                                keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                                decoration: InputDecoration(
-                                  labelText: 'Non-Saleable Qty',
-                                  suffixText: widget.line.uomName,
-                                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                                  filled: true,
-                                  fillColor: Colors.white,
-                                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                        if (showQuality)
+                          Row(
+                            children: [
+                              Expanded(
+                                child: TextField(
+                                  controller: entry.nonSaleableCtrl,
+                                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                                  decoration: InputDecoration(
+                                    labelText: 'Non-Saleable Qty',
+                                    suffixText: widget.line.uomName,
+                                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                                    filled: true,
+                                    fillColor: Colors.white,
+                                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                                  ),
                                 ),
                               ),
-                            ),
-                            const SizedBox(width: 10),
-                            Expanded(
-                              child: TextField(
-                                controller: entry.qualityCtrl,
-                                keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                                decoration: InputDecoration(
-                                  labelText: 'Quality Qty',
-                                  suffixText: widget.line.uomName,
-                                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                                  filled: true,
-                                  fillColor: Colors.white,
-                                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: TextField(
+                                  controller: entry.qualityCtrl,
+                                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                                  decoration: InputDecoration(
+                                    labelText: 'Quality (Segregation)',
+                                    suffixText: widget.line.uomName,
+                                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                                    filled: true,
+                                    fillColor: Colors.white,
+                                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                                  ),
                                 ),
                               ),
+                            ],
+                          )
+                        else
+                          TextField(
+                            controller: entry.nonSaleableCtrl,
+                            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                            decoration: InputDecoration(
+                              labelText: 'Non-Saleable Qty',
+                              suffixText: widget.line.uomName,
+                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                              filled: true,
+                              fillColor: Colors.white,
+                              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                             ),
-                          ],
-                        ),
+                          ),
                       ],
                     ],
                   ),

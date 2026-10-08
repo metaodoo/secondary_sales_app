@@ -280,6 +280,12 @@ class AppAction {
   static const mtReturnsSubmitSalesOperation =
       'action.modern_trade.returns.submit_sales_operation';
   static const mtReturnsConfirm = 'action.modern_trade.returns.confirm';
+  static const mtReturnsSegregateSaleable =
+      'action.modern_trade.returns.segregate_saleable';
+  static const mtReturnsSegregateNonSaleable =
+      'action.modern_trade.returns.segregate_non_saleable';
+  static const mtReturnsSegregateQuality =
+      'action.modern_trade.returns.segregate_quality';
 
   // Modern Trade (MT - Secondary) actions.
   static const mtSecStockAuditCreate = 'action.mt_secondary.stock_audit.create';
@@ -1520,6 +1526,27 @@ const List<AccessResource> accessCatalog = [
     'action',
     'modern_trade',
     'Modern Trade › Returns › Confirm (button)',
+    _mt,
+  ),
+  AccessResource(
+    AppAction.mtReturnsSegregateSaleable,
+    'action',
+    'modern_trade',
+    'Modern Trade › Returns › Segregate Saleable (show non-saleable field)',
+    _mt,
+  ),
+  AccessResource(
+    AppAction.mtReturnsSegregateNonSaleable,
+    'action',
+    'modern_trade',
+    'Modern Trade › Returns › Segregate Non-Saleable (show quality field)',
+    _mt,
+  ),
+  AccessResource(
+    AppAction.mtReturnsSegregateQuality,
+    'action',
+    'modern_trade',
+    'Modern Trade › Returns › Segregate Quality (show non-saleable field)',
     _mt,
   ),
 

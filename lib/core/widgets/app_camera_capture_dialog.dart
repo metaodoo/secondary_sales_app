@@ -395,8 +395,10 @@ class _AppCameraCaptureDialogState extends State<AppCameraCaptureDialog>
                 style: GoogleFonts.inter(color: Colors.white, fontSize: 14),
               ),
               const SizedBox(height: 16),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
+              Wrap(
+                spacing: 12,
+                runSpacing: 8,
+                alignment: WrapAlignment.center,
                 children: [
                   OutlinedButton.icon(
                     style: OutlinedButton.styleFrom(
@@ -407,7 +409,6 @@ class _AppCameraCaptureDialogState extends State<AppCameraCaptureDialog>
                     icon: const Icon(Icons.refresh_rounded, size: 18),
                     label: const Text('Retry'),
                   ),
-                  const SizedBox(width: 12),
                   FilledButton.icon(
                     style: FilledButton.styleFrom(backgroundColor: AppColors.primary),
                     onPressed: _fallbackToSystemCamera,

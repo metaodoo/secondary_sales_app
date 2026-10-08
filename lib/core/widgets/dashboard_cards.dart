@@ -187,16 +187,20 @@ class SalesOrderCard extends StatelessWidget {
                   const SizedBox(height: 12),
                 ],
                 Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text(
-                      order.name,
-                      style: const TextStyle(
-                        color: AppColors.textSecondary,
-                        fontSize: 15,
-                        fontWeight: FontWeight.w500,
+                    Expanded(
+                      child: Text(
+                        order.name,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: AppColors.textSecondary,
+                          fontSize: 15,
+                          fontWeight: FontWeight.w500,
+                        ),
                       ),
                     ),
+                    const SizedBox(width: 8),
                     Text(
                       '${order.currencySymbol}${order.amount.toStringAsFixed(2)}',
                       style: const TextStyle(
@@ -205,6 +209,7 @@ class SalesOrderCard extends StatelessWidget {
                         fontSize: 16,
                       ),
                     ),
+                    const SizedBox(width: 8),
                     Container(
                       padding: const EdgeInsets.symmetric(
                         horizontal: 10,

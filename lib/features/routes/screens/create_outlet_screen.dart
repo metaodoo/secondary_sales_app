@@ -674,19 +674,23 @@ class _CreateOutletScreenState extends State<CreateOutletScreen> {
                                                 size: 16,
                                               ),
                                               const SizedBox(width: 4),
-                                              Text(
-                                                _isResolvingAddress && _capturedLatitude == null
-                                                    ? 'Locking shop GPS coordinates…'
-                                                    : _capturedLatitude != null &&
-                                                            _capturedLongitude !=
-                                                                null
-                                                        ? 'Lat: ${_capturedLatitude!.toStringAsFixed(6)}, Lon: ${_capturedLongitude!.toStringAsFixed(6)}${_capturedAccuracy != null ? ' (±${_capturedAccuracy!.round()}m)' : ''}'
-                                                        : (_locationError ??
-                                                              'Location not captured'),
-                                                style: const TextStyle(
-                                                  color: Colors.white,
-                                                  fontWeight: FontWeight.bold,
-                                                  fontSize: 12,
+                                              Expanded(
+                                                child: Text(
+                                                  _isResolvingAddress && _capturedLatitude == null
+                                                      ? 'Locking shop GPS coordinates…'
+                                                      : _capturedLatitude != null &&
+                                                              _capturedLongitude !=
+                                                                  null
+                                                          ? 'Lat: ${_capturedLatitude!.toStringAsFixed(6)}, Lon: ${_capturedLongitude!.toStringAsFixed(6)}${_capturedAccuracy != null ? ' (±${_capturedAccuracy!.round()}m)' : ''}'
+                                                          : (_locationError ??
+                                                                'Location not captured'),
+                                                  maxLines: 1,
+                                                  overflow: TextOverflow.ellipsis,
+                                                  style: const TextStyle(
+                                                    color: Colors.white,
+                                                    fontWeight: FontWeight.bold,
+                                                    fontSize: 12,
+                                                  ),
                                                 ),
                                               ),
                                             ],

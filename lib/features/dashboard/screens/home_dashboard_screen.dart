@@ -1544,56 +1544,66 @@ class _ModulesGrid extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (items.isEmpty) return const SizedBox.shrink();
-    return GridView.count(
-      crossAxisCount: 2,
-      crossAxisSpacing: 14,
-      mainAxisSpacing: 14,
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      childAspectRatio: 1.4,
-      children: items
-          .map(
-            (item) => Container(
-              decoration: ssPanelDecoration(),
-              child: Material(
-                color: Colors.transparent,
-                child: InkWell(
-                  onTap: item.onTap,
-                  borderRadius: BorderRadius.circular(AppRadii.large),
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Row(
-                      children: [
-                        Container(
-                          width: 48,
-                          height: 48,
-                          decoration: BoxDecoration(
-                            color: item.color.withValues(alpha: 0.12),
-                            shape: BoxShape.circle,
-                          ),
-                          child: Icon(item.icon, color: item.color, size: 26),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isNarrow = constraints.maxWidth < 350;
+        final textScale = MediaQuery.textScalerOf(context).scale(1);
+        final aspectRatio = isNarrow || textScale > 1.1 ? 1.2 : 1.35;
+        return GridView.count(
+          crossAxisCount: 2,
+          crossAxisSpacing: isNarrow ? 10 : 14,
+          mainAxisSpacing: isNarrow ? 10 : 14,
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          childAspectRatio: aspectRatio,
+          children: items
+              .map(
+                (item) => Container(
+                  decoration: ssPanelDecoration(),
+                  child: Material(
+                    color: Colors.transparent,
+                    child: InkWell(
+                      onTap: item.onTap,
+                      borderRadius: BorderRadius.circular(AppRadii.large),
+                      child: Padding(
+                        padding: EdgeInsets.symmetric(
+                          horizontal: isNarrow ? 10 : 14,
+                          vertical: isNarrow ? 10 : 14,
                         ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Text(
-                            item.title,
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              color: AppColors.textPrimary,
-                              fontWeight: FontWeight.w700,
-                              fontSize: 15,
+                        child: Row(
+                          children: [
+                            Container(
+                              width: isNarrow ? 40 : 46,
+                              height: isNarrow ? 40 : 46,
+                              decoration: BoxDecoration(
+                                color: item.color.withValues(alpha: 0.12),
+                                shape: BoxShape.circle,
+                              ),
+                              child: Icon(item.icon, color: item.color, size: isNarrow ? 22 : 24),
                             ),
-                          ),
+                            SizedBox(width: isNarrow ? 8 : 10),
+                            Expanded(
+                              child: Text(
+                                item.title,
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  color: AppColors.textPrimary,
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: isNarrow ? 13 : 14,
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
-                      ],
+                      ),
                     ),
                   ),
                 ),
-              ),
-            ),
-          )
-          .toList(growable: false),
+              )
+              .toList(growable: false),
+        );
+      },
     );
   }
 }

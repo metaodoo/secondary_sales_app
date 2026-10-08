@@ -991,35 +991,73 @@ class ProductSelectionCard extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.all(14),
             child: (businessType == 'gt' && saleType == 'secondary')
-                ? Row(
-                    children: [
-                      Expanded(
-                        child: _QtyStepper(
-                          label: 'Order Qty',
-                          value: orderQty,
-                          accentColor: AppColors.primary,
-                          onChanged: (val) => onQuantityChanged(val, damagedQty, qualityQty),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: _QtyStepper(
-                          label: 'Damaged Expired',
-                          value: damagedQty,
-                          accentColor: Colors.orange.shade800,
-                          onChanged: (val) => onQuantityChanged(orderQty, val, qualityQty),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: _QtyStepper(
-                          label: 'Damage Quality',
-                          value: qualityQty,
-                          accentColor: Colors.red.shade700,
-                          onChanged: (val) => onQuantityChanged(orderQty, damagedQty, val),
-                        ),
-                      ),
-                    ],
+                ? LayoutBuilder(
+                    builder: (context, constraints) {
+                      if (constraints.maxWidth < 340) {
+                        return Column(
+                          children: [
+                            _QtyStepper(
+                              label: 'Order Qty',
+                              value: orderQty,
+                              accentColor: AppColors.primary,
+                              onChanged: (val) => onQuantityChanged(val, damagedQty, qualityQty),
+                            ),
+                            const SizedBox(height: 8),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: _QtyStepper(
+                                    label: 'Damaged Expired',
+                                    value: damagedQty,
+                                    accentColor: Colors.orange.shade800,
+                                    onChanged: (val) => onQuantityChanged(orderQty, val, qualityQty),
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: _QtyStepper(
+                                    label: 'Damage Quality',
+                                    value: qualityQty,
+                                    accentColor: Colors.red.shade700,
+                                    onChanged: (val) => onQuantityChanged(orderQty, damagedQty, val),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        );
+                      }
+                      return Row(
+                        children: [
+                          Expanded(
+                            child: _QtyStepper(
+                              label: 'Order Qty',
+                              value: orderQty,
+                              accentColor: AppColors.primary,
+                              onChanged: (val) => onQuantityChanged(val, damagedQty, qualityQty),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: _QtyStepper(
+                              label: 'Damaged Expired',
+                              value: damagedQty,
+                              accentColor: Colors.orange.shade800,
+                              onChanged: (val) => onQuantityChanged(orderQty, val, qualityQty),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: _QtyStepper(
+                              label: 'Damage Quality',
+                              value: qualityQty,
+                              accentColor: Colors.red.shade700,
+                              onChanged: (val) => onQuantityChanged(orderQty, damagedQty, val),
+                            ),
+                          ),
+                        ],
+                      );
+                    },
                   )
                 : Row(
                     children: [

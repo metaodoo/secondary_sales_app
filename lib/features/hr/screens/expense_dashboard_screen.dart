@@ -560,39 +560,42 @@ class _ExpenseDashboardContentState extends State<_ExpenseDashboardContent> with
             if (isApprovalList && item['can_approve'] == true) ...[
               const SizedBox(height: 12),
               Row(
-                mainAxisAlignment: MainAxisAlignment.end,
                 children: [
-                  OutlinedButton.icon(
-                    style: OutlinedButton.styleFrom(
-                      side: const BorderSide(color: Colors.red),
-                      foregroundColor: Colors.red,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      style: OutlinedButton.styleFrom(
+                        side: const BorderSide(color: Colors.red),
+                        foregroundColor: Colors.red,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      ),
+                      icon: const Icon(Icons.close, size: 16),
+                      label: const Text('Reject', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                      onPressed: () => _showRefuseDialog(context, provider, sheetId),
                     ),
-                    icon: const Icon(Icons.close, size: 16),
-                    label: const Text('Reject', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
-                    onPressed: () => _showRefuseDialog(context, provider, sheetId),
                   ),
                   const SizedBox(width: 8),
-                  ElevatedButton.icon(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.green,
-                      foregroundColor: Colors.white,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.green,
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      ),
+                      icon: const Icon(Icons.check, size: 16),
+                      label: const Text('Approve', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                      onPressed: () async {
+                        final success = await provider.approveSheet(sheetId);
+                        if (success && context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Expense report approved successfully.')),
+                          );
+                        } else if (context.mounted && provider.actionError != null) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text(provider.actionError!)),
+                          );
+                        }
+                      },
                     ),
-                    icon: const Icon(Icons.check, size: 16),
-                    label: const Text('Approve', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
-                    onPressed: () async {
-                      final success = await provider.approveSheet(sheetId);
-                      if (success && context.mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Expense report approved successfully.')),
-                        );
-                      } else if (context.mounted && provider.actionError != null) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text(provider.actionError!)),
-                        );
-                      }
-                    },
                   ),
                 ],
               ),
