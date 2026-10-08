@@ -15,7 +15,7 @@ class OfflineDatabaseHelper {
   static final OfflineDatabaseHelper instance = OfflineDatabaseHelper._();
 
   static const String _dbName = 'offline_store.db';
-  static const int _dbVersion = 3;
+  static const int _dbVersion = 4;
 
   static const String tableOutbox = 'outbox_operations';
   static const String tableMasterCache = 'cached_master_data';
@@ -28,6 +28,11 @@ class OfflineDatabaseHelper {
   static const String tableDistributorStocks = 'local_distributor_stocks';
   static const String tableVans = 'local_vans';
   static const String tableReferenceMetadata = 'local_reference_metadata';
+
+  // Caching & Domain Alignment Tables (v4 - MF-40, MF-52, MF-56, MF-57)
+  static const String tableSecondaryOrdersCache = 'local_secondary_orders_cache';
+  static const String tableMtSessionAudits = 'local_mt_session_stock_audits';
+  static const String tableMtJourneyPlans = 'local_mt_journey_plans';
 
   Database? _db;
   final Uuid _uuidGenerator = const Uuid();
@@ -97,9 +102,10 @@ class OfflineDatabaseHelper {
           'CREATE INDEX idx_cache_type ON $tableMasterCache(entity_type);',
         );
 
-        // 3. Relational Master Tables (v2 & v3)
+        // 3. Relational Master Tables (v2, v3, & v4)
         await _createV2Tables(db);
         await _upgradeToV3(db);
+        await _upgradeToV4(db);
       },
       onUpgrade: (db, oldVersion, newVersion) async {
         if (oldVersion < 2) {
@@ -107,6 +113,9 @@ class OfflineDatabaseHelper {
         }
         if (oldVersion < 3) {
           await _upgradeToV3(db);
+        }
+        if (oldVersion < 4) {
+          await _upgradeToV4(db);
         }
       },
     );
@@ -808,6 +817,77 @@ class OfflineDatabaseHelper {
     } catch (_) {}
   }
 
+  Future<void> _upgradeToV4(Database db) async {
+    // 1. Secondary Orders 30-Day Cache (MF-40)
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS $tableSecondaryOrdersCache (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        server_id INTEGER,
+        client_order_uuid TEXT UNIQUE,
+        name TEXT NOT NULL,
+        partner_id INTEGER NOT NULL,
+        partner_name TEXT,
+        distributor_id INTEGER,
+        date_order TEXT NOT NULL,
+        amount_total REAL NOT NULL DEFAULT 0.0,
+        state TEXT NOT NULL DEFAULT 'draft',
+        sync_status TEXT NOT NULL DEFAULT 'SYNCED',
+        sale_type TEXT DEFAULT 'secondary',
+        business_type TEXT DEFAULT 'gt',
+        lines_json TEXT,
+        created_at TEXT NOT NULL
+      );
+    ''');
+    await db.execute('CREATE INDEX IF NOT EXISTS idx_sec_orders_partner ON $tableSecondaryOrdersCache(partner_id);');
+    await db.execute('CREATE INDEX IF NOT EXISTS idx_sec_orders_date ON $tableSecondaryOrdersCache(date_order);');
+    await db.execute('CREATE INDEX IF NOT EXISTS idx_sec_orders_dist ON $tableSecondaryOrdersCache(distributor_id);');
+    await db.execute('CREATE INDEX IF NOT EXISTS idx_sec_orders_status ON $tableSecondaryOrdersCache(sync_status);');
+
+    // 2. MT Stock Audits Session Cache (MF-56, MF-57)
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS $tableMtSessionAudits (
+        id TEXT PRIMARY KEY,
+        outlet_id INTEGER NOT NULL,
+        outlet_name TEXT,
+        type TEXT NOT NULL DEFAULT 'opening_stock',
+        type_label TEXT,
+        state TEXT NOT NULL DEFAULT 'draft',
+        date TEXT NOT NULL,
+        visit_id INTEGER,
+        notes TEXT,
+        total_lines INTEGER DEFAULT 0,
+        total_stock_count REAL DEFAULT 0.0,
+        lines_json TEXT,
+        created_at TEXT NOT NULL,
+        is_synced INTEGER NOT NULL DEFAULT 0
+      );
+    ''');
+    await db.execute('CREATE INDEX IF NOT EXISTS idx_mt_audit_outlet ON $tableMtSessionAudits(outlet_id);');
+    await db.execute('CREATE INDEX IF NOT EXISTS idx_mt_audit_created ON $tableMtSessionAudits(created_at);');
+
+    // 3. MT Journey Plans & Outlets (MF-52)
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS $tableMtJourneyPlans (
+        outlet_id INTEGER PRIMARY KEY,
+        name TEXT NOT NULL,
+        ss_code TEXT,
+        owner_name TEXT,
+        phone TEXT,
+        street TEXT,
+        latitude REAL,
+        longitude REAL,
+        radius_meters REAL DEFAULT 150.0,
+        pjp_id INTEGER,
+        planned_date TEXT,
+        sequence INTEGER DEFAULT 10,
+        requires_justification INTEGER DEFAULT 0,
+        raw_json TEXT,
+        updated_at TEXT NOT NULL
+      );
+    ''');
+    await db.execute('CREATE INDEX IF NOT EXISTS idx_mt_jp_pjp ON $tableMtJourneyPlans(pjp_id);');
+  }
+
   /// Runs an atomic batch transaction across SQLite tables.
   Future<T> runInTransaction<T>(Future<T> Function(Transaction txn) action) async {
     final db = await database;
@@ -1308,5 +1388,392 @@ class OfflineDatabaseHelper {
     final dataStr = rows.first['data_json'] as String?;
     if (dataStr == null || dataStr.isEmpty) return null;
     return jsonDecode(dataStr);
+  }
+
+  // ---------------------------------------------------------------------------
+  // SECONDARY ORDERS 30-DAY CACHE (MF-40)
+  // ---------------------------------------------------------------------------
+
+  Future<void> saveCachedSecondaryOrders(
+    List<Map<String, dynamic>> orders, {
+    Transaction? txn,
+  }) async {
+    final executor = txn ?? await database;
+    final nowIso = DateTime.now().toUtc().toIso8601String();
+
+    for (final o in orders) {
+      final sId = o['id'] is int ? o['id'] as int : int.tryParse(o['id']?.toString() ?? '') ?? 0;
+      if (sId <= 0 && o['name'] == null) continue;
+
+      final hub = o['distributor'] ?? o['customer'];
+      final partnerId = hub is Map
+          ? (hub['id'] is int ? hub['id'] as int : int.tryParse(hub['id']?.toString() ?? '') ?? 0)
+          : (o['partner_id'] is int ? o['partner_id'] as int : int.tryParse(o['partner_id']?.toString() ?? '') ?? 0);
+      final partnerName = hub is Map ? (hub['name']?.toString() ?? '') : (o['partner_name']?.toString() ?? '');
+      final distId = o['distributor_id'] is int ? o['distributor_id'] as int : int.tryParse(o['distributor_id']?.toString() ?? '') ?? 0;
+      final dateOrder = o['date_order']?.toString() ?? nowIso;
+      final amountTotal = (o['amount_total'] as num?)?.toDouble() ?? (o['amount'] as num?)?.toDouble() ?? 0.0;
+      final state = o['state']?.toString() ?? 'draft';
+      final saleType = o['sale_type']?.toString() ?? 'secondary';
+      final businessType = o['business_type']?.toString() ?? 'gt';
+      final linesJson = o['lines'] != null ? jsonEncode(o['lines']) : (o['lines_json']?.toString());
+      final uuid = o['client_order_uuid']?.toString() ?? o['client_uuid']?.toString();
+
+      await executor.insert(
+        tableSecondaryOrdersCache,
+        {
+          if (sId > 0) 'server_id': sId,
+          'client_order_uuid': uuid,
+          'name': o['name']?.toString() ?? 'SO-$sId',
+          'partner_id': partnerId,
+          'partner_name': partnerName,
+          'distributor_id': distId,
+          'date_order': dateOrder,
+          'amount_total': amountTotal,
+          'state': state,
+          'sync_status': 'SYNCED',
+          'sale_type': saleType,
+          'business_type': businessType,
+          'lines_json': linesJson,
+          'created_at': nowIso,
+        },
+        conflictAlgorithm: ConflictAlgorithm.replace,
+      );
+    }
+  }
+
+  Future<void> saveOptimisticSecondaryOrder({
+    required String clientOrderUuid,
+    required int outletId,
+    required String outletName,
+    required int distributorId,
+    required double amountTotal,
+    required List<dynamic> lines,
+    String saleType = 'secondary',
+    String businessType = 'gt',
+  }) async {
+    final db = await database;
+    final nowIso = DateTime.now().toUtc().toIso8601String();
+    final nowEpoch = DateTime.now().millisecondsSinceEpoch;
+
+    await db.insert(
+      tableSecondaryOrdersCache,
+      {
+        'server_id': null,
+        'client_order_uuid': clientOrderUuid,
+        'name': 'OFF-$nowEpoch',
+        'partner_id': outletId,
+        'partner_name': outletName,
+        'distributor_id': distributorId,
+        'date_order': nowIso,
+        'amount_total': amountTotal,
+        'state': 'draft',
+        'sync_status': 'PENDING',
+        'sale_type': saleType,
+        'business_type': businessType,
+        'lines_json': jsonEncode(lines),
+        'created_at': nowIso,
+      },
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+  }
+
+  Future<List<Map<String, dynamic>>> getCachedSecondaryOrders({
+    int? outletId,
+    int? distributorId,
+    String? search,
+    String? status,
+    DateTime? dateFrom,
+    DateTime? dateTo,
+    String? saleType,
+    String? businessType,
+    int limit = 50,
+    int offset = 0,
+  }) async {
+    final db = await database;
+    final whereClauses = <String>[];
+    final whereArgs = <dynamic>[];
+
+    if (outletId != null && outletId > 0) {
+      whereClauses.add('partner_id = ?');
+      whereArgs.add(outletId);
+    }
+    if (distributorId != null && distributorId > 0) {
+      whereClauses.add('distributor_id = ?');
+      whereArgs.add(distributorId);
+    }
+    if (saleType != null && saleType.isNotEmpty) {
+      whereClauses.add('sale_type = ?');
+      whereArgs.add(saleType);
+    }
+    if (businessType != null && businessType.isNotEmpty) {
+      whereClauses.add('business_type = ?');
+      whereArgs.add(businessType);
+    }
+    if (status != null && status.isNotEmpty && status != 'all') {
+      whereClauses.add('state = ?');
+      whereArgs.add(status);
+    }
+    if (search != null && search.trim().isNotEmpty) {
+      whereClauses.add('(name LIKE ? OR partner_name LIKE ?)');
+      whereArgs.add('%${search.trim()}%');
+      whereArgs.add('%${search.trim()}%');
+    }
+    if (dateFrom != null) {
+      whereClauses.add('date_order >= ?');
+      whereArgs.add(dateFrom.toIso8601String().split('T').first);
+    }
+    if (dateTo != null) {
+      whereClauses.add('date_order <= ?');
+      whereArgs.add('${dateTo.toIso8601String().split('T').first}T23:59:59');
+    }
+
+    final whereStr = whereClauses.isNotEmpty ? whereClauses.join(' AND ') : null;
+
+    final rows = await db.query(
+      tableSecondaryOrdersCache,
+      where: whereStr,
+      whereArgs: whereArgs.isNotEmpty ? whereArgs : null,
+      orderBy: 'date_order DESC, id DESC',
+      limit: limit,
+      offset: offset,
+    );
+
+    return rows.map((r) {
+      List<dynamic> lines = [];
+      if (r['lines_json'] != null) {
+        try {
+          lines = jsonDecode(r['lines_json'] as String) as List<dynamic>;
+        } catch (_) {}
+      }
+      return {
+        'id': r['server_id'] ?? r['id'],
+        'name': r['name'],
+        'date_order': r['date_order'],
+        'partner_id': r['partner_id'],
+        'partner_name': r['partner_name'],
+        'customer': {'id': r['partner_id'], 'name': r['partner_name'] ?? ''},
+        'distributor_id': r['distributor_id'],
+        'amount_total': r['amount_total'],
+        'state': r['state'],
+        'sync_status': r['sync_status'],
+        'sale_type': r['sale_type'],
+        'business_type': r['business_type'],
+        'lines': lines,
+        'line_count': lines.length,
+        'delivery_status': 'no',
+        'currency_symbol': '৳',
+      };
+    }).toList();
+  }
+
+  /// Strict 30-day rolling window: Purges any synced orders older than 30 days
+  /// to protect device storage and keep SQLite index scans under 2ms.
+  Future<int> pruneSecondaryOrdersOlderThan30Days() async {
+    final db = await database;
+    final count = await db.rawDelete('''
+      DELETE FROM $tableSecondaryOrdersCache
+      WHERE date_order < datetime('now', '-30 days')
+      AND sync_status = 'SYNCED'
+    ''');
+    if (count > 0) {
+      debugPrint('[OfflineDB] Pruned $count historical orders older than 30 days.');
+    }
+    return count;
+  }
+
+  // ---------------------------------------------------------------------------
+  // MT STOCK AUDITS SESSION CACHE (MF-56, MF-57)
+  // ---------------------------------------------------------------------------
+
+  Future<void> saveMtSessionStockAudit(Map<String, dynamic> audit) async {
+    final db = await database;
+    final nowIso = DateTime.now().toUtc().toIso8601String();
+    final auditId = audit['id']?.toString() ?? audit['client_uuid']?.toString() ?? const Uuid().v4();
+    final outletId = audit['outlet_id'] is int ? audit['outlet_id'] as int : int.tryParse(audit['outlet_id']?.toString() ?? '') ?? 0;
+    final lines = audit['lines'] as List? ?? [];
+
+    await db.insert(
+      tableMtSessionAudits,
+      {
+        'id': auditId,
+        'outlet_id': outletId,
+        'outlet_name': audit['outlet_name'] ?? audit['outlet']?['name'] ?? '',
+        'type': audit['type'] ?? 'opening_stock',
+        'type_label': audit['type_label'] ?? audit['type'] ?? '',
+        'state': audit['state'] ?? 'draft',
+        'date': audit['date'] ?? audit['audit_date'] ?? nowIso,
+        'visit_id': audit['visit_id'] is int ? audit['visit_id'] as int : int.tryParse(audit['visit_id']?.toString() ?? ''),
+        'notes': audit['notes'] ?? audit['remarks'] ?? '',
+        'total_lines': lines.length,
+        'total_stock_count': (audit['total_stock_count'] as num?)?.toDouble() ?? 0.0,
+        'lines_json': jsonEncode(lines),
+        'created_at': nowIso,
+        'is_synced': audit['is_synced'] == 1 ? 1 : 0,
+      },
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+  }
+
+  Future<List<Map<String, dynamic>>> getMtSessionStockAudits({
+    int? outletId,
+    String? type,
+    String? state,
+    String? search,
+  }) async {
+    final db = await database;
+    final whereClauses = <String>[];
+    final whereArgs = <dynamic>[];
+
+    if (outletId != null && outletId > 0) {
+      whereClauses.add('outlet_id = ?');
+      whereArgs.add(outletId);
+    }
+    if (type != null && type.isNotEmpty && type != 'all') {
+      whereClauses.add('type = ?');
+      whereArgs.add(type);
+    }
+    if (state != null && state.isNotEmpty && state != 'all') {
+      whereClauses.add('state = ?');
+      whereArgs.add(state);
+    }
+    if (search != null && search.trim().isNotEmpty) {
+      whereClauses.add('(outlet_name LIKE ? OR notes LIKE ?)');
+      whereArgs.add('%${search.trim()}%');
+      whereArgs.add('%${search.trim()}%');
+    }
+
+    final whereStr = whereClauses.isNotEmpty ? whereClauses.join(' AND ') : null;
+
+    final rows = await db.query(
+      tableMtSessionAudits,
+      where: whereStr,
+      whereArgs: whereArgs.isNotEmpty ? whereArgs : null,
+      orderBy: 'created_at DESC',
+    );
+
+    return rows.map((r) {
+      List<dynamic> lines = [];
+      if (r['lines_json'] != null) {
+        try {
+          lines = jsonDecode(r['lines_json'] as String) as List<dynamic>;
+        } catch (_) {}
+      }
+      return {
+        'id': int.tryParse(r['id'] as String) ?? (r['id'].hashCode.abs() % 1000000),
+        'name': 'AUDIT-${r['id']}',
+        'type': r['type'],
+        'type_label': r['type_label'],
+        'state': r['state'],
+        'date': r['date'],
+        'outlet_id': r['outlet_id'],
+        'outlet': {'id': r['outlet_id'], 'name': r['outlet_name']},
+        'visit_id': r['visit_id'],
+        'notes': r['notes'],
+        'total_lines': r['total_lines'],
+        'total_stock_count': r['total_stock_count'],
+        'lines': lines,
+        'pending_sync': r['is_synced'] == 0,
+      };
+    }).toList();
+  }
+
+  /// Purges session audits older than 24 hours to prevent storage leaks.
+  Future<int> pruneOldMtSessionStockAudits() async {
+    final db = await database;
+    final count = await db.rawDelete('''
+      DELETE FROM $tableMtSessionAudits
+      WHERE created_at < datetime('now', '-24 hours')
+    ''');
+    if (count > 0) {
+      debugPrint('[OfflineDB] Pruned $count session MT stock audits older than 24 hours.');
+    }
+    return count;
+  }
+
+  // ---------------------------------------------------------------------------
+  // MT JOURNEY PLANS & OUTLETS (MF-52)
+  // ---------------------------------------------------------------------------
+
+  Future<void> saveMtJourneyPlans(
+    List<Map<String, dynamic>> outlets, {
+    Transaction? txn,
+  }) async {
+    final executor = txn ?? await database;
+    final nowIso = DateTime.now().toUtc().toIso8601String();
+
+    for (final o in outlets) {
+      final id = o['id'] is int ? o['id'] as int : int.tryParse(o['id']?.toString() ?? '') ?? 0;
+      if (id <= 0) continue;
+
+      await executor.insert(
+        tableMtJourneyPlans,
+        {
+          'outlet_id': id,
+          'name': o['name']?.toString() ?? 'MT Outlet #$id',
+          'ss_code': o['ss_code']?.toString() ?? o['code']?.toString() ?? '',
+          'owner_name': o['owner_name']?.toString() ?? '',
+          'phone': o['phone']?.toString() ?? o['mobile']?.toString() ?? '',
+          'street': o['street']?.toString() ?? '',
+          'latitude': (o['latitude'] as num?)?.toDouble() ?? (o['partner_latitude'] as num?)?.toDouble() ?? 0.0,
+          'longitude': (o['longitude'] as num?)?.toDouble() ?? (o['partner_longitude'] as num?)?.toDouble() ?? 0.0,
+          'radius_meters': (o['radius_meters'] as num?)?.toDouble() ?? (o['outlet_radius'] as num?)?.toDouble() ?? 150.0,
+          'pjp_id': o['pjp_id'] is int ? o['pjp_id'] as int : int.tryParse(o['pjp_id']?.toString() ?? ''),
+          'planned_date': o['planned_date']?.toString(),
+          'sequence': (o['sequence'] as num?)?.toInt() ?? 10,
+          'requires_justification': o['requires_justification'] == true ? 1 : 0,
+          'raw_json': jsonEncode(o),
+          'updated_at': nowIso,
+        },
+        conflictAlgorithm: ConflictAlgorithm.replace,
+      );
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> getMtJourneyPlans({String? searchQuery}) async {
+    final db = await database;
+    final whereClauses = <String>[];
+    final whereArgs = <dynamic>[];
+
+    if (searchQuery != null && searchQuery.trim().isNotEmpty) {
+      whereClauses.add('(name LIKE ? OR ss_code LIKE ? OR street LIKE ?)');
+      whereArgs.add('%${searchQuery.trim()}%');
+      whereArgs.add('%${searchQuery.trim()}%');
+      whereArgs.add('%${searchQuery.trim()}%');
+    }
+
+    final whereStr = whereClauses.isNotEmpty ? whereClauses.join(' AND ') : null;
+
+    final rows = await db.query(
+      tableMtJourneyPlans,
+      where: whereStr,
+      whereArgs: whereArgs.isNotEmpty ? whereArgs : null,
+      orderBy: 'sequence ASC, name ASC',
+    );
+
+    return rows.map((r) {
+      if (r['raw_json'] != null) {
+        try {
+          final decoded = jsonDecode(r['raw_json'] as String) as Map<String, dynamic>;
+          return decoded;
+        } catch (_) {}
+      }
+      return {
+        'id': r['outlet_id'],
+        'name': r['name'],
+        'ss_code': r['ss_code'],
+        'owner_name': r['owner_name'],
+        'phone': r['phone'],
+        'mobile': r['phone'],
+        'street': r['street'],
+        'latitude': r['latitude'],
+        'longitude': r['longitude'],
+        'outlet_radius': r['radius_meters'],
+        'pjp_id': r['pjp_id'],
+        'planned_date': r['planned_date'],
+        'sequence': r['sequence'],
+        'requires_justification': r['requires_justification'] == 1,
+      };
+    }).toList();
   }
 }

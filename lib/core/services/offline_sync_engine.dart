@@ -224,8 +224,13 @@ class OfflineSyncEngine with WidgetsBindingObserver {
         if (respData is Map) {
           final serverId = int.tryParse(respData['id']?.toString() ?? respData['outlet_id']?.toString() ?? '');
           if (serverId != null && serverId > 0) {
-            if (entityType == 'visit') {
-              await _dbHelper.patchChildVisitId(opUuid, serverId);
+            if (entityType == 'visit' || entityType == 'mt_justification') {
+              final visitId = respData['visit'] is Map
+                  ? int.tryParse(respData['visit']['id']?.toString() ?? '')
+                  : int.tryParse(respData['visit_id']?.toString() ?? respData['id']?.toString() ?? '');
+              if (visitId != null && visitId > 0) {
+                await _dbHelper.patchChildVisitId(opUuid, visitId);
+              }
             } else if (entityType == 'outlet') {
               final tempId = payload['_temp_outlet_id'] is int
                   ? payload['_temp_outlet_id'] as int

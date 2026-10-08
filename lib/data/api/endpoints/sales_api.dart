@@ -52,12 +52,39 @@ extension SalesApi on ApiService {
           '${dateTo.year.toString().padLeft(4, '0')}-${dateTo.month.toString().padLeft(2, '0')}-${dateTo.day.toString().padLeft(2, '0')}';
     }
 
-    final result = await _post(AppConstants.saleOrdersEndpoint, params);
-    if (result['success'] == true) {
-      final List<dynamic> data = result['data'] ?? [];
-      return data.map((json) => PrimaryOrder.fromMap(json)).toList();
+    try {
+      final result = await _post(AppConstants.saleOrdersEndpoint, params);
+      if (result['success'] == true) {
+        final List<dynamic> data = result['data'] ?? [];
+        final ordersList = data
+            .map((json) => json is Map<String, dynamic> ? json : Map<String, dynamic>.from(json as Map))
+            .toList();
+
+        // Asynchronously update 30-day rolling cache (MF-40)
+        unawaited(OfflineDatabaseHelper.instance.saveCachedSecondaryOrders(ordersList));
+
+        return ordersList.map((json) => PrimaryOrder.fromMap(json)).toList();
+      }
+      throw Exception(result['message'] ?? 'Failed to load orders');
+    } catch (e) {
+      // Fallback: If network fails or offline, load from local 30-day SQLite cache (MF-40)
+      final cached = await OfflineDatabaseHelper.instance.getCachedSecondaryOrders(
+        outletId: outletId,
+        search: search,
+        status: status,
+        dateFrom: dateFrom,
+        dateTo: dateTo,
+        saleType: saleType,
+        businessType: businessType,
+        limit: pageSize,
+        offset: (page - 1) * pageSize,
+      );
+      if (cached.isNotEmpty) {
+        debugPrint('[SalesApi] Loaded ${cached.length} orders from 30-day offline cache.');
+        return cached.map((m) => PrimaryOrder.fromMap(m)).toList();
+      }
+      rethrow;
     }
-    throw Exception(result['message'] ?? 'Failed to load orders');
   }
 
   Future<SaleOrderDetail> getPrimarySaleOrderDetail(

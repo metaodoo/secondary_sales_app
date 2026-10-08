@@ -1,5 +1,7 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:secondary_sales/core/services/offline_database_helper.dart';
 import 'package:secondary_sales/data/api/api_service.dart';
 import 'package:secondary_sales/data/models/modern_trade/mt_outlet.dart';
 import 'package:secondary_sales/data/models/modern_trade/mt_stock_audit.dart';
@@ -192,6 +194,10 @@ class ModernTradeProvider with ChangeNotifier {
       final list = (res['outlets'] as List? ?? []);
       _outlets = list.map((m) => MtOutlet.fromMap(m is Map<String, dynamic> ? m : Map<String, dynamic>.from(m))).toList();
       
+      // Save to local MT Journey Plans SQLite table (MF-52)
+      final rawList = list.map((m) => m is Map<String, dynamic> ? m : Map<String, dynamic>.from(m as Map)).toList();
+      unawaited(OfflineDatabaseHelper.instance.saveMtJourneyPlans(rawList));
+
       // Update local check-in state if any outlet is active
       final active = _outlets.where((o) => o.isActiveCheckedIn).firstOrNull;
       if (active != null) {
@@ -212,7 +218,15 @@ class ModernTradeProvider with ChangeNotifier {
         _checkInTime = null;
       }
     } catch (e) {
-      _error = e.toString();
+      // Fallback: Load from local SQLite MT Journey Plans cache (MF-52)
+      final cachedList = await OfflineDatabaseHelper.instance.getMtJourneyPlans();
+      if (cachedList.isNotEmpty) {
+        _outlets = cachedList.map((m) => MtOutlet.fromMap(m)).toList();
+        _error = null;
+        debugPrint('[MT Provider] Loaded ${_outlets.length} MT outlets from local journey plans cache.');
+      } else {
+        _error = e.toString();
+      }
     } finally {
       if (_loadingCount > 0) _loadingCount--;
       notifyListeners();
@@ -383,7 +397,26 @@ class ModernTradeProvider with ChangeNotifier {
       }
       _stockAuditsTotal = res.total;
     } catch (e) {
-      _error = e.toString();
+      // Fallback: Query session-scoped offline stock audits (MF-57)
+      final sessionAudits = await OfflineDatabaseHelper.instance.getMtSessionStockAudits(
+        outletId: outletId,
+        type: type,
+        state: state,
+        search: search,
+      );
+      if (sessionAudits.isNotEmpty) {
+        final parsed = sessionAudits.map((m) => MtStockAudit.fromMap(m)).toList();
+        if (page == 1) {
+          _stockAudits = parsed;
+        } else {
+          _stockAudits.addAll(parsed);
+        }
+        _stockAuditsTotal = _stockAudits.length;
+        _error = null;
+        debugPrint('[MT Provider] Loaded ${_stockAudits.length} session stock audits from local cache.');
+      } else {
+        _error = e.toString();
+      }
     } finally {
       if (_loadingCount > 0) _loadingCount--;
       notifyListeners();
@@ -411,12 +444,18 @@ class ModernTradeProvider with ChangeNotifier {
         audits: res.audits,
       );
     } catch (e) {
-      debugPrint('Error checking today audits: $e');
+      // Offline fallback: Check local session audits (MF-57)
+      final sessionAudits = await OfflineDatabaseHelper.instance.getMtSessionStockAudits(outletId: outletId);
+      final audits = sessionAudits.map((m) => MtStockAudit.fromMap(m)).toList();
+      final hasOpening = audits.any((a) => a.type == 'opening_stock');
+      final closingAudit = audits.where((a) => a.type == 'closing_stock').firstOrNull;
+      final hasClosing = closingAudit != null;
+      final isClosingConfirmed = closingAudit?.isConfirmed ?? false;
       return (
-        hasOpening: false,
-        hasClosing: false,
-        isClosingConfirmed: false,
-        audits: <MtStockAudit>[],
+        hasOpening: hasOpening,
+        hasClosing: hasClosing,
+        isClosingConfirmed: isClosingConfirmed,
+        audits: audits,
       );
     }
   }
@@ -554,6 +593,24 @@ class ModernTradeProvider with ChangeNotifier {
         pageSize: pageSize,
       );
     } catch (e) {
+      debugPrint('[MT Provider] Network failed fetching audit products, loading from local SQLite: $e');
+      final local = await OfflineDatabaseHelper.instance.getLocalProducts(
+        categoryId: categoryId,
+        search: search,
+      );
+      if (local.isNotEmpty) {
+        return local.map((m) => MtStockAuditProduct(
+          id: m['id'] is int ? m['id'] as int : int.tryParse(m['id'].toString()) ?? 0,
+          name: m['name'] as String? ?? '',
+          defaultCode: m['default_code'] as String?,
+          tracking: 'none',
+          categoryId: m['category_id'] as int?,
+          categoryName: m['category_name'] as String?,
+          uomId: m['uom_id'] as int?,
+          uomName: m['uom_name'] as String?,
+          qtyAvailable: (m['stock'] as num?)?.toDouble() ?? 0.0,
+        )).toList();
+      }
       _error = e.toString();
       return [];
     }

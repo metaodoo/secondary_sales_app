@@ -258,7 +258,9 @@ class ApiService {
         (path.contains('/ss/routes/') && path.contains('/update')) ||
         path.contains('/outlets/add') ||
         path.contains('/outlets/create') ||
-        (path.contains('/outlets/') && path.contains('/remove'));
+        (path.contains('/outlets/') && path.contains('/remove')) ||
+        path.contains('/mt/justification/create') ||
+        path.contains('/mt/stock-audits/create');
   }
 
   String _resolveEntityType(String path) {
@@ -269,6 +271,8 @@ class ApiService {
     if (path.contains('/scraps')) return 'scrap';
     if (path.contains('/hr/attendance/action')) return 'attendance';
     if (path.contains('/hr/expense/sheet/create')) return 'expense';
+    if (path.contains('/mt/justification/create')) return 'mt_justification';
+    if (path.contains('/mt/stock-audits/create')) return 'mt_stock_audit';
     if (path.contains('/contacts/create') ||
         path.contains('/outlets/add') ||
         path.contains('/outlets/create')) {
@@ -295,7 +299,7 @@ class ApiService {
     }
 
     String? parentUuid = params['visit_uuid']?.toString() ?? params['parent_uuid']?.toString();
-    if (parentUuid == null && (entityType == 'order' || entityType == 'return')) {
+    if (parentUuid == null && (entityType == 'order' || entityType == 'return' || entityType == 'mt_stock_audit')) {
       // Auto-link to currently active offline visit
       parentUuid = await OfflineDatabaseHelper.instance.getActiveVisitUuid();
     }
@@ -335,7 +339,68 @@ class ApiService {
       data['client_order_uuid'] = opUuid;
       data['outlet_id'] = params['outlet_id'] ?? 0;
       data['order_lines'] = params['order_lines'] ?? [];
-      data['amount_total'] = 0.0;
+      
+      double computedTotal = 0.0;
+      final lines = (params['order_lines'] as List?) ?? [];
+      for (final l in lines) {
+        if (l is Map) {
+          final qty = (l['product_uom_qty'] as num?)?.toDouble() ?? (l['quantity'] as num?)?.toDouble() ?? 0.0;
+          final price = (l['price_unit'] as num?)?.toDouble() ?? 0.0;
+          computedTotal += (qty * price);
+        }
+      }
+      data['amount_total'] = computedTotal;
+
+      // Optimistic cache into local 30-day table (MF-40)
+      final outletId = params['outlet_id'] is int ? params['outlet_id'] as int : int.tryParse(params['outlet_id']?.toString() ?? '') ?? 0;
+      final distId = params['distributor_id'] is int ? params['distributor_id'] as int : int.tryParse(params['distributor_id']?.toString() ?? '') ?? 0;
+      unawaited(OfflineDatabaseHelper.instance.saveOptimisticSecondaryOrder(
+        clientOrderUuid: opUuid,
+        outletId: outletId,
+        outletName: params['outlet_name']?.toString() ?? 'Outlet #$outletId',
+        distributorId: distId,
+        amountTotal: computedTotal,
+        lines: lines,
+        saleType: params['sale_type']?.toString() ?? 'secondary',
+        businessType: params['business_type']?.toString() ?? 'gt',
+      ));
+    } else if (entityType == 'mt_justification') {
+      final fakeId = nowEpoch ~/ 1000;
+      final outletId = params['outlet_id'] is int ? params['outlet_id'] as int : int.tryParse(params['outlet_id']?.toString() ?? '') ?? 0;
+      data['id'] = fakeId;
+      data['visit_id'] = fakeId;
+      data['outlet_id'] = outletId;
+      data['justification_type'] = params['justification_type'] ?? 'off_schedule';
+      data['reason'] = params['reason'] ?? '';
+      data['state'] = 'approved';
+      data['message'] = 'Off-schedule justification accepted offline.';
+      data['visit'] = {
+        'id': fakeId,
+        'outlet_id': outletId,
+        'check_in_time': nowIso,
+        'requires_visit_reason': false,
+        'is_active_checked_in': true,
+      };
+    } else if (entityType == 'mt_stock_audit') {
+      final fakeId = nowEpoch ~/ 1000;
+      final outletId = params['outlet_id'] is int ? params['outlet_id'] as int : int.tryParse(params['outlet_id']?.toString() ?? '') ?? 0;
+      final lines = (params['lines'] as List?) ?? [];
+      data['id'] = fakeId;
+      data['name'] = 'AUDIT-OFF-$fakeId';
+      data['type'] = params['type'] ?? 'opening_stock';
+      data['type_label'] = (params['type'] ?? 'opening_stock').toString().replaceAll('_', ' ').toUpperCase();
+      data['state'] = params['confirm'] == true ? 'confirm' : 'draft';
+      data['date'] = params['audit_date'] ?? nowIso;
+      data['outlet_id'] = outletId;
+      data['outlet'] = {'id': outletId};
+      data['visit_id'] = params['visit_id'];
+      data['notes'] = params['notes'] ?? '';
+      data['total_lines'] = lines.length;
+      data['lines'] = lines;
+      data['pending_sync'] = true;
+
+      // Save to local MT session stock audits table (MF-57)
+      unawaited(OfflineDatabaseHelper.instance.saveMtSessionStockAudit(data));
     } else if (entityType == 'attendance') {
       data['action'] = params['action'] ?? 'check_in';
       data['timestamp'] = nowIso;
@@ -432,6 +497,9 @@ class ApiService {
   bool _isCacheableReadEndpoint(String path) {
     if (_isWriteEndpoint(path)) return false;
     return path.contains('/ss/routes') ||
+        path.contains('/mt/outlets') ||
+        path.contains('/mt/stock-audits') ||
+        path.contains('/sale-orders') ||
         (path.contains('/contacts') && !path.contains('/create')) ||
         (path.contains('/products') && !path.contains('/create')) ||
         path.contains('/visit-reasons') ||
@@ -443,6 +511,9 @@ class ApiService {
     final routeDetailMatch = RegExp(r'/ss/routes/(\d+)$').firstMatch(path);
     if (routeDetailMatch != null) return 'route_detail_${routeDetailMatch.group(1)}';
     if (path.contains('/ss/routes')) return 'routes_${params['employee_id'] ?? _employeeId ?? 0}';
+    if (path.contains('/mt/outlets')) return 'mt_outlets_${params['employee_id'] ?? _employeeId ?? 0}';
+    if (path.contains('/mt/stock-audits')) return 'mt_stock_audits_${params['outlet_id'] ?? 0}';
+    if (path.contains('/sale-orders')) return 'sale_orders_${params['outlet_id'] ?? params['employee_id'] ?? 0}';
     if (path.contains('/contacts')) return 'contacts_route_${params['route_id'] ?? 'all'}';
     if (path.contains('/products/categories')) return 'catalog_categories';
     if (path.contains('/products')) return 'catalog_products';
@@ -455,6 +526,9 @@ class ApiService {
   String _resolveCacheType(String path) {
     if (RegExp(r'/ss/routes/\d+').hasMatch(path)) return 'route_detail';
     if (path.contains('/ss/routes')) return 'routes';
+    if (path.contains('/mt/outlets')) return 'mt_outlets';
+    if (path.contains('/mt/stock-audits')) return 'mt_stock_audits';
+    if (path.contains('/sale-orders')) return 'sale_orders';
     if (path.contains('/contacts')) return 'contacts';
     if (path.contains('/products')) return 'products';
     if (path.contains('/visit-reasons')) return 'reasons';

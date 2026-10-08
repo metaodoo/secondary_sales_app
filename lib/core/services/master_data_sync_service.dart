@@ -291,6 +291,38 @@ class MasterDataSyncService with ChangeNotifier {
         debugPrint('[LOGIN-CACHE-HYDRATION] Step 2.6 Failed (${step26Sw.elapsedMilliseconds}ms): $e');
       }
 
+      // Step 2.6b: Fetch MT Outlets / Project Journey Plans (MF-52)
+      List<Map<String, dynamic>> rawMtOutlets = [];
+      try {
+        final mtRes = await _apiService.executeRawPost('/api/v1/mt/outlets', {
+          'employee_id': employeeId,
+        });
+        if (mtRes['success'] == true) {
+          final list = mtRes['outlets'] as List? ?? [];
+          rawMtOutlets = List<Map<String, dynamic>>.from(list);
+          debugPrint('[LOGIN-CACHE-HYDRATION] Step 2.6b Success: Received ${rawMtOutlets.length} MT journey plan outlets.');
+        }
+      } catch (e) {
+        debugPrint('[LOGIN-CACHE-HYDRATION] Step 2.6b MT outlets fetch failed: $e');
+      }
+
+      // Step 2.6c: Fetch 30-day Secondary Orders History (MF-40)
+      List<Map<String, dynamic>> rawPastOrders = [];
+      try {
+        final ordersRes = await _apiService.executeRawPost('/api/v1/sale-orders', {
+          'employee_id': employeeId,
+          'sale_type': 'secondary',
+          'page_size': 50,
+        });
+        if (ordersRes['success'] == true) {
+          final list = ordersRes['data'] as List? ?? [];
+          rawPastOrders = List<Map<String, dynamic>>.from(list);
+          debugPrint('[LOGIN-CACHE-HYDRATION] Step 2.6c Success: Received ${rawPastOrders.length} recent secondary orders.');
+        }
+      } catch (e) {
+        debugPrint('[LOGIN-CACHE-HYDRATION] Step 2.6c Past orders fetch failed: $e');
+      }
+
       // -----------------------------------------------------------------------
       // ATOMIC TRANSACTION WRITE TO SQLITE
       // -----------------------------------------------------------------------
@@ -350,9 +382,21 @@ class MasterDataSyncService with ChangeNotifier {
             txn: txn,
           );
         }
+
+        if (rawMtOutlets.isNotEmpty) {
+          await _dbHelper.saveMtJourneyPlans(rawMtOutlets, txn: txn);
+        }
+
+        if (rawPastOrders.isNotEmpty) {
+          await _dbHelper.saveCachedSecondaryOrders(rawPastOrders, txn: txn);
+        }
       });
       step27Sw.stop();
       debugPrint('[LOGIN-CACHE-HYDRATION] Step 2.7 SQLite Transaction Committed in ${step27Sw.elapsedMilliseconds}ms.');
+
+      // Rolling Cache Pruning (MF-40, MF-57)
+      await _dbHelper.pruneSecondaryOrdersOlderThan30Days();
+      await _dbHelper.pruneOldMtSessionStockAudits();
 
       totalSw.stop();
       _lastSyncedAt = DateTime.now();
