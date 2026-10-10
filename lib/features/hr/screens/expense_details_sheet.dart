@@ -305,6 +305,21 @@ class _ExpenseDetailsSheetState extends State<ExpenseDetailsSheet> {
                                               ),
                                             ],
                                           ),
+                                          if (item['is_personal_vehicle'] == true ||
+                                              (item['total_km_run'] != null && (item['total_km_run'] as num) > 0)) ...[
+                                            const SizedBox(height: 6),
+                                            Container(
+                                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                              decoration: BoxDecoration(
+                                                color: AppColors.primary.withOpacity(0.08),
+                                                borderRadius: BorderRadius.circular(6),
+                                              ),
+                                              child: Text(
+                                                'Odometer: ${(item['odometer_day_start'] as num?)?.toDouble().toStringAsFixed(1) ?? '0.0'} → ${(item['odometer_day_end'] as num?)?.toDouble().toStringAsFixed(1) ?? '0.0'} (${(item['total_km_run'] as num?)?.toDouble().toStringAsFixed(1) ?? '0.0'} km)',
+                                                style: const TextStyle(fontSize: 12, color: AppColors.primary, fontWeight: FontWeight.w600),
+                                              ),
+                                            ),
+                                          ],
                                           if (item['description'] != null && item['description'].toString().isNotEmpty) ...[
                                             const Divider(height: 16),
                                             Text(

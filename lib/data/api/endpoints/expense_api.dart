@@ -1,8 +1,10 @@
 part of '../api_service.dart';
 
 extension ExpenseApi on ApiService {
-  Future<Map<String, dynamic>> getExpenseCategories() async {
-    return _post('/api/v1/hr/expense/categories', {});
+  Future<Map<String, dynamic>> getExpenseCategories([int? employeeId]) async {
+    return _post('/api/v1/hr/expense/categories', {
+      if (employeeId != null) 'employee_id': employeeId,
+    });
   }
 
   Future<Map<String, dynamic>> getExpenseDrafts(int employeeId) async {

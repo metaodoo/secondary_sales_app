@@ -106,12 +106,12 @@ class ExpenseProvider extends ChangeNotifier {
     fetchSheetList(tab: 'pending');
   }
 
-  Future<void> fetchCategories() async {
+  Future<void> fetchCategories({int? employeeId}) async {
     _isLoadingCategories = true;
     notifyListeners();
 
     try {
-      final response = await _apiService.getExpenseCategories();
+      final response = await _apiService.getExpenseCategories(employeeId ?? _employeeId);
       if (response['success'] == true) {
         final List data = response['data'] ?? [];
         _categories = data.map((e) => e as Map<String, dynamic>).toList();

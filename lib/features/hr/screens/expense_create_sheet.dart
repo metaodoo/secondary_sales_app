@@ -61,6 +61,11 @@ class _ExpenseCreateSheetState extends State<ExpenseCreateSheet> {
             'amount': (item['amount'] as num?)?.toDouble() ?? 0.0,
             'date': item['date'] ?? DateTime.now().toString().split(' ')[0],
             'description': item['description'] ?? '',
+            'odometer_day_start': (item['odometer_day_start'] as num?)?.toDouble(),
+            'odometer_day_end': (item['odometer_day_end'] as num?)?.toDouble(),
+            'total_km_run': (item['total_km_run'] as num?)?.toDouble(),
+            'is_personal_vehicle': item['is_personal_vehicle'] == true,
+            'expense_allowance_type': item['expense_allowance_type'] ?? '',
           });
         }
       }
@@ -354,9 +359,23 @@ class _ExpenseCreateSheetState extends State<ExpenseCreateSheet> {
                           ),
                           subtitle: Padding(
                             padding: const EdgeInsets.only(top: 2.0),
-                            child: Text(
-                              'Category: ${item['category_name']} • Date: ${item['date']}',
-                              style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Category: ${item['category_name']} • Date: ${item['date']}',
+                                  style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                                ),
+                                if (item['is_personal_vehicle'] == true ||
+                                    (item['total_km_run'] != null && (item['total_km_run'] as num) > 0))
+                                  Padding(
+                                    padding: const EdgeInsets.only(top: 2.0),
+                                    child: Text(
+                                      'Start: ${(item['odometer_day_start'] ?? 0.0).toStringAsFixed(1)} | End: ${(item['odometer_day_end'] ?? 0.0).toStringAsFixed(1)} | ${(item['total_km_run'] ?? 0.0).toStringAsFixed(1)} KM',
+                                      style: const TextStyle(fontSize: 11, color: AppColors.primary, fontWeight: FontWeight.w600),
+                                    ),
+                                  ),
+                              ],
                             ),
                           ),
                           trailing: IconButton(
@@ -416,9 +435,80 @@ class _ExpenseItemDialogState extends State<_ExpenseItemDialog> {
   final _titleController = TextEditingController();
   final _amountController = TextEditingController();
   final _descController = TextEditingController();
-  
+  final _dayStartController = TextEditingController();
+  final _dayEndController = TextEditingController();
+  final _totalKmController = TextEditingController();
+
   Map<String, dynamic>? _selectedCategory;
   DateTime _selectedDate = DateTime.now();
+
+  @override
+  void dispose() {
+    _titleController.dispose();
+    _amountController.dispose();
+    _descController.dispose();
+    _dayStartController.dispose();
+    _dayEndController.dispose();
+    _totalKmController.dispose();
+    super.dispose();
+  }
+
+  String get _allowanceType => _selectedCategory?['expense_allowance_type']?.toString() ?? '';
+  bool get _isPersonalVehicle => _allowanceType == 'personal_vehicle_mileage_rate_card';
+  bool get _isCeilingType => const [
+    'ex_base_station_day_allowance',
+    'night_stay_allowance',
+    'hotel_ceiling_metro',
+    'hotel_ceiling_non_metro',
+  ].contains(_allowanceType);
+
+  double? get _limitAmount => (_selectedCategory?['limit_amount'] as num?)?.toDouble();
+  bool get _hasGrade => _selectedCategory?['has_grade'] == true;
+  String get _gradeName => _selectedCategory?['grade_name']?.toString() ?? '';
+
+  void _onOdometerChanged() {
+    if (!_isPersonalVehicle) return;
+    final startText = _dayStartController.text.trim();
+    final endText = _dayEndController.text.trim();
+    if (startText.isNotEmpty && endText.isNotEmpty) {
+      final start = double.tryParse(startText) ?? 0.0;
+      final end = double.tryParse(endText) ?? 0.0;
+      if (end >= start) {
+        final km = end - start;
+        _totalKmController.text = km.toStringAsFixed(2);
+        _recalculateMileageAmount(km);
+      } else {
+        _totalKmController.text = '0.00';
+        _amountController.text = '0.00';
+      }
+    }
+  }
+
+  void _onTotalKmChanged() {
+    if (!_isPersonalVehicle) return;
+    final km = double.tryParse(_totalKmController.text.trim()) ?? 0.0;
+    _recalculateMileageAmount(km);
+  }
+
+  void _recalculateMileageAmount(double km) {
+    final rate = _limitAmount ?? 0.0;
+    final total = km * rate;
+    _amountController.text = total.toStringAsFixed(2);
+  }
+
+  void _onCategoryChanged(Map<String, dynamic>? val) {
+    setState(() {
+      _selectedCategory = val;
+      if (_titleController.text.isEmpty && val != null) {
+        _titleController.text = val['name'] ?? '';
+      }
+      if (_isPersonalVehicle) {
+        _onOdometerChanged();
+      } else {
+        _amountController.clear();
+      }
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -451,13 +541,54 @@ class _ExpenseItemDialogState extends State<_ExpenseItemDialog> {
                       child: Text(cat['name'] ?? ''),
                     );
                   }).toList(),
-                  onChanged: (val) {
-                    setState(() {
-                      _selectedCategory = val;
-                    });
-                  },
+                  onChanged: _onCategoryChanged,
                   validator: (val) => val == null ? 'Category is required.' : null,
                 ),
+
+                // Allowance type informative banner
+                if (_selectedCategory != null && (_isCeilingType || _isPersonalVehicle)) ...[
+                  const SizedBox(height: 10),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: (!_hasGrade || _limitAmount == null)
+                          ? Colors.amber.withOpacity(0.12)
+                          : AppColors.primary.withOpacity(0.08),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                        color: (!_hasGrade || _limitAmount == null)
+                            ? Colors.amber[700]!
+                            : AppColors.primary.withOpacity(0.3),
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          (!_hasGrade || _limitAmount == null) ? Icons.warning_amber_rounded : Icons.info_outline,
+                          size: 18,
+                          color: (!_hasGrade || _limitAmount == null) ? Colors.amber[800] : AppColors.primary,
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            !_hasGrade
+                                ? 'No employee grade assigned. This category requires an assigned grade.'
+                                : _limitAmount == null
+                                    ? 'This category is not configured in your grade (${_gradeName.isNotEmpty ? _gradeName : "Unassigned"}).'
+                                    : _isPersonalVehicle
+                                        ? 'Grade Rate: ৳${_limitAmount!.toStringAsFixed(2)} per km'
+                                        : 'Grade Limit: Maximum ৳${_limitAmount!.toStringAsFixed(2)}',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: (!_hasGrade || _limitAmount == null) ? Colors.amber[900] : AppColors.primary,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
                 const SizedBox(height: 16),
 
                 // Item Title/Name
@@ -470,21 +601,115 @@ class _ExpenseItemDialogState extends State<_ExpenseItemDialog> {
                   ),
                   validator: (val) => val == null || val.trim().isEmpty ? 'Title is required.' : null,
                 ),
+
+                // Personal Vehicle Odometer and KM Fields
+                if (_isPersonalVehicle) ...[
+                  const SizedBox(height: 16),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextFormField(
+                          controller: _dayStartController,
+                          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                          decoration: InputDecoration(
+                            labelText: 'Day Start (Odo Meter)',
+                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          ),
+                          onChanged: (_) => _onOdometerChanged(),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: TextFormField(
+                          controller: _dayEndController,
+                          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                          decoration: InputDecoration(
+                            labelText: 'Day End (Odo Meter)',
+                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          ),
+                          onChanged: (_) => _onOdometerChanged(),
+                          validator: (val) {
+                            final startText = _dayStartController.text.trim();
+                            final endText = _dayEndController.text.trim();
+                            if (startText.isNotEmpty && endText.isNotEmpty) {
+                              final start = double.tryParse(startText) ?? 0.0;
+                              final end = double.tryParse(endText) ?? 0.0;
+                              if (end < start) {
+                                return 'Day End cannot be less than Day Start.';
+                              }
+                            }
+                            return null;
+                          },
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  TextFormField(
+                    controller: _totalKmController,
+                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    decoration: InputDecoration(
+                      labelText: 'Total Kilo Meter run *',
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      suffixText: 'KM',
+                    ),
+                    onChanged: (_) => _onTotalKmChanged(),
+                    validator: (val) {
+                      if (!_isPersonalVehicle) return null;
+                      if (val == null || val.trim().isEmpty) return 'Total km is required.';
+                      final km = double.tryParse(val.trim());
+                      if (km == null || km <= 0) return 'Total km must be greater than 0.';
+                      return null;
+                    },
+                  ),
+                ],
                 const SizedBox(height: 16),
 
                 // Amount
                 TextFormField(
                   controller: _amountController,
+                  readOnly: _isPersonalVehicle,
                   keyboardType: const TextInputType.numberWithOptions(decimal: true),
                   decoration: InputDecoration(
                     labelText: 'Amount (৳) *',
                     border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
                     contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    helperText: _isPersonalVehicle
+                        ? (_limitAmount != null
+                            ? 'Formula: Total KM × ৳${_limitAmount!.toStringAsFixed(2)}/km'
+                            : null)
+                        : (_isCeilingType && _limitAmount != null
+                            ? 'Maximum allowed: ৳${_limitAmount!.toStringAsFixed(2)}'
+                            : null),
+                    helperMaxLines: 2,
+                    filled: _isPersonalVehicle,
+                    fillColor: _isPersonalVehicle ? Colors.grey[100] : null,
                   ),
                   validator: (val) {
                     if (val == null || val.trim().isEmpty) return 'Amount is required.';
                     final d = double.tryParse(val.trim());
                     if (d == null || d <= 0) return 'Enter a valid amount > 0.';
+                    if (_isCeilingType) {
+                      if (!_hasGrade) {
+                        return 'Cannot submit: No grade assigned to employee.';
+                      }
+                      if (_limitAmount == null) {
+                        return 'Cannot submit: Category not configured in your grade.';
+                      }
+                      if (d > _limitAmount!) {
+                        return 'Amount exceeds maximum allowed limit of ৳${_limitAmount!.toStringAsFixed(2)}.';
+                      }
+                    } else if (_isPersonalVehicle) {
+                      if (!_hasGrade) {
+                        return 'Cannot submit: No grade assigned to employee.';
+                      }
+                      if (_limitAmount == null) {
+                        return 'Cannot submit: Personal vehicle rate is not configured in your grade.';
+                      }
+                    }
                     return null;
                   },
                 ),
@@ -546,6 +771,13 @@ class _ExpenseItemDialogState extends State<_ExpenseItemDialog> {
           style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary, foregroundColor: Colors.white),
           onPressed: () {
             if (_dialogFormKey.currentState?.validate() ?? false) {
+              final allowanceType = _allowanceType;
+              final isPersonalVehicle = _isPersonalVehicle;
+
+              final startKm = isPersonalVehicle ? (double.tryParse(_dayStartController.text.trim()) ?? 0.0) : null;
+              final endKm = isPersonalVehicle ? (double.tryParse(_dayEndController.text.trim()) ?? 0.0) : null;
+              final totalKm = isPersonalVehicle ? (double.tryParse(_totalKmController.text.trim()) ?? 0.0) : null;
+
               final Map<String, dynamic> item = {
                 'title': _titleController.text.trim(),
                 'amount': double.parse(_amountController.text.trim()),
@@ -553,6 +785,11 @@ class _ExpenseItemDialogState extends State<_ExpenseItemDialog> {
                 'category_name': _selectedCategory!['name'],
                 'date': _selectedDate.toLocal().toString().split(' ')[0],
                 'description': _descController.text.trim(),
+                'expense_allowance_type': allowanceType,
+                'is_personal_vehicle': isPersonalVehicle,
+                if (startKm != null) 'odometer_day_start': startKm,
+                if (endKm != null) 'odometer_day_end': endKm,
+                if (totalKm != null) 'total_km_run': totalKm,
               };
 
               widget.onSave(item);
