@@ -494,9 +494,29 @@ class RouteProvider with ChangeNotifier {
     }
   }
 
+  Future<({List<Map<String, dynamic>> records, int total})> fetchAllOutletsWithPagination({
+    String? search,
+    bool? assigned = false,
+    int page = 1,
+    int pageSize = 20,
+  }) async {
+    try {
+      return await _apiService.getOutletsWithPagination(
+        search: search,
+        assigned: assigned,
+        page: page,
+        pageSize: pageSize,
+      );
+    } catch (e) {
+      _error = e.toString();
+      return (records: <Map<String, dynamic>>[], total: 0);
+    }
+  }
+
   Future<Map<String, dynamic>?> updateOutlet(
     int outletId, {
     String? name,
+    String? ownerName,
     String? mobile,
     String? email,
     String? street,
@@ -512,6 +532,7 @@ class RouteProvider with ChangeNotifier {
       final updated = await _apiService.updateOutlet(
         outletId,
         name: name,
+        ownerName: ownerName,
         mobile: mobile,
         email: email,
         street: street,

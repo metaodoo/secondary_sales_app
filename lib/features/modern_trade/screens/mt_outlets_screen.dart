@@ -94,12 +94,16 @@ class _MtOutletsScreenState extends State<MtOutletsScreen> with WidgetsBindingOb
     final provider = context.watch<ModernTradeProvider>();
     final outlets = provider.getSortedOutlets(searchQuery: _searchQuery);
 
+    final totalCount = provider.outlets.length;
+    final filteredCount = outlets.length;
+    final countText = _searchQuery.isEmpty ? '$totalCount' : '$filteredCount / $totalCount';
+
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
-        title: const Text(
-          'MT Outlets',
-          style: TextStyle(
+        title: Text(
+          'MT Outlets ($countText)',
+          style: const TextStyle(
             color: AppColors.primaryStrong,
             fontWeight: FontWeight.bold,
           ),
@@ -245,7 +249,25 @@ class _MtOutletsScreenState extends State<MtOutletsScreen> with WidgetsBindingOb
                 ],
               ),
             ),
-            const SizedBox(height: 4),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16.0, 6.0, 16.0, 4.0),
+              child: Row(
+                children: [
+                  Text(
+                    _searchQuery.isEmpty
+                        ? 'AVAILABLE OUTLETS ($totalCount)'
+                        : 'FOUND OUTLETS ($filteredCount of $totalCount)',
+                    style: const TextStyle(
+                      color: AppColors.textSecondary,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 11,
+                      letterSpacing: 0.8,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 2),
             Expanded(
               child: provider.isLoading && provider.outlets.isEmpty
                   ? const Center(child: CircularProgressIndicator())

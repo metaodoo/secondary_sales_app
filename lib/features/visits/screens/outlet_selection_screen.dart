@@ -368,13 +368,19 @@ class _OutletSelectionScreenState extends State<OutletSelectionScreen> {
       ];
     }
 
+    final totalCount = _outlets.where((o) => o['active'] != false).length;
+    final filteredCount = displayedOutlets.length;
+    final countText = _searchQuery.isEmpty ? '$totalCount' : '$filteredCount / $totalCount';
+
     return Scaffold(
       backgroundColor: AppColors.background,
       body: Column(
         children: [
           BlueHeader(
-            title: 'Select Outlet',
-            subtitle: 'Choose an outlet to visit',
+            title: 'Select Outlet ($countText)',
+            subtitle: _searchQuery.isEmpty
+                ? '$totalCount outlets available on this route'
+                : 'Showing $filteredCount of $totalCount outlets',
             trailing: IconButton(
               icon: const Icon(Icons.arrow_back, color: Colors.white),
               onPressed: () => Navigator.pop(context),
@@ -517,6 +523,25 @@ class _OutletSelectionScreenState extends State<OutletSelectionScreen> {
               ],
             ),
           ),
+          if (!_isLoading && _error == null)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16.0, 6.0, 16.0, 4.0),
+              child: Row(
+                children: [
+                  Text(
+                    _searchQuery.isEmpty
+                        ? 'AVAILABLE OUTLETS ($totalCount)'
+                        : 'FOUND OUTLETS ($filteredCount of $totalCount)',
+                    style: const TextStyle(
+                      color: AppColors.textSecondary,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 11,
+                      letterSpacing: 0.8,
+                    ),
+                  ),
+                ],
+              ),
+            ),
           if (_isLoading)
             const Expanded(child: Center(child: CircularProgressIndicator()))
           else if (_error != null)

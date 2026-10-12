@@ -30,6 +30,7 @@ class _OutletsListScreenState extends State<OutletsListScreen> {
   final ScrollController _scrollController = ScrollController();
   Timer? _searchDebounce;
   List<Map<String, dynamic>> _outlets = [];
+  int? _totalCount;
   bool _isLoading = true;
   bool _isLoadingMore = false;
   bool _hasMore = true;
@@ -136,7 +137,7 @@ class _OutletsListScreenState extends State<OutletsListScreen> {
       final provider = Provider.of<RouteProvider>(context, listen: false);
       final query = search ?? _searchController.text;
       // Fetch ALL outlets by passing assigned: null
-      final outlets = await provider.fetchAllOutlets(
+      final result = await provider.fetchAllOutletsWithPagination(
         search: query,
         assigned: null,
         page: _page,
@@ -145,11 +146,13 @@ class _OutletsListScreenState extends State<OutletsListScreen> {
       if (mounted) {
         setState(() {
           if (reset) {
-            _outlets = outlets;
+            _outlets = result.records;
+            _totalCount = result.total;
           } else {
-            _outlets.addAll(outlets);
+            _outlets.addAll(result.records);
+            _totalCount = result.total;
           }
-          _hasMore = outlets.length == _pageSize;
+          _hasMore = result.records.length == _pageSize;
           if (_hasMore) {
             _page += 1;
           }
@@ -309,6 +312,11 @@ class _OutletsListScreenState extends State<OutletsListScreen> {
       ];
     }
 
+    final totalCount = _totalCount ?? _outlets.length;
+    final filteredCount = displayedOutlets.length;
+    final baseTitle = widget.startSecondarySale ? 'Select Outlet' : 'Outlets';
+    final countText = _searchController.text.trim().isEmpty ? '$totalCount' : '$filteredCount / $totalCount';
+
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
@@ -324,11 +332,11 @@ class _OutletsListScreenState extends State<OutletsListScreen> {
           onPressed: () => Navigator.pop(context),
         ),
         title: Text(
-          widget.startSecondarySale ? 'Select Outlet' : 'Outlets',
-          style: TextStyle(
+          '$baseTitle ($countText)',
+          style: const TextStyle(
             color: AppColors.primaryStrong,
             fontWeight: FontWeight.bold,
-            fontSize: 22,
+            fontSize: 20,
           ),
         ),
         centerTitle: true,
@@ -469,7 +477,23 @@ class _OutletsListScreenState extends State<OutletsListScreen> {
                   ),
                 ],
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 8),
+              if (!_isLoading && _error == null)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 4.0),
+                  child: Text(
+                    _searchController.text.trim().isEmpty
+                        ? 'AVAILABLE OUTLETS ($totalCount)'
+                        : 'FOUND OUTLETS ($filteredCount of $totalCount)',
+                    style: const TextStyle(
+                      color: AppColors.textSecondary,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 11,
+                      letterSpacing: 0.8,
+                    ),
+                  ),
+                ),
+              const SizedBox(height: 4),
               if (_error != null) ErrorPanel(_error!),
               if (_isLoading && displayedOutlets.isNotEmpty) ...[
                 const LinearProgressIndicator(),

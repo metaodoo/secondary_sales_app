@@ -18,6 +18,7 @@ class EditOutletScreen extends StatefulWidget {
 class _EditOutletScreenState extends State<EditOutletScreen> {
   final _formKey = GlobalKey<FormState>();
   late TextEditingController _nameController;
+  late TextEditingController _ownerNameController;
   late TextEditingController _phoneController;
   late TextEditingController _addressController;
 
@@ -30,6 +31,12 @@ class _EditOutletScreenState extends State<EditOutletScreen> {
     super.initState();
     _nameController = TextEditingController(
       text: widget.outlet['name']?.toString() ?? '',
+    );
+    _ownerNameController = TextEditingController(
+      text: widget.outlet['owner_name']?.toString() ??
+          widget.outlet['ownerName']?.toString() ??
+          widget.outlet['outlet_owner_name']?.toString() ??
+          '',
     );
     _phoneController = TextEditingController(
       text:
@@ -69,6 +76,7 @@ class _EditOutletScreenState extends State<EditOutletScreen> {
   @override
   void dispose() {
     _nameController.dispose();
+    _ownerNameController.dispose();
     _phoneController.dispose();
     _addressController.dispose();
     super.dispose();
@@ -85,6 +93,7 @@ class _EditOutletScreenState extends State<EditOutletScreen> {
       final updatedOutlet = await provider.updateOutlet(
         widget.outlet['id'] as int,
         name: _nameController.text.trim(),
+        ownerName: _ownerNameController.text.trim(),
         mobile: _phoneController.text.trim(),
         street: _addressController.text.trim(),
         outletClassId: _selectedOutletClassId,
@@ -262,6 +271,30 @@ class _EditOutletScreenState extends State<EditOutletScreen> {
                           ? 'Enter customer name'
                           : null,
                       decoration: InputDecoration(
+                        filled: true,
+                        fillColor: AppColors.borderMuted,
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide: BorderSide.none,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    const Text(
+                      'Outlet Owner Name *',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w500,
+                        fontSize: 14,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    TextFormField(
+                      controller: _ownerNameController,
+                      validator: (v) => v == null || v.trim().isEmpty
+                          ? 'Enter owner name'
+                          : null,
+                      decoration: InputDecoration(
+                        hintText: 'Enter owner name',
                         filled: true,
                         fillColor: AppColors.borderMuted,
                         border: OutlineInputBorder(

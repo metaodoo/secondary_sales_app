@@ -30,6 +30,25 @@ extension ContactsApi on ApiService {
     int page = 1,
     int pageSize = 20,
   }) async {
+    final res = await getOutletsWithPagination(
+      search: search,
+      routeId: routeId,
+      assigned: assigned,
+      sort: sort,
+      page: page,
+      pageSize: pageSize,
+    );
+    return res.records;
+  }
+
+  Future<({List<Map<String, dynamic>> records, int total})> getOutletsWithPagination({
+    String? search,
+    int? routeId,
+    bool? assigned,
+    String? sort,
+    int page = 1,
+    int pageSize = 20,
+  }) async {
     final params = <String, dynamic>{
       'customer_type': 'outlet',
       'page': page,
@@ -53,7 +72,12 @@ extension ContactsApi on ApiService {
     final result = await _post(AppConstants.contactsEndpoint, params);
     if (result['success'] == true) {
       final List<dynamic> data = result['data'] ?? [];
-      return data.map((json) => Map<String, dynamic>.from(json)).toList();
+      final records = data.map((json) => Map<String, dynamic>.from(json)).toList();
+      final pagination = result['pagination'];
+      final total = (pagination is Map && pagination['total'] is int)
+          ? pagination['total'] as int
+          : records.length;
+      return (records: records, total: total);
     }
     throw Exception(result['message'] ?? 'Failed to load outlets');
   }
@@ -171,6 +195,7 @@ extension ContactsApi on ApiService {
   Future<Map<String, dynamic>> updateOutlet(
     int id, {
     String? name,
+    String? ownerName,
     String? mobile,
     String? phone,
     String? email,
@@ -185,6 +210,8 @@ extension ContactsApi on ApiService {
     final params = <String, dynamic>{
       'customer_type': 'outlet',
       if (name != null && name.trim().isNotEmpty) 'name': name.trim(),
+      if (ownerName != null && ownerName.trim().isNotEmpty)
+        'owner_name': ownerName.trim(),
       if (mobile != null && mobile.trim().isNotEmpty) 'mobile': mobile.trim(),
       if (phone != null && phone.trim().isNotEmpty) 'phone': phone.trim(),
       if (email != null && email.trim().isNotEmpty) 'email': email.trim(),
