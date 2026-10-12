@@ -1,4 +1,3 @@
-import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:secondary_sales/data/api/api_service.dart';
 import 'package:secondary_sales/features/auth/auth_provider.dart';
@@ -64,6 +63,7 @@ class ExpenseProvider extends ChangeNotifier {
 
     // Initial loads
     fetchCategories();
+    fetchDrafts();
     fetchSheetList(tab: 'own');
     fetchSheetList(tab: 'pending');
   }
@@ -350,6 +350,99 @@ class ExpenseProvider extends ChangeNotifier {
       return false;
     } finally {
       _isActionLoading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<Map<String, dynamic>?> createDraftExpense({
+    required int categoryId,
+    String? title,
+    double? amount,
+    String? date,
+    String? description,
+    double? odometerDayStart,
+    double? odometerDayEnd,
+    double? totalKmRun,
+    String? odometerStartImage,
+    String? odometerEndImage,
+  }) async {
+    _isSubmitting = true;
+    _requestError = null;
+    notifyListeners();
+
+    try {
+      final response = await _apiService.createExpense(
+        employeeId: _employeeId,
+        categoryId: categoryId,
+        title: title,
+        amount: amount,
+        date: date,
+        description: description,
+        odometerDayStart: odometerDayStart,
+        odometerDayEnd: odometerDayEnd,
+        totalKmRun: totalKmRun,
+        odometerStartImage: odometerStartImage,
+        odometerEndImage: odometerEndImage,
+      );
+      if (response['success'] == true) {
+        await fetchDrafts();
+        return response['data'];
+      } else {
+        _requestError = response['message'] ?? 'Failed to create expense.';
+        return null;
+      }
+    } catch (e) {
+      _requestError = e.toString().replaceAll('Exception: ', '');
+      return null;
+    } finally {
+      _isSubmitting = false;
+      notifyListeners();
+    }
+  }
+
+  Future<Map<String, dynamic>?> updateDraftExpense({
+    required int expenseId,
+    int? categoryId,
+    String? title,
+    double? amount,
+    String? date,
+    String? description,
+    double? odometerDayStart,
+    double? odometerDayEnd,
+    double? totalKmRun,
+    String? odometerStartImage,
+    String? odometerEndImage,
+  }) async {
+    _isSubmitting = true;
+    _requestError = null;
+    notifyListeners();
+
+    try {
+      final response = await _apiService.updateExpense(
+        expenseId: expenseId,
+        categoryId: categoryId,
+        title: title,
+        amount: amount,
+        date: date,
+        description: description,
+        odometerDayStart: odometerDayStart,
+        odometerDayEnd: odometerDayEnd,
+        totalKmRun: totalKmRun,
+        odometerStartImage: odometerStartImage,
+        odometerEndImage: odometerEndImage,
+      );
+      if (response['success'] == true) {
+        await fetchDrafts();
+        return response['data'];
+      } else {
+        _requestError = response['message'] ?? 'Failed to update expense.';
+        return null;
+      }
+    } catch (e) {
+      _requestError = e.toString().replaceAll('Exception: ', '');
+      return null;
+    } finally {
+      _isSubmitting = false;
       notifyListeners();
     }
   }

@@ -15,6 +15,7 @@ import 'package:secondary_sales/features/hr/attendance_provider.dart';
 import 'package:secondary_sales/features/hr/screens/attendance_screen.dart';
 import 'package:secondary_sales/features/hr/screens/expense_dashboard_screen.dart';
 import 'package:secondary_sales/features/hr/screens/leave_dashboard_screen.dart';
+import 'package:secondary_sales/features/hr/screens/personal_vehicle_trip_screen.dart';
 import 'package:secondary_sales/features/modern_trade/modern_trade_provider.dart';
 import 'package:secondary_sales/features/my_team/screens/my_team_screen.dart';
 import 'package:secondary_sales/features/notifications/notification_provider.dart';
@@ -309,6 +310,13 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
           icon: Icons.receipt_long_outlined,
           color: const Color(0xFF6366F1),
           onTap: () => _open(const ExpenseDashboardScreen()),
+        ),
+      if (canAccessExpense)
+        _ModuleItem(
+          title: 'Personal Vehicle',
+          icon: Icons.two_wheeler_outlined,
+          color: const Color(0xFF0D9488),
+          onTap: () => _open(const PersonalVehicleTripScreen()),
         ),
       if (canAccessMyTeam)
         _ModuleItem(

@@ -269,6 +269,12 @@ class _MtReturnDetailScreenState extends State<MtReturnDetailScreen> {
                         _buildHeaderCard(rr),
                         const SizedBox(height: 16),
 
+                        // Prominent Return Type Switcher Banner (Non-Saleable & Quality only)
+                        if (!rr.isSaleable) ...[
+                          _buildReturnTypeBanner(rr),
+                          const SizedBox(height: 16),
+                        ],
+
                         // Linked Transfers Section
                         _buildTransfersSection(rr),
                         const SizedBox(height: 16),
@@ -328,63 +334,36 @@ class _MtReturnDetailScreenState extends State<MtReturnDetailScreen> {
               ),
               if (!isSaleable) ...[
                 const SizedBox(width: 8),
-                Builder(
-                  builder: (context) {
-                    final canChangeType = rr.canConvertToReplacement || rr.canConvertToReturn;
-                    final badgeColor = rr.isDirectReturn ? Colors.deepOrange : Colors.blue;
-                    final badgeWidget = Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: badgeColor.shade50,
-                        borderRadius: BorderRadius.circular(6),
-                        border: Border.all(
-                          color: canChangeType ? badgeColor.shade400 : badgeColor.shade300,
-                          width: canChangeType ? 1.2 : 1.0,
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: rr.isDirectReturn ? Colors.deepOrange.shade50 : Colors.blue.shade50,
+                    borderRadius: BorderRadius.circular(6),
+                    border: Border.all(
+                      color: rr.isDirectReturn ? Colors.deepOrange.shade300 : Colors.blue.shade300,
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        rr.isDirectReturn
+                            ? Icons.assignment_return_outlined
+                            : Icons.published_with_changes_outlined,
+                        size: 13,
+                        color: rr.isDirectReturn ? Colors.deepOrange.shade800 : Colors.blue.shade800,
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        rr.returnTypeDisplay,
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                          color: rr.isDirectReturn ? Colors.deepOrange.shade800 : Colors.blue.shade800,
                         ),
                       ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            rr.isDirectReturn
-                                ? Icons.assignment_return_outlined
-                                : Icons.published_with_changes_outlined,
-                            size: 13,
-                            color: badgeColor.shade800,
-                          ),
-                          const SizedBox(width: 4),
-                          Text(
-                            rr.returnTypeDisplay,
-                            style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w700,
-                              color: badgeColor.shade800,
-                            ),
-                          ),
-                          if (canChangeType) ...[
-                            const SizedBox(width: 4),
-                            Icon(
-                              Icons.edit_outlined,
-                              size: 11,
-                              color: badgeColor.shade700,
-                            ),
-                          ],
-                        ],
-                      ),
-                    );
-
-                    if (canChangeType) {
-                      return Tooltip(
-                        message: 'Tap to change Return Type',
-                        child: InkWell(
-                          onTap: () => _openReturnTypePicker(rr),
-                          borderRadius: BorderRadius.circular(6),
-                          child: badgeWidget,
-                        ),
-                      );
-                    }
-                    return badgeWidget;
-                  },
+                    ],
+                  ),
                 ),
               ],
               const SizedBox(width: 8),
@@ -431,6 +410,98 @@ class _MtReturnDetailScreenState extends State<MtReturnDetailScreen> {
     );
   }
 
+  Widget _buildReturnTypeBanner(MtReturnRequest rr) {
+    final canChangeType = rr.canConvertToReplacement || rr.canConvertToReturn;
+    final isReplacement = rr.isReplacement;
+    final primaryColor = isReplacement ? const Color(0xFF0288D1) : const Color(0xFFE65100);
+    final bgColor = isReplacement ? const Color(0xFFE1F5FE) : const Color(0xFFFFF3E0);
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: bgColor,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: primaryColor.withValues(alpha: 0.35), width: 1.2),
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              shape: BoxShape.circle,
+              border: Border.all(color: primaryColor.withValues(alpha: 0.3)),
+            ),
+            child: Icon(
+              isReplacement ? Icons.published_with_changes_outlined : Icons.assignment_return_outlined,
+              color: primaryColor,
+              size: 20,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Text(
+                      'Return Type: ${rr.returnTypeDisplay}',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w800,
+                        color: primaryColor,
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                      decoration: BoxDecoration(
+                        color: primaryColor.withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Text(
+                        isReplacement ? 'Replacement Delivery' : 'Scrap Only',
+                        style: TextStyle(
+                          fontSize: 9,
+                          fontWeight: FontWeight.w700,
+                          color: primaryColor,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  isReplacement
+                    ? 'Outlet will receive fresh replacement goods.'
+                    : 'Scrap intake only. No outgoing goods will be sent.',
+                  style: TextStyle(fontSize: 11, color: Colors.grey.shade700),
+                ),
+              ],
+            ),
+          ),
+          if (canChangeType) ...[
+            const SizedBox(width: 8),
+            ElevatedButton.icon(
+              onPressed: () => _openReturnTypePicker(rr),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: primaryColor,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                visualDensity: VisualDensity.compact,
+                elevation: 0,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              ),
+              icon: const Icon(Icons.swap_horiz, size: 16),
+              label: const Text('Change', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
   Widget _buildTransfersSection(MtReturnRequest rr) {
     final transfers = rr.transfers
         .where((t) =>
@@ -438,7 +509,7 @@ class _MtReturnDetailScreenState extends State<MtReturnDetailScreen> {
         .toList();
 
     if (transfers.isEmpty) {
-      if (rr.isDirectReturn) {
+      if (!rr.isSaleable && rr.isDirectReturn) {
         return Container(
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(

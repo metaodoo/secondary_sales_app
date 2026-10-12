@@ -110,6 +110,8 @@ class LeaveProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
+      _apiService.updateSessionId(_authProvider.sessionId);
+      _apiService.updateAccessToken(_authProvider.accessToken);
       final response = await _apiService.getLeaveTypes(_employeeId);
       if (response['success'] == true) {
         final List data = response['data'] ?? [];

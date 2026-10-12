@@ -7,6 +7,7 @@ import 'package:secondary_sales/core/theme/app_theme.dart';
 import 'package:secondary_sales/features/auth/auth_provider.dart';
 import 'package:secondary_sales/features/hr/screens/attendance_screen.dart';
 import 'package:secondary_sales/features/hr/screens/expense_dashboard_screen.dart';
+import 'package:secondary_sales/features/hr/screens/personal_vehicle_trip_screen.dart';
 import 'package:secondary_sales/features/hr/screens/leave_dashboard_screen.dart';
 import 'package:secondary_sales/features/my_team/screens/my_team_screen.dart';
 
@@ -74,6 +75,13 @@ List<ModuleLauncherItem> buildTopLevelModuleItems(BuildContext context) {
         icon: Icons.receipt_long_outlined,
         color: const Color(0xFF6366F1),
         onTap: () => open(const ExpenseDashboardScreen()),
+      ),
+    if (auth.canView(AppScreen.moduleExpense))
+      ModuleLauncherItem(
+        title: 'Personal Vehicle',
+        icon: Icons.two_wheeler_outlined,
+        color: const Color(0xFF0D9488),
+        onTap: () => open(const PersonalVehicleTripScreen()),
       ),
     if (auth.canView(AppScreen.moduleMyTeam))
       ModuleLauncherItem(

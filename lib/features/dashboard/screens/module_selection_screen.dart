@@ -9,6 +9,7 @@ import 'package:secondary_sales/features/settings/screens/settings_tab.dart';
 import 'package:secondary_sales/features/hr/screens/attendance_screen.dart';
 import 'package:secondary_sales/features/hr/screens/leave_dashboard_screen.dart';
 import 'package:secondary_sales/features/hr/screens/expense_dashboard_screen.dart';
+import 'package:secondary_sales/features/hr/screens/personal_vehicle_trip_screen.dart';
 import 'package:secondary_sales/features/my_team/screens/my_team_screen.dart';
 
 class ModuleSelectionScreen extends StatelessWidget {
@@ -202,6 +203,22 @@ class ModuleSelectionScreen extends StatelessWidget {
                       context,
                       MaterialPageRoute(
                         builder: (_) => const ExpenseDashboardScreen(),
+                      ),
+                    );
+                  },
+                ),
+                const SizedBox(height: 24),
+                _buildLargeModuleCard(
+                  context,
+                  title: 'Personal Vehicle',
+                  description: 'Track vehicle trips with Day Start & End odometer photos.',
+                  icon: Icons.two_wheeler_outlined,
+                  color: const Color(0xFF0D9488), // Teal color
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const PersonalVehicleTripScreen(),
                       ),
                     );
                   },

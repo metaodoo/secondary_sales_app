@@ -55,6 +55,12 @@ class _LeaveRequestSheetState extends State<LeaveRequestSheet> {
         _reasonController.text = leave['reason'];
       }
     }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final provider = context.read<LeaveProvider>();
+      if (provider.leaveTypes.isEmpty && !provider.isLoadingTypes) {
+        provider.fetchLeaveTypes();
+      }
+    });
   }
 
   Map<String, dynamic>? get _selectedLeaveType {
@@ -71,6 +77,36 @@ class _LeaveRequestSheetState extends State<LeaveRequestSheet> {
     final type = _selectedLeaveType;
     if (type == null) return false;
     return type['is_sick_leave'] == true;
+  }
+
+  bool get _isCasualLeave {
+    final type = _selectedLeaveType;
+    if (type == null) return false;
+    return type['is_casual_leave'] == true;
+  }
+
+  bool get _allowConsecutiveDays {
+    final type = _selectedLeaveType;
+    if (type == null) return true;
+    return type['allow_consecutive_days'] != false;
+  }
+
+  bool get _isMaternityLeave {
+    final type = _selectedLeaveType;
+    if (type == null) return false;
+    return type['is_maternity_leave'] == true;
+  }
+
+  double get _maxDaysPerMonth {
+    final type = _selectedLeaveType;
+    if (type == null) return 0.0;
+    return (type['max_days_per_month'] as num?)?.toDouble() ?? 0.0;
+  }
+
+  double? get _currentMonthRemainingQuota {
+    final type = _selectedLeaveType;
+    if (type == null) return null;
+    return (type['current_month_remaining_quota'] as num?)?.toDouble();
   }
 
   int get _durationDays {
@@ -104,6 +140,22 @@ class _LeaveRequestSheetState extends State<LeaveRequestSheet> {
       final now = DateTime.now();
       final today = DateTime(now.year, now.month, now.day);
 
+      if (_requiresAdvanceNotice) {
+        final earliest = today.add(Duration(days: _advanceNoticeDays));
+        if (_startDate != null && _startDate!.isBefore(earliest)) {
+          _startDate = earliest;
+        }
+        if (_endDate != null && _endDate!.isBefore(earliest)) {
+          _endDate = earliest;
+        }
+      }
+
+      if (_isCasualLeave || !_allowConsecutiveDays) {
+        if (_startDate != null) {
+          _endDate = _startDate;
+        }
+      }
+
       if (policy == 'past_today') {
         if (_startDate != null && _startDate!.isAfter(today)) _startDate = null;
         if (_endDate != null && _endDate!.isAfter(today)) _endDate = null;
@@ -130,6 +182,26 @@ class _LeaveRequestSheetState extends State<LeaveRequestSheet> {
         _startDate == null ||
         _endDate == null ||
         _reasonController.text.trim().isEmpty) {
+      return;
+    }
+
+    if ((_isCasualLeave || !_allowConsecutiveDays) && _durationDays > 1) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Casual Leave can only be requested for 1 day at a time.'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    if (_isCasualLeave && _currentMonthRemainingQuota != null && _currentMonthRemainingQuota! <= 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Monthly quota for Casual Leave is exhausted (Maximum 2 days per month).'),
+          backgroundColor: Colors.red,
+        ),
+      );
       return;
     }
 
@@ -244,23 +316,60 @@ class _LeaveRequestSheetState extends State<LeaveRequestSheet> {
   }
 
   Future<void> _pickDate(bool isStart) async {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final policy = (_selectedLeaveType != null ? (_selectedLeaveType!['date_policy'] ?? 'any') : 'any').toString();
+
+    DateTime firstDate = today.subtract(const Duration(days: 90));
+    DateTime lastDate = today.add(const Duration(days: 365));
+
+    if (_requiresAdvanceNotice) {
+      firstDate = today.add(Duration(days: _advanceNoticeDays));
+    }
+
+    if (policy == 'past_today') {
+      lastDate = today;
+    } else if (policy == 'today_only') {
+      firstDate = today;
+      lastDate = today;
+    }
+
+    DateTime initialDate = isStart
+        ? (_startDate ?? (_requiresAdvanceNotice ? firstDate : today))
+        : (_endDate ?? _startDate ?? (_requiresAdvanceNotice ? firstDate : today));
+
+    if (initialDate.isBefore(firstDate)) {
+      initialDate = firstDate;
+    }
+    if (initialDate.isAfter(lastDate)) {
+      initialDate = lastDate;
+    }
+
     final picked = await showDatePicker(
       context: context,
-      initialDate: DateTime.now(),
-      firstDate: DateTime.now().subtract(const Duration(days: 30)),
-      lastDate: DateTime.now().add(const Duration(days: 365)),
+      initialDate: initialDate,
+      firstDate: firstDate,
+      lastDate: lastDate,
     );
+
     if (picked != null) {
       setState(() {
         if (isStart) {
           _startDate = picked;
-          if (_endDate != null && _endDate!.isBefore(_startDate!)) {
+          if (_isCasualLeave || !_allowConsecutiveDays) {
+            _endDate = picked;
+          } else if (_endDate != null && _endDate!.isBefore(_startDate!)) {
             _endDate = _startDate;
           }
         } else {
-          _endDate = picked;
-          if (_startDate != null && _startDate!.isAfter(_endDate!)) {
-            _startDate = _endDate;
+          if (_isCasualLeave || !_allowConsecutiveDays) {
+            _startDate = picked;
+            _endDate = picked;
+          } else {
+            _endDate = picked;
+            if (_startDate != null && _startDate!.isAfter(_endDate!)) {
+              _startDate = _endDate;
+            }
           }
         }
       });
@@ -395,13 +504,15 @@ class _LeaveRequestSheetState extends State<LeaveRequestSheet> {
                               borderRadius: BorderRadius.circular(12),
                             ),
                             child: Text(
-                              type['requires_allocation'] == 'yes'
-                                  ? (type['remaining'] != null
-                                      ? (double.tryParse(type['remaining'].toString()) ?? 0.0) % 1 == 0
-                                          ? (double.tryParse(type['remaining'].toString()) ?? 0.0).toInt().toString()
-                                          : type['remaining'].toString()
-                                      : '0')
-                                  : 'Available',
+                              (type['is_casual_leave'] == true && type['current_month_remaining_quota'] != null)
+                                  ? '${(type['current_month_remaining_quota'] as num).toInt()}/${(type['max_days_per_month'] as num?)?.toInt() ?? 2} left/mo'
+                                  : (type['requires_allocation'] == 'yes'
+                                      ? (type['remaining'] != null
+                                          ? (double.tryParse(type['remaining'].toString()) ?? 0.0) % 1 == 0
+                                              ? (double.tryParse(type['remaining'].toString()) ?? 0.0).toInt().toString()
+                                              : type['remaining'].toString()
+                                          : '0')
+                                      : 'Available'),
                               style: TextStyle(
                                 color: (type['requires_allocation'] == 'yes'
                                         ? type['is_available'] == true
@@ -419,6 +530,88 @@ class _LeaveRequestSheetState extends State<LeaveRequestSheet> {
                   }).toList(),
                   onChanged: provider.isSubmitting ? null : _onLeaveTypeChanged,
                 ),
+              if (_isCasualLeave) ...[
+                const SizedBox(height: 10),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFEF3C7),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: const Color(0xFFF59E0B)),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.info_outline, color: Color(0xFFD97706), size: 20),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          'Casual Leave (CL): Single-day requests only. Max 2 days/month${_currentMonthRemainingQuota != null ? ' (${_currentMonthRemainingQuota!.toInt()} of ${_maxDaysPerMonth.toInt()} days left this month).' : '.'}',
+                          style: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: Color(0xFF92400E),
+                            height: 1.3,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ] else if (_requiresAdvanceNotice) ...[
+                const SizedBox(height: 10),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFEFF6FF),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: const Color(0xFF3B82F6)),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.calendar_month, color: Color(0xFF2563EB), size: 20),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          'Advance Notice: Must be submitted at least $_advanceNoticeDays calendar days in advance.',
+                          style: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: Color(0xFF1E40AF),
+                            height: 1.3,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ] else if (_isMaternityLeave) ...[
+                const SizedBox(height: 10),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFDF2F8),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: const Color(0xFFEC4899)),
+                  ),
+                  child: const Row(
+                    children: [
+                      Icon(Icons.child_care, color: Color(0xFFDB2777), size: 20),
+                      SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          'Maternity Leave (ML): Continuous calendar days. Weekends and public holidays are included in duration.',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: Color(0xFF9D174D),
+                            height: 1.3,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
               const SizedBox(height: 16),
 
               const Text('Duration', style: TextStyle(fontWeight: FontWeight.bold)),
@@ -456,10 +649,13 @@ class _LeaveRequestSheetState extends State<LeaveRequestSheet> {
                   const SizedBox(width: 12),
                   Expanded(
                     child: InkWell(
-                      onTap: provider.isSubmitting ? null : () => _pickDate(false),
+                      onTap: (_isCasualLeave || !_allowConsecutiveDays || provider.isSubmitting)
+                          ? null
+                          : () => _pickDate(false),
                       child: InputDecorator(
                         decoration: InputDecoration(
                           labelText: 'End Date *',
+                          helperText: (_isCasualLeave || !_allowConsecutiveDays) ? 'Single day' : null,
                           border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
                           contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                           errorText: (_validationTriggered && _endDate == null)
@@ -472,11 +668,20 @@ class _LeaveRequestSheetState extends State<LeaveRequestSheet> {
                             Expanded(
                               child: Text(
                                 _endDate != null ? _endDate!.toString().split(' ')[0] : 'Select date',
-                                style: const TextStyle(fontSize: 13),
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  color: (_isCasualLeave || !_allowConsecutiveDays)
+                                      ? AppColors.textSecondary
+                                      : null,
+                                ),
                                 overflow: TextOverflow.ellipsis,
                               ),
                             ),
-                            const Icon(Icons.calendar_today, size: 16),
+                            Icon(
+                              (_isCasualLeave || !_allowConsecutiveDays) ? Icons.lock_outline : Icons.calendar_today,
+                              size: 16,
+                              color: (_isCasualLeave || !_allowConsecutiveDays) ? Colors.grey : null,
+                            ),
                           ],
                         ),
                       ),

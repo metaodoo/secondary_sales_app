@@ -4,8 +4,10 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:secondary_sales/core/widgets/app_camera_capture_dialog.dart';
 import 'package:secondary_sales/core/services/media_storage_service.dart';
 import 'package:secondary_sales/core/theme/app_theme.dart';
+import 'package:secondary_sales/core/util/dialog_helper.dart';
 import 'package:secondary_sales/features/hr/expense_provider.dart';
 
 class ExpenseCreateSheet extends StatefulWidget {
@@ -42,7 +44,9 @@ class _ExpenseCreateSheetState extends State<ExpenseCreateSheet> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<ExpenseProvider>().fetchCategories();
+      final p = context.read<ExpenseProvider>();
+      p.fetchCategories();
+      p.fetchDrafts();
     });
 
     if (widget.sheetToEdit != null) {
@@ -66,6 +70,10 @@ class _ExpenseCreateSheetState extends State<ExpenseCreateSheet> {
             'total_km_run': (item['total_km_run'] as num?)?.toDouble(),
             'is_personal_vehicle': item['is_personal_vehicle'] == true,
             'expense_allowance_type': item['expense_allowance_type'] ?? '',
+            'has_odometer_start_image': item['has_odometer_start_image'] == true,
+            'has_odometer_end_image': item['has_odometer_end_image'] == true,
+            'odometer_start_image': item['odometer_start_image'],
+            'odometer_end_image': item['odometer_end_image'],
           });
         }
       }
@@ -117,9 +125,7 @@ class _ExpenseCreateSheetState extends State<ExpenseCreateSheet> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error picking file: $e'), backgroundColor: Colors.red),
-        );
+        showValidationErrorDialog(context, 'Error picking file: $e');
       }
     }
   }
@@ -140,6 +146,107 @@ class _ExpenseCreateSheetState extends State<ExpenseCreateSheet> {
     );
   }
 
+  void _openSelectDraftDialog() {
+    final provider = context.read<ExpenseProvider>();
+    final availableDrafts = provider.drafts.where((d) {
+      final dId = d['id'];
+      return !_expenseItems.any((item) => item['id'] == dId);
+    }).toList();
+
+    if (availableDrafts.isEmpty) {
+      showValidationErrorDialog(
+        context,
+        'No pending vehicle trips or saved expenses found to add.',
+        title: 'No Saved Trips or Expenses',
+      );
+      return;
+    }
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('Add Saved Trip / Expense', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 17)),
+        content: SizedBox(
+          width: MediaQuery.of(context).size.width * 0.9,
+          child: ListView.separated(
+            shrinkWrap: true,
+            itemCount: availableDrafts.length,
+            separatorBuilder: (_, _) => const Divider(height: 1),
+            itemBuilder: (context, index) {
+              final draft = availableDrafts[index];
+              final isPersonalVehicle = draft['is_personal_vehicle'] == true;
+              final hasEndImage = draft['has_odometer_end_image'] == true;
+              final title = draft['title'] ?? (isPersonalVehicle ? 'Personal Vehicle Trip' : 'Saved Expense');
+              final amount = (draft['amount'] as num?)?.toDouble() ?? 0.0;
+              final date = draft['date'] ?? '';
+
+              return ListTile(
+                contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                leading: CircleAvatar(
+                  backgroundColor: isPersonalVehicle ? const Color(0xFF0D9488).withOpacity(0.12) : AppColors.primary.withOpacity(0.12),
+                  child: Icon(
+                    isPersonalVehicle ? Icons.two_wheeler_outlined : Icons.receipt_long_outlined,
+                    color: isPersonalVehicle ? const Color(0xFF0D9488) : AppColors.primary,
+                    size: 22,
+                  ),
+                ),
+                title: Text(title, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+                subtitle: Text(
+                  isPersonalVehicle
+                      ? 'Date: $date • KM: ${(draft['total_km_run'] ?? 0.0)} • End Photo: ${hasEndImage ? "✓" : "Missing ✕"}'
+                      : 'Date: $date • Category: ${draft['category'] ?? ""}',
+                  style: const TextStyle(fontSize: 12),
+                ),
+                trailing: Text(
+                  '৳${amount.toStringAsFixed(2)}',
+                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppColors.primary),
+                ),
+                onTap: () {
+                  if (isPersonalVehicle && !hasEndImage) {
+                    Navigator.pop(ctx);
+                    showValidationErrorDialog(
+                      context,
+                      'Day End Odometer Image is required for this trip before adding it to the expense report. Please complete the trip in the Personal Vehicle menu first.',
+                      title: 'Missing Day End Photo',
+                    );
+                    return;
+                  }
+
+                  Navigator.pop(ctx);
+                  setState(() {
+                    _expenseItems.add({
+                      'id': draft['id'],
+                      'title': title,
+                      'category_id': draft['category_id'],
+                      'category_name': draft['category'] ?? '',
+                      'amount': amount,
+                      'date': date,
+                      'description': draft['description'] ?? '',
+                      'odometer_day_start': (draft['odometer_day_start'] as num?)?.toDouble(),
+                      'odometer_day_end': (draft['odometer_day_end'] as num?)?.toDouble(),
+                      'total_km_run': (draft['total_km_run'] as num?)?.toDouble(),
+                      'is_personal_vehicle': isPersonalVehicle,
+                      'expense_allowance_type': draft['expense_allowance_type'] ?? (isPersonalVehicle ? 'personal_vehicle_mileage_rate_card' : ''),
+                      'has_odometer_start_image': draft['has_odometer_start_image'] == true,
+                      'has_odometer_end_image': draft['has_odometer_end_image'] == true,
+                    });
+                  });
+                },
+              );
+            },
+          ),
+        ),
+        actions: [
+          OutlinedButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
+        ],
+      ),
+    );
+  }
+
   void _removeItem(int index) {
     setState(() {
       _expenseItems.removeAt(index);
@@ -151,10 +258,34 @@ class _ExpenseCreateSheetState extends State<ExpenseCreateSheet> {
     if (provider.isSubmitting) return;
 
     if (_expenseItems.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please add at least one expense item.')),
-      );
+      showValidationErrorDialog(context, 'Please add at least one expense item.');
       return;
+    }
+
+    // Restriction check: Day Start & Day End meter photos are mandatory for Personal Vehicle items before adding to sheet
+    for (var item in _expenseItems) {
+      if (item['is_personal_vehicle'] == true) {
+        final title = item['title'] ?? 'Personal Vehicle';
+        final hasStart = item['has_odometer_start_image'] == true ||
+            (item['odometer_start_image'] != null && (item['odometer_start_image'] as String).isNotEmpty);
+        if (!hasStart) {
+          showValidationErrorDialog(
+            context,
+            'Day Start Odometer Photo is required for "$title".',
+          );
+          return;
+        }
+
+        final hasEnd = item['has_odometer_end_image'] == true ||
+            (item['odometer_end_image'] != null && (item['odometer_end_image'] as String).isNotEmpty);
+        if (!hasEnd) {
+          showValidationErrorDialog(
+            context,
+            'Day End Odometer Photo is mandatory for "$title" before submitting the report.',
+          );
+          return;
+        }
+      }
     }
 
     final bool isEditing = widget.sheetToEdit != null;
@@ -184,9 +315,7 @@ class _ExpenseCreateSheetState extends State<ExpenseCreateSheet> {
         ),
       );
     } else if (mounted && provider.requestError != null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(provider.requestError!)),
-      );
+      showValidationErrorDialog(context, provider.requestError!);
     }
   }
 
@@ -299,11 +428,27 @@ class _ExpenseCreateSheetState extends State<ExpenseCreateSheet> {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     const Text('Expense Items *', style: TextStyle(fontWeight: FontWeight.bold)),
-                    TextButton.icon(
-                      style: TextButton.styleFrom(foregroundColor: AppColors.primary),
-                      onPressed: provider.isSubmitting ? null : _openAddItemDialog,
-                      icon: const Icon(Icons.add, size: 18),
-                      label: const Text('Add Item', style: TextStyle(fontWeight: FontWeight.bold)),
+                    Row(
+                      children: [
+                        TextButton.icon(
+                          style: TextButton.styleFrom(
+                            foregroundColor: const Color(0xFF0D9488),
+                            padding: const EdgeInsets.symmetric(horizontal: 8),
+                          ),
+                          onPressed: provider.isSubmitting ? null : _openSelectDraftDialog,
+                          icon: const Icon(Icons.two_wheeler_outlined, size: 18),
+                          label: const Text('Add Saved Trip', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                        ),
+                        TextButton.icon(
+                          style: TextButton.styleFrom(
+                            foregroundColor: AppColors.primary,
+                            padding: const EdgeInsets.symmetric(horizontal: 8),
+                          ),
+                          onPressed: provider.isSubmitting ? null : _openAddItemDialog,
+                          icon: const Icon(Icons.add, size: 18),
+                          label: const Text('Add Item', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                        ),
+                      ],
                     ),
                   ],
                 ),
@@ -367,7 +512,7 @@ class _ExpenseCreateSheetState extends State<ExpenseCreateSheet> {
                                   style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
                                 ),
                                 if (item['is_personal_vehicle'] == true ||
-                                    (item['total_km_run'] != null && (item['total_km_run'] as num) > 0))
+                                    (item['total_km_run'] != null && (item['total_km_run'] as num) > 0)) ...[
                                   Padding(
                                     padding: const EdgeInsets.only(top: 2.0),
                                     child: Text(
@@ -375,6 +520,37 @@ class _ExpenseCreateSheetState extends State<ExpenseCreateSheet> {
                                       style: const TextStyle(fontSize: 11, color: AppColors.primary, fontWeight: FontWeight.w600),
                                     ),
                                   ),
+                                  Padding(
+                                    padding: const EdgeInsets.only(top: 4.0),
+                                    child: Row(
+                                      children: [
+                                        Icon(
+                                          (item['has_odometer_start_image'] == true || item['odometer_start_image'] != null)
+                                              ? Icons.check_circle
+                                              : Icons.cancel,
+                                          size: 13,
+                                          color: (item['has_odometer_start_image'] == true || item['odometer_start_image'] != null)
+                                              ? Colors.green
+                                              : Colors.red,
+                                        ),
+                                        const SizedBox(width: 4),
+                                        const Text('Start Photo', style: TextStyle(fontSize: 11)),
+                                        const SizedBox(width: 12),
+                                        Icon(
+                                          (item['has_odometer_end_image'] == true || item['odometer_end_image'] != null)
+                                              ? Icons.check_circle
+                                              : Icons.cancel,
+                                          size: 13,
+                                          color: (item['has_odometer_end_image'] == true || item['odometer_end_image'] != null)
+                                              ? Colors.green
+                                              : Colors.red,
+                                        ),
+                                        const SizedBox(width: 4),
+                                        const Text('End Photo', style: TextStyle(fontSize: 11)),
+                                      ],
+                                    ),
+                                  ),
+                                ],
                               ],
                             ),
                           ),
@@ -439,8 +615,47 @@ class _ExpenseItemDialogState extends State<_ExpenseItemDialog> {
   final _dayEndController = TextEditingController();
   final _totalKmController = TextEditingController();
 
+  File? _startPhotoFile;
+  String? _startPhotoBase64;
+  File? _endPhotoFile;
+  String? _endPhotoBase64;
+
   Map<String, dynamic>? _selectedCategory;
   DateTime _selectedDate = DateTime.now();
+
+  Future<void> _pickOdometerPhoto({required bool isStart}) async {
+    try {
+      final picked = await AppCameraCaptureDialog.capture(
+        context,
+        title: isStart ? 'Day Start Odometer Photo' : 'Day End Odometer Photo',
+        helperTip: 'Align the vehicle odometer reading clearly within the frame',
+      );
+      if (picked == null) return;
+
+      final persistentFile = await MediaStorageService.persistPickedFile(
+        picked,
+        category: MediaCategory.expenses,
+        customPrefix: isStart ? 'odo_start' : 'odo_end',
+      );
+      final file = persistentFile ?? File(picked.path);
+      final bytes = await file.readAsBytes();
+      final b64 = base64Encode(bytes);
+
+      setState(() {
+        if (isStart) {
+          _startPhotoFile = file;
+          _startPhotoBase64 = b64;
+        } else {
+          _endPhotoFile = file;
+          _endPhotoBase64 = b64;
+        }
+      });
+    } catch (e) {
+      if (mounted) {
+        showValidationErrorDialog(context, 'Failed to pick photo: $e');
+      }
+    }
+  }
 
   @override
   void dispose() {
@@ -612,11 +827,16 @@ class _ExpenseItemDialogState extends State<_ExpenseItemDialog> {
                           controller: _dayStartController,
                           keyboardType: const TextInputType.numberWithOptions(decimal: true),
                           decoration: InputDecoration(
-                            labelText: 'Day Start (Odo Meter)',
+                            labelText: 'Day Start (Odo Meter) *',
                             border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
                             contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                           ),
                           onChanged: (_) => _onOdometerChanged(),
+                          validator: (val) {
+                            if (!_isPersonalVehicle) return null;
+                            if (val == null || val.trim().isEmpty) return 'Required.';
+                            return null;
+                          },
                         ),
                       ),
                       const SizedBox(width: 12),
@@ -625,19 +845,21 @@ class _ExpenseItemDialogState extends State<_ExpenseItemDialog> {
                           controller: _dayEndController,
                           keyboardType: const TextInputType.numberWithOptions(decimal: true),
                           decoration: InputDecoration(
-                            labelText: 'Day End (Odo Meter)',
+                            labelText: 'Day End (Odo Meter) *',
                             border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
                             contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                           ),
                           onChanged: (_) => _onOdometerChanged(),
                           validator: (val) {
+                            if (!_isPersonalVehicle) return null;
+                            if (val == null || val.trim().isEmpty) return 'Required.';
                             final startText = _dayStartController.text.trim();
                             final endText = _dayEndController.text.trim();
                             if (startText.isNotEmpty && endText.isNotEmpty) {
                               final start = double.tryParse(startText) ?? 0.0;
                               final end = double.tryParse(endText) ?? 0.0;
                               if (end < start) {
-                                return 'Day End cannot be less than Day Start.';
+                                return 'Day End < Day Start.';
                               }
                             }
                             return null;
@@ -646,7 +868,69 @@ class _ExpenseItemDialogState extends State<_ExpenseItemDialog> {
                       ),
                     ],
                   ),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 12),
+
+                  // Odometer Photo Capture Buttons
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          style: OutlinedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
+                            side: BorderSide(
+                              color: _startPhotoFile != null ? Colors.green : AppColors.primary,
+                            ),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                          ),
+                          onPressed: () => _pickOdometerPhoto(isStart: true),
+                          icon: Icon(
+                            _startPhotoFile != null ? Icons.check_circle : Icons.photo_camera,
+                            size: 16,
+                            color: _startPhotoFile != null ? Colors.green : AppColors.primary,
+                          ),
+                          label: Text(
+                            _startPhotoFile != null ? 'Start Photo ✓' : 'Start Photo *',
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                              color: _startPhotoFile != null ? Colors.green : AppColors.primary,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          style: OutlinedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
+                            side: BorderSide(
+                              color: _endPhotoFile != null ? Colors.green : AppColors.primary,
+                            ),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                          ),
+                          onPressed: () => _pickOdometerPhoto(isStart: false),
+                          icon: Icon(
+                            _endPhotoFile != null ? Icons.check_circle : Icons.photo_camera,
+                            size: 16,
+                            color: _endPhotoFile != null ? Colors.green : AppColors.primary,
+                          ),
+                          label: Text(
+                            _endPhotoFile != null ? 'End Photo ✓' : 'End Photo *',
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                              color: _endPhotoFile != null ? Colors.green : AppColors.primary,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
                   TextFormField(
                     controller: _totalKmController,
                     keyboardType: const TextInputType.numberWithOptions(decimal: true),
@@ -774,6 +1058,23 @@ class _ExpenseItemDialogState extends State<_ExpenseItemDialog> {
               final allowanceType = _allowanceType;
               final isPersonalVehicle = _isPersonalVehicle;
 
+              if (isPersonalVehicle) {
+                if (_startPhotoBase64 == null) {
+                  showValidationErrorDialog(
+                    context,
+                    'Day Start Odometer Photo is required for Personal Vehicle.',
+                  );
+                  return;
+                }
+                if (_endPhotoBase64 == null) {
+                  showValidationErrorDialog(
+                    context,
+                    'Day End Odometer Photo is required for Personal Vehicle.',
+                  );
+                  return;
+                }
+              }
+
               final startKm = isPersonalVehicle ? (double.tryParse(_dayStartController.text.trim()) ?? 0.0) : null;
               final endKm = isPersonalVehicle ? (double.tryParse(_dayEndController.text.trim()) ?? 0.0) : null;
               final totalKm = isPersonalVehicle ? (double.tryParse(_totalKmController.text.trim()) ?? 0.0) : null;
@@ -790,6 +1091,10 @@ class _ExpenseItemDialogState extends State<_ExpenseItemDialog> {
                 if (startKm != null) 'odometer_day_start': startKm,
                 if (endKm != null) 'odometer_day_end': endKm,
                 if (totalKm != null) 'total_km_run': totalKm,
+                if (isPersonalVehicle) 'odometer_start_image': _startPhotoBase64,
+                if (isPersonalVehicle) 'has_odometer_start_image': _startPhotoBase64 != null,
+                if (isPersonalVehicle) 'odometer_end_image': _endPhotoBase64,
+                if (isPersonalVehicle) 'has_odometer_end_image': _endPhotoBase64 != null,
               };
 
               widget.onSave(item);

@@ -319,6 +319,26 @@ class _ExpenseDetailsSheetState extends State<ExpenseDetailsSheet> {
                                                 style: const TextStyle(fontSize: 12, color: AppColors.primary, fontWeight: FontWeight.w600),
                                               ),
                                             ),
+                                            const SizedBox(height: 4),
+                                            Row(
+                                              children: [
+                                                Icon(
+                                                  item['has_odometer_start_image'] == true ? Icons.check_circle : Icons.cancel,
+                                                  size: 13,
+                                                  color: item['has_odometer_start_image'] == true ? Colors.green : Colors.red,
+                                                ),
+                                                const SizedBox(width: 4),
+                                                const Text('Start Photo', style: TextStyle(fontSize: 11)),
+                                                const SizedBox(width: 12),
+                                                Icon(
+                                                  item['has_odometer_end_image'] == true ? Icons.check_circle : Icons.cancel,
+                                                  size: 13,
+                                                  color: item['has_odometer_end_image'] == true ? Colors.green : Colors.red,
+                                                ),
+                                                const SizedBox(width: 4),
+                                                const Text('End Photo', style: TextStyle(fontSize: 11)),
+                                              ],
+                                            ),
                                           ],
                                           if (item['description'] != null && item['description'].toString().isNotEmpty) ...[
                                             const Divider(height: 16),

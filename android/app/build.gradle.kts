@@ -96,3 +96,26 @@ dependencies {
     // Import the Firebase BoM
     implementation(platform("com.google.firebase:firebase-bom:34.15.0"))
 }
+
+val copySplitApksWithPrefix = tasks.register("copySplitApksWithPrefix") {
+    doLast {
+        val flutterApkDir = project.layout.buildDirectory.dir("outputs/flutter-apk").get().asFile
+        if (flutterApkDir.exists()) {
+            val v8a = File(flutterApkDir, "app-arm64-v8a-release.apk")
+            val v7a = File(flutterApkDir, "app-armeabi-v7a-release.apk")
+
+            if (v8a.exists()) {
+                v8a.copyTo(File(flutterApkDir, "GDFL_64bit.apk"), overwrite = true)
+                v8a.copyTo(rootProject.file("GDFL_64bit.apk"), overwrite = true)
+            }
+            if (v7a.exists()) {
+                v7a.copyTo(File(flutterApkDir, "GDFL_32bit.apk"), overwrite = true)
+                v7a.copyTo(rootProject.file("GDFL_32bit.apk"), overwrite = true)
+            }
+        }
+    }
+}
+
+tasks.matching { it.name == "assembleRelease" }.configureEach {
+    finalizedBy(copySplitApksWithPrefix)
+}

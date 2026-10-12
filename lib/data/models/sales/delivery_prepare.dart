@@ -80,6 +80,7 @@ class DeliveryPicking {
       destinationLocationId: destLoc is Map
           ? asNonZeroInt(destLoc['id'])
           : null,
+
       destinationLocationName: destLoc is Map
           ? asNullableString(destLoc['name'])
           : null,

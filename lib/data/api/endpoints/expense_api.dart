@@ -86,4 +86,60 @@ extension ExpenseApi on ApiService {
       'reason': reason,
     });
   }
+
+  Future<Map<String, dynamic>> createExpense({
+    required int employeeId,
+    required int categoryId,
+    String? title,
+    double? amount,
+    String? date,
+    String? description,
+    double? odometerDayStart,
+    double? odometerDayEnd,
+    double? totalKmRun,
+    String? odometerStartImage,
+    String? odometerEndImage,
+  }) async {
+    return _post('/api/v1/hr/expense/create', {
+      'employee_id': employeeId,
+      'category_id': categoryId,
+      if (title != null) 'title': title,
+      if (amount != null) 'amount': amount,
+      if (date != null) 'date': date,
+      if (description != null) 'description': description,
+      if (odometerDayStart != null) 'odometer_day_start': odometerDayStart,
+      if (odometerDayEnd != null) 'odometer_day_end': odometerDayEnd,
+      if (totalKmRun != null) 'total_km_run': totalKmRun,
+      if (odometerStartImage != null) 'odometer_start_image': odometerStartImage,
+      if (odometerEndImage != null) 'odometer_end_image': odometerEndImage,
+    });
+  }
+
+  Future<Map<String, dynamic>> updateExpense({
+    required int expenseId,
+    int? categoryId,
+    String? title,
+    double? amount,
+    String? date,
+    String? description,
+    double? odometerDayStart,
+    double? odometerDayEnd,
+    double? totalKmRun,
+    String? odometerStartImage,
+    String? odometerEndImage,
+  }) async {
+    return _post('/api/v1/hr/expense/update', {
+      'expense_id': expenseId,
+      if (categoryId != null) 'category_id': categoryId,
+      if (title != null) 'title': title,
+      if (amount != null) 'amount': amount,
+      if (date != null) 'date': date,
+      if (description != null) 'description': description,
+      if (odometerDayStart != null) 'odometer_day_start': odometerDayStart,
+      if (odometerDayEnd != null) 'odometer_day_end': odometerDayEnd,
+      if (totalKmRun != null) 'total_km_run': totalKmRun,
+      if (odometerStartImage != null) 'odometer_start_image': odometerStartImage,
+      if (odometerEndImage != null) 'odometer_end_image': odometerEndImage,
+    });
+  }
 }

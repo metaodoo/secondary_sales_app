@@ -5,6 +5,7 @@ import 'package:secondary_sales/features/auth/auth_provider.dart';
 import 'package:secondary_sales/features/hr/expense_provider.dart';
 import 'package:secondary_sales/features/hr/screens/expense_create_sheet.dart';
 import 'package:secondary_sales/features/hr/screens/expense_details_sheet.dart';
+import 'package:secondary_sales/features/hr/screens/personal_vehicle_trip_sheet.dart';
 import 'package:secondary_sales/core/access/permission_gate.dart';
 import 'package:secondary_sales/core/access/access_resources.dart';
 import 'package:secondary_sales/core/widgets/ss_ui.dart';
@@ -225,10 +226,76 @@ class _ExpenseDashboardContentState extends State<_ExpenseDashboardContent> with
             )
           : null,
       body: RefreshIndicator(
-        onRefresh: () => provider.fetchSheetList(),
+        onRefresh: () async {
+          await provider.fetchDrafts();
+          await provider.fetchSheetList();
+        },
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            // Active Trip in Progress Banner
+            if (provider.activeTab == 'own' &&
+                provider.drafts.any((d) => d['is_personal_vehicle'] == true)) ...[
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+                child: Material(
+                  color: Colors.teal[50],
+                  borderRadius: BorderRadius.circular(12),
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(12),
+                    onTap: () {
+                      final activeTrip = provider.drafts.cast<Map<String, dynamic>?>().firstWhere(
+                        (d) => d?['is_personal_vehicle'] == true,
+                        orElse: () => null,
+                      );
+                      PersonalVehicleTripSheet.show(
+                        context,
+                        activeTrip: activeTrip,
+                        provider: provider,
+                      );
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: Colors.teal[300]!),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(Icons.two_wheeler, color: Colors.teal[800], size: 24),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Active Vehicle Trip in Progress',
+                                  style: TextStyle(
+                                    color: Colors.teal[900],
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 13,
+                                  ),
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  'Start Meter: ${(provider.drafts.firstWhere((d) => d['is_personal_vehicle'] == true)['odometer_day_start'] ?? 0.0).toStringAsFixed(1)} KM • Tap to end trip',
+                                  style: TextStyle(
+                                    color: Colors.teal[700],
+                                    fontSize: 11,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          Icon(Icons.arrow_forward_ios, size: 14, color: Colors.teal[800]),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+
             // Stat cards header
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
