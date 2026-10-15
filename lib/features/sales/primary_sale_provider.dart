@@ -26,6 +26,7 @@ class PrimarySaleProvider with ChangeNotifier {
   List<StockLocation> _locations = [];
   int _loadingCount = 0;
   String? _error;
+  String _channelBusinessType = 'gt';
 
   List<DistributionHub> get hubs => _hubs;
   List<Product> get products => _products;
@@ -39,6 +40,12 @@ class PrimarySaleProvider with ChangeNotifier {
   List<StockLocation> get locations => _locations;
   bool get isLoading => _loadingCount > 0;
   String? get error => _error;
+  String get channelBusinessType => _channelBusinessType;
+
+  void setChannelBusinessType(String value) {
+    final next = value.trim().toLowerCase();
+    _channelBusinessType = next.isEmpty ? 'gt' : next;
+  }
 
   void updateAuth({String? accessToken, String? sessionId, int? employeeId}) {
     _apiService.updateAccessToken(accessToken);
@@ -84,7 +91,7 @@ class PrimarySaleProvider with ChangeNotifier {
     DateTime? dateFrom,
     DateTime? dateTo,
     String saleType = 'primary',
-    String? businessType = 'gt',
+    String? businessType,
     int? outletId,
   }) async {
     _loadingCount++;
@@ -98,7 +105,7 @@ class PrimarySaleProvider with ChangeNotifier {
         dateFrom: dateFrom,
         dateTo: dateTo,
         saleType: saleType,
-        businessType: businessType,
+        businessType: businessType ?? _channelBusinessType,
         outletId: outletId,
       );
     } catch (e) {
@@ -536,6 +543,7 @@ class PrimarySaleProvider with ChangeNotifier {
         expectedDeliveryDate: expectedDeliveryDate,
         warehouseId: warehouseId,
         confirm: confirm,
+        businessType: _channelBusinessType,
       );
       await fetchRecentOrders();
       return true;
@@ -567,6 +575,7 @@ class PrimarySaleProvider with ChangeNotifier {
         expectedDeliveryDate: expectedDeliveryDate,
         confirm: confirm,
         warehouseId: warehouseId,
+        businessType: _channelBusinessType,
       );
       await fetchRecentOrders();
       return true;

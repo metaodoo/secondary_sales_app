@@ -53,7 +53,7 @@ extension SalesApi on ApiService {
     }
 
     try {
-      final result = await _post(AppConstants.saleOrdersEndpoint, params);
+      final result = await _post(_saleOrdersPath(businessType), params);
       if (result['success'] == true) {
         final List<dynamic> data = result['data'] ?? [];
         final ordersList = data
@@ -177,7 +177,7 @@ extension SalesApi on ApiService {
       params['warehouse_id'] = warehouseId;
     }
 
-    final result = await _post(AppConstants.createSaleOrderEndpoint, params);
+    final result = await _post(_createSaleOrderPath(businessType), params);
     if (result['success'] == true) {
       return PrimaryOrder.fromMap(result['data'] ?? <String, dynamic>{});
     }
@@ -300,5 +300,27 @@ extension SalesApi on ApiService {
       return result['data'] ?? <String, dynamic>{};
     }
     throw Exception(result['message'] ?? 'Failed to update secondary sale order');
+  }
+}
+
+String _saleOrdersPath(String? businessType) {
+  switch (businessType) {
+    case 'cs':
+      return '/api/v1/cs/sale-orders';
+    case 'is':
+      return '/api/v1/is/sale-orders';
+    default:
+      return AppConstants.saleOrdersEndpoint;
+  }
+}
+
+String _createSaleOrderPath(String? businessType) {
+  switch (businessType) {
+    case 'cs':
+      return '/api/v1/cs/sale-orders/create';
+    case 'is':
+      return '/api/v1/is/sale-orders/create';
+    default:
+      return AppConstants.createSaleOrderEndpoint;
   }
 }

@@ -22,6 +22,8 @@ class SsModuleCode {
   static const mtSecondarySales = 'MT_SS';
   static const hr = 'HR';
   static const dashboard = 'DSBRD';
+  static const corporateSales = 'CS';
+  static const institutionSales = 'IS';
 }
 
 /// Screen (view) resource keys.
@@ -37,6 +39,10 @@ class AppScreen {
   static const moduleLeave = 'screen.module.leave';
   static const moduleExpense = 'screen.module.accounts';
   static const moduleMyTeam = 'screen.module.dashboard';
+  static const moduleCorporate = 'screen.module.corporate_sale';
+  static const moduleInstitution = 'screen.module.institution_sale';
+  static const corporateOrdersList = 'screen.corporate_sale.orders.list';
+  static const institutionOrdersList = 'screen.institution_sale.orders.list';
 
   // Modern Trade (MT - Primary Sales) screens.
   static const mtOutletsList = 'screen.modern_trade.outlets.list';
@@ -201,6 +207,8 @@ class AppAction {
 
   // Primary sale orders and deliveries.
   static const primaryOrderCreate = 'action.primary_sale.orders.create';
+  static const corporateOrderCreate = 'action.corporate_sale.orders.create';
+  static const institutionOrderCreate = 'action.institution_sale.orders.create';
   static const primaryOrderConfirm = 'action.primary_sale.orders.confirm';
   static const primaryOrderCancel = 'action.primary_sale.orders.cancel';
   static const primaryDeliveryValidate =
@@ -325,6 +333,8 @@ class AppAction {
   }
 
   static String deliveryValidateFor(String saleType, [String? businessType]) {
+    if (businessType == 'cs') return corporateOrderCreate;
+    if (businessType == 'is') return institutionOrderCreate;
     if (businessType == 'mt' || saleType == 'mt' || saleType == 'modern_trade') {
       return mtDeliveryValidate;
     }
@@ -402,6 +412,8 @@ const _mtBoth = <String>[
 const _hr = <String>[SsModuleCode.hr];
 const _acc = <String>[SsModuleCode.accounts];
 const _dashboard = <String>[SsModuleCode.dashboard];
+const _cs = <String>[SsModuleCode.corporateSales];
+const _is = <String>[SsModuleCode.institutionSales];
 const _psSs = <String>[SsModuleCode.primarySales, SsModuleCode.secondarySales];
 
 /// The full catalog pushed to the backend. Keep labels admin-friendly.
@@ -437,6 +449,48 @@ const List<AccessResource> accessCatalog = [
     'mt_secondary',
     'App Modules › Audit Sales',
     _mtSec,
+  ),
+  AccessResource(
+    AppScreen.moduleCorporate,
+    'screen',
+    'corporate_sale',
+    'App Modules › Corporate Sales (CS)',
+    _cs,
+  ),
+  AccessResource(
+    AppScreen.corporateOrdersList,
+    'screen',
+    'corporate_sale',
+    'Corporate Sales (CS) › Orders',
+    _cs,
+  ),
+  AccessResource(
+    AppAction.corporateOrderCreate,
+    'action',
+    'corporate_sale',
+    'Corporate Sales (CS) › Create Order',
+    _cs,
+  ),
+  AccessResource(
+    AppScreen.moduleInstitution,
+    'screen',
+    'institution_sale',
+    'App Modules › Institution Sales (IS)',
+    _is,
+  ),
+  AccessResource(
+    AppScreen.institutionOrdersList,
+    'screen',
+    'institution_sale',
+    'Institution Sales (IS) › Orders',
+    _is,
+  ),
+  AccessResource(
+    AppAction.institutionOrderCreate,
+    'action',
+    'institution_sale',
+    'Institution Sales (IS) › Create Order',
+    _is,
   ),
   AccessResource(
     AppScreen.moduleAttendance,

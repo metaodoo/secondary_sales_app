@@ -66,8 +66,10 @@ class _ValidateDeliveryScreenState extends State<ValidateDeliveryScreen> {
       !_canValidate;
 
   bool get _isMt => widget.businessType == 'mt';
+  bool get _isChannelSale =>
+      widget.businessType == 'cs' || widget.businessType == 'is';
   bool get _isSecondary => widget.saleType == 'secondary';
-  bool get _hideLots => _isSecondary || _isMt;
+  bool get _hideLots => _isSecondary || _isMt || _isChannelSale;
 
   @override
   void dispose() {
@@ -343,7 +345,7 @@ class _ValidateDeliveryScreenState extends State<ValidateDeliveryScreen> {
     });
   }
 
-  Future<void> _confirmDelivery() async {
+  Future<void> _confirmDelivery({bool confirm = true}) async {
     FocusScope.of(context).unfocus();
     await Future<void>.delayed(Duration.zero);
     if (!mounted) return;
@@ -395,7 +397,9 @@ class _ValidateDeliveryScreenState extends State<ValidateDeliveryScreen> {
       return;
     }
 
-    if (widget.saleType == 'primary' && !_isMt) {
+    final saveOnly = (_isChannelSale && !confirm) ||
+        (widget.saleType == 'primary' && !_isMt && !_isChannelSale);
+    if (saveOnly) {
       if (!mounted) return;
       final order = await context.read<PrimarySaleProvider>().validateDelivery(
         orderId: widget.orderId,
@@ -740,42 +744,104 @@ class _ValidateDeliveryScreenState extends State<ValidateDeliveryScreen> {
                   color: Colors.white,
                   border: Border(top: BorderSide(color: Color(0xFFDDE6F2))),
                 ),
-                child: SizedBox(
-                  width: double.infinity,
-                  height: 50,
-                  child: PermissionGate(
-                    resourceKey: AppAction.deliveryValidateFor(
-                      widget.saleType,
-                      widget.businessType,
-                    ),
-                    child: FilledButton(
-                      onPressed: provider.isLoading || _prepare == null
-                          ? null
-                          : _confirmDelivery,
-                      style: FilledButton.styleFrom(
-                        backgroundColor: const Color(0xFF16C083),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(9),
+                child: _isChannelSale
+                    ? Column(
+                        children: [
+                          SizedBox(
+                            width: double.infinity,
+                            height: 50,
+                            child: OutlinedButton(
+                              onPressed: provider.isLoading || _prepare == null
+                                  ? null
+                                  : () => _confirmDelivery(confirm: false),
+                              style: OutlinedButton.styleFrom(
+                                side: const BorderSide(color: Color(0xFF16C083)),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(9),
+                                ),
+                              ),
+                              child: const Text(
+                                'Save Delivery',
+                                style: TextStyle(
+                                  color: Color(0xFF16C083),
+                                  fontWeight: FontWeight.w800,
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 10),
+                          SizedBox(
+                            width: double.infinity,
+                            height: 50,
+                            child: PermissionGate(
+                              resourceKey: AppAction.deliveryValidateFor(
+                                widget.saleType,
+                                widget.businessType,
+                              ),
+                              child: FilledButton(
+                                onPressed: provider.isLoading || _prepare == null
+                                    ? null
+                                    : () => _confirmDelivery(confirm: true),
+                                style: FilledButton.styleFrom(
+                                  backgroundColor: const Color(0xFF16C083),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(9),
+                                  ),
+                                ),
+                                child: provider.isLoading && _prepare != null
+                                    ? const SizedBox(
+                                        width: 22,
+                                        height: 22,
+                                        child: CircularProgressIndicator(
+                                          color: Colors.white,
+                                          strokeWidth: 2,
+                                        ),
+                                      )
+                                    : const Text(
+                                        'Confirm Delivery',
+                                        style: TextStyle(fontWeight: FontWeight.w800),
+                                      ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      )
+                    : SizedBox(
+                        width: double.infinity,
+                        height: 50,
+                        child: PermissionGate(
+                          resourceKey: AppAction.deliveryValidateFor(
+                            widget.saleType,
+                            widget.businessType,
+                          ),
+                          child: FilledButton(
+                            onPressed: provider.isLoading || _prepare == null
+                                ? null
+                                : _confirmDelivery,
+                            style: FilledButton.styleFrom(
+                              backgroundColor: const Color(0xFF16C083),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(9),
+                              ),
+                            ),
+                            child: provider.isLoading && _prepare != null
+                                ? const SizedBox(
+                                    width: 22,
+                                    height: 22,
+                                    child: CircularProgressIndicator(
+                                      color: Colors.white,
+                                      strokeWidth: 2,
+                                    ),
+                                  )
+                                : Text(
+                                    (widget.saleType == 'primary' && !_isMt)
+                                        ? 'Save Delivery'
+                                        : 'Confirm Delivery',
+                                    style: const TextStyle(fontWeight: FontWeight.w800),
+                                  ),
+                          ),
                         ),
                       ),
-                      child: provider.isLoading && _prepare != null
-                          ? const SizedBox(
-                              width: 22,
-                              height: 22,
-                              child: CircularProgressIndicator(
-                                color: Colors.white,
-                                strokeWidth: 2,
-                              ),
-                            )
-                          : Text(
-                              (widget.saleType == 'primary' && !_isMt)
-                                  ? 'Save Delivery'
-                                  : 'Confirm Delivery',
-                              style: const TextStyle(fontWeight: FontWeight.w800),
-                            ),
-                    ),
-                  ),
-                ),
               ),
           ],
         ),

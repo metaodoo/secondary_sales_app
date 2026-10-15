@@ -27,6 +27,8 @@ class DashboardTab extends StatelessWidget {
     this.showPrimarySalesModule = true,
     this.showSecondarySalesModule = true,
     required this.moduleType,
+    this.moduleTitle,
+    this.businessType = 'gt',
     required this.onBackToModules,
     this.onOpenMenu,
   });
@@ -36,6 +38,8 @@ class DashboardTab extends StatelessWidget {
   final bool showPrimarySalesModule;
   final bool showSecondarySalesModule;
   final String moduleType;
+  final String? moduleTitle;
+  final String businessType;
   final VoidCallback onBackToModules;
 
   /// Opens the global navigation drawer. When provided, the app-bar leading
@@ -67,13 +71,14 @@ class DashboardTab extends StatelessWidget {
               )
             : null,
         title: Text(
-          moduleType == 'primary'
+          moduleTitle ??
+          (moduleType == 'primary'
               ? 'Primary Sales'
               : (moduleType == 'mt_primary' || moduleType == 'modern_trade'
                   ? 'MT - Primary Sales'
                   : (moduleType == 'mt_secondary' || moduleType == 'modern_trade_secondary'
                       ? 'Audit Sales'
-                      : 'Secondary Sales')),
+                      : 'Secondary Sales'))),
           style: const TextStyle(
             color: AppColors.primaryStrong,
             fontWeight: FontWeight.bold,
@@ -336,6 +341,25 @@ class DashboardTab extends StatelessWidget {
                           iconColor: Colors.white,
                           circleColor: AppColors.primaryStrong,
                           onTap: () => onModuleSelected(AppShellIndex.sales),
+                        ),
+                      if ((businessType == 'cs' || businessType == 'is') &&
+                          showPrimarySalesModule)
+                        _buildModuleCard(
+                          title: 'Delivery',
+                          icon: Icons.local_shipping_outlined,
+                          iconColor: AppColors.primary,
+                          circleColor: AppColors.primarySoft,
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => DeliveriesListScreen(
+                                  moduleType: 'primary',
+                                  businessType: businessType,
+                                ),
+                              ),
+                            );
+                          },
                         ),
                       if (showDealerModule)
                         _buildModuleCard(

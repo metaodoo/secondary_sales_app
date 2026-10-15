@@ -55,6 +55,28 @@ List<ModuleLauncherItem> buildTopLevelModuleItems(BuildContext context) {
         color: const Color(0xFF10B981),
         onTap: () => open(const AppShell(moduleType: 'secondary')),
       ),
+    if (auth.canAccessCorporateSales)
+      ModuleLauncherItem(
+        title: 'Corporate Sales (CS)',
+        icon: Icons.apartment_outlined,
+        color: const Color(0xFF7C3AED),
+        onTap: () => open(const AppShell(
+          moduleType: 'primary',
+          businessType: 'cs',
+          moduleTitle: 'Corporate Sales (CS)',
+        )),
+      ),
+    if (auth.canAccessInstitutionSales)
+      ModuleLauncherItem(
+        title: 'Institution Sales (IS)',
+        icon: Icons.account_balance_outlined,
+        color: const Color(0xFF0F766E),
+        onTap: () => open(const AppShell(
+          moduleType: 'primary',
+          businessType: 'is',
+          moduleTitle: 'Institution Sales (IS)',
+        )),
+      ),
     if (auth.canView(AppScreen.moduleAttendance))
       ModuleLauncherItem(
         title: 'Attendance',

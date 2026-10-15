@@ -242,6 +242,8 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
     final canAccessLeave = auth.canView(AppScreen.moduleLeave);
     final canAccessExpense = auth.canView(AppScreen.moduleExpense);
     final canAccessMyTeam = auth.canView(AppScreen.moduleMyTeam);
+    final canAccessCorporate = auth.canAccessCorporateSales;
+    final canAccessInstitution = auth.canAccessInstitutionSales;
 
     final canShowTeam = summary?.hasTeam ?? false;
     final showTeam = canShowTeam && _showTeam;
@@ -275,6 +277,28 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
           icon: Icons.storefront_outlined,
           color: const Color(0xFF10B981),
           onTap: () => _open(const AppShell(moduleType: 'secondary')),
+        ),
+      if (canAccessCorporate)
+        _ModuleItem(
+          title: 'Corporate Sales (CS)',
+          icon: Icons.apartment_outlined,
+          color: const Color(0xFF7C3AED),
+          onTap: () => _open(const AppShell(
+            moduleType: 'primary',
+            businessType: 'cs',
+            moduleTitle: 'Corporate Sales (CS)',
+          )),
+        ),
+      if (canAccessInstitution)
+        _ModuleItem(
+          title: 'Institution Sales (IS)',
+          icon: Icons.account_balance_outlined,
+          color: const Color(0xFF0F766E),
+          onTap: () => _open(const AppShell(
+            moduleType: 'primary',
+            businessType: 'is',
+            moduleTitle: 'Institution Sales (IS)',
+          )),
         ),
       if (canAccessMtPrimary)
         _ModuleItem(

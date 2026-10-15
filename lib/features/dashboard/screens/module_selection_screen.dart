@@ -11,6 +11,7 @@ import 'package:secondary_sales/features/hr/screens/leave_dashboard_screen.dart'
 import 'package:secondary_sales/features/hr/screens/expense_dashboard_screen.dart';
 import 'package:secondary_sales/features/hr/screens/personal_vehicle_trip_screen.dart';
 import 'package:secondary_sales/features/my_team/screens/my_team_screen.dart';
+import 'package:secondary_sales/features/corporate_institutional_sale/corporate_institutional_sale_module_cards.dart';
 
 class ModuleSelectionScreen extends StatelessWidget {
   const ModuleSelectionScreen({super.key});
@@ -112,6 +113,8 @@ class ModuleSelectionScreen extends StatelessWidget {
                 ),
                 const SizedBox(height: 24),
               ],
+
+              const CorporateInstitutionalSaleModuleCards(),
 
               // ─── MT - Primary Sales ───────────────
               if (canAccessMtPrimary) ...[

@@ -155,6 +155,22 @@ class AuthProvider with ChangeNotifier {
   // Backward compatibility alias
   bool get canAccessModernTrade => canAccessMtPrimarySales;
 
+  bool get canAccessCorporateSales {
+    if (access.granted.isEmpty) {
+      return false;
+    }
+    return access.granted.contains(AppScreen.moduleCorporate) ||
+        access.granted.contains(AppScreen.corporateOrdersList);
+  }
+
+  bool get canAccessInstitutionSales {
+    if (access.granted.isEmpty) {
+      return false;
+    }
+    return access.granted.contains(AppScreen.moduleInstitution) ||
+        access.granted.contains(AppScreen.institutionOrdersList);
+  }
+
   /// Backend-driven screen/action access for the current user's group.
   /// Empty (allow-all) until the backend ships grants — see ACCESS_CONTROL_PLAN.md.
   AccessControl get access => _session?.access ?? const AccessControl();
