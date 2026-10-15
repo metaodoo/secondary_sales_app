@@ -253,11 +253,12 @@ class _CreateOutletScreenState extends State<CreateOutletScreen> {
       if (_warmedPosition != null && _warmedPosition!.accuracy <= 25.0) {
         position = _warmedPosition!;
       } else {
-        // Sample high-accuracy GPS for up to 6 seconds directly at the shop entrance
+        // Sample high-accuracy GPS directly at the shop entrance.
+        // Strict threshold (max 35m) ensures cell-tower / Wi-Fi triangulation (> 500m) is rejected.
         position = await LocationService.getAccuratePosition(
           desiredAccuracyInMeters: 25.0,
-          maxAcceptableAccuracyInMeters: 100.0,
-          timeLimit: const Duration(seconds: 6),
+          maxAcceptableAccuracyInMeters: 35.0,
+          timeLimit: const Duration(seconds: 15),
         );
       }
 

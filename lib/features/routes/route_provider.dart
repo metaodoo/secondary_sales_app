@@ -523,6 +523,8 @@ class RouteProvider with ChangeNotifier {
     String? city,
     int? outletClassId,
     int? outletTypeId,
+    double? partnerLatitude,
+    double? partnerLongitude,
   }) async {
     _loadingCount++;
     _error = null;
@@ -539,7 +541,17 @@ class RouteProvider with ChangeNotifier {
         city: city,
         outletClassId: outletClassId,
         outletTypeId: outletTypeId,
+        partnerLatitude: partnerLatitude,
+        partnerLongitude: partnerLongitude,
       );
+
+      // If updating coordinates for an outlet on the currently active route,
+      // refresh the route detail so the distance badges and list immediately update.
+      if (_activeRoute != null &&
+          (partnerLatitude != null || partnerLongitude != null)) {
+        await fetchRouteDetail(_activeRoute!.id);
+      }
+
       return updated;
     } catch (e) {
       _error = e.toString();

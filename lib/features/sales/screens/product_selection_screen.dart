@@ -380,7 +380,7 @@ class _ProductSelectionScreenState extends State<ProductSelectionScreen> {
       body: SafeArea(
         child: Column(
           children: [
-            if (widget.customerName != null && widget.customerName!.isNotEmpty) ...[
+            if ((widget.customerName != null && widget.customerName!.isNotEmpty) || widget.hub != null) ...[
               Padding(
                 padding: const EdgeInsets.fromLTRB(24, 12, 24, 0),
                 child: Container(
@@ -391,25 +391,52 @@ class _ProductSelectionScreenState extends State<ProductSelectionScreen> {
                     borderRadius: BorderRadius.circular(10),
                     border: Border.all(color: const Color(0xFFD6DDFB)),
                   ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text(
-                        widget.customerName!,
-                        style: const TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.bold,
-                          color: AppColors.textPrimary,
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              widget.customerName ?? widget.hub?.name ?? '',
+                              style: const TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.bold,
+                                color: AppColors.textPrimary,
+                              ),
+                            ),
+                            if ((widget.customerCode ?? widget.hub?.code) != null &&
+                                (widget.customerCode ?? widget.hub?.code)!.trim().isNotEmpty) ...[
+                              const SizedBox(height: 2),
+                              Text(
+                                'Code: ${(widget.customerCode ?? widget.hub?.code)!.trim()}',
+                                style: const TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
+                                  color: AppColors.primary,
+                                ),
+                              ),
+                            ],
+                          ],
                         ),
                       ),
-                      if (widget.customerCode != null && widget.customerCode!.trim().isNotEmpty) ...[
-                        const SizedBox(height: 2),
-                        Text(
-                          'Code: ${widget.customerCode!.trim()}',
-                          style: const TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w600,
-                            color: AppColors.primary,
+                      if (widget.hub?.totalDue != null) ...[
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFFEF2F2),
+                            borderRadius: BorderRadius.circular(6),
+                            border: Border.all(color: const Color(0xFFFCA5A5)),
+                          ),
+                          child: Text(
+                            'Due: ৳${widget.hub!.totalDue!.toStringAsFixed(2)}',
+                            style: const TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFFDC2626),
+                            ),
                           ),
                         ),
                       ],

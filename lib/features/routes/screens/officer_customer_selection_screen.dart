@@ -133,6 +133,98 @@ class _OfficerCustomerSelectionScreenState
     }
   }
 
+  Future<void> _recalibrateOutletLocation(RouteOutlet outlet) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Row(
+          children: [
+            Icon(Icons.edit_location_alt_outlined, color: AppColors.primaryStrong),
+            SizedBox(width: 8),
+            Text('Update GPS Location', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+          ],
+        ),
+        content: Text(
+          'Are you currently physically standing at "${outlet.name}"?\n\n'
+          'This will overwrite the outlet\'s saved coordinates with your current high-precision GPS position so you can check in accurately.',
+          style: const TextStyle(fontSize: 14, height: 1.4),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primaryStrong,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Update Now'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm != true || !mounted) return;
+
+    try {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Row(
+            children: [
+              SizedBox(
+                width: 16,
+                height: 16,
+                child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+              ),
+              SizedBox(width: 12),
+              Text('Acquiring high-accuracy satellite GPS fix…'),
+            ],
+          ),
+          duration: Duration(seconds: 4),
+        ),
+      );
+
+      final position = await LocationService.getAccuratePosition(
+        desiredAccuracyInMeters: 25.0,
+        maxAcceptableAccuracyInMeters: 35.0,
+        timeLimit: const Duration(seconds: 15),
+      );
+
+      final routeProv = context.read<RouteProvider>();
+      final result = await routeProv.updateOutlet(
+        outlet.id,
+        partnerLatitude: position.latitude,
+        partnerLongitude: position.longitude,
+      );
+
+      if (!mounted) return;
+
+      if (result != null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Location updated to ±${position.accuracy.round()}m accuracy! You can now check in.',
+            ),
+            backgroundColor: const Color(0xFF10B981),
+          ),
+        );
+        _refreshRoute();
+      } else {
+        throw Exception(routeProv.error ?? 'Failed to update location');
+      }
+    } catch (e) {
+      if (mounted) {
+        ssShowLocationErrorDialog(
+          context,
+          'Could not calibrate GPS: ${e.toString().replaceAll('Exception: ', '')}',
+        );
+      }
+    }
+  }
+
   String _formatTime(DateTime dt) {
     final localDt = dt.toLocal();
     final hour = localDt.hour > 12
@@ -596,32 +688,33 @@ class _OfficerCustomerSelectionScreenState
                                   width: isCheckedIn ? 2 : 1,
                                 ),
                               ),
-                              child: Row(
+                              child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Container(
-                                    padding: const EdgeInsets.all(10),
-                                    decoration: BoxDecoration(
-                                      color: AppColors.primarySoft,
-                                      borderRadius: BorderRadius.circular(20),
-                                    ),
-                                    child: const Icon(
-                                      Icons.storefront,
-                                      color: Color(0xFF3B82F6),
-                                      size: 20,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 12),
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        // Primary: Outlet Name with full column width
+                                  Row(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Container(
+                                        padding: const EdgeInsets.all(10),
+                                        decoration: BoxDecoration(
+                                          color: AppColors.primarySoft,
+                                          borderRadius: BorderRadius.circular(20),
+                                        ),
+                                        child: const Icon(
+                                          Icons.storefront,
+                                          color: Color(0xFF3B82F6),
+                                          size: 20,
+                                        ),
+                                      ),
+                                      const SizedBox(width: 12),
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                        // Primary: Outlet Name with full width, naturally wraps row by row
                                         Text(
                                           outlet.name,
-                                          maxLines: 2,
-                                          overflow: TextOverflow.ellipsis,
+                                          softWrap: true,
                                           style: const TextStyle(
                                             fontWeight: FontWeight.bold,
                                             fontSize: 15,
@@ -629,26 +722,25 @@ class _OfficerCustomerSelectionScreenState
                                             color: AppColors.textPrimary,
                                           ),
                                         ),
-                                        // Secondary: SS Code + Distance Badge on their own row
-                                        const SizedBox(height: 3),
-                                        Row(
+                                        // Secondary: SS Code + Distance Badge (Wrap prevents squishing on narrow screens)
+                                        const SizedBox(height: 4),
+                                        Wrap(
+                                          spacing: 6,
+                                          runSpacing: 4,
+                                          crossAxisAlignment: WrapCrossAlignment.center,
                                           children: [
                                             if (outlet.code != null &&
-                                                outlet.code!.trim().isNotEmpty) ...[
-                                              Flexible(
-                                                child: Text(
-                                                  'SS Code: ${outlet.code!.trim()}',
-                                                  maxLines: 1,
-                                                  overflow: TextOverflow.ellipsis,
-                                                  style: const TextStyle(
-                                                    color: AppColors.primary,
-                                                    fontWeight: FontWeight.w600,
-                                                    fontSize: 12,
-                                                  ),
+                                                outlet.code!.trim().isNotEmpty)
+                                              Text(
+                                                'SS Code: ${outlet.code!.trim()}',
+                                                maxLines: 1,
+                                                overflow: TextOverflow.ellipsis,
+                                                style: const TextStyle(
+                                                  color: AppColors.primary,
+                                                  fontWeight: FontWeight.w600,
+                                                  fontSize: 12,
                                                 ),
                                               ),
-                                              if (distanceMeters != null) const SizedBox(width: 6),
-                                            ],
                                             if (distanceMeters != null)
                                               _buildDistanceBadge(
                                                 distanceMeters,
@@ -759,9 +851,13 @@ class _OfficerCustomerSelectionScreenState
                                       ],
                                     ),
                                   ),
-                                  const SizedBox(width: 10),
-                                  if (isCheckedIn) ...[
-                                    ElevatedButton.icon(
+                                ],
+                              ),
+                              const SizedBox(height: 12),
+                              if (isCheckedIn)
+                                SizedBox(
+                                  width: double.infinity,
+                                  child: ElevatedButton.icon(
                                       onPressed: _checkingOutOutletId != null
                                            ? null
                                            : () async {
@@ -859,8 +955,11 @@ class _OfficerCustomerSelectionScreenState
                                         ),
                                       ),
                                     ),
-                                  ] else ...[
-                                    ElevatedButton.icon(
+                                  )
+                                  else
+                                    SizedBox(
+                                      width: double.infinity,
+                                      child: ElevatedButton.icon(
                                        onPressed: _checkingInOutletId != null
                                            ? null
                                            : () async {
@@ -965,12 +1064,16 @@ class _OfficerCustomerSelectionScreenState
                                                  }
                                                } catch (e) {
                                                  if (context.mounted) {
+                                                   final errorMsg = e.toString().replaceAll(
+                                                     'Exception: ',
+                                                     '',
+                                                   );
+                                                   final isGeofenceError = errorMsg.contains('away from') || errorMsg.contains('radius');
                                                    ssShowLocationErrorDialog(
                                                      context,
-                                                     e.toString().replaceAll(
-                                                       'Exception: ',
-                                                       '',
-                                                     ),
+                                                     errorMsg,
+                                                     actionLabel: isGeofenceError ? 'Update GPS' : null,
+                                                     onAction: isGeofenceError ? () => _recalibrateOutletLocation(outlet) : null,
                                                    );
                                                  }
                                                } finally {
@@ -1019,7 +1122,7 @@ class _OfficerCustomerSelectionScreenState
                                         ),
                                       ),
                                     ),
-                                  ],
+                                  ),
                                 ],
                               ),
                             ),

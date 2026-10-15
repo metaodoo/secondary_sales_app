@@ -88,12 +88,14 @@ class OrderPartner {
     required this.name,
     this.phone,
     this.address,
+    this.totalDue,
   });
 
   final int id;
   final String name;
   final String? phone;
   final String? address;
+  final double? totalDue;
 
   factory OrderPartner.fromMap(Map<String, dynamic> map) {
     return OrderPartner(
@@ -101,6 +103,7 @@ class OrderPartner {
       name: (map['name'] ?? '').toString(),
       phone: asNullableString(map['phone']),
       address: asNullableString(map['address']),
+      totalDue: asNullableDouble(map['total_due'] ?? map['due_amount'] ?? map['credit']),
     );
   }
 }

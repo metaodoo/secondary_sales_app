@@ -446,4 +446,68 @@ class ExpenseProvider extends ChangeNotifier {
       notifyListeners();
     }
   }
+
+  // Personal Vehicle Trips State & Actions
+  List<Map<String, dynamic>> _vehicleExpenses = [];
+  bool _isLoadingVehicleExpenses = false;
+
+  List<Map<String, dynamic>> get vehicleExpenses => _vehicleExpenses;
+  bool get isLoadingVehicleExpenses => _isLoadingVehicleExpenses;
+
+  Future<void> fetchVehicleExpenses({String? startDate, String? endDate}) async {
+    if (_employeeId == 0) return;
+    _isLoadingVehicleExpenses = true;
+    notifyListeners();
+
+    try {
+      final response = await _apiService.getExpenseList(
+        employeeId: _employeeId,
+        mode: 'own',
+        isPersonalVehicle: true,
+        startDate: startDate,
+        endDate: endDate,
+      );
+      if (response['success'] == true) {
+        final List data = response['data'] ?? [];
+        _vehicleExpenses = data.map((e) => e as Map<String, dynamic>).toList();
+      }
+    } catch (e) {
+      debugPrint('Failed to fetch personal vehicle expenses: $e');
+    } finally {
+      _isLoadingVehicleExpenses = false;
+      notifyListeners();
+    }
+  }
+
+  Future<Map<String, dynamic>?> submitVehicleExpenseSheet({
+    required int expenseId,
+    String? title,
+    String? description,
+  }) async {
+    _isSubmitting = true;
+    _requestError = null;
+    notifyListeners();
+
+    try {
+      final response = await _apiService.submitPersonalVehicleExpenseSheet(
+        expenseId: expenseId,
+        title: title,
+        description: description,
+      );
+      if (response['success'] == true) {
+        await fetchDrafts();
+        await fetchVehicleExpenses();
+        return response['data'];
+      } else {
+        _requestError = response['message'] ?? 'Failed to submit vehicle expense sheet.';
+        return null;
+      }
+    } catch (e) {
+      _requestError = e.toString().replaceAll('Exception: ', '');
+      return null;
+    } finally {
+      _isSubmitting = false;
+      notifyListeners();
+    }
+  }
 }

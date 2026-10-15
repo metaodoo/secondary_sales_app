@@ -186,7 +186,7 @@ List<MenuSection> buildMenuSections(String moduleType) {
           builder: (_) => const MtStockAuditListScreen(),
         ),
         MenuDestination(
-          label: 'Secondary Orders',
+          label: 'Audit Orders',
           icon: Icons.receipt_long_outlined,
           screenKey: AppScreen.mtSecOrdersList,
           builder: (_) => const MtSecOrdersListScreen(),

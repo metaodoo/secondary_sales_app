@@ -206,6 +206,8 @@ extension ContactsApi on ApiService {
     String? vat,
     int? outletClassId,
     int? outletTypeId,
+    double? partnerLatitude,
+    double? partnerLongitude,
   }) async {
     final params = <String, dynamic>{
       'customer_type': 'outlet',
@@ -223,6 +225,8 @@ extension ContactsApi on ApiService {
       if (vat != null && vat.trim().isNotEmpty) 'vat': vat.trim(),
       if (outletClassId != null) 'outlet_class_id': outletClassId,
       if (outletTypeId != null) 'outlet_type_id': outletTypeId,
+      if (partnerLatitude != null) 'partner_latitude': partnerLatitude,
+      if (partnerLongitude != null) 'partner_longitude': partnerLongitude,
     };
 
     final result = await _post(

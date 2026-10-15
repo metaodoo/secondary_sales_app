@@ -170,6 +170,66 @@ class _LeaveRequestSheetState extends State<LeaveRequestSheet> {
     });
   }
 
+  void _showRestrictionDialog(
+    String title,
+    String message, {
+    IconData icon = Icons.info_outline,
+    Color iconColor = const Color(0xFFD97706),
+    Color iconBgColor = const Color(0xFFFEF3C7),
+  }) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        titlePadding: const EdgeInsets.fromLTRB(24, 24, 24, 12),
+        contentPadding: const EdgeInsets.fromLTRB(24, 0, 24, 16),
+        title: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: iconBgColor,
+                shape: BoxShape.circle,
+              ),
+              child: Icon(icon, color: iconColor, size: 24),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                title,
+                style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
+              ),
+            ),
+          ],
+        ),
+        content: Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: AppColors.background,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: AppColors.borderSoft),
+          ),
+          child: Text(
+            message,
+            style: const TextStyle(fontSize: 14, height: 1.4, color: AppColors.textPrimary),
+          ),
+        ),
+        actions: [
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primary,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+            ),
+            onPressed: () => Navigator.pop(context),
+            child: const Text('OK', style: TextStyle(fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
+  }
+
   void _submit() async {
     final provider = context.read<LeaveProvider>();
     if (provider.isSubmitting) return;
@@ -178,43 +238,94 @@ class _LeaveRequestSheetState extends State<LeaveRequestSheet> {
       _validationTriggered = true;
     });
 
-    if (_selectedLeaveTypeId == null ||
-        _startDate == null ||
-        _endDate == null ||
-        _reasonController.text.trim().isEmpty) {
+    // 1. Validate Leave Type
+    if (_selectedLeaveTypeId == null) {
+      _showRestrictionDialog(
+        'Leave Type Required',
+        'Please select a leave type before submitting your request.',
+        icon: Icons.category_outlined,
+        iconColor: const Color(0xFFDC2626),
+        iconBgColor: const Color(0xFFFEE2E2),
+      );
       return;
     }
 
+    // 2. Validate Start Date
+    if (_startDate == null) {
+      _showRestrictionDialog(
+        'Start Date Required',
+        'Please select the start date for your leave request.',
+        icon: Icons.calendar_today_outlined,
+        iconColor: const Color(0xFFDC2626),
+        iconBgColor: const Color(0xFFFEE2E2),
+      );
+      return;
+    }
+
+    // 3. Validate End Date
+    if (_endDate == null) {
+      _showRestrictionDialog(
+        'End Date Required',
+        'Please select the end date for your leave request.',
+        icon: Icons.calendar_today_outlined,
+        iconColor: const Color(0xFFDC2626),
+        iconBgColor: const Color(0xFFFEE2E2),
+      );
+      return;
+    }
+
+    // 4. Validate Date Order
+    if (_endDate!.isBefore(_startDate!)) {
+      _showRestrictionDialog(
+        'Invalid Date Range',
+        'End date cannot be earlier than start date. Please select a valid date range.',
+        icon: Icons.date_range_outlined,
+        iconColor: const Color(0xFFDC2626),
+        iconBgColor: const Color(0xFFFEE2E2),
+      );
+      return;
+    }
+
+    // Casual Leave / Non-consecutive single-day restriction
     if ((_isCasualLeave || !_allowConsecutiveDays) && _durationDays > 1) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Casual Leave can only be requested for 1 day at a time.'),
-          backgroundColor: Colors.red,
-        ),
+      final typeName = _selectedLeaveType?['name'] ?? 'Casual Leave';
+      _showRestrictionDialog(
+        'Single-Day Policy',
+        '$typeName can only be requested for 1 day at a time. Consecutive days are not permitted under company policy.',
+        icon: Icons.event_busy_outlined,
+        iconColor: const Color(0xFFD97706),
+        iconBgColor: const Color(0xFFFEF3C7),
       );
       return;
     }
 
+    // 7. Monthly Quota Restriction
     if (_isCasualLeave && _currentMonthRemainingQuota != null && _currentMonthRemainingQuota! <= 0) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Monthly quota for Casual Leave is exhausted (Maximum 2 days per month).'),
-          backgroundColor: Colors.red,
-        ),
+      final typeName = _selectedLeaveType?['name'] ?? 'Casual Leave';
+      final maxQuota = _maxDaysPerMonth > 0 ? _maxDaysPerMonth.toInt() : 2;
+      _showRestrictionDialog(
+        'Monthly Quota Exhausted',
+        'Your monthly quota for $typeName is exhausted (Maximum $maxQuota day(s) per calendar month). You cannot submit additional requests for this month.',
+        icon: Icons.block_outlined,
+        iconColor: const Color(0xFFDC2626),
+        iconBgColor: const Color(0xFFFEE2E2),
       );
       return;
     }
 
+    // 8. Mandatory Sick Leave Attachment (> 2 days)
     if (_requiresAttachment && (_attachmentBase64 == null || _attachmentBase64!.isEmpty) && widget.leaveToEdit == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('For Sick Leave of more than 2 days, attaching a photo or document is mandatory.'),
-          backgroundColor: Colors.red,
-        ),
+      _showRestrictionDialog(
+        'Medical Document Required',
+        'For Sick Leave exceeding 2 days, attaching a medical certificate, prescription, or relevant document is mandatory.',
+        icon: Icons.attach_file_outlined,
+        iconColor: const Color(0xFFD97706),
+        iconBgColor: const Color(0xFFFEF3C7),
       );
       return;
     }
 
+    // 9. Advance Notice Restriction
     if (_requiresAdvanceNotice && _startDate != null) {
       final now = DateTime.now();
       final today = DateTime(now.year, now.month, now.day);
@@ -222,11 +333,14 @@ class _LeaveRequestSheetState extends State<LeaveRequestSheet> {
       final noticeDays = start.difference(today).inDays;
       if (noticeDays < _advanceNoticeDays) {
         final leaveTypeName = _selectedLeaveType?['name'] ?? 'This leave type';
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('$leaveTypeName must be requested at least $_advanceNoticeDays days in advance.'),
-            backgroundColor: Colors.red,
-          ),
+        final earliestDate = today.add(Duration(days: _advanceNoticeDays));
+        final formattedEarliest = '${earliestDate.year}-${earliestDate.month.toString().padLeft(2, '0')}-${earliestDate.day.toString().padLeft(2, '0')}';
+        _showRestrictionDialog(
+          'Advance Notice Required',
+          '$leaveTypeName must be requested at least $_advanceNoticeDays calendar day(s) in advance.\n\nEarliest selectable start date is $formattedEarliest (Current notice given: ${noticeDays < 0 ? 0 : noticeDays} day(s)).',
+          icon: Icons.schedule_outlined,
+          iconColor: const Color(0xFFD97706),
+          iconBgColor: const Color(0xFFFEF3C7),
         );
         return;
       }
@@ -691,7 +805,7 @@ class _LeaveRequestSheetState extends State<LeaveRequestSheet> {
               ),
               const SizedBox(height: 16),
 
-              const Text('Reason *', style: TextStyle(fontWeight: FontWeight.bold)),
+              const Text('Reason (Optional)', style: TextStyle(fontWeight: FontWeight.bold)),
               const SizedBox(height: 8),
               TextField(
                 controller: _reasonController,
@@ -701,9 +815,6 @@ class _LeaveRequestSheetState extends State<LeaveRequestSheet> {
                 decoration: InputDecoration(
                   hintText: 'Enter reason for leave...',
                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                  errorText: (_validationTriggered && _reasonController.text.trim().isEmpty)
-                      ? 'Reason is required'
-                      : null,
                 ),
               ),
               const SizedBox(height: 16),

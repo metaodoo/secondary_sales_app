@@ -183,7 +183,7 @@ class LeaveProvider extends ChangeNotifier {
     required int leaveTypeId,
     required String dateFrom,
     required String dateTo,
-    required String reason,
+    String? reason,
     String? attachment,
     String? attachmentName,
   }) async {

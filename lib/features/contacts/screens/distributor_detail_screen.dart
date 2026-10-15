@@ -82,6 +82,11 @@ class _DistributorDetailScreenState extends State<DistributorDetailScreen> {
                           value: _distributor.mobile ?? _distributor.phone,
                         ),
                         _DetailRow(label: 'Email', value: _distributor.email),
+                        if (_distributor.totalDue != null)
+                          _DetailRow(
+                            label: 'Current Balance (Due)',
+                            value: '৳${_distributor.totalDue!.toStringAsFixed(2)}',
+                          ),
                         _DetailRow(
                           label: 'Address',
                           value: _distributor.street,

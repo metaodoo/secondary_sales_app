@@ -37,6 +37,13 @@ double asDouble(Object? value) {
   return double.tryParse(value?.toString() ?? '') ?? 0.0;
 }
 
+/// Nullable double. Returns null when the value is absent (`null`/`false`) or unparseable.
+double? asNullableDouble(Object? value) {
+  if (value == null || value == false) return null;
+  if (value is num) return value.toDouble();
+  return double.tryParse(value.toString());
+}
+
 /// Odoo booleans: real bools, numbers (0 == false) and the string forms
 /// ('', '0', 'false', 'no' are false; everything else true).
 bool asBool(Object? value) {

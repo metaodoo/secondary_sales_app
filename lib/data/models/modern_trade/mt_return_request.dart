@@ -37,6 +37,7 @@ class MtReturnRequest {
   final MtAllowedActions allowedActions;
   final List<MtReturnRequestLine> lines;
   final List<MtReturnTransfer> transfers;
+  final List<MtReturnAttachment> attachments;
 
   MtReturnRequest({
     required this.id,
@@ -75,6 +76,7 @@ class MtReturnRequest {
     required this.allowedActions,
     this.lines = const [],
     this.transfers = const [],
+    this.attachments = const [],
   });
 
   bool get isSaleable => returnBucket == 'saleable';
@@ -85,6 +87,9 @@ class MtReturnRequest {
   bool get isConfirmed => state.toLowerCase() == 'confirmed';
   bool get isDraft => state.toLowerCase() == 'kao';
   bool get isSegregationStage => state.toLowerCase() != 'kao' && state.toLowerCase() != 'dm';
+  bool get hasImageAttachment => attachments.any((a) => a.isImage);
+  MtReturnAttachment? get primaryImageAttachment =>
+      attachments.where((a) => a.isImage).firstOrNull;
 
   factory MtReturnRequest.fromMap(Map<String, dynamic> map) {
     final partner = map['partner'] is Map ? map['partner'] as Map : null;
@@ -96,6 +101,7 @@ class MtReturnRequest {
     final actMap = map['allowed_actions'] is Map ? map['allowed_actions'] as Map<String, dynamic> : <String, dynamic>{};
     final rawLines = map['lines'] as List? ?? [];
     final rawTransfers = map['transfers'] as List? ?? [];
+    final rawAttachments = map['attachments'] as List? ?? [];
 
     final bucket = map['return_bucket']?.toString() ?? 'saleable';
     final parsedReturnType = map['return_type']?.toString() ?? (bucket == 'saleable' ? 'return' : 'replacement');
@@ -144,6 +150,9 @@ class MtReturnRequest {
           .toList(),
       transfers: rawTransfers
           .map((t) => MtReturnTransfer.fromMap(Map<String, dynamic>.from(t as Map)))
+          .toList(),
+      attachments: rawAttachments
+          .map((a) => MtReturnAttachment.fromMap(Map<String, dynamic>.from(a as Map)))
           .toList(),
     );
   }
@@ -462,3 +471,44 @@ class MtTransferMoveLine {
     );
   }
 }
+
+class MtReturnAttachment {
+  final int id;
+  final String name;
+  final String? mimetype;
+  final String url;
+  final String imageUrl;
+  final bool isImage;
+
+  MtReturnAttachment({
+    required this.id,
+    required this.name,
+    this.mimetype,
+    required this.url,
+    required this.imageUrl,
+    this.isImage = false,
+  });
+
+  factory MtReturnAttachment.fromMap(Map<String, dynamic> map) {
+    final name = map['name']?.toString() ?? '';
+    final mime = map['mimetype']?.toString() ?? '';
+    final url = map['url']?.toString() ?? '';
+    final imgUrl = map['image_url']?.toString() ?? (url.isNotEmpty ? url : '');
+    final isImg = map['is_image'] == true ||
+        mime.startsWith('image/') ||
+        name.toLowerCase().endsWith('.jpg') ||
+        name.toLowerCase().endsWith('.jpeg') ||
+        name.toLowerCase().endsWith('.png') ||
+        name.toLowerCase().endsWith('.webp');
+
+    return MtReturnAttachment(
+      id: asInt(map['id']),
+      name: name,
+      mimetype: mime.isNotEmpty ? mime : null,
+      url: url,
+      imageUrl: imgUrl,
+      isImage: isImg,
+    );
+  }
+}
+

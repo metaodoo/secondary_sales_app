@@ -93,6 +93,56 @@ class _MtReturnCreateScreenState extends State<MtReturnCreateScreen> {
     }
   }
 
+  void _openFilePreviewDialog(File file, String title) {
+    showDialog(
+      context: context,
+      builder: (ctx) => Dialog(
+        backgroundColor: Colors.black,
+        insetPadding: EdgeInsets.zero,
+        child: Stack(
+          alignment: Alignment.topRight,
+          children: [
+            InteractiveViewer(
+              minScale: 0.5,
+              maxScale: 4.0,
+              child: Center(
+                child: Image.file(
+                  file,
+                  fit: BoxFit.contain,
+                ),
+              ),
+            ),
+            SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Expanded(
+                      child: Text(
+                        title,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.close, color: Colors.white, size: 28),
+                      onPressed: () => Navigator.pop(ctx),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   void _onAddProduct() async {
     final result = await MtReturnProductSelectionSheet.show(
       context,
@@ -865,39 +915,79 @@ class _MtReturnCreateScreenState extends State<MtReturnCreateScreen> {
           else
             Row(
               children: [
-                ClipRRect(
+                InkWell(
                   borderRadius: BorderRadius.circular(6),
-                  child: Image.file(
+                  onTap: () => _openFilePreviewDialog(
                     _challanImageFile!,
-                    width: 50,
-                    height: 50,
-                    fit: BoxFit.cover,
+                    _challanImageName ?? 'Return Challan Photo',
+                  ),
+                  child: Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(6),
+                        child: Image.file(
+                          _challanImageFile!,
+                          width: 50,
+                          height: 50,
+                          fit: BoxFit.cover,
+                        ),
+                      ),
+                      Container(
+                        width: 50,
+                        height: 50,
+                        decoration: BoxDecoration(
+                          color: Colors.black.withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: const Icon(Icons.zoom_in, color: Colors.white, size: 20),
+                      ),
+                    ],
                   ),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        _challanImageName ?? 'Photo Attached',
-                        style: const TextStyle(
-                          fontWeight: FontWeight.w600,
-                          fontSize: 13,
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(6),
+                    onTap: () => _openFilePreviewDialog(
+                      _challanImageFile!,
+                      _challanImageName ?? 'Return Challan Photo',
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          _challanImageName ?? 'Photo Attached',
+                          style: const TextStyle(
+                            fontWeight: FontWeight.w600,
+                            fontSize: 13,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      const Text(
-                        'Photo Evidence Attached',
-                        style: TextStyle(
-                          color: Colors.green,
-                          fontSize: 11,
-                          fontWeight: FontWeight.w600,
+                        const SizedBox(height: 2),
+                        const Text(
+                          'Tap to preview photo evidence',
+                          style: TextStyle(
+                            color: Colors.green,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
+                  ),
+                ),
+                IconButton(
+                  icon: const Icon(
+                    Icons.visibility_outlined,
+                    color: AppColors.primaryStrong,
+                  ),
+                  tooltip: 'Preview Photo',
+                  onPressed: () => _openFilePreviewDialog(
+                    _challanImageFile!,
+                    _challanImageName ?? 'Return Challan Photo',
                   ),
                 ),
                 IconButton(
@@ -905,6 +995,7 @@ class _MtReturnCreateScreenState extends State<MtReturnCreateScreen> {
                     Icons.delete_outline,
                     color: Colors.red,
                   ),
+                  tooltip: 'Remove Photo',
                   onPressed: () {
                     setState(() {
                       _challanImageFile = null;

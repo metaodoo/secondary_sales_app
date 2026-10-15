@@ -1,14 +1,12 @@
-import 'dart:convert';
-import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:secondary_sales/core/widgets/app_camera_capture_dialog.dart';
-import 'package:secondary_sales/core/services/media_storage_service.dart';
 import 'package:secondary_sales/core/theme/app_theme.dart';
 import 'package:secondary_sales/core/util/dialog_helper.dart';
 import 'package:secondary_sales/core/widgets/ss_ui.dart';
 import 'package:secondary_sales/features/auth/auth_provider.dart';
 import 'package:secondary_sales/features/hr/expense_provider.dart';
+import 'package:secondary_sales/features/hr/screens/personal_vehicle_trip_sheet.dart';
+import 'package:secondary_sales/features/hr/screens/personal_vehicle_trip_details_sheet.dart';
 
 class PersonalVehicleTripScreen extends StatelessWidget {
   const PersonalVehicleTripScreen({super.key});
@@ -30,21 +28,8 @@ class _PersonalVehicleTripContent extends StatefulWidget {
 }
 
 class _PersonalVehicleTripContentState extends State<_PersonalVehicleTripContent> {
-  final _formKey = GlobalKey<FormState>();
-  final _titleController = TextEditingController();
-  final _startKmController = TextEditingController();
-  final _endKmController = TextEditingController();
-  final _totalKmController = TextEditingController();
-  final _amountController = TextEditingController();
-  final _notesController = TextEditingController();
-
-  File? _startPhotoFile;
-  String? _startPhotoBase64;
-  File? _endPhotoFile;
-  String? _endPhotoBase64;
-
-  Map<String, dynamic>? _vehicleCategory;
-  Map<String, dynamic>? _activeTrip;
+  DateTime? _filterStartDate;
+  DateTime? _filterEndDate;
   bool _isInitialized = false;
 
   @override
@@ -60,215 +45,179 @@ class _PersonalVehicleTripContentState extends State<_PersonalVehicleTripContent
     await Future.wait([
       provider.fetchCategories(),
       provider.fetchDrafts(),
+      provider.fetchVehicleExpenses(
+        startDate: _filterStartDate != null ? _filterStartDate!.toString().split(' ')[0] : null,
+        endDate: _filterEndDate != null ? _filterEndDate!.toString().split(' ')[0] : null,
+      ),
     ]);
-
-    if (!mounted) return;
-
-    _vehicleCategory = provider.categories.cast<Map<String, dynamic>?>().firstWhere(
-      (c) => c?['expense_allowance_type'] == 'personal_vehicle_mileage_rate_card',
-      orElse: () => null,
-    );
-
-    final active = provider.drafts.cast<Map<String, dynamic>?>().firstWhere(
-      (d) => d?['is_personal_vehicle'] == true,
-      orElse: () => null,
-    );
-
-    setState(() {
-      _activeTrip = active;
-      if (active != null) {
-        _titleController.text = active['title'] ?? 'Personal Vehicle Travel';
-        final start = (active['odometer_day_start'] as num?)?.toDouble() ?? 0.0;
-        _startKmController.text = start > 0 ? start.toStringAsFixed(1) : '';
-        _notesController.text = active['description'] ?? '';
-      } else {
-        _titleController.text = 'Personal Vehicle Travel';
-        _startKmController.clear();
-        _endKmController.clear();
-        _totalKmController.clear();
-        _amountController.clear();
-        _notesController.clear();
-        _startPhotoFile = null;
-        _startPhotoBase64 = null;
-        _endPhotoFile = null;
-        _endPhotoBase64 = null;
-      }
-      _isInitialized = true;
-    });
-  }
-
-  @override
-  void dispose() {
-    _titleController.dispose();
-    _startKmController.dispose();
-    _endKmController.dispose();
-    _totalKmController.dispose();
-    _amountController.dispose();
-    _notesController.dispose();
-    super.dispose();
-  }
-
-  bool get _isEndingTrip => _activeTrip != null;
-  double? get _ratePerKm => (_vehicleCategory?['limit_amount'] as num?)?.toDouble();
-  bool get _hasGrade => _vehicleCategory?['has_grade'] == true;
-  String get _gradeName => _vehicleCategory?['grade_name']?.toString() ?? '';
-
-  Future<void> _pickImage({required bool isStart}) async {
-    try {
-      final picked = await AppCameraCaptureDialog.capture(
-        context,
-        title: isStart ? 'Capture Day Start Meter' : 'Capture Day End Meter',
-        helperTip: 'Align the vehicle odometer reading clearly within the frame',
-      );
-      if (picked == null) return;
-
-      final persistentFile = await MediaStorageService.persistPickedFile(
-        picked,
-        category: MediaCategory.expenses,
-        customPrefix: isStart ? 'odo_start' : 'odo_end',
-      );
-      final file = persistentFile ?? File(picked.path);
-      final bytes = await file.readAsBytes();
-      final b64 = base64Encode(bytes);
-
+    if (mounted) {
       setState(() {
-        if (isStart) {
-          _startPhotoFile = file;
-          _startPhotoBase64 = b64;
-        } else {
-          _endPhotoFile = file;
-          _endPhotoBase64 = b64;
-        }
+        _isInitialized = true;
       });
-    } catch (e) {
-      if (mounted) {
-        showValidationErrorDialog(context, 'Failed to capture photo: $e');
-      }
     }
   }
 
-  void _onKmChanged() {
-    final start = double.tryParse(_startKmController.text.trim()) ?? 0.0;
-    final end = double.tryParse(_endKmController.text.trim()) ?? 0.0;
-    if (end >= start && end > 0) {
-      final km = end - start;
-      _totalKmController.text = km.toStringAsFixed(2);
-      final rate = _ratePerKm ?? 0.0;
-      _amountController.text = (km * rate).toStringAsFixed(2);
-    } else {
-      _totalKmController.text = '0.00';
-      _amountController.text = '0.00';
+  Map<String, dynamic>? get _activeTrip {
+    final provider = context.read<ExpenseProvider>();
+    return provider.drafts.cast<Map<String, dynamic>?>().firstWhere(
+      (d) {
+        if (d == null) return false;
+        if (d['is_personal_vehicle'] != true) return false;
+        final endOdo = (d['odometer_day_end'] as num?)?.toDouble() ?? 0.0;
+        final hasEndImg = d['has_odometer_end_image'] == true;
+        // Trip is active/in-progress only if not completed yet
+        return endOdo <= 0.0 || !hasEndImg;
+      },
+      orElse: () => null,
+    );
+  }
+
+  Future<void> _openTripEntrySheet({
+    Map<String, dynamic>? activeTrip,
+    DateTime? initialDate,
+  }) async {
+    final provider = context.read<ExpenseProvider>();
+    final result = await PersonalVehicleTripSheet.show(
+      context,
+      activeTrip: activeTrip,
+      initialDate: initialDate,
+      provider: provider,
+    );
+    if (result == true) {
+      _loadData();
     }
   }
 
-  Future<void> _submitTrip() async {
-    if (!_formKey.currentState!.validate()) return;
+  void _handleFabPress(Map<String, dynamic>? activeTrip) {
+    if (activeTrip == null) {
+      _openTripEntrySheet(activeTrip: null);
+      return;
+    }
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => Container(
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        padding: const EdgeInsets.fromLTRB(20, 16, 20, 28),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Center(
+              child: Container(
+                width: 40,
+                height: 4,
+                margin: const EdgeInsets.only(bottom: 16),
+                decoration: BoxDecoration(
+                  color: Colors.grey[300],
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+            const Text(
+              'New Trip Entry',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              'An active trip started on ${activeTrip['date'] ?? 'today'} is currently in progress.',
+              style: const TextStyle(fontSize: 13, color: AppColors.textSecondary),
+            ),
+            const SizedBox(height: 16),
+            ListTile(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+                side: BorderSide(color: AppColors.primary.withOpacity(0.3)),
+              ),
+              tileColor: AppColors.primary.withOpacity(0.05),
+              leading: const CircleAvatar(
+                backgroundColor: AppColors.primary,
+                child: Icon(Icons.history, color: Colors.white, size: 20),
+              ),
+              title: const Text('Record Back-Dated Trip', style: TextStyle(fontWeight: FontWeight.bold)),
+              subtitle: const Text('Create a vehicle expense for a previous date with start & end readings.'),
+              onTap: () {
+                Navigator.pop(ctx);
+                _openTripEntrySheet(
+                  activeTrip: null,
+                  initialDate: DateTime.now().subtract(const Duration(days: 1)),
+                );
+              },
+            ),
+            const SizedBox(height: 12),
+            ListTile(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+                side: BorderSide(color: Colors.teal[300]!),
+              ),
+              tileColor: Colors.teal[50],
+              leading: CircleAvatar(
+                backgroundColor: Colors.teal[700],
+                child: const Icon(Icons.timer_outlined, color: Colors.white, size: 20),
+              ),
+              title: const Text('Continue Active Trip', style: TextStyle(fontWeight: FontWeight.bold)),
+              subtitle: Text('Enter end odometer for today\'s trip (Start: ${activeTrip['odometer_day_start'] ?? 0.0} KM).'),
+              onTap: () {
+                Navigator.pop(ctx);
+                _openTripEntrySheet(activeTrip: activeTrip);
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _createExpenseSheet(int expenseId, String title) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('Create Expense Sheet', style: TextStyle(fontWeight: FontWeight.bold)),
+        content: Text('Create and submit an Expense Sheet for "$title"? It will be sent to your manager for approval.'),
+        actions: [
+          OutlinedButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primary,
+              foregroundColor: Colors.white,
+            ),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Create & Submit'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm != true || !mounted) return;
 
     final provider = context.read<ExpenseProvider>();
+    final result = await provider.submitVehicleExpenseSheet(expenseId: expenseId);
 
-    if (!_isEndingTrip) {
-      // Starting trip: start image is strictly mandatory
-      if (_startPhotoBase64 == null) {
-        showValidationErrorDialog(
-          context,
-          'Day Start Odometer Photo is mandatory to start a trip.',
-        );
-        return;
-      }
-
-      final startKm = double.tryParse(_startKmController.text.trim()) ?? 0.0;
-      final catId = _vehicleCategory?['id'];
-      if (catId == null) {
-        showValidationErrorDialog(
-          context,
-          'Personal Vehicle category not found or not configured.',
-        );
-        return;
-      }
-
-      final result = await provider.createDraftExpense(
-        categoryId: catId,
-        title: _titleController.text.trim(),
-        amount: 0.0,
-        odometerDayStart: startKm,
-        odometerStartImage: _startPhotoBase64,
-        description: _notesController.text.trim(),
+    if (result != null && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Expense Sheet "${result['sheet_title']}" created and submitted successfully!'),
+          backgroundColor: Colors.green,
+        ),
       );
-
-      if (result != null && mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Personal Vehicle Trip started successfully!'),
-            backgroundColor: Colors.green,
-          ),
-        );
-        _loadData();
-      } else if (mounted && provider.requestError != null) {
-        showValidationErrorDialog(context, provider.requestError!);
-      }
-    } else {
-      // Ending trip: end image and end km are strictly mandatory
-      final trip = _activeTrip!;
-      final hasStartImage = trip['has_odometer_start_image'] == true || _startPhotoBase64 != null;
-      if (!hasStartImage) {
-        showValidationErrorDialog(
-          context,
-          'Day Start Odometer Photo is missing.',
-        );
-        return;
-      }
-
-      final hasEndImage = trip['has_odometer_end_image'] == true || _endPhotoBase64 != null;
-      if (!hasEndImage) {
-        showValidationErrorDialog(
-          context,
-          'Day End Odometer Photo is mandatory to complete the trip.',
-        );
-        return;
-      }
-
-      final startKm = double.tryParse(_startKmController.text.trim()) ?? 0.0;
-      final endKm = double.tryParse(_endKmController.text.trim()) ?? 0.0;
-      if (endKm < startKm) {
-        showValidationErrorDialog(
-          context,
-          'Day End reading cannot be less than Day Start reading.',
-        );
-        return;
-      }
-
-      final totalKm = endKm - startKm;
-      final amount = double.tryParse(_amountController.text.trim()) ?? (totalKm * (_ratePerKm ?? 0.0));
-
-      final result = await provider.updateDraftExpense(
-        expenseId: trip['id'],
-        title: _titleController.text.trim(),
-        amount: amount,
-        odometerDayStart: startKm,
-        odometerDayEnd: endKm,
-        totalKmRun: totalKm,
-        odometerStartImage: _startPhotoBase64,
-        odometerEndImage: _endPhotoBase64,
-        description: _notesController.text.trim(),
-      );
-
-      if (result != null && mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Trip completed! Total: ${totalKm.toStringAsFixed(1)} KM (৳${amount.toStringAsFixed(2)})'),
-            backgroundColor: Colors.green,
-          ),
-        );
-        _loadData();
-      } else if (mounted && provider.requestError != null) {
-        showValidationErrorDialog(context, provider.requestError!);
-      }
+      _loadData();
+    } else if (mounted && provider.requestError != null) {
+      showValidationErrorDialog(context, provider.requestError!);
     }
   }
 
   @override
   Widget build(BuildContext context) {
     final provider = context.watch<ExpenseProvider>();
+    final activeTrip = _activeTrip;
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -296,370 +245,330 @@ class _PersonalVehicleTripContentState extends State<_PersonalVehicleTripContent
           ),
         ],
       ),
-      body: RefreshIndicator(
-        onRefresh: _loadData,
-        child: SingleChildScrollView(
-          physics: const AlwaysScrollableScrollPhysics(),
-          padding: const EdgeInsets.all(20.0),
-          child: !_isInitialized
-              ? const Center(
-                  child: Padding(
-                    padding: EdgeInsets.only(top: 100),
-                    child: CircularProgressIndicator(),
-                  ),
-                )
-              : Form(
-                  key: _formKey,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      // Active Trip Status Banner
-                      Container(
-                        padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(
-                          color: _isEndingTrip ? Colors.teal[50] : Colors.blue[50],
-                          borderRadius: BorderRadius.circular(16),
-                          border: Border.all(
-                            color: _isEndingTrip ? Colors.teal[300]! : Colors.blue[200]!,
-                          ),
-                        ),
-                        child: Row(
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.all(10),
-                              decoration: BoxDecoration(
-                                color: _isEndingTrip ? Colors.teal[100] : Colors.blue[100],
-                                shape: BoxShape.circle,
-                              ),
-                              child: Icon(
-                                _isEndingTrip ? Icons.timer_outlined : Icons.directions_bike_outlined,
-                                color: _isEndingTrip ? Colors.teal[900] : Colors.blue[900],
-                                size: 28,
-                              ),
-                            ),
-                            const SizedBox(width: 14),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    _isEndingTrip ? 'Trip in Progress' : 'Ready to Start Trip',
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 16,
-                                      color: _isEndingTrip ? Colors.teal[900] : Colors.blue[900],
-                                    ),
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    _isEndingTrip
-                                        ? 'Start KM: ${_startKmController.text} • Capture Day End meter to close trip.'
-                                        : 'Capture Day Start meter image & reading to begin your daily journey.',
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      color: _isEndingTrip ? Colors.teal[800] : Colors.blue[800],
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-
-                      // Rate Card Info Banner
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                        decoration: BoxDecoration(
-                          color: (!_hasGrade || _ratePerKm == null)
-                              ? Colors.amber.withOpacity(0.12)
-                              : AppColors.primary.withOpacity(0.08),
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(
-                            color: (!_hasGrade || _ratePerKm == null)
-                                ? Colors.amber[700]!
-                                : AppColors.primary.withOpacity(0.3),
-                          ),
-                        ),
-                        child: Row(
-                          children: [
-                            Icon(
-                              (!_hasGrade || _ratePerKm == null) ? Icons.warning_amber_rounded : Icons.info_outline,
-                              size: 20,
-                              color: (!_hasGrade || _ratePerKm == null) ? Colors.amber[800] : AppColors.primary,
-                            ),
-                            const SizedBox(width: 10),
-                            Expanded(
-                              child: Text(
-                                !_hasGrade
-                                    ? 'No employee grade assigned.'
-                                    : _ratePerKm == null
-                                        ? 'Personal vehicle mileage is not configured for grade ${_gradeName.isNotEmpty ? _gradeName : "Unassigned"}.'
-                                        : 'Mileage Rate: ৳${_ratePerKm!.toStringAsFixed(2)} per km (${_gradeName.isNotEmpty ? _gradeName : "Grade"})',
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w600,
-                                  color: (!_hasGrade || _ratePerKm == null) ? Colors.amber[900] : AppColors.primary,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 20),
-
-                      // Title Field
-                      const Text('Trip Details', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-                      const SizedBox(height: 8),
-                      TextFormField(
-                        controller: _titleController,
-                        decoration: InputDecoration(
-                          labelText: 'Trip Title / Purpose *',
-                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                        ),
-                        validator: (val) => val == null || val.trim().isEmpty ? 'Title is required.' : null,
-                      ),
-                      const SizedBox(height: 20),
-
-                      // Day Start Section
-                      const Text('Day Start (Trip Start)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-                      const SizedBox(height: 8),
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Expanded(
-                            flex: 3,
-                            child: TextFormField(
-                              controller: _startKmController,
-                              readOnly: _isEndingTrip,
-                              keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                              decoration: InputDecoration(
-                                labelText: 'Start KM Reading *',
-                                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                                contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                                filled: _isEndingTrip,
-                                fillColor: _isEndingTrip ? Colors.grey[100] : null,
-                              ),
-                              validator: (val) {
-                                if (val == null || val.trim().isEmpty) return 'Start KM required.';
-                                final num = double.tryParse(val.trim());
-                                if (num == null || num < 0) return 'Invalid KM.';
-                                return null;
-                              },
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            flex: 2,
-                            child: OutlinedButton.icon(
-                              style: OutlinedButton.styleFrom(
-                                padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 8),
-                                side: BorderSide(
-                                  color: (_startPhotoFile != null || _activeTrip?['has_odometer_start_image'] == true)
-                                      ? Colors.green
-                                      : AppColors.primary,
-                                ),
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                              ),
-                              onPressed: _isEndingTrip ? null : () => _pickImage(isStart: true),
-                              icon: Icon(
-                                (_startPhotoFile != null || _activeTrip?['has_odometer_start_image'] == true)
-                                    ? Icons.check_circle
-                                    : Icons.photo_camera,
-                                size: 18,
-                                color: (_startPhotoFile != null || _activeTrip?['has_odometer_start_image'] == true)
-                                    ? Colors.green
-                                    : AppColors.primary,
-                              ),
-                              label: Text(
-                                (_startPhotoFile != null || _activeTrip?['has_odometer_start_image'] == true)
-                                    ? 'Start Photo ✓'
-                                    : 'Take Photo *',
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.bold,
-                                  color: (_startPhotoFile != null || _activeTrip?['has_odometer_start_image'] == true)
-                                      ? Colors.green
-                                      : AppColors.primary,
-                                ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                      if (_startPhotoFile != null)
-                        Padding(
-                          padding: const EdgeInsets.only(top: 6.0),
-                          child: Text(
-                            '✓ Photo captured (${_startPhotoFile!.path.split('/').last})',
-                            style: const TextStyle(fontSize: 11, color: Colors.green),
-                          ),
-                        ),
-
-                      // Day End Section (Enabled only when ending trip)
-                      if (_isEndingTrip) ...[
-                        const SizedBox(height: 20),
-                        const Text('Day End (Trip End)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-                        const SizedBox(height: 8),
-                        Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Expanded(
-                              flex: 3,
-                              child: TextFormField(
-                                controller: _endKmController,
-                                keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                                decoration: InputDecoration(
-                                  labelText: 'End KM Reading *',
-                                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                                  contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                                ),
-                                onChanged: (_) => _onKmChanged(),
-                                validator: (val) {
-                                  if (!_isEndingTrip) return null;
-                                  if (val == null || val.trim().isEmpty) return 'End KM required.';
-                                  final end = double.tryParse(val.trim());
-                                  final start = double.tryParse(_startKmController.text.trim()) ?? 0.0;
-                                  if (end == null || end < start) return 'Must be ≥ Start KM.';
-                                  return null;
-                                },
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              flex: 2,
-                              child: OutlinedButton.icon(
-                                style: OutlinedButton.styleFrom(
-                                  padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 8),
-                                  side: BorderSide(
-                                    color: (_endPhotoFile != null || _activeTrip?['has_odometer_end_image'] == true)
-                                        ? Colors.green
-                                        : AppColors.primary,
-                                  ),
-                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                                ),
-                                onPressed: () => _pickImage(isStart: false),
-                                icon: Icon(
-                                  (_endPhotoFile != null || _activeTrip?['has_odometer_end_image'] == true)
-                                      ? Icons.check_circle
-                                      : Icons.photo_camera,
-                                  size: 18,
-                                  color: (_endPhotoFile != null || _activeTrip?['has_odometer_end_image'] == true)
-                                      ? Colors.green
-                                      : AppColors.primary,
-                                ),
-                                label: Text(
-                                  (_endPhotoFile != null || _activeTrip?['has_odometer_end_image'] == true)
-                                      ? 'End Photo ✓'
-                                      : 'Take Photo *',
-                                  style: TextStyle(
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.bold,
-                                    color: (_endPhotoFile != null || _activeTrip?['has_odometer_end_image'] == true)
-                                        ? Colors.green
-                                        : AppColors.primary,
-                                  ),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                        if (_endPhotoFile != null)
-                          Padding(
-                            padding: const EdgeInsets.only(top: 6.0),
-                            child: Text(
-                              '✓ Photo captured (${_endPhotoFile!.path.split('/').last})',
-                              style: const TextStyle(fontSize: 11, color: Colors.green),
-                            ),
-                          ),
-                        const SizedBox(height: 16),
-
-                        // Calculated Summary Box
-                        Container(
-                          padding: const EdgeInsets.all(16),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(16),
-                            border: Border.all(color: AppColors.borderSoft),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withOpacity(0.04),
-                                blurRadius: 8,
-                                offset: const Offset(0, 2),
-                              ),
-                            ],
-                          ),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceAround,
-                            children: [
-                              Column(
-                                children: [
-                                  const Text('Total KM Run', style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    '${_totalKmController.text.isNotEmpty ? _totalKmController.text : "0.00"} KM',
-                                    style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.primary),
-                                  ),
-                                ],
-                              ),
-                              Container(height: 32, width: 1, color: AppColors.borderSoft),
-                              Column(
-                                children: [
-                                  const Text('Total Amount', style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    '৳${_amountController.text.isNotEmpty ? _amountController.text : "0.00"}',
-                                    style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.green),
-                                  ),
-                                ],
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-
-                      const SizedBox(height: 20),
-                      // Notes
-                      const Text('Notes / Remarks', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-                      const SizedBox(height: 8),
-                      TextFormField(
-                        controller: _notesController,
-                        decoration: InputDecoration(
-                          hintText: 'Enter optional route or purpose remarks...',
-                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                        ),
-                        maxLines: 2,
-                      ),
-                      const SizedBox(height: 32),
-
-                      // Submit Button
-                      ElevatedButton(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: _isEndingTrip ? Colors.green : AppColors.primary,
-                          foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(vertical: 16),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                        ),
-                        onPressed: provider.isSubmitting ? null : _submitTrip,
-                        child: provider.isSubmitting
-                            ? const SizedBox(width: 22, height: 22, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                            : Text(
-                                _isEndingTrip ? 'Complete Trip' : 'Start Trip',
-                                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                              ),
-                      ),
-                    ],
-                  ),
-                ),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () => _handleFabPress(activeTrip),
+        backgroundColor: AppColors.primary,
+        icon: const Icon(Icons.add, color: Colors.white),
+        label: const Text(
+          'New Trip Entry',
+          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
         ),
       ),
+      body: !_isInitialized
+          ? const Center(child: CircularProgressIndicator())
+          : RefreshIndicator(
+              onRefresh: _loadData,
+              child: Column(
+                children: [
+                  // Active Trip in Progress Banner if any
+                  if (activeTrip != null)
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+                      child: Material(
+                        color: Colors.teal[50],
+                        borderRadius: BorderRadius.circular(12),
+                        child: InkWell(
+                          borderRadius: BorderRadius.circular(12),
+                          onTap: () => _openTripEntrySheet(activeTrip: activeTrip),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: Colors.teal[300]!),
+                            ),
+                            child: Row(
+                              children: [
+                                Icon(Icons.two_wheeler, color: Colors.teal[800], size: 24),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        'Active Vehicle Trip in Progress',
+                                        style: TextStyle(
+                                          color: Colors.teal[900],
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 13,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 2),
+                                      Text(
+                                        'Start: ${(activeTrip['odometer_day_start'] ?? 0.0)} KM • Tap to finish & record end meter',
+                                        style: TextStyle(
+                                          color: Colors.teal[700],
+                                          fontSize: 11,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                Icon(Icons.arrow_forward_ios, size: 14, color: Colors.teal[800]),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+
+                  // Date Filter Bar
+                  Container(
+                    margin: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: AppColors.borderSoft),
+                    ),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: InkWell(
+                            onTap: () async {
+                              final picked = await showDateRangePicker(
+                                context: context,
+                                firstDate: DateTime.now().subtract(const Duration(days: 365)),
+                                lastDate: DateTime.now(),
+                                initialDateRange: (_filterStartDate != null && _filterEndDate != null)
+                                    ? DateTimeRange(start: _filterStartDate!, end: _filterEndDate!)
+                                    : null,
+                              );
+                              if (picked != null) {
+                                setState(() {
+                                  _filterStartDate = picked.start;
+                                  _filterEndDate = picked.end;
+                                });
+                                provider.fetchVehicleExpenses(
+                                  startDate: picked.start.toString().split(' ')[0],
+                                  endDate: picked.end.toString().split(' ')[0],
+                                );
+                              }
+                            },
+                            child: Row(
+                              children: [
+                                const Icon(Icons.calendar_month_outlined, size: 18, color: AppColors.primary),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    (_filterStartDate != null && _filterEndDate != null)
+                                        ? '${_filterStartDate!.toString().split(' ')[0]} to ${_filterEndDate!.toString().split(' ')[0]}'
+                                        : 'Filter trips by date range',
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: (_filterStartDate != null) ? FontWeight.bold : FontWeight.normal,
+                                      color: (_filterStartDate != null) ? AppColors.textPrimary : AppColors.textSecondary,
+                                    ),
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                        if (_filterStartDate != null)
+                          IconButton(
+                            icon: const Icon(Icons.clear, size: 18, color: Colors.red),
+                            padding: EdgeInsets.zero,
+                            constraints: const BoxConstraints(),
+                            onPressed: () {
+                              setState(() {
+                                _filterStartDate = null;
+                                _filterEndDate = null;
+                              });
+                              provider.fetchVehicleExpenses();
+                            },
+                          ),
+                      ],
+                    ),
+                  ),
+
+                  // Trips List
+                  Expanded(
+                    child: provider.isLoadingVehicleExpenses
+                        ? const Center(child: CircularProgressIndicator())
+                        : provider.vehicleExpenses.isEmpty
+                            ? Center(
+                                child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Icon(Icons.directions_bike_outlined, size: 54, color: Colors.grey[400]),
+                                    const SizedBox(height: 12),
+                                    const Text(
+                                      'No personal vehicle trips found.',
+                                      style: TextStyle(color: Colors.grey, fontSize: 14),
+                                    ),
+                                    const SizedBox(height: 8),
+                                    const Text(
+                                      'Tap "New Trip Entry" below to record today\'s or back-dated trips.',
+                                      style: TextStyle(color: Colors.grey, fontSize: 12),
+                                    ),
+                                  ],
+                                ),
+                              )
+                            : ListView.separated(
+                                padding: const EdgeInsets.fromLTRB(16, 4, 16, 80),
+                                itemCount: provider.vehicleExpenses.length,
+                                separatorBuilder: (_, _) => const SizedBox(height: 12),
+                                itemBuilder: (context, index) {
+                                  final item = provider.vehicleExpenses[index];
+                                  final hasSheet = item['sheet_id'] != null;
+                                  final sheetTitle = item['sheet_title'] ?? '';
+                                  final isCompleted = (item['odometer_day_end'] as num?)?.toDouble() != null &&
+                                      (item['odometer_day_end'] as num).toDouble() > 0 &&
+                                      item['has_odometer_end_image'] == true;
+
+                                  return Material(
+                                    color: Colors.white,
+                                    borderRadius: BorderRadius.circular(16),
+                                    child: InkWell(
+                                      borderRadius: BorderRadius.circular(16),
+                                      onTap: () async {
+                                        final action = await PersonalVehicleTripDetailsSheet.show(
+                                          context,
+                                          item,
+                                          provider: provider,
+                                        );
+                                        if (action == 'complete') {
+                                          _openTripEntrySheet(activeTrip: item);
+                                        } else {
+                                          _loadData();
+                                        }
+                                      },
+                                      child: Container(
+                                        padding: const EdgeInsets.all(16),
+                                        decoration: BoxDecoration(
+                                          borderRadius: BorderRadius.circular(16),
+                                          border: Border.all(color: AppColors.borderSoft),
+                                          boxShadow: [
+                                            BoxShadow(
+                                              color: Colors.black.withOpacity(0.03),
+                                              blurRadius: 6,
+                                              offset: const Offset(0, 2),
+                                            ),
+                                          ],
+                                        ),
+                                        child: Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            // Title & Status Badge
+                                            Row(
+                                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                              children: [
+                                                Expanded(
+                                                  child: Text(
+                                                    item['title'] ?? 'Personal Vehicle Trip',
+                                                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                                                    overflow: TextOverflow.ellipsis,
+                                                  ),
+                                                ),
+                                                Container(
+                                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                                  decoration: BoxDecoration(
+                                                    color: hasSheet
+                                                        ? Colors.green.withOpacity(0.12)
+                                                        : isCompleted
+                                                            ? Colors.blue.withOpacity(0.12)
+                                                            : Colors.amber.withOpacity(0.12),
+                                                    borderRadius: BorderRadius.circular(8),
+                                                  ),
+                                                  child: Text(
+                                                    hasSheet
+                                                        ? 'Sheet: $sheetTitle'
+                                                        : isCompleted
+                                                            ? 'Completed (Unreported)'
+                                                            : 'In Progress',
+                                                    style: TextStyle(
+                                                      fontSize: 11,
+                                                      fontWeight: FontWeight.bold,
+                                                      color: hasSheet
+                                                          ? Colors.green[800]
+                                                          : isCompleted
+                                                              ? Colors.blue[800]
+                                                              : Colors.amber[900],
+                                                    ),
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                            const SizedBox(height: 8),
+
+                                            // Trip date & Readings
+                                            Row(
+                                              children: [
+                                                const Icon(Icons.calendar_today, size: 13, color: AppColors.textSecondary),
+                                                const SizedBox(width: 4),
+                                                Text(
+                                                  item['date'] ?? '',
+                                                  style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                                                ),
+                                                const SizedBox(width: 16),
+                                                const Icon(Icons.speed, size: 14, color: AppColors.textSecondary),
+                                                const SizedBox(width: 4),
+                                                Text(
+                                                  '${(item['total_km_run'] ?? 0.0)} KM (${(item['odometer_day_start'] ?? 0.0)} → ${(item['odometer_day_end'] ?? 0.0)})',
+                                                  style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                                                ),
+                                              ],
+                                            ),
+                                            const SizedBox(height: 12),
+
+                                            // Amount & Create Sheet button
+                                            Row(
+                                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                              children: [
+                                                Text(
+                                                  '৳${((item['amount'] as num?)?.toDouble() ?? 0.0).toStringAsFixed(2)}',
+                                                  style: const TextStyle(
+                                                    fontWeight: FontWeight.bold,
+                                                    fontSize: 16,
+                                                    color: AppColors.primary,
+                                                  ),
+                                                ),
+                                                Row(
+                                                  children: [
+                                                    if (!hasSheet && !isCompleted)
+                                                      ElevatedButton.icon(
+                                                        style: ElevatedButton.styleFrom(
+                                                          backgroundColor: Colors.teal[700],
+                                                          foregroundColor: Colors.white,
+                                                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                                        ),
+                                                        onPressed: () => _openTripEntrySheet(activeTrip: item),
+                                                        icon: const Icon(Icons.timer_outlined, size: 15),
+                                                        label: const Text('Finish Trip', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                                                      ),
+                                                    if (!hasSheet && isCompleted)
+                                                      ElevatedButton.icon(
+                                                        style: ElevatedButton.styleFrom(
+                                                          backgroundColor: const Color(0xFF0D9488),
+                                                          foregroundColor: Colors.white,
+                                                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                                        ),
+                                                        onPressed: provider.isSubmitting
+                                                            ? null
+                                                            : () => _createExpenseSheet(item['id'], item['title'] ?? 'Vehicle Trip'),
+                                                        icon: const Icon(Icons.post_add, size: 15),
+                                                        label: const Text('Create Sheet', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                                                      ),
+                                                    const SizedBox(width: 6),
+                                                    const Icon(Icons.arrow_forward_ios, size: 12, color: AppColors.textSecondary),
+                                                  ],
+                                                ),
+                                              ],
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ),
+                                  );
+                                },
+                              ),
+                  ),
+                ],
+              ),
+            ),
     );
   }
 }

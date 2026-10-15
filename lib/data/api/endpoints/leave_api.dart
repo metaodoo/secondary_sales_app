@@ -12,7 +12,7 @@ extension LeaveApi on ApiService {
     required int leaveTypeId,
     required String dateFrom,
     required String dateTo,
-    required String reason,
+    String? reason,
     String? attachment,
     String? attachmentName,
   }) async {
@@ -21,7 +21,7 @@ extension LeaveApi on ApiService {
       'leave_type_id': leaveTypeId,
       'date_from': dateFrom,
       'date_to': dateTo,
-      'reason': reason,
+      if (reason != null && reason.isNotEmpty) 'reason': reason,
       'attachment': attachment,
       'attachment_name': attachmentName,
     });

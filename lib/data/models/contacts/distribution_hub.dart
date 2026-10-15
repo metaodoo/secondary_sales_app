@@ -12,6 +12,7 @@ class DistributionHub {
   final String? mobile;
   final String? email;
   final String? vat;
+  final double? totalDue;
 
   DistributionHub({
     required this.id,
@@ -26,6 +27,7 @@ class DistributionHub {
     this.mobile,
     this.email,
     this.vat,
+    this.totalDue,
   });
 
   String get displayNameWithCode {
@@ -49,6 +51,7 @@ class DistributionHub {
       mobile: map['mobile'] ?? map['phone'],
       email: map['email'],
       vat: map['vat'],
+      totalDue: asNullableDouble(map['total_due'] ?? map['due_amount'] ?? map['credit']),
     );
   }
 

@@ -28,6 +28,8 @@ import 'package:secondary_sales/core/services/location_tracking_service.dart';
 import 'package:secondary_sales/core/services/app_update_service.dart';
 import 'package:secondary_sales/core/services/offline_sync_engine.dart';
 
+import 'package:flutter_screenutil/flutter_screenutil.dart';
+
 export 'package:secondary_sales/core/app_navigator.dart' show appNavigatorKey;
 
 /// Brings the background location service in line with the SERVER's attendance
@@ -299,12 +301,20 @@ class _MyAppState extends State<MyApp> {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Sales Force Management',
-      navigatorKey: appNavigatorKey,
-      debugShowCheckedModeBanner: false,
-      theme: buildAppTheme(),
-      home: const AuthGate(authenticatedChild: HomeDashboardScreen()),
+    return ScreenUtilInit(
+      designSize: const Size(360, 800), // Standard Android reference size
+      minTextAdapt: true,
+      splitScreenMode: true,
+      builder: (context, child) {
+        return MaterialApp(
+          title: 'Sales Force Management',
+          navigatorKey: appNavigatorKey,
+          debugShowCheckedModeBanner: false,
+          theme: buildAppTheme(),
+          home: child,
+        );
+      },
+      child: const AuthGate(authenticatedChild: HomeDashboardScreen()),
     );
   }
 }

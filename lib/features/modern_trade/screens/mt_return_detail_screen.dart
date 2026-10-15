@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:secondary_sales/core/access/access_resources.dart';
+import 'package:secondary_sales/core/constants.dart';
 import 'package:secondary_sales/core/theme/app_theme.dart';
 import 'package:secondary_sales/data/models/modern_trade/mt_return_request.dart';
 import 'package:secondary_sales/features/auth/auth_provider.dart';
@@ -171,7 +172,143 @@ class _MtReturnDetailScreenState extends State<MtReturnDetailScreen> {
     }
   }
 
+  void _onDeleteLine(MtReturnRequestLine line, MtReturnRequest rr) async {
+    if (rr.lines.length <= 1) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('A Return Request must have at least one product line.'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Remove Product Line?'),
+        content: Text('Are you sure you want to remove "${line.productName}" from this return request?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red.shade700),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Remove', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true && mounted) {
+      final payload = <Map<String, dynamic>>[
+        {'id': line.id, 'delete': true},
+      ];
+      final provider = context.read<MtReturnProvider>();
+      final ok = await provider.updateReturnLines(widget.returnId, payload);
+      if (ok && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Product line removed successfully!'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      } else if (provider.errorMessage != null && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(provider.errorMessage!),
+            backgroundColor: Colors.red.shade700,
+          ),
+        );
+      }
+    }
+  }
+
+  void _openImagePreviewDialog(BuildContext context, String imageUrl, String title) {
+    final fullUrl = imageUrl.startsWith('http')
+        ? imageUrl
+        : '${AppConstants.baseUrl}$imageUrl';
+
+    showDialog(
+      context: context,
+      builder: (ctx) => Dialog(
+        backgroundColor: Colors.black,
+        insetPadding: EdgeInsets.zero,
+        child: Stack(
+          alignment: Alignment.topRight,
+          children: [
+            InteractiveViewer(
+              minScale: 0.5,
+              maxScale: 4.0,
+              child: Center(
+                child: Image.network(
+                  fullUrl,
+                  headers: context.read<AuthProvider>().authHeaders,
+                  fit: BoxFit.contain,
+                  loadingBuilder: (context, child, progress) {
+                    if (progress == null) return child;
+                    return const Center(
+                      child: CircularProgressIndicator(color: Colors.white),
+                    );
+                  },
+                  errorBuilder: (context, err, st) => const Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.broken_image, size: 54, color: Colors.white70),
+                      SizedBox(height: 10),
+                      Text(
+                        'Failed to load image',
+                        style: TextStyle(color: Colors.white, fontSize: 14),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Expanded(
+                      child: Text(
+                        title,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.close, color: Colors.white, size: 28),
+                      onPressed: () => Navigator.pop(ctx),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   void _openReturnTypePicker(MtReturnRequest rr) async {
+    if (rr.state.toLowerCase() != 'kao') {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Return type can only be changed in KAO state.'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
     final selectedType = await showMtReturnTypePicker(
       context,
       returnBucket: rr.returnBucket,
@@ -268,6 +405,12 @@ class _MtReturnDetailScreenState extends State<MtReturnDetailScreen> {
                         // Header Status & Outlet Card
                         _buildHeaderCard(rr),
                         const SizedBox(height: 16),
+
+                        // Return Challan Photo Evidence Preview Card (available in ALL states)
+                        if (rr.attachments.isNotEmpty) ...[
+                          _buildAttachmentsPreviewCard(rr),
+                          const SizedBox(height: 16),
+                        ],
 
                         // Prominent Return Type Switcher Banner (Non-Saleable & Quality only)
                         if (!rr.isSaleable) ...[
@@ -410,8 +553,129 @@ class _MtReturnDetailScreenState extends State<MtReturnDetailScreen> {
     );
   }
 
+  Widget _buildAttachmentsPreviewCard(MtReturnRequest rr) {
+    final imageAtt = rr.primaryImageAttachment;
+    final firstAtt = imageAtt ?? (rr.attachments.isNotEmpty ? rr.attachments.first : null);
+    if (firstAtt == null) return const SizedBox.shrink();
+
+    final rawUrl = firstAtt.imageUrl.isNotEmpty ? firstAtt.imageUrl : firstAtt.url;
+    final fullUrl = rawUrl.startsWith('http')
+        ? rawUrl
+        : '${AppConstants.baseUrl}$rawUrl';
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.grey.shade200),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Row(
+                children: [
+                  Icon(Icons.receipt_long_outlined, color: AppColors.primaryStrong, size: 20),
+                  SizedBox(width: 8),
+                  Text(
+                    'Return Challan Document',
+                    style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
+                  ),
+                ],
+              ),
+              if (firstAtt.isImage)
+                TextButton.icon(
+                  onPressed: () => _openImagePreviewDialog(context, fullUrl, firstAtt.name),
+                  icon: const Icon(Icons.fullscreen, size: 18, color: AppColors.primaryStrong),
+                  label: const Text(
+                    'Preview',
+                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.primaryStrong),
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          InkWell(
+            borderRadius: BorderRadius.circular(10),
+            onTap: firstAtt.isImage
+                ? () => _openImagePreviewDialog(context, fullUrl, firstAtt.name)
+                : null,
+            child: Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: Colors.grey.shade50,
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: Colors.grey.shade200),
+              ),
+              child: Row(
+                children: [
+                  if (firstAtt.isImage)
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(8),
+                      child: Image.network(
+                        fullUrl,
+                        headers: context.read<AuthProvider>().authHeaders,
+                        width: 60,
+                        height: 60,
+                        fit: BoxFit.cover,
+                        errorBuilder: (context, error, stackTrace) => Container(
+                          width: 60,
+                          height: 60,
+                          color: Colors.grey.shade200,
+                          child: const Icon(Icons.broken_image, color: Colors.grey),
+                        ),
+                      ),
+                    )
+                  else
+                    Container(
+                      width: 60,
+                      height: 60,
+                      decoration: BoxDecoration(
+                        color: Colors.blue.shade50,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: const Icon(Icons.description_outlined, color: Colors.blue, size: 30),
+                    ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          firstAtt.name,
+                          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          firstAtt.isImage
+                              ? 'Challan Photo Evidence • Tap to preview'
+                              : 'Document Attachment',
+                          style: TextStyle(fontSize: 11, color: Colors.grey.shade600, fontWeight: FontWeight.w500),
+                        ),
+                      ],
+                    ),
+                  ),
+                  if (firstAtt.isImage)
+                    const Padding(
+                      padding: EdgeInsets.only(right: 6),
+                      child: Icon(Icons.zoom_in, color: AppColors.primaryStrong, size: 22),
+                    ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildReturnTypeBanner(MtReturnRequest rr) {
-    final canChangeType = rr.canConvertToReplacement || rr.canConvertToReturn;
+    final canChangeType = (rr.canConvertToReplacement || rr.canConvertToReturn) && rr.state.toLowerCase() == 'kao';
     final isReplacement = rr.isReplacement;
     final primaryColor = isReplacement ? const Color(0xFF0288D1) : const Color(0xFFE65100);
     final bgColor = isReplacement ? const Color(0xFFE1F5FE) : const Color(0xFFFFF3E0);
@@ -790,12 +1054,18 @@ class _MtReturnDetailScreenState extends State<MtReturnDetailScreen> {
                           ],
                         ),
                       ),
-                      if (canEditLines)
+                      if (canEditLines) ...[
                         IconButton(
                           onPressed: () => _onEditOrSplitLine(line, rr),
                           icon: const Icon(Icons.edit_note_rounded, color: AppColors.primaryStrong, size: 22),
                           tooltip: 'Edit & Split Lots',
                         ),
+                        IconButton(
+                          onPressed: () => _onDeleteLine(line, rr),
+                          icon: Icon(Icons.delete_outline, color: Colors.red.shade600, size: 20),
+                          tooltip: 'Remove Product Line',
+                        ),
+                      ],
                       // Hamburger details button
                       IconButton(
                         onPressed: () => MtReturnLineHistorySheet.show(

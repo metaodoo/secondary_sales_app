@@ -428,27 +428,14 @@ class _ExpenseCreateSheetState extends State<ExpenseCreateSheet> {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     const Text('Expense Items *', style: TextStyle(fontWeight: FontWeight.bold)),
-                    Row(
-                      children: [
-                        TextButton.icon(
-                          style: TextButton.styleFrom(
-                            foregroundColor: const Color(0xFF0D9488),
-                            padding: const EdgeInsets.symmetric(horizontal: 8),
-                          ),
-                          onPressed: provider.isSubmitting ? null : _openSelectDraftDialog,
-                          icon: const Icon(Icons.two_wheeler_outlined, size: 18),
-                          label: const Text('Add Saved Trip', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-                        ),
-                        TextButton.icon(
-                          style: TextButton.styleFrom(
-                            foregroundColor: AppColors.primary,
-                            padding: const EdgeInsets.symmetric(horizontal: 8),
-                          ),
-                          onPressed: provider.isSubmitting ? null : _openAddItemDialog,
-                          icon: const Icon(Icons.add, size: 18),
-                          label: const Text('Add Item', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-                        ),
-                      ],
+                    TextButton.icon(
+                      style: TextButton.styleFrom(
+                        foregroundColor: AppColors.primary,
+                        padding: const EdgeInsets.symmetric(horizontal: 8),
+                      ),
+                      onPressed: provider.isSubmitting ? null : _openAddItemDialog,
+                      icon: const Icon(Icons.add, size: 18),
+                      label: const Text('Add Item', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
                     ),
                   ],
                 ),
@@ -750,7 +737,9 @@ class _ExpenseItemDialogState extends State<_ExpenseItemDialog> {
                     contentPadding: const EdgeInsets.symmetric(horizontal: 12),
                   ),
                   initialValue: _selectedCategory,
-                  items: provider.categories.map((cat) {
+                  items: provider.categories
+                      .where((cat) => cat['expense_allowance_type'] != 'personal_vehicle_mileage_rate_card')
+                      .map((cat) {
                     return DropdownMenuItem<Map<String, dynamic>>(
                       value: cat,
                       child: Text(cat['name'] ?? ''),

@@ -59,6 +59,7 @@ class _CreatePrimarySaleScreenState extends State<CreatePrimarySaleScreen> {
             name: detail.distributor!.name,
             address: detail.distributor!.address,
             phone: detail.distributor!.phone,
+            totalDue: detail.distributor!.totalDue ?? _hub.totalDue,
           );
         }
 
@@ -246,14 +247,36 @@ class _CreatePrimarySaleScreenState extends State<CreatePrimarySaleScreen> {
                         vertical: 24,
                       ),
                       children: [
-                        // Customer Name Field
-                        const Text(
-                          'Customer Name',
-                          style: TextStyle(
-                            color: AppColors.textPrimary,
-                            fontWeight: FontWeight.w600,
-                            fontSize: 14,
-                          ),
+                        // Customer Name Field with DB Balance
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            const Text(
+                              'Customer Name',
+                              style: TextStyle(
+                                color: AppColors.textPrimary,
+                                fontWeight: FontWeight.w600,
+                                fontSize: 14,
+                              ),
+                            ),
+                            if (_hub.totalDue != null)
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFFEF2F2),
+                                  borderRadius: BorderRadius.circular(6),
+                                  border: Border.all(color: const Color(0xFFFCA5A5)),
+                                ),
+                                child: Text(
+                                  'DB Balance: ৳${_hub.totalDue!.toStringAsFixed(2)}',
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.bold,
+                                    color: Color(0xFFDC2626),
+                                  ),
+                                ),
+                              ),
+                          ],
                         ),
                         const SizedBox(height: 8),
                         Container(

@@ -142,4 +142,33 @@ extension ExpenseApi on ApiService {
       if (odometerEndImage != null) 'odometer_end_image': odometerEndImage,
     });
   }
+
+  Future<Map<String, dynamic>> getExpenseList({
+    required int employeeId,
+    String mode = 'own',
+    bool? isPersonalVehicle,
+    String? startDate,
+    String? endDate,
+  }) async {
+    return _post('/api/v1/hr/expense/list', {
+      'employee_id': employeeId,
+      'mode': mode,
+      if (isPersonalVehicle != null) 'is_personal_vehicle': isPersonalVehicle,
+      if (startDate != null) 'start_date': startDate,
+      if (endDate != null) 'end_date': endDate,
+    });
+  }
+
+  Future<Map<String, dynamic>> submitPersonalVehicleExpenseSheet({
+    required int expenseId,
+    String? title,
+    String? description,
+  }) async {
+    return _post('/api/v1/hr/expense/personal-vehicle/submit-sheet', {
+      'expense_id': expenseId,
+      if (title != null) 'title': title,
+      if (description != null) 'description': description,
+    });
+  }
 }
+
