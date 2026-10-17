@@ -9,7 +9,7 @@ import 'package:secondary_sales/features/sales/primary_sale_provider.dart';
 import 'package:secondary_sales/features/sales/screens/product_selection_screen.dart';
 import 'package:secondary_sales/core/services/offline_database_helper.dart';
 import 'package:secondary_sales/core/widgets/ss_ui.dart';
-import 'package:secondary_sales/core/widgets/order_form_widgets.dart';
+// import 'package:secondary_sales/core/widgets/order_form_widgets.dart';
 import 'package:secondary_sales/features/modern_trade/modern_trade_provider.dart';
 import 'package:secondary_sales/features/routes/route_provider.dart';
 
@@ -20,10 +20,19 @@ class OrderLineModel {
   final int dbStock;
   final int vanStock;
   final String? uom;
-  int orderQty;
+  int customerOrderQty;
+
+  /// Backwards compatibility alias for customerOrderQty
+  int get orderQty => customerOrderQty;
+  set orderQty(int val) => customerOrderQty = val;
+
   int damagedExpiredQty;
   int damageQualityQty;
+
+  // --- OLD FLOW (Deprecated): Flag for settling return against bill ---
+  // bool adjustWithBill;
   bool adjustWithBill;
+  // -------------------------------------------------------------------
 
   OrderLineModel({
     required this.productId,
@@ -32,21 +41,24 @@ class OrderLineModel {
     this.dbStock = 0,
     this.vanStock = 0,
     this.uom,
-    this.orderQty = 0,
+    int? customerOrderQty,
+    int? orderQty,
     this.damagedExpiredQty = 0,
     this.damageQualityQty = 0,
     this.adjustWithBill = false,
-  });
+  }) : customerOrderQty = customerOrderQty ?? orderQty ?? 0;
 
-  /// Quantity actually charged for. A bill-adjusted return is settled against
-  /// the bill rather than swapped for fresh stock, so the returned units come
-  /// off what the customer pays -- and a returns-only line goes negative.
-  /// Mirrors `sale.order.line._ss_billable_qty` on the server.
-  int get billableQty => adjustWithBill
-      ? orderQty - (damagedExpiredQty + damageQualityQty)
-      : orderQty;
+  /// Payable quantity is customerOrderQty - (damagedExpiredQty + damageQualityQty)
+  int get payableQty => customerOrderQty - (damagedExpiredQty + damageQualityQty);
 
-  double get lineTotal => unitPrice * billableQty;
+  // --- OLD FLOW (Deprecated): billableQty based on adjustWithBill ---
+  // int get billableQty => adjustWithBill
+  //     ? orderQty - (damagedExpiredQty + damageQualityQty)
+  //     : orderQty;
+  // -----------------------------------------------------------------
+  int get billableQty => payableQty;
+
+  double get lineTotal => unitPrice * payableQty;
 }
 
 class OrderCreationScreen extends StatefulWidget {
@@ -100,7 +112,7 @@ class _OrderCreationScreenState extends State<OrderCreationScreen> {
             dbStock: entry.product.distributorStock?.toInt() ?? 0,
             vanStock: entry.product.stock?.toInt() ?? 0,
             uom: entry.product.uom,
-            orderQty: entry.quantity,
+            customerOrderQty: entry.customerOrderQty,
             damagedExpiredQty: entry.damagedQty,
             damageQualityQty: entry.qualityQty,
             adjustWithBill: entry.adjustWithBill,
@@ -140,7 +152,9 @@ class _OrderCreationScreenState extends State<OrderCreationScreen> {
                             (line.orderedQty + line.balanceQty))
                         .toInt(),
                 uom: line.uomName,
-                orderQty: line.orderedQty.toInt(),
+                customerOrderQty: (line.customerOrderQty > 0 || line.damagedExpiredQty > 0 || line.damageQualityQty > 0
+                    ? line.customerOrderQty
+                    : line.orderedQty).toInt(),
                 damagedExpiredQty: line.damagedExpiredQty.toInt(),
                 damageQualityQty: line.damageQualityQty.toInt(),
                 adjustWithBill: line.adjustWithBill,
@@ -195,13 +209,12 @@ class _OrderCreationScreenState extends State<OrderCreationScreen> {
           (l) => l.productId == entry.product.id,
         );
         if (existingIndex >= 0) {
-          lines[existingIndex].orderQty += entry.quantity;
+          lines[existingIndex].customerOrderQty += entry.customerOrderQty;
           lines[existingIndex].damagedExpiredQty += entry.damagedQty;
           lines[existingIndex].damageQualityQty += entry.qualityQty;
-          // Merging into an existing line: if either side needs the bill
-          // adjustment, the merged line does.
-          lines[existingIndex].adjustWithBill =
-              lines[existingIndex].adjustWithBill || entry.adjustWithBill;
+          // --- OLD FLOW (Deprecated):
+          // lines[existingIndex].adjustWithBill =
+          //     lines[existingIndex].adjustWithBill || entry.adjustWithBill;
         } else {
           lines.add(
             OrderLineModel(
@@ -210,7 +223,7 @@ class _OrderCreationScreenState extends State<OrderCreationScreen> {
               unitPrice: entry.product.price,
               dbStock: entry.product.distributorStock?.toInt() ?? 0,
               vanStock: entry.product.stock?.toInt() ?? 0,
-              orderQty: entry.quantity,
+              customerOrderQty: entry.customerOrderQty,
               damagedExpiredQty: entry.damagedQty,
               damageQualityQty: entry.qualityQty,
               adjustWithBill: entry.adjustWithBill,
@@ -397,10 +410,12 @@ class _OrderCreationScreenState extends State<OrderCreationScreen> {
             .map(
               (l) => {
                 'product_id': l.productId,
-                'order_qty': l.orderQty,
+                'customer_order_qty': l.customerOrderQty,
+                'order_qty': l.customerOrderQty,
                 'damaged_expired_qty': l.damagedExpiredQty,
                 'damage_quality_qty': l.damageQualityQty,
-                'ss_adjust_with_bill': l.adjustWithBill,
+                // --- OLD FLOW (Deprecated):
+                // 'ss_adjust_with_bill': l.adjustWithBill,
                 'price_unit': l.unitPrice,
               },
             )
@@ -942,11 +957,11 @@ class _OrderCreationScreenState extends State<OrderCreationScreen> {
               children: [
                 Expanded(
                   child: _buildQtyControl(
-                    label: 'Order Qty',
-                    value: line.orderQty,
+                    label: 'Customer Order Qty',
+                    value: line.customerOrderQty,
                     onChanged: (val) {
                       setState(() {
-                        line.orderQty = val;
+                        line.customerOrderQty = val;
                       });
                     },
                   ),
@@ -983,15 +998,16 @@ class _OrderCreationScreenState extends State<OrderCreationScreen> {
                 const Expanded(child: SizedBox()),
               ],
             ),
-            if (line.damagedExpiredQty > 0 || line.damageQualityQty > 0) ...[
-              const SizedBox(height: 8),
-              AdjustReturnToggle(
-                value: line.adjustWithBill,
-                vanStock: line.vanStock,
-                onChanged: (val) =>
-                    setState(() => line.adjustWithBill = val),
-              ),
-            ],
+            // --- OLD FLOW (Deprecated): Adjust return toggle ---
+            // if (line.damagedExpiredQty > 0 || line.damageQualityQty > 0) ...[
+            //   const SizedBox(height: 8),
+            //   AdjustReturnToggle(
+            //     value: line.adjustWithBill,
+            //     vanStock: line.vanStock,
+            //     onChanged: (val) =>
+            //         setState(() => line.adjustWithBill = val),
+            //   ),
+            // ],
           ] else ...[
             // MT or GT Primary
             Row(
@@ -999,10 +1015,10 @@ class _OrderCreationScreenState extends State<OrderCreationScreen> {
                 Expanded(
                   child: _buildQtyControl(
                     label: 'Order Qty',
-                    value: line.orderQty,
+                    value: line.customerOrderQty,
                     onChanged: (val) {
                       setState(() {
-                        line.orderQty = val;
+                        line.customerOrderQty = val;
                       });
                     },
                   ),
@@ -1015,22 +1031,46 @@ class _OrderCreationScreenState extends State<OrderCreationScreen> {
 
           const SizedBox(height: 16),
 
-          // Line Total
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+          // Payable Qty & Line Total
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text(
-                'Line Total',
-                style: TextStyle(fontSize: 11, color: AppColors.textSecondary),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                '$_currencySymbol${line.lineTotal.toStringAsFixed(2)}',
-                style: const TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.bold,
-                  color: AppColors.primaryStrong,
+              if (widget.businessType == 'gt' && widget.saleType == 'secondary')
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Payable Qty',
+                      style: TextStyle(fontSize: 11, color: AppColors.textSecondary),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      '${line.payableQty}',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
+                        color: line.payableQty < 0 ? Colors.red.shade700 : AppColors.textPrimary,
+                      ),
+                    ),
+                  ],
                 ),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  const Text(
+                    'Line Total',
+                    style: TextStyle(fontSize: 11, color: AppColors.textSecondary),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    '$_currencySymbol${line.lineTotal.toStringAsFixed(2)}',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                      color: line.lineTotal < 0 ? Colors.red.shade700 : AppColors.primaryStrong,
+                    ),
+                  ),
+                ],
               ),
             ],
           ),

@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'package:secondary_sales/core/widgets/ss_ui.dart';
 import 'package:secondary_sales/core/theme/app_theme.dart';
-import 'package:secondary_sales/core/widgets/order_form_widgets.dart';
+// import 'package:secondary_sales/core/widgets/order_form_widgets.dart';
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -1024,7 +1024,7 @@ class ProductSelectionCard extends StatelessWidget {
                         return Column(
                           children: [
                             _QtyStepper(
-                              label: 'Order Qty',
+                              label: 'Customer Order Qty',
                               value: orderQty,
                               accentColor: AppColors.primary,
                               onChanged: (val) => onQuantityChanged(val, damagedQty, qualityQty),
@@ -1058,7 +1058,7 @@ class ProductSelectionCard extends StatelessWidget {
                         children: [
                           Expanded(
                             child: _QtyStepper(
-                              label: 'Order Qty',
+                              label: 'Customer Order Qty',
                               value: orderQty,
                               accentColor: AppColors.primary,
                               onChanged: (val) => onQuantityChanged(val, damagedQty, qualityQty),
@@ -1101,17 +1101,18 @@ class ProductSelectionCard extends StatelessWidget {
                   ),
           ),
 
-          AnimatedSize(
-            duration: const Duration(milliseconds: 180),
-            curve: Curves.easeOut,
-            child: (businessType == 'gt' && saleType == 'secondary' && (lineEntry?.hasReturn ?? false))
-                ? AdjustReturnToggle(
-                    value: lineEntry?.adjustWithBill ?? false,
-                    vanStock: product.stock?.toInt() ?? 0,
-                    onChanged: onAdjustWithBillChanged,
-                  )
-                : const SizedBox(width: double.infinity),
-          ),
+          // --- OLD FLOW (Deprecated): Adjust return toggle ---
+          // AnimatedSize(
+          //   duration: const Duration(milliseconds: 180),
+          //   curve: Curves.easeOut,
+          //   child: (businessType == 'gt' && saleType == 'secondary' && (lineEntry?.hasReturn ?? false))
+          //       ? AdjustReturnToggle(
+          //           value: lineEntry?.adjustWithBill ?? false,
+          //           vanStock: product.stock?.toInt() ?? 0,
+          //           onChanged: onAdjustWithBillChanged,
+          //         )
+          //       : const SizedBox(width: double.infinity),
+          // ),
         ],
       ),
     );

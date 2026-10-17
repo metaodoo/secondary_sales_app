@@ -98,7 +98,10 @@ class _MtReturnLineEditSheetState extends State<MtReturnLineEditSheet> {
 
     // Fetch product lots
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<MtReturnProvider>().fetchProductLots(widget.line.productId);
+      context.read<MtReturnProvider>().fetchProductLots(
+            widget.line.productId,
+            returnBucket: widget.returnBucket,
+          );
     });
   }
 

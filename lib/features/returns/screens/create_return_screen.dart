@@ -92,6 +92,24 @@ class _CreateReturnScreenState extends State<CreateReturnScreen> {
     }
   }
 
+  bool get _isFreshReturn {
+    final bucket =
+        _prepareData?['ss_stock_bucket'] ?? _prepareData?['return_type'];
+    if (bucket != null) {
+      final b = bucket.toString().toLowerCase();
+      if (b == 'fresh' || b == 'fresh_return') return true;
+      if (b.contains('scrap') || b.contains('quality') || b.contains('damage')) {
+        return false;
+      }
+    }
+    if (_qcMode == 'fresh_split') return true;
+    if (_qcMode == 'scrap_sum') return false;
+    final ep = widget.endpoint.toLowerCase();
+    return !ep.contains('qc_returns') &&
+        !ep.contains('scraps') &&
+        !ep.contains('damaged');
+  }
+
   /// Which QC rule this picking carries, as reported by the backend:
   /// `fresh_split`, `scrap_sum`, or null for a leg the decision does not apply
   /// to. Served rather than derived so the rule lives in one place.
@@ -101,6 +119,7 @@ class _CreateReturnScreenState extends State<CreateReturnScreen> {
   /// columns each one uses comes from [qcColumnsFor]; when a mode is active the
   /// movement is derived by the backend and the app stops sending `quantity`.
   String? _qcMode;
+  String? _returnReceiptStatus;
 
   bool get _qcSplit => _qcMode != null;
 
@@ -238,6 +257,7 @@ class _CreateReturnScreenState extends State<CreateReturnScreen> {
         _isReadOnly =
             details['state'] == 'done' || details['state'] == 'cancel';
         _qcMode = details['qc_mode'] as String?;
+        _returnReceiptStatus = details['return_recipt_status'] as String?;
         _challanNumberController.text = details['challan_number'] ?? '';
         _selectedDamageType = details['damage_type'] ?? 'saleable';
         final atts = details['attachments'] as List<dynamic>?;
@@ -258,7 +278,10 @@ class _CreateReturnScreenState extends State<CreateReturnScreen> {
           'source_location': details['source_location'],
           'warehouse': details['destination_location'],
           'return_book_number': details['return_book_number'],
-          'return_book_page': details['return_book_page'],
+          'ss_stock_bucket': details['ss_stock_bucket'] ??
+              details['ss_return_type'] ??
+              details['return_type'],
+          'return_type': details['return_type'] ?? details['ss_return_type'],
         };
 
         final linesData = details['lines'] as List<dynamic>? ?? [];
@@ -339,25 +362,36 @@ class _CreateReturnScreenState extends State<CreateReturnScreen> {
               );
             }
           }
-          // Whatever is already on the record for this product, whichever
-          // column it sits in. Taking the maximum rather than one nominated
-          // column means the cap can only ever be too generous, never too
-          // tight -- a quantity someone already saved is never what blocks
-          // them.
-          final recorded = [
-            entry.quantity,
-            entry.soQty ?? 0.0,
-            entry.qcQty ?? 0.0,
-            entry.wNonsaleableQty ?? 0.0,
-            entry.qcSaleableQty ?? 0.0,
-            entry.qcNonsaleableQty ?? 0.0,
-            entry.wQcQty ?? 0.0,
-            entry.actualQcQty ?? 0.0,
-          ].reduce((a, b) => a > b ? a : b);
+          // On Leg 2 (transit leg), the stock originally debited from the distributor
+          // is what the Sales Officer declared and moved on Leg 1 (`so_qty`).
+          // The distributor's total fresh capacity on Leg 2 is:
+          // remaining fresh stock at distributor + stock moved on Leg 1 (`so_qty`).
+          final recorded = _isTransitLeg
+              ? ((entry.soQty != null && entry.soQty! > 0)
+                  ? entry.soQty!
+                  : entry.quantity)
+              : [
+                  entry.quantity,
+                  entry.soQty ?? 0.0,
+                  entry.qcQty ?? 0.0,
+                  entry.wNonsaleableQty ?? 0.0,
+                  entry.qcSaleableQty ?? 0.0,
+                  entry.qcNonsaleableQty ?? 0.0,
+                  entry.wQcQty ?? 0.0,
+                  entry.actualQcQty ?? 0.0,
+                ].reduce((a, b) => a > b ? a : b);
           _recordedOnLoad[product.id] =
               (_recordedOnLoad[product.id] ?? 0.0) + recorded;
 
           _lines.add(entry);
+        }
+        for (final entry in _lines) {
+          _distributorStock.putIfAbsent(
+            entry.product.id,
+            () => _isFreshReturn
+                ? entry.product.freshQty
+                : entry.product.availableQty,
+          );
         }
       });
 
@@ -403,7 +437,8 @@ class _CreateReturnScreenState extends State<CreateReturnScreen> {
             _distributorStockLoaded = true;
             for (final p in products) {
               final product = TransferProduct.fromMap(p);
-              _distributorStock[product.id] = product.availableQty;
+              _distributorStock[product.id] =
+                  _isFreshReturn ? product.freshQty : product.availableQty;
               final locQty = _locationQtyForProduct(product);
               if (locQty > 0) {
                 _lines.add(
@@ -430,7 +465,8 @@ class _CreateReturnScreenState extends State<CreateReturnScreen> {
   }
 
   /// Fill [_distributorStock] from `/products`, which reports each product's
-  /// total across the distributor's three stock locations.
+  /// total across the distributor's three stock locations (or Fresh location
+  /// alone for fresh returns).
   ///
   /// Called on the edit path too, where the picking's own line data cannot
   /// supply this: a reopened return reports availability at its source
@@ -442,26 +478,54 @@ class _CreateReturnScreenState extends State<CreateReturnScreen> {
       endpoint: widget.endpoint,
     );
     if (!mounted) return;
-    _distributorStock
-      ..clear()
-      ..addEntries(
-        products.map(TransferProduct.fromMap).map(
-          (product) => MapEntry(product.id, product.availableQty),
-        ),
-      );
+    for (final p in products) {
+      final product = TransferProduct.fromMap(p);
+      _distributorStock[product.id] =
+          _isFreshReturn ? product.freshQty : product.availableQty;
+    }
     _distributorStockLoaded = true;
+  }
+
+  bool get _isTransitLeg {
+    final src = _prepareData?['source_location'];
+    if (src is Map && src['usage'] == 'transit') return true;
+    if (_qcSplit) return true;
+    return false;
+  }
+
+  bool _canShowSendToSalesOperation(AuthProvider auth) {
+    if (!auth.canSendToSalesOperationFor(widget.moduleType)) return false;
+    if (!_isTransitLeg) return false;
+    return _returnReceiptStatus == 'warehouse_receipt';
+  }
+
+  bool _canShowValidate(AuthProvider auth) {
+    if (!auth.canValidateReturnFor(widget.moduleType)) return false;
+    if (_isTransitLeg) {
+      return _returnReceiptStatus == 'sales_operation_receipt';
+    }
+    return true;
   }
 
   /// The most this line may carry, or null when the distributor's stock is not
   /// known yet and the entry cannot be judged.
+  ///
+  /// Only on Leg 2 (transit leg) has the return already moved stock out of the
+  /// distributor's location. On Leg 1, the picking has not debited the distributor
+  /// location yet, so `stock` already represents the distributor's total stock on hand.
+  /// Adding `_recordedOnLoad` on Leg 1 would double-count the stock and allow
+  /// exceeding the true inventory on edit/update.
   double? _distributorCap(VirtualTransferLineEntry line) {
     if (!_distributorStockLoaded) return null;
     // Missing from a loaded map means the distributor holds none of it.
     final stock = _distributorStock[line.product.id] ?? 0.0;
-    return stock + (_recordedOnLoad[line.product.id] ?? 0.0);
+    final recorded =
+        _isTransitLeg ? (_recordedOnLoad[line.product.id] ?? 0.0) : 0.0;
+    return stock + recorded;
   }
 
-  /// The SO quantity this line is asking to return -- the only column capped.
+  /// The SO quantity this line is asking to return -- the only column capped
+  /// for scrap returns.
   ///
   /// `so_qty` is the sales officer's declaration of what came back from the
   /// market, and it is the only column the server builds leg 1's movement
@@ -478,14 +542,41 @@ class _CreateReturnScreenState extends State<CreateReturnScreen> {
         : (line.soQty ?? 0.0);
   }
 
+  /// The active quantity this line is asking to return for the user's role.
+  ///
+  /// On Fresh returns, this checks:
+  /// - Sales Operation / QC: `qcSaleableQty`
+  /// - Logistics / Warehouse Coordinator: `warehouse_qty` / `qcQty` / `wQcQty`
+  /// - Sales Officer (Leg 1): `so_qty`
+  ///
+  /// On Scrap / Quality / Damaged returns, this continues checking `so_qty`
+  /// against the 3-location combined stock.
+  double _activeEnteredQtyFor(
+    VirtualTransferLineEntry line,
+    AuthProvider auth,
+  ) {
+    if (_isFreshReturn) {
+      if (_qcSplit || auth.canEditQcQty) {
+        return line.product.tracking != 'none'
+            ? _lotSum(line, (l) => l.qcSaleableQty)
+            : (line.qcSaleableQty ?? 0.0);
+      }
+      if (auth.canEditWarehouseQty) {
+        return line.product.tracking != 'none'
+            ? _allocatedQcQty(line)
+            : (line.qcQty ?? line.wQcQty ?? 0.0);
+      }
+    }
+    return _enteredSoQtyFor(line);
+  }
+
   /// Gate a primary return on the distributor actually holding what is being
   /// returned. Shows the excess dialog and answers false when it does not.
   ///
-  /// Primary returns used to skip this check entirely, on the grounds that
-  /// goods come back from the market and need not still be on hand. The cap is
-  /// the sum of all three of the distributor's locations rather than the one
-  /// bucket being returned, so that reasoning still holds within a distributor
-  /// -- what it no longer allows is returning stock the distributor never had.
+  /// For Fresh returns, the cap is strictly the distributor's Fresh location stock
+  /// (plus whatever was recorded on load for this return).
+  /// For Scrap (Quality / Damaged) returns, the cap is the sum of all three of
+  /// the distributor's locations with automatic backend top-up.
   Future<bool> _withinDistributorStock(AuthProvider auth) async {
     if (!_isPrimaryTier) return true;
 
@@ -494,7 +585,7 @@ class _CreateReturnScreenState extends State<CreateReturnScreen> {
       if (!_lineHasSubmittedQty(line, auth)) continue;
       final cap = _distributorCap(line);
       if (cap == null) continue;
-      final entered = _enteredSoQtyFor(line);
+      final entered = _activeEnteredQtyFor(line, auth);
       // Tolerance keeps float noise from tripping an exactly-at-stock entry.
       if (entered > cap + 0.0001) {
         excessItems.add(
@@ -512,7 +603,9 @@ class _CreateReturnScreenState extends State<CreateReturnScreen> {
     await showStockExcessValidationDialog(
       context,
       excessItems: excessItems,
-      title: 'Distributor Stock Exceeded',
+      title: _isFreshReturn
+          ? 'Fresh Stock Exceeded'
+          : 'Distributor Stock Exceeded',
     );
     return false;
   }
@@ -554,7 +647,9 @@ class _CreateReturnScreenState extends State<CreateReturnScreen> {
       for (final line in _lines) {
         _distributorStock.putIfAbsent(
           line.product.id,
-          () => line.product.availableQty,
+          () => _isFreshReturn
+              ? line.product.freshQty
+              : line.product.availableQty,
         );
       }
       // Clear lots that are no longer in lines
@@ -924,9 +1019,19 @@ class _CreateReturnScreenState extends State<CreateReturnScreen> {
       return;
     }
 
+    if (sendToSalesOperation) {
+      setState(() {
+        _returnReceiptStatus = 'sales_operation_receipt';
+      });
+    }
+
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text('${widget.title} saved successfully!'),
+        content: Text(
+          sendToSalesOperation
+              ? '${widget.title} sent to Sales Operation successfully!'
+              : '${widget.title} saved successfully!',
+        ),
         backgroundColor: Colors.green,
       ),
     );
@@ -1728,7 +1833,7 @@ class _CreateReturnScreenState extends State<CreateReturnScreen> {
                               ),
                             ),
                           ],
-                          if (auth.canSendToSalesOperationFor(widget.moduleType)) ...[
+                          if (_canShowSendToSalesOperation(auth)) ...[
                             if (auth.canCancelReturnFor(widget.moduleType) ||
                                 auth.canSaveReturnFor(widget.moduleType))
                               const SizedBox(width: 8),
@@ -1755,10 +1860,10 @@ class _CreateReturnScreenState extends State<CreateReturnScreen> {
                               ),
                             ),
                           ],
-                          if (auth.canValidateReturnFor(widget.moduleType)) ...[
+                          if (_canShowValidate(auth)) ...[
                             if (auth.canCancelReturnFor(widget.moduleType) ||
                                 auth.canSaveReturnFor(widget.moduleType) ||
-                                auth.canSendToSalesOperationFor(widget.moduleType))
+                                _canShowSendToSalesOperation(auth))
                               const SizedBox(width: 8),
                             Expanded(
                               flex: 2,

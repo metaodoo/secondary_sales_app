@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:secondary_sales/data/api/api_service.dart';
 import 'package:secondary_sales/data/models/modern_trade/mt_return_request.dart';
+import 'package:secondary_sales/data/models/sales/product_category.dart';
 
 class MtReturnProvider extends ChangeNotifier {
   final ApiService _api = ApiService.instance;
@@ -20,12 +21,18 @@ class MtReturnProvider extends ChangeNotifier {
   String _searchQuery = '';
   DateTime? _dateFrom;
   DateTime? _dateTo;
+  String _sortOrder = 'date desc, id desc';
+  int? _selectedOutletId;
 
   Map<String, dynamic>? _prepareData;
   List<Map<String, dynamic>> _availableProducts = [];
   List<Map<String, dynamic>> _availableLots = [];
+  List<ProductCategory> _appCategories = [];
   bool _isLoadingProducts = false;
   bool _isLoadingLots = false;
+
+  // Getters
+  List<ProductCategory> get appCategories => _appCategories;
 
   // Getters
   List<MtReturnRequest> get returns => _returns;
@@ -43,8 +50,14 @@ class MtReturnProvider extends ChangeNotifier {
   String get searchQuery => _searchQuery;
   DateTime? get dateFrom => _dateFrom;
   DateTime? get dateTo => _dateTo;
+  String get sortOrder => _sortOrder;
+  int? get selectedOutletId => _selectedOutletId;
 
   Map<String, dynamic>? get prepareData => _prepareData;
+  List<Map<String, dynamic>> get allowedOutlets {
+    final list = (_prepareData?['allowed_outlets'] ?? _prepareData?['outlets']) as List?;
+    return list?.cast<Map<String, dynamic>>() ?? [];
+  }
   List<Map<String, dynamic>> get availableProducts => _availableProducts;
   List<Map<String, dynamic>> get availableLots => _availableLots;
   bool get isLoadingProducts => _isLoadingProducts;
@@ -63,6 +76,16 @@ class MtReturnProvider extends ChangeNotifier {
   void setDateRange(DateTime? from, DateTime? to, {String? returnBucket}) {
     _dateFrom = from;
     _dateTo = to;
+    fetchReturns(returnBucket: returnBucket, refresh: true);
+  }
+
+  void setSortOrder(String order, {String? returnBucket}) {
+    _sortOrder = order;
+    fetchReturns(returnBucket: returnBucket, refresh: true);
+  }
+
+  void setOutletFilter(int? outletId, {String? returnBucket}) {
+    _selectedOutletId = outletId;
     fetchReturns(returnBucket: returnBucket, refresh: true);
   }
 
@@ -90,8 +113,10 @@ class MtReturnProvider extends ChangeNotifier {
         search: _searchQuery.isNotEmpty ? _searchQuery : null,
         state: _selectedStateFilter != 'all' ? _selectedStateFilter : null,
         returnBucket: bucketToFetch,
+        partnerId: _selectedOutletId,
         dateFrom: _dateFrom != null ? "${_dateFrom!.year}-${_dateFrom!.month.toString().padLeft(2, '0')}-${_dateFrom!.day.toString().padLeft(2, '0')}" : null,
         dateTo: _dateTo != null ? "${_dateTo!.year}-${_dateTo!.month.toString().padLeft(2, '0')}-${_dateTo!.day.toString().padLeft(2, '0')}" : null,
+        order: _sortOrder,
       );
 
       if (refresh) {
@@ -142,12 +167,24 @@ class MtReturnProvider extends ChangeNotifier {
     }
   }
 
-  Future<void> fetchReturnProducts({String? search}) async {
+  Future<void> fetchAppCategories() async {
+    try {
+      _appCategories = await _api.getProductCategories();
+      notifyListeners();
+    } catch (e) {
+      debugPrint('Failed to load app categories in MT return provider: $e');
+    }
+  }
+
+  Future<void> fetchReturnProducts({String? search, int? appCategoryId}) async {
     _isLoadingProducts = true;
     notifyListeners();
 
     try {
-      _availableProducts = await _api.getMtReturnProducts(search: search);
+      _availableProducts = await _api.getMtReturnProducts(
+        search: search,
+        appCategoryId: appCategoryId,
+      );
     } catch (e) {
       _errorMessage = e.toString().replaceAll('Exception: ', '');
     } finally {
@@ -156,13 +193,13 @@ class MtReturnProvider extends ChangeNotifier {
     }
   }
 
-  Future<void> fetchProductLots(int productId) async {
+  Future<void> fetchProductLots(int productId, {String? returnBucket}) async {
     _isLoadingLots = true;
     _availableLots = [];
     notifyListeners();
 
     try {
-      _availableLots = await _api.getMtReturnProductLots(productId);
+      _availableLots = await _api.getMtReturnProductLots(productId, returnBucket: returnBucket);
     } catch (e) {
       _errorMessage = e.toString().replaceAll('Exception: ', '');
     } finally {

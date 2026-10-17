@@ -50,6 +50,7 @@ class _MtReturnProductSelectionSheetState extends State<MtReturnProductSelection
 
   Map<String, dynamic>? _selectedProduct;
   int? _selectedLotId;
+  int? _selectedAppCategoryId;
 
   @override
   void initState() {
@@ -74,13 +75,18 @@ class _MtReturnProductSelectionSheetState extends State<MtReturnProductSelection
           : '0';
 
       WidgetsBinding.instance.addPostFrameCallback((_) {
+        context.read<MtReturnProvider>().fetchAppCategories();
         final prodId = _selectedProduct?['id'] as int?;
         if (prodId != null) {
-          context.read<MtReturnProvider>().fetchProductLots(prodId);
+          context.read<MtReturnProvider>().fetchProductLots(
+                prodId,
+                returnBucket: widget.returnBucket,
+              );
         }
       });
     } else {
       WidgetsBinding.instance.addPostFrameCallback((_) {
+        context.read<MtReturnProvider>().fetchAppCategories();
         context.read<MtReturnProvider>().fetchReturnProducts();
       });
     }
@@ -100,9 +106,139 @@ class _MtReturnProductSelectionSheetState extends State<MtReturnProductSelection
     _searchDebounce?.cancel();
     _searchDebounce = Timer(const Duration(milliseconds: 300), () {
       if (mounted) {
-        context.read<MtReturnProvider>().fetchReturnProducts(search: val.trim());
+        context.read<MtReturnProvider>().fetchReturnProducts(
+          search: val.trim(),
+          appCategoryId: _selectedAppCategoryId,
+        );
       }
     });
+  }
+
+  void _openCategorySearchModal(MtReturnProvider provider) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) {
+        String catQuery = '';
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            final filteredCategories = provider.appCategories.where((cat) {
+              return cat.name.toLowerCase().contains(catQuery.toLowerCase());
+            }).toList();
+
+            return DraggableScrollableSheet(
+              initialChildSize: 0.65,
+              minChildSize: 0.4,
+              maxChildSize: 0.9,
+              expand: false,
+              builder: (_, scrollController) {
+                return Column(
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.all(16.0),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              const Text(
+                                'Select Category',
+                                style: TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              IconButton(
+                                icon: const Icon(Icons.close),
+                                onPressed: () => Navigator.pop(ctx),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 12),
+                          TextField(
+                            onChanged: (val) {
+                              setModalState(() {
+                                catQuery = val.trim();
+                              });
+                            },
+                            decoration: InputDecoration(
+                              hintText: 'Search category...',
+                              prefixIcon: const Icon(Icons.search, size: 20),
+                              contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(10),
+                                borderSide: const BorderSide(color: AppColors.borderSoft),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const Divider(height: 1),
+                    Expanded(
+                      child: ListView.builder(
+                        controller: scrollController,
+                        itemCount: filteredCategories.length + 1,
+                        itemBuilder: (context, index) {
+                          if (index == 0) {
+                            final isAllSelected = _selectedAppCategoryId == null;
+                            return ListTile(
+                              title: const Text('All Categories'),
+                              trailing: isAllSelected
+                                  ? const Icon(Icons.check, color: AppColors.primaryStrong)
+                                  : null,
+                              onTap: () {
+                                setState(() {
+                                  _selectedAppCategoryId = null;
+                                });
+                                Navigator.pop(ctx);
+                                provider.fetchReturnProducts(
+                                  search: _searchController.text.trim(),
+                                  appCategoryId: null,
+                                );
+                              },
+                            );
+                          }
+                          final cat = filteredCategories[index - 1];
+                          final isSelected = _selectedAppCategoryId == cat.id;
+                          return ListTile(
+                            title: Text(cat.name),
+                            trailing: isSelected
+                                ? const Icon(Icons.check, color: AppColors.primaryStrong)
+                                : null,
+                            onTap: () {
+                              setState(() {
+                                _selectedAppCategoryId = cat.id;
+                              });
+                              Navigator.pop(ctx);
+                              provider.fetchReturnProducts(
+                                search: _searchController.text.trim(),
+                                appCategoryId: cat.id,
+                              );
+                            },
+                          );
+                        },
+                      ),
+                    ),
+                  ],
+                );
+              },
+            );
+          },
+        );
+      },
+    );
+  }
+
+  bool get _isTracked {
+    if (_selectedProduct == null) return false;
+    final tracking = _selectedProduct!['tracking']?.toString().toLowerCase().trim();
+    return tracking == 'lot' || tracking == 'serial' || (tracking != null && tracking.isNotEmpty && tracking != 'none' && tracking != 'false');
   }
 
   void _onSelectProduct(Map<String, dynamic> product) {
@@ -112,7 +248,10 @@ class _MtReturnProductSelectionSheetState extends State<MtReturnProductSelection
     });
     final prodId = product['id'] as int?;
     if (prodId != null) {
-      context.read<MtReturnProvider>().fetchProductLots(prodId);
+      context.read<MtReturnProvider>().fetchProductLots(
+            prodId,
+            returnBucket: widget.returnBucket,
+          );
     }
   }
 
@@ -167,14 +306,11 @@ class _MtReturnProductSelectionSheetState extends State<MtReturnProductSelection
       }
     }
 
-    final tracking = _selectedProduct?['tracking']?.toString();
-    final isTracked = tracking == 'lot' || tracking == 'serial';
-
-    if (isTracked && (_selectedLotId == null || _selectedLotId == 0)) {
+    if (_isTracked && (_selectedLotId == null || _selectedLotId == 0)) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          backgroundColor: Colors.red,
-          content: Text('Please select a Lot / Serial number for this tracked product.'),
+        SnackBar(
+          backgroundColor: Colors.red.shade700,
+          content: const Text('Lot selection is mandatory for this tracked product.'),
         ),
       );
       return;
@@ -285,7 +421,10 @@ class _MtReturnProductSelectionSheetState extends State<MtReturnProductSelection
                       icon: const Icon(Icons.clear, size: 18),
                       onPressed: () {
                         _searchController.clear();
-                        provider.fetchReturnProducts(search: '');
+                        provider.fetchReturnProducts(
+                          search: '',
+                          appCategoryId: _selectedAppCategoryId,
+                        );
                       },
                     )
                   : null,
@@ -299,6 +438,117 @@ class _MtReturnProductSelectionSheetState extends State<MtReturnProductSelection
             ),
           ),
         ),
+        if (provider.appCategories.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+            child: Row(
+              children: [
+                InkWell(
+                  onTap: () => _openCategorySearchModal(provider),
+                  borderRadius: BorderRadius.circular(18),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: AppColors.primarySoft,
+                      borderRadius: BorderRadius.circular(18),
+                      border: Border.all(color: AppColors.primaryTint),
+                    ),
+                    child: const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.search, size: 16, color: AppColors.primary),
+                        SizedBox(width: 4),
+                        Text(
+                          'Category',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                            color: AppColors.primary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: SizedBox(
+                    height: 38,
+                    child: ListView.builder(
+                      scrollDirection: Axis.horizontal,
+                      padding: EdgeInsets.zero,
+                      itemCount: provider.appCategories.length + 1,
+                      itemBuilder: (context, index) {
+                        if (index == 0) {
+                          final bool isSelected = _selectedAppCategoryId == null;
+                          return Padding(
+                            padding: const EdgeInsets.only(right: 6),
+                            child: ChoiceChip(
+                              label: const Text('All Categories'),
+                              selected: isSelected,
+                              selectedColor: AppColors.primaryStrong,
+                              labelStyle: TextStyle(
+                                color: isSelected ? Colors.white : AppColors.textPrimary,
+                                fontWeight: FontWeight.w600,
+                                fontSize: 12,
+                              ),
+                              backgroundColor: Colors.white,
+                              side: BorderSide(
+                                color: isSelected ? AppColors.primaryStrong : AppColors.borderSoft,
+                              ),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(18),
+                              ),
+                              onSelected: (_) {
+                                setState(() {
+                                  _selectedAppCategoryId = null;
+                                });
+                                provider.fetchReturnProducts(
+                                  search: _searchController.text.trim(),
+                                  appCategoryId: null,
+                                );
+                              },
+                            ),
+                          );
+                        }
+                        final cat = provider.appCategories[index - 1];
+                        final bool isSelected = _selectedAppCategoryId == cat.id;
+                        return Padding(
+                          padding: const EdgeInsets.only(right: 6),
+                          child: ChoiceChip(
+                            label: Text(cat.name),
+                            selected: isSelected,
+                            selectedColor: AppColors.primaryStrong,
+                            labelStyle: TextStyle(
+                              color: isSelected ? Colors.white : AppColors.textPrimary,
+                              fontWeight: FontWeight.w600,
+                              fontSize: 12,
+                            ),
+                            backgroundColor: Colors.white,
+                            side: BorderSide(
+                              color: isSelected ? AppColors.primaryStrong : AppColors.borderSoft,
+                            ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(18),
+                            ),
+                            onSelected: (_) {
+                              setState(() {
+                                _selectedAppCategoryId = cat.id;
+                              });
+                              provider.fetchReturnProducts(
+                                search: _searchController.text.trim(),
+                                appCategoryId: cat.id,
+                              );
+                            },
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
         Expanded(
           child: provider.isLoadingProducts
               ? const Center(child: CircularProgressIndicator())
@@ -396,7 +646,10 @@ class _MtReturnProductSelectionSheetState extends State<MtReturnProductSelection
                   ),
                 ),
                 TextButton(
-                  onPressed: () => setState(() => _selectedProduct = null),
+                  onPressed: () => setState(() {
+                    _selectedProduct = null;
+                    _selectedLotId = null;
+                  }),
                   child: const Text('Change'),
                 ),
               ],
@@ -408,25 +661,25 @@ class _MtReturnProductSelectionSheetState extends State<MtReturnProductSelection
           Row(
             children: [
               Text(
-                (_selectedProduct?['tracking'] == 'lot' || _selectedProduct?['tracking'] == 'serial')
+                _isTracked
                     ? 'Lot / Serial Number (Required)'
                     : 'Lot / Serial Number (Optional)',
                 style: TextStyle(
                   fontSize: 13,
                   fontWeight: FontWeight.w600,
-                  color: (_selectedProduct?['tracking'] == 'lot' || _selectedProduct?['tracking'] == 'serial')
+                  color: _isTracked
                       ? const Color(0xFFDC2626)
                       : AppColors.textPrimary,
                 ),
               ),
-              if (_selectedProduct?['tracking'] == 'lot' || _selectedProduct?['tracking'] == 'serial')
+              if (_isTracked)
                 const Text(' *', style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold)),
             ],
           ),
           const SizedBox(height: 6),
           if (provider.isLoadingLots)
             const Center(child: Padding(padding: EdgeInsets.all(8), child: CircularProgressIndicator()))
-          else if ((_selectedProduct?['tracking'] == 'lot' || _selectedProduct?['tracking'] == 'serial') && provider.availableLots.isEmpty)
+          else if (_isTracked && provider.availableLots.isEmpty)
             Container(
               padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
@@ -461,10 +714,10 @@ class _MtReturnProductSelectionSheetState extends State<MtReturnProductSelection
                   ? 'Exp: ${lot['expiration_date']}'
                   : null,
               modalTitle: 'Select Return Lot',
-              hintText: (_selectedProduct?['tracking'] == 'lot' || _selectedProduct?['tracking'] == 'serial')
-                  ? 'Select lot number *'
-                  : 'Select lot number...',
-              allowClear: !(_selectedProduct?['tracking'] == 'lot' || _selectedProduct?['tracking'] == 'serial'),
+              hintText: _isTracked
+                  ? 'Select lot number (Required) *'
+                  : 'Select lot number (Optional)...',
+              allowClear: !_isTracked,
               clearLabel: 'No specific lot',
               onChanged: (val) {
                 setState(() => _selectedLotId = val != null ? val['id'] as int? : null);

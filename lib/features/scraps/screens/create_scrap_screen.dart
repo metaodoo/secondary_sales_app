@@ -99,6 +99,7 @@ class _CreateScrapScreenState extends State<CreateScrapScreen> {
   /// at all. Nothing on a damaged or quality return is saleable, so it carries
   /// its own warehouse and QC columns instead of the fresh ones.
   bool _scrapSum = false;
+  String? _returnReceiptStatus;
   bool _isReadOnly = false;
   String? _selectedDamageType;
 
@@ -223,6 +224,7 @@ class _CreateScrapScreenState extends State<CreateScrapScreen> {
           _isReadOnly =
               details['state'] == 'done' || details['state'] == 'cancel';
           _scrapSum = details['qc_mode'] == 'scrap_sum';
+          _returnReceiptStatus = details['return_recipt_status'] as String?;
           _selectedDamageType = details['damage_type'];
           final atts = details['attachments'] as List<dynamic>?;
           if (atts != null && atts.isNotEmpty) {
@@ -426,6 +428,27 @@ class _CreateScrapScreenState extends State<CreateScrapScreen> {
         ),
       );
     _distributorStockLoaded = true;
+  }
+
+  bool get _isTransitLeg {
+    final src = _prepareData?['source_location'];
+    if (src is Map && src['usage'] == 'transit') return true;
+    if (_scrapSum) return true;
+    return false;
+  }
+
+  bool _canShowSendToSalesOperation(AuthProvider auth) {
+    if (!auth.canSendToSalesOperationScrapFor(widget.moduleType)) return false;
+    if (!_isTransitLeg) return false;
+    return _returnReceiptStatus == 'warehouse_receipt';
+  }
+
+  bool _canShowValidate(AuthProvider auth) {
+    if (!auth.canValidateScrapFor(widget.moduleType)) return false;
+    if (_isTransitLeg) {
+      return _returnReceiptStatus == 'sales_operation_receipt';
+    }
+    return true;
   }
 
   /// The most this line may carry, or null when the distributor's stock is not
@@ -872,9 +895,19 @@ class _CreateScrapScreenState extends State<CreateScrapScreen> {
       return;
     }
 
+    if (sendToSalesOperation) {
+      setState(() {
+        _returnReceiptStatus = 'sales_operation_receipt';
+      });
+    }
+
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text('${widget.title} created successfully!'),
+        content: Text(
+          sendToSalesOperation
+              ? '${widget.title} sent to Sales Operation successfully!'
+              : '${widget.title} saved successfully!',
+        ),
         backgroundColor: Colors.green,
       ),
     );
@@ -1676,7 +1709,7 @@ class _CreateScrapScreenState extends State<CreateScrapScreen> {
                               ),
                             ),
                           ],
-                          if (auth.canSendToSalesOperationScrapFor(widget.moduleType)) ...[
+                          if (_canShowSendToSalesOperation(auth)) ...[
                             if (auth.canCancelScrapFor(widget.moduleType) ||
                                 auth.canSaveScrapFor(widget.moduleType))
                               const SizedBox(width: 8),
@@ -1703,10 +1736,10 @@ class _CreateScrapScreenState extends State<CreateScrapScreen> {
                               ),
                             ),
                           ],
-                          if (auth.canValidateScrapFor(widget.moduleType)) ...[
+                          if (_canShowValidate(auth)) ...[
                             if (auth.canCancelScrapFor(widget.moduleType) ||
                                 auth.canSaveScrapFor(widget.moduleType) ||
-                                auth.canSendToSalesOperationScrapFor(widget.moduleType))
+                                _canShowSendToSalesOperation(auth))
                               const SizedBox(width: 8),
                             Expanded(
                               flex: 2,

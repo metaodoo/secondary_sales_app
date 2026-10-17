@@ -144,6 +144,7 @@ class SaleOrderDetailLine {
   const SaleOrderDetailLine({
     required this.id,
     this.product,
+    this.customerOrderQty = 0.0,
     required this.orderedQty,
     required this.deliveredQty,
     required this.balanceQty,
@@ -159,6 +160,7 @@ class SaleOrderDetailLine {
 
   final int id;
   final OrderProduct? product;
+  final double customerOrderQty;
   final double orderedQty;
   final double deliveredQty;
   final double balanceQty;
@@ -179,6 +181,7 @@ class SaleOrderDetailLine {
       product: product is Map
           ? OrderProduct.fromMap(product.cast<String, dynamic>())
           : null,
+      customerOrderQty: asDouble(map['customer_order_qty'] ?? map['product_uom_qty']),
       orderedQty: asDouble(map['product_uom_qty']),
       deliveredQty: asDouble(map['qty_delivered']),
       balanceQty: asDouble(map['balance_qty']),

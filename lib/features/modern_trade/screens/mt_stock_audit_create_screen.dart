@@ -882,25 +882,13 @@ class _ProductAuditCardState extends State<_ProductAuditCard> {
         _lotRows.add(row);
       }
     } else {
-      if (widget.product.requiresLots) {
-        if (widget.product.lots.isNotEmpty) {
-          final row = _LotRowData(
-            lotId: widget.product.lots.first.id,
-            lotName: widget.product.lots.first.name,
-            initialQty: 0.0,
-          );
-          _attachFocusListener(row);
-          _lotRows.add(row);
-        }
-      } else {
-        final row = _LotRowData(
-          lotId: null,
-          lotName: null,
-          initialQty: 0.0,
-        );
-        _attachFocusListener(row);
-        _lotRows.add(row);
-      }
+      final row = _LotRowData(
+        lotId: null,
+        lotName: null,
+        initialQty: 0.0,
+      );
+      _attachFocusListener(row);
+      _lotRows.add(row);
     }
   }
 
@@ -993,13 +981,9 @@ class _ProductAuditCardState extends State<_ProductAuditCard> {
 
   void _addLotRow() {
     if (widget.product.lots.isEmpty) return;
-    final selectedLotIds = _lotRows.map((r) => r.lotId).toSet();
-    final availableLot = widget.product.lots.where((l) => !selectedLotIds.contains(l.id)).firstOrNull ??
-        widget.product.lots.first;
-
     final newRow = _LotRowData(
-      lotId: availableLot.id,
-      lotName: availableLot.name,
+      lotId: null,
+      lotName: null,
       initialQty: 0.0,
     );
     _attachFocusListener(newRow);
@@ -1130,12 +1114,16 @@ class _ProductAuditCardState extends State<_ProductAuditCard> {
                     color: const Color(0xFFF8FAFC),
                     borderRadius: BorderRadius.circular(8),
                     border: Border.all(
-                      color: rowQty > 0
-                          ? AppColors.primaryStrong.withValues(alpha: 0.35)
-                          : const Color(0xFFE2E8F0),
+                      color: (rowQty > 0 && (row.lotId == null || row.lotId == 0))
+                          ? const Color(0xFFEF4444)
+                          : (rowQty > 0
+                              ? AppColors.primaryStrong.withValues(alpha: 0.35)
+                              : const Color(0xFFE2E8F0)),
+                      width: (rowQty > 0 && (row.lotId == null || row.lotId == 0)) ? 1.5 : 1.0,
                     ),
                   ),
                   child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Row(
                         children: [
@@ -1157,11 +1145,11 @@ class _ProductAuditCardState extends State<_ProductAuditCard> {
                                   : null,
                               modalTitle: 'Select Lot & Expiry',
                               hintText: 'Select Lot & Expiry *',
+                              allowClear: false,
                               onChanged: (val) {
-                                if (val == null) return;
                                 setState(() {
-                                  row.lotId = val.id;
-                                  row.lotName = val.name;
+                                  row.lotId = val?.id;
+                                  row.lotName = val?.name;
                                 });
                                 _notifyChanged();
                               },
@@ -1188,6 +1176,19 @@ class _ProductAuditCardState extends State<_ProductAuditCard> {
                           ],
                         ],
                       ),
+                      if (rowQty > 0 && (row.lotId == null || row.lotId == 0)) ...[
+                        const SizedBox(height: 6),
+                        const Row(
+                          children: [
+                            Icon(Icons.error_outline, size: 14, color: Color(0xFFEF4444)),
+                            SizedBox(width: 4),
+                            Text(
+                              'Please select a lot for this count',
+                              style: TextStyle(fontSize: 11, color: Color(0xFFDC2626), fontWeight: FontWeight.w500),
+                            ),
+                          ],
+                        ),
+                      ],
                       const SizedBox(height: 8),
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,

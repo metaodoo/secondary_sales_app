@@ -31,6 +31,7 @@ class _MtOutletsScreenState extends State<MtOutletsScreen> with WidgetsBindingOb
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
   final GpsLockService _gpsLockService = GpsLockService();
+  Timer? _searchDebounce;
 
   @override
   void initState() {
@@ -72,9 +73,19 @@ class _MtOutletsScreenState extends State<MtOutletsScreen> with WidgetsBindingOb
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _searchDebounce?.cancel();
     _gpsLockService.dispose();
     _searchController.dispose();
     super.dispose();
+  }
+
+  void _onSearchChanged(String val) {
+    _searchDebounce?.cancel();
+    _searchDebounce = Timer(const Duration(milliseconds: 300), () {
+      if (mounted) {
+        setState(() => _searchQuery = val.trim());
+      }
+    });
   }
 
   Future<void> _openActionModalFor(MtOutlet outlet) async {
@@ -134,7 +145,7 @@ class _MtOutletsScreenState extends State<MtOutletsScreen> with WidgetsBindingOb
               padding: const EdgeInsets.fromLTRB(16.0, 8.0, 16.0, 8.0),
               child: TextField(
                 controller: _searchController,
-                onChanged: (val) => setState(() => _searchQuery = val.trim()),
+                onChanged: _onSearchChanged,
                 decoration: ssInputDecoration(
                   'Search store name or code...',
                   Icons.search,

@@ -340,6 +340,7 @@ extension ModernTradeApi on ApiService {
     String? date,
     String? dateFrom,
     String? dateTo,
+    String? order,
   }) async {
     final params = <String, dynamic>{
       'employee_id': _activeEmployeeId,
@@ -352,6 +353,7 @@ extension ModernTradeApi on ApiService {
       if (date != null) 'date': date,
       if (dateFrom != null) 'date_from': dateFrom,
       if (dateTo != null) 'date_to': dateTo,
+      if (order != null && order.isNotEmpty) 'order': order,
     };
 
     final result = await _post(
@@ -475,10 +477,11 @@ extension ModernTradeApi on ApiService {
   }
 
   /// Fetch products for Modern Trade return requests
-  Future<List<Map<String, dynamic>>> getMtReturnProducts({String? search}) async {
+  Future<List<Map<String, dynamic>>> getMtReturnProducts({String? search, int? appCategoryId}) async {
     final params = <String, dynamic>{
       'employee_id': _activeEmployeeId,
       if (search != null && search.isNotEmpty) 'search': search,
+      if (appCategoryId != null) 'app_categ_id': appCategoryId,
     };
 
     final result = await _post(
@@ -492,10 +495,13 @@ extension ModernTradeApi on ApiService {
   }
 
   /// Fetch lots for a product
-  Future<List<Map<String, dynamic>>> getMtReturnProductLots(int productId) async {
+  Future<List<Map<String, dynamic>>> getMtReturnProductLots(int productId, {String? returnBucket}) async {
     final result = await _post(
       '${AppConstants.apiPrefix}/mt/returns/products/$productId/lots',
-      {'employee_id': _activeEmployeeId},
+      {
+        'employee_id': _activeEmployeeId,
+        if (returnBucket != null && returnBucket.isNotEmpty) 'return_bucket': returnBucket,
+      },
     );
     if (result['success'] == true) {
       return List<Map<String, dynamic>>.from(result['data'] ?? []);

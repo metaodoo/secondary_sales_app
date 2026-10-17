@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
@@ -201,6 +202,144 @@ class _MtReturnCreateScreenState extends State<MtReturnCreateScreen> {
     }
   }
 
+  void _openOutletPickerModal(List<Map<String, dynamic>> outlets) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) {
+        String searchQuery = '';
+        Timer? modalDebounce;
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            final filteredOutlets = outlets.where((o) {
+              if (searchQuery.isEmpty) return true;
+              final name = (o['name'] ?? '').toString().toLowerCase();
+              final code = (o['ss_code'] ?? '').toString().toLowerCase();
+              final q = searchQuery.toLowerCase();
+              return name.contains(q) || code.contains(q);
+            }).toList();
+
+            return DraggableScrollableSheet(
+              initialChildSize: 0.7,
+              minChildSize: 0.4,
+              maxChildSize: 0.92,
+              expand: false,
+              builder: (_, scrollController) {
+                return Column(
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.all(16.0),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(
+                                'Select Allowed Outlet (${outlets.length})',
+                                style: const TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                  color: AppColors.textPrimary,
+                                ),
+                              ),
+                              IconButton(
+                                icon: const Icon(Icons.close),
+                                onPressed: () {
+                                  modalDebounce?.cancel();
+                                  Navigator.pop(ctx);
+                                },
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 12),
+                          TextField(
+                            onChanged: (val) {
+                              modalDebounce?.cancel();
+                              modalDebounce = Timer(const Duration(milliseconds: 300), () {
+                                setModalState(() {
+                                  searchQuery = val.trim();
+                                });
+                              });
+                            },
+                            decoration: InputDecoration(
+                              hintText: 'Search outlet name or code...',
+                              prefixIcon: const Icon(Icons.search, size: 20),
+                              contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(10),
+                                borderSide: const BorderSide(color: AppColors.borderSoft),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const Divider(height: 1),
+                    Expanded(
+                      child: filteredOutlets.isEmpty
+                          ? Center(
+                              child: Text(
+                                'No allowed outlets match "$searchQuery"',
+                                style: TextStyle(color: Colors.grey.shade600),
+                              ),
+                            )
+                          : ListView.builder(
+                              controller: scrollController,
+                              itemCount: filteredOutlets.length,
+                              itemBuilder: (context, index) {
+                                final o = filteredOutlets[index];
+                                final id = o['id'] as int?;
+                                final name = o['name']?.toString() ?? '';
+                                final ssCode = o['ss_code']?.toString() ?? '';
+                                final zone = o['zone'] is Map ? o['zone']['name']?.toString() : null;
+                                final isSelected = _selectedOutletId == id;
+
+                                return ListTile(
+                                  leading: Icon(
+                                    Icons.storefront,
+                                    color: isSelected ? AppColors.primaryStrong : Colors.grey.shade600,
+                                  ),
+                                  title: Text(
+                                    name,
+                                    style: TextStyle(
+                                      fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                                      color: isSelected ? AppColors.primaryStrong : AppColors.textPrimary,
+                                    ),
+                                  ),
+                                  subtitle: Text(
+                                    [
+                                      if (ssCode.isNotEmpty) 'Code: $ssCode',
+                                      if (zone != null && zone.isNotEmpty) 'Zone: $zone',
+                                    ].join(' • '),
+                                    style: TextStyle(color: Colors.grey.shade600, fontSize: 12),
+                                  ),
+                                  trailing: isSelected
+                                      ? const Icon(Icons.check_circle, color: AppColors.primaryStrong)
+                                      : null,
+                                  onTap: () {
+                                    modalDebounce?.cancel();
+                                    Navigator.pop(ctx);
+                                    setState(() => _selectedOutletId = id);
+                                  },
+                                );
+                              },
+                            ),
+                    ),
+                  ],
+                );
+              },
+            );
+          },
+        );
+      },
+    );
+  }
+
   void _onSubmit() async {
     final provider = context.read<MtReturnProvider>();
     final outlets = (provider.prepareData?['outlets'] as List?)?.cast<Map<String, dynamic>>() ?? [];
@@ -222,8 +361,8 @@ class _MtReturnCreateScreenState extends State<MtReturnCreateScreen> {
 
     for (final l in _lines) {
       final product = l['product'] as Map<String, dynamic>?;
-      final tracking = product?['tracking']?.toString();
-      final isTracked = tracking == 'lot' || tracking == 'serial';
+      final tracking = product?['tracking']?.toString().toLowerCase().trim();
+      final isTracked = tracking == 'lot' || tracking == 'serial' || (tracking != null && tracking.isNotEmpty && tracking != 'none' && tracking != 'false');
       if (isTracked && (l['lot_id'] == null || l['lot_id'] == 0)) {
         final prodName = product?['name']?.toString() ?? 'Tracked product';
         ScaffoldMessenger.of(context).showSnackBar(
@@ -321,27 +460,39 @@ class _MtReturnCreateScreenState extends State<MtReturnCreateScreen> {
                 children: [
                   const Text('Select MT Outlet', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
                   const SizedBox(height: 6),
-                  DropdownButtonFormField<int?>(
-                    value: _selectedOutletId,
-                    isExpanded: true,
-                    decoration: InputDecoration(
-                      hintText: 'Select outlet...',
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                  InkWell(
+                    onTap: () => _openOutletPickerModal(outlets),
+                    borderRadius: BorderRadius.circular(10),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: Colors.grey.shade400),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(Icons.storefront_outlined, size: 20, color: Colors.grey.shade700),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Text(
+                              selectedOutlet != null
+                                  ? (selectedOutlet['ss_code'] != null && selectedOutlet['ss_code'].toString().isNotEmpty
+                                      ? '${selectedOutlet['name']} [${selectedOutlet['ss_code']}]'
+                                      : selectedOutlet['name']?.toString() ?? '')
+                                  : 'Select allowed outlet...',
+                              style: TextStyle(
+                                fontSize: 14,
+                                color: selectedOutlet != null ? AppColors.textPrimary : Colors.grey.shade600,
+                                fontWeight: selectedOutlet != null ? FontWeight.w600 : FontWeight.normal,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          Icon(Icons.arrow_drop_down, color: Colors.grey.shade700),
+                        ],
+                      ),
                     ),
-                    items: outlets.map((o) {
-                      final id = o['id'] as int?;
-                      final name = o['name']?.toString() ?? '';
-                      final ssCode = o['ss_code']?.toString() ?? '';
-                      return DropdownMenuItem<int?>(
-                        value: id,
-                        child: Text(
-                          ssCode.isNotEmpty ? '$name [$ssCode]' : name,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      );
-                    }).toList(),
-                    onChanged: (val) => setState(() => _selectedOutletId = val),
                   ),
                   if (selectedOutlet != null) ...[
                     const SizedBox(height: 12),

@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import 'package:secondary_sales/core/access/access_resources.dart';
 import 'package:secondary_sales/core/theme/app_theme.dart';
@@ -44,15 +45,27 @@ class _MtReturnsListScreenState extends State<MtReturnsListScreen> {
     (key: 'confirmed', label: 'Confirmed'),
   ];
 
+  final List<({String key, String label, IconData icon})> _sortOptions = const [
+    (key: 'date desc, id desc', label: 'Date: Newest first', icon: Icons.schedule),
+    (key: 'date asc, id asc', label: 'Date: Oldest first', icon: Icons.history),
+    (key: 'partner_id asc, id desc', label: 'Outlet: A to Z', icon: Icons.sort_by_alpha),
+    (key: 'partner_id desc, id desc', label: 'Outlet: Z to A', icon: Icons.sort_by_alpha),
+    (key: 'name asc, id desc', label: 'Reference: A to Z', icon: Icons.tag),
+    (key: 'name desc, id desc', label: 'Reference: Z to A', icon: Icons.tag),
+    (key: 'state asc, date desc', label: 'Status / Stage', icon: Icons.flag_outlined),
+  ];
+
   @override
   void initState() {
     super.initState();
     _scrollController.addListener(_onScroll);
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<MtReturnProvider>().fetchReturns(
-            returnBucket: widget.returnBucket,
-            refresh: true,
-          );
+      final p = context.read<MtReturnProvider>();
+      p.fetchPrepareContext();
+      p.fetchReturns(
+        returnBucket: widget.returnBucket,
+        refresh: true,
+      );
     });
   }
 
@@ -72,6 +85,208 @@ class _MtReturnsListScreenState extends State<MtReturnsListScreen> {
         context.read<MtReturnProvider>().setSearchQuery(val.trim(), returnBucket: widget.returnBucket);
       }
     });
+  }
+
+  Future<void> _selectDateRange() async {
+    final provider = context.read<MtReturnProvider>();
+    final now = DateTime.now();
+    final initialStart = provider.dateFrom ?? now;
+    final initialEnd = provider.dateTo ?? now;
+    final picked = await showDateRangePicker(
+      context: context,
+      initialDateRange: DateTimeRange(start: initialStart, end: initialEnd),
+      firstDate: DateTime(2020),
+      lastDate: DateTime(2035),
+      builder: (context, child) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            colorScheme: const ColorScheme.light(
+              primary: AppColors.primaryStrong,
+              onPrimary: Colors.white,
+              onSurface: AppColors.textPrimary,
+            ),
+          ),
+          child: child!,
+        );
+      },
+    );
+    if (picked != null) {
+      provider.setDateRange(picked.start, picked.end, returnBucket: widget.returnBucket);
+    }
+  }
+
+  void _clearDateFilter() {
+    context.read<MtReturnProvider>().setDateRange(null, null, returnBucket: widget.returnBucket);
+  }
+
+  String _formatDateRange(DateTime? from, DateTime? to) {
+    if (from == null && to == null) return 'All Dates';
+    if (from != null && to != null) {
+      final isSameDay = from.year == to.year && from.month == to.month && from.day == to.day;
+      if (isSameDay) {
+        final now = DateTime.now();
+        final isToday = from.year == now.year && from.month == now.month && from.day == now.day;
+        return isToday ? 'Today (${DateFormat('dd MMM').format(from)})' : DateFormat('dd MMM yyyy').format(from);
+      }
+      return '${DateFormat('dd MMM').format(from)} - ${DateFormat('dd MMM').format(to)}';
+    }
+    if (from != null) return 'From ${DateFormat('dd MMM').format(from)}';
+    return 'Until ${DateFormat('dd MMM').format(to!)}';
+  }
+
+  String _selectedOutletName(MtReturnProvider provider) {
+    if (provider.selectedOutletId == null) return 'All Outlets';
+    final match = provider.allowedOutlets.firstWhere(
+      (o) => o['id'] == provider.selectedOutletId,
+      orElse: () => <String, dynamic>{},
+    );
+    if (match.isNotEmpty) {
+      final name = match['name']?.toString() ?? 'Outlet';
+      return name.length > 15 ? '${name.substring(0, 13)}...' : name;
+    }
+    return 'Outlet #${provider.selectedOutletId}';
+  }
+
+  void _openOutletFilterModal(MtReturnProvider provider) {
+    final outlets = provider.allowedOutlets;
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) {
+        String searchQuery = '';
+        Timer? modalDebounce;
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            final filteredOutlets = outlets.where((o) {
+              if (searchQuery.isEmpty) return true;
+              final name = (o['name'] ?? '').toString().toLowerCase();
+              final code = (o['ss_code'] ?? '').toString().toLowerCase();
+              final q = searchQuery.toLowerCase();
+              return name.contains(q) || code.contains(q);
+            }).toList();
+
+            return DraggableScrollableSheet(
+              initialChildSize: 0.7,
+              minChildSize: 0.4,
+              maxChildSize: 0.92,
+              expand: false,
+              builder: (_, scrollController) {
+                return Column(
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.all(16.0),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(
+                                'Filter by Outlet (${outlets.length})',
+                                style: const TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                  color: AppColors.textPrimary,
+                                ),
+                              ),
+                              IconButton(
+                                icon: const Icon(Icons.close),
+                                onPressed: () {
+                                  modalDebounce?.cancel();
+                                  Navigator.pop(ctx);
+                                },
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 12),
+                          TextField(
+                            onChanged: (val) {
+                              modalDebounce?.cancel();
+                              modalDebounce = Timer(const Duration(milliseconds: 300), () {
+                                setModalState(() {
+                                  searchQuery = val.trim();
+                                });
+                              });
+                            },
+                            decoration: InputDecoration(
+                              hintText: 'Search outlet name or code...',
+                              prefixIcon: const Icon(Icons.search, size: 20),
+                              contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(10),
+                                borderSide: const BorderSide(color: AppColors.borderSoft),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const Divider(height: 1),
+                    Expanded(
+                      child: ListView.builder(
+                        controller: scrollController,
+                        itemCount: filteredOutlets.length + 1,
+                        itemBuilder: (context, index) {
+                          if (index == 0) {
+                            final isAllSelected = provider.selectedOutletId == null;
+                            return ListTile(
+                              leading: const Icon(Icons.storefront_outlined, color: AppColors.primaryStrong),
+                              title: const Text('All Allowed Outlets', style: TextStyle(fontWeight: FontWeight.w600)),
+                              trailing: isAllSelected
+                                  ? const Icon(Icons.check, color: AppColors.primaryStrong)
+                                  : null,
+                              onTap: () {
+                                modalDebounce?.cancel();
+                                Navigator.pop(ctx);
+                                provider.setOutletFilter(null, returnBucket: widget.returnBucket);
+                              },
+                            );
+                          }
+                          final o = filteredOutlets[index - 1];
+                          final id = o['id'] as int?;
+                          final name = o['name']?.toString() ?? '';
+                          final ssCode = o['ss_code']?.toString() ?? '';
+                          final isSelected = provider.selectedOutletId == id;
+
+                          return ListTile(
+                            leading: Icon(
+                              Icons.storefront,
+                              color: isSelected ? AppColors.primaryStrong : Colors.grey.shade600,
+                            ),
+                            title: Text(
+                              name,
+                              style: TextStyle(
+                                fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                                color: isSelected ? AppColors.primaryStrong : AppColors.textPrimary,
+                              ),
+                            ),
+                            subtitle: ssCode.isNotEmpty
+                                ? Text('Code: $ssCode', style: TextStyle(color: Colors.grey.shade600, fontSize: 12))
+                                : null,
+                            trailing: isSelected
+                                ? const Icon(Icons.check, color: AppColors.primaryStrong)
+                                : null,
+                            onTap: () {
+                              modalDebounce?.cancel();
+                              Navigator.pop(ctx);
+                              provider.setOutletFilter(id, returnBucket: widget.returnBucket);
+                            },
+                          );
+                        },
+                      ),
+                    ),
+                  ],
+                );
+              },
+            );
+          },
+        );
+      },
+    );
   }
 
   void _onScroll() {
@@ -134,6 +349,9 @@ class _MtReturnsListScreenState extends State<MtReturnsListScreen> {
         auth.canView(specificScreenKey) ||
         (widget.createScreenKey != null && auth.canView(widget.createScreenKey!));
 
+    final isDateActive = provider.dateFrom != null || provider.dateTo != null;
+    final isOutletActive = provider.selectedOutletId != null;
+
     return Scaffold(
       backgroundColor: AppColors.surface,
       appBar: AppBar(
@@ -186,7 +404,166 @@ class _MtReturnsListScreenState extends State<MtReturnsListScreen> {
                   onChanged: _onSearchChanged,
                   onSubmitted: (val) => provider.setSearchQuery(val.trim(), returnBucket: widget.returnBucket),
                 ),
-                const SizedBox(height: 10),
+                const SizedBox(height: 8),
+
+                // Date Range, Outlet Filter & Sort Toolbar
+                Row(
+                  children: [
+                    // Date Filter Button
+                    Expanded(
+                      flex: 4,
+                      child: InkWell(
+                        onTap: _selectDateRange,
+                        borderRadius: BorderRadius.circular(8),
+                        child: Container(
+                          height: 38,
+                          padding: const EdgeInsets.symmetric(horizontal: 8),
+                          decoration: BoxDecoration(
+                            color: isDateActive ? AppColors.primarySoft : Colors.grey.shade100,
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(
+                              color: isDateActive ? AppColors.primaryStrong : Colors.grey.shade300,
+                            ),
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(
+                                Icons.calendar_month_outlined,
+                                size: 16,
+                                color: isDateActive ? AppColors.primaryStrong : Colors.grey.shade700,
+                              ),
+                              const SizedBox(width: 4),
+                              Expanded(
+                                child: Text(
+                                  _formatDateRange(provider.dateFrom, provider.dateTo),
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: isDateActive ? FontWeight.w700 : FontWeight.w500,
+                                    color: isDateActive ? AppColors.primaryStrong : AppColors.textPrimary,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                              if (isDateActive)
+                                InkWell(
+                                  onTap: _clearDateFilter,
+                                  child: const Icon(Icons.close, size: 14, color: AppColors.primaryStrong),
+                                ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+
+                    // Outlet Filter Button
+                    Expanded(
+                      flex: 4,
+                      child: InkWell(
+                        onTap: () => _openOutletFilterModal(provider),
+                        borderRadius: BorderRadius.circular(8),
+                        child: Container(
+                          height: 38,
+                          padding: const EdgeInsets.symmetric(horizontal: 8),
+                          decoration: BoxDecoration(
+                            color: isOutletActive ? AppColors.primarySoft : Colors.grey.shade100,
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(
+                              color: isOutletActive ? AppColors.primaryStrong : Colors.grey.shade300,
+                            ),
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(
+                                Icons.storefront_outlined,
+                                size: 16,
+                                color: isOutletActive ? AppColors.primaryStrong : Colors.grey.shade700,
+                              ),
+                              const SizedBox(width: 4),
+                              Expanded(
+                                child: Text(
+                                  _selectedOutletName(provider),
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: isOutletActive ? FontWeight.w700 : FontWeight.w500,
+                                    color: isOutletActive ? AppColors.primaryStrong : AppColors.textPrimary,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                              if (isOutletActive)
+                                InkWell(
+                                  onTap: () => provider.setOutletFilter(null, returnBucket: widget.returnBucket),
+                                  child: const Icon(Icons.close, size: 14, color: AppColors.primaryStrong),
+                                ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+
+                    // Sort Button
+                    PopupMenuButton<String>(
+                      tooltip: 'Sort returns',
+                      initialValue: provider.sortOrder,
+                      onSelected: (val) => provider.setSortOrder(val, returnBucket: widget.returnBucket),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      itemBuilder: (ctx) => _sortOptions.map((opt) {
+                        final isSelected = provider.sortOrder == opt.key;
+                        return PopupMenuItem<String>(
+                          value: opt.key,
+                          child: Row(
+                            children: [
+                              Icon(
+                                opt.icon,
+                                size: 18,
+                                color: isSelected ? AppColors.primaryStrong : Colors.grey.shade700,
+                              ),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: Text(
+                                  opt.label,
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: isSelected ? FontWeight.w700 : FontWeight.normal,
+                                    color: isSelected ? AppColors.primaryStrong : AppColors.textPrimary,
+                                  ),
+                                ),
+                              ),
+                              if (isSelected)
+                                const Icon(Icons.check, size: 16, color: AppColors.primaryStrong),
+                            ],
+                          ),
+                        );
+                      }).toList(),
+                      child: Container(
+                        height: 38,
+                        padding: const EdgeInsets.symmetric(horizontal: 10),
+                        decoration: BoxDecoration(
+                          color: Colors.grey.shade100,
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: Colors.grey.shade300),
+                        ),
+                        child: const Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.swap_vert, size: 18, color: AppColors.primaryStrong),
+                            SizedBox(width: 2),
+                            Text(
+                              'Sort',
+                              style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppColors.primaryStrong),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+
                 // Status Filter Chips
                 SizedBox(
                   height: 34,

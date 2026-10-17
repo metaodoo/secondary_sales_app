@@ -3,36 +3,47 @@ import 'product.dart';
 class OrderLineEntry {
   OrderLineEntry({
     required this.product,
-    required this.quantity,
+    int? customerOrderQty,
+    int? quantity,
     this.damagedQty = 0,
     this.qualityQty = 0,
     this.adjustWithBill = false,
     this.discountPercent = 0.0,
-  });
+  }) : customerOrderQty = customerOrderQty ?? quantity ?? 0;
 
   final Product product;
-  int quantity;
+  int customerOrderQty;
+
+  /// Backwards compatibility alias for customerOrderQty
+  int get quantity => customerOrderQty;
+  set quantity(int val) => customerOrderQty = val;
+
   int damagedQty;
   int qualityQty;
 
-  /// The product is not in the van, so this return cannot be exchanged for
-  /// fresh stock. It is taken back on its own and settled against the bill.
+  // --- OLD FLOW (Deprecated): Flag for settling return against bill ---
+  // bool adjustWithBill;
   bool adjustWithBill;
+  // -------------------------------------------------------------------
 
   double discountPercent;
 
-  bool get isSelected => quantity > 0 || damagedQty > 0 || qualityQty > 0;
+  bool get isSelected => customerOrderQty > 0 || damagedQty > 0 || qualityQty > 0;
 
   /// Whether this line has anything to adjust in the first place.
   bool get hasReturn => damagedQty > 0 || qualityQty > 0;
-  int get totalQty => quantity + damagedQty + qualityQty;
+  int get totalQty => customerOrderQty + damagedQty + qualityQty;
 
-  /// See `OrderLineModel.billableQty` -- kept in step with the server's
-  /// `sale.order.line._ss_billable_qty`.
-  int get billableQty =>
-      adjustWithBill ? quantity - (damagedQty + qualityQty) : quantity;
+  /// Payable quantity = customerOrderQty - (damagedQty + qualityQty)
+  int get payableQty => customerOrderQty - (damagedQty + qualityQty);
 
-  double get grossAmount => product.price * billableQty;
+  // --- OLD FLOW (Deprecated): billableQty based on adjustWithBill ---
+  // int get billableQty =>
+  //     adjustWithBill ? quantity - (damagedQty + qualityQty) : quantity;
+  // -----------------------------------------------------------------
+  int get billableQty => payableQty;
+
+  double get grossAmount => product.price * payableQty;
   double get discountAmount => grossAmount * (discountPercent / 100);
   double get totalAmount => grossAmount - discountAmount;
 }
