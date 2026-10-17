@@ -120,25 +120,62 @@ class DashboardAttendanceSummary {
   }
 }
 
+class AttendancePersonDay {
+  const AttendancePersonDay({
+    required this.employeeId,
+    required this.name,
+    required this.date,
+    required this.status,
+  });
+
+  final int employeeId;
+  final String name;
+  final String date;
+  final String status;
+
+  static AttendancePersonDay? fromMapOrNull(Map<String, dynamic>? map) {
+    if (map == null) return null;
+    final name = (map['name'] ?? '').toString();
+    if (name.isEmpty) return null;
+    return AttendancePersonDay(
+      employeeId: asInt(map['employee_id']),
+      name: name,
+      date: (map['date'] ?? '').toString(),
+      status: (map['status'] ?? '').toString(),
+    );
+  }
+}
+
 class AttendanceWindow {
   const AttendanceWindow({
     required this.present,
     required this.absent,
     this.late = 0,
+    this.entries = const [],
   });
 
   final int present;
   final int absent;
   final int late;
+  final List<AttendancePersonDay> entries;
 
   int get total => present + absent;
 
   static AttendanceWindow? fromMapOrNull(Map<String, dynamic>? map) {
     if (map == null) return null;
+    final rawEntries = map['entries'];
+    final entries = <AttendancePersonDay>[];
+    if (rawEntries is List) {
+      for (final item in rawEntries) {
+        final person = AttendancePersonDay.fromMapOrNull(asMapOrNull(item));
+        if (person != null) entries.add(person);
+      }
+    }
     return AttendanceWindow(
       present: asInt(map['present']),
       absent: asInt(map['absent']),
       late: asInt(map['late']),
+      entries: entries,
     );
   }
 }
