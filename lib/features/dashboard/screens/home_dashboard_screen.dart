@@ -242,6 +242,8 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
     final canAccessLeave = auth.canView(AppScreen.moduleLeave);
     final canAccessExpense = auth.canView(AppScreen.moduleExpense);
     final canAccessMyTeam = auth.canView(AppScreen.moduleMyTeam);
+    final canAccessCorporate = auth.canAccessCorporateSales;
+    final canAccessInstitution = auth.canAccessInstitutionSales;
 
     final canShowTeam = summary?.hasTeam ?? false;
     final showTeam = canShowTeam && _showTeam;
@@ -275,6 +277,28 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
           icon: Icons.storefront_outlined,
           color: const Color(0xFF10B981),
           onTap: () => _open(const AppShell(moduleType: 'secondary')),
+        ),
+      if (canAccessCorporate)
+        _ModuleItem(
+          title: 'Corporate Sales (CS)',
+          icon: Icons.apartment_outlined,
+          color: const Color(0xFF7C3AED),
+          onTap: () => _open(const AppShell(
+            moduleType: 'primary',
+            businessType: 'cs',
+            moduleTitle: 'Corporate Sales (CS)',
+          )),
+        ),
+      if (canAccessInstitution)
+        _ModuleItem(
+          title: 'Institution Sales (IS)',
+          icon: Icons.account_balance_outlined,
+          color: const Color(0xFF0F766E),
+          onTap: () => _open(const AppShell(
+            moduleType: 'primary',
+            businessType: 'is',
+            moduleTitle: 'Institution Sales (IS)',
+          )),
         ),
       if (canAccessMtPrimary)
         _ModuleItem(
@@ -634,6 +658,10 @@ AttendanceWindow _selectAttendanceWindow(
     present: attendance.my.present + attendance.team!.present,
     absent: attendance.my.absent + attendance.team!.absent,
     late: attendance.my.late + attendance.team!.late,
+    entries: [
+      ...attendance.my.entries,
+      ...attendance.team!.entries,
+    ],
   );
 }
 
@@ -982,6 +1010,7 @@ class _AttendanceRow extends StatelessWidget {
                 value: window.present.toString(),
                 bg: AppColors.successSoft,
                 fg: const Color(0xFF166534),
+                onTap: () => _openAttendancePeople(context, 'Present', window),
               ),
             ),
             const SizedBox(width: 8),
@@ -991,6 +1020,7 @@ class _AttendanceRow extends StatelessWidget {
                 value: window.absent.toString(),
                 bg: const Color(0xFFFEE2E2),
                 fg: const Color(0xFFB91C1C),
+                onTap: () => _openAttendancePeople(context, 'Absent', window),
               ),
             ),
             const SizedBox(width: 8),
@@ -1000,6 +1030,7 @@ class _AttendanceRow extends StatelessWidget {
                 value: window.late.toString(),
                 bg: const Color(0xFFFEF3C7),
                 fg: const Color(0xFFB45309),
+                onTap: () => _openAttendancePeople(context, 'Late', window),
               ),
             ),
           ],
@@ -1009,49 +1040,102 @@ class _AttendanceRow extends StatelessWidget {
   }
 }
 
+void _openAttendancePeople(
+  BuildContext context,
+  String label,
+  AttendanceWindow window,
+) {
+  final status = label.toLowerCase();
+  final people = window.entries.where((entry) {
+    if (status == 'present') return entry.status == 'present' || entry.status == 'late';
+    return entry.status == status;
+  }).toList();
+  Navigator.of(context).push(
+    MaterialPageRoute(
+      builder: (_) => _AttendancePeopleScreen(title: label, people: people),
+    ),
+  );
+}
+
 class _AttendanceStat extends StatelessWidget {
   const _AttendanceStat({
     required this.label,
     required this.value,
     required this.bg,
     required this.fg,
+    required this.onTap,
   });
 
   final String label;
   final String value;
   final Color bg;
   final Color fg;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
-      decoration: BoxDecoration(
-        color: bg,
+    return Material(
+      color: bg,
+      borderRadius: BorderRadius.circular(12),
+      child: InkWell(
         borderRadius: BorderRadius.circular(12),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            label,
-            style: TextStyle(
-              color: fg.withValues(alpha: 0.85),
-              fontWeight: FontWeight.w700,
-              fontSize: 11,
-            ),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                label,
+                style: TextStyle(
+                  color: fg.withValues(alpha: 0.85),
+                  fontWeight: FontWeight.w700,
+                  fontSize: 11,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                value,
+                style: TextStyle(
+                  color: fg,
+                  fontWeight: FontWeight.w800,
+                  fontSize: 18,
+                ),
+              ),
+            ],
           ),
-          const SizedBox(height: 4),
-          Text(
-            value,
-            style: TextStyle(
-              color: fg,
-              fontWeight: FontWeight.w800,
-              fontSize: 18,
-            ),
-          ),
-        ],
+        ),
       ),
+    );
+  }
+}
+
+class _AttendancePeopleScreen extends StatelessWidget {
+  const _AttendancePeopleScreen({required this.title, required this.people});
+
+  final String title;
+  final List<AttendancePersonDay> people;
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: Text(title)),
+      body: people.isEmpty
+          ? const Center(child: Text('No records'))
+          : ListView.separated(
+              itemCount: people.length,
+              separatorBuilder: (_, _) => const Divider(height: 1),
+              itemBuilder: (context, index) {
+                final person = people[index];
+                final dateLabel = person.date.isEmpty
+                    ? ''
+                    : DateFormat('d MMM yyyy').format(DateTime.parse(person.date));
+                return ListTile(
+                  title: Text(person.name),
+                  subtitle: dateLabel.isEmpty ? null : Text(dateLabel),
+                );
+              },
+            ),
     );
   }
 }

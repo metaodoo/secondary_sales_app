@@ -21,7 +21,14 @@ import 'package:secondary_sales/core/theme/app_theme.dart';
 
 class AppShell extends StatefulWidget {
   final String moduleType;
-  const AppShell({super.key, required this.moduleType});
+  final String businessType;
+  final String? moduleTitle;
+  const AppShell({
+    super.key,
+    required this.moduleType,
+    this.businessType = 'gt',
+    this.moduleTitle,
+  });
 
   @override
   State<AppShell> createState() => _AppShellState();
@@ -41,6 +48,7 @@ class _AppShellState extends State<AppShell> {
   DateTime? _dateToFilter;
   Timer? _orderSearchDebounce;
   Timer? _distributorSearchDebounce;
+  PrimarySaleProvider? _saleProvider;
 
   // Tabs that render their own new/add FAB; the module launcher is hidden there
   // so the two floating buttons don't collide.
@@ -58,6 +66,8 @@ class _AppShellState extends State<AppShell> {
     if (widget.moduleType == 'primary') {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         final provider = context.read<PrimarySaleProvider>();
+        _saleProvider = provider;
+        provider.setChannelBusinessType(widget.businessType);
         provider.fetchRecentOrders();
         provider.fetchInitialData();
       });
@@ -70,6 +80,9 @@ class _AppShellState extends State<AppShell> {
     _distributorSearchDebounce?.cancel();
     _orderSearchController.dispose();
     _distributorSearchController.dispose();
+    if (widget.businessType != 'gt') {
+      _saleProvider?.setChannelBusinessType('gt');
+    }
     super.dispose();
   }
 
@@ -166,7 +179,12 @@ class _AppShellState extends State<AppShell> {
     // "Primary Sales" feature (Sales card + Primary Sales nav) is gated by the
     // sales-list key, decoupled from module entry (screen.module.primary) so a
     // group can be let into the Primary module without seeing the Sales feature.
-    final canAccessPrimary = auth.canView(AppScreen.primarySalesList);
+    final canAccessChannelSales = widget.businessType == 'cs'
+        ? auth.canAccessCorporateSales
+        : widget.businessType == 'is'
+            ? auth.canAccessInstitutionSales
+            : false;
+    final canAccessPrimary = auth.canView(AppScreen.primarySalesList) || canAccessChannelSales;
     final canAccessSecondary = auth.canAccessSecondarySales;
 
     final currentIndex = !canAccessDealers && _currentIndex == 1
@@ -184,6 +202,8 @@ class _AppShellState extends State<AppShell> {
         showPrimarySalesModule: canAccessPrimary,
         showSecondarySalesModule: canAccessSecondary,
         moduleType: widget.moduleType,
+        moduleTitle: widget.moduleTitle,
+        businessType: widget.businessType,
         onBackToModules: _exitModule,
         onOpenMenu: () => _scaffoldKey.currentState?.openEndDrawer(),
         onModuleSelected: (index) {

@@ -74,7 +74,14 @@ class HomeTab extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final provider = context.watch<PrimarySaleProvider>();
+    final auth = context.watch<AuthProvider>();
     final orders = provider.recentOrders;
+    final channel = provider.channelBusinessType;
+    final canCreate = channel == 'cs'
+        ? auth.canDo(AppAction.corporateOrderCreate)
+        : channel == 'is'
+            ? auth.canDo(AppAction.institutionOrderCreate)
+            : auth.canView(AppScreen.createPrimarySale);
 
     final bool hasDateFilter = dateFromFilter != null && dateToFilter != null;
     final bool hasStatusFilter = statusFilter != 'all';
@@ -82,13 +89,12 @@ class HomeTab extends StatelessWidget {
 
     return Scaffold(
       backgroundColor: AppColors.background,
-      floatingActionButton:
-          context.watch<AuthProvider>().canView(AppScreen.createPrimarySale)
-              ? SsCreateFab(
-                  label: 'New Sales Order',
-                  onPressed: onNewOrderTap,
-                )
-              : null,
+      floatingActionButton: canCreate
+          ? SsCreateFab(
+              label: 'New Sales Order',
+              onPressed: onNewOrderTap,
+            )
+          : null,
       appBar: AppBar(
         backgroundColor: AppColors.surface,
         elevation: 0,
