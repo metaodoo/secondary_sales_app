@@ -54,6 +54,7 @@ part 'endpoints/dashboard_api.dart';
 part 'endpoints/notification_api.dart';
 part 'endpoints/notice_api.dart';
 part 'endpoints/modern_trade_api.dart';
+part 'endpoints/cs_return_api.dart';
 
 class ApiService {
   ApiService._internal();
