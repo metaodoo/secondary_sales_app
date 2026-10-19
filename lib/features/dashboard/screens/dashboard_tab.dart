@@ -18,6 +18,7 @@ import 'package:secondary_sales/features/modern_trade/screens/mt_outlets_screen.
 import 'package:secondary_sales/features/modern_trade/screens/mt_stock_audit_list_screen.dart';
 import 'package:secondary_sales/features/modern_trade/screens/mt_sec_orders_list_screen.dart';
 import 'package:secondary_sales/features/modern_trade/screens/mt_returns_list_screen.dart';
+import 'package:secondary_sales/features/corporate_institutional_sale/screens/cs_return_screen.dart';
 
 class DashboardTab extends StatelessWidget {
   const DashboardTab({
@@ -342,6 +343,36 @@ class DashboardTab extends StatelessWidget {
                           circleColor: AppColors.primaryStrong,
                           onTap: () => onModuleSelected(AppShellIndex.sales),
                         ),
+                      if (businessType == 'cs' && showPrimarySalesModule) ...[
+                        _buildModuleCard(
+                          title: 'Non-Saleable',
+                          icon: Icons.recycling_outlined,
+                          iconColor: Colors.white,
+                          circleColor: const Color(0xFFDC2626),
+                          onTap: () => _openCsReturn(context, 'non_saleable', 'Non-Saleable Returns', 'New Non-Saleable'),
+                        ),
+                        _buildModuleCard(
+                          title: 'Short-Dated / Expired',
+                          icon: Icons.event_busy_outlined,
+                          iconColor: Colors.white,
+                          circleColor: const Color(0xFFD97706),
+                          onTap: () => _openCsReturn(context, 'short_dated', 'Short-Dated / Expired', 'New Short-Dated'),
+                        ),
+                        _buildModuleCard(
+                          title: 'Quality Issue',
+                          icon: Icons.verified_outlined,
+                          iconColor: Colors.white,
+                          circleColor: const Color(0xFF7C3AED),
+                          onTap: () => _openCsReturn(context, 'quality', 'Quality Issue Returns', 'New Quality Issue'),
+                        ),
+                        _buildModuleCard(
+                          title: 'Saleable Return',
+                          icon: Icons.assignment_return_outlined,
+                          iconColor: Colors.white,
+                          circleColor: const Color(0xFF2563EB),
+                          onTap: () => _openCsReturn(context, 'saleable', 'Saleable Returns', 'New Saleable'),
+                        ),
+                      ],
                       if ((businessType == 'cs' || businessType == 'is') &&
                           showPrimarySalesModule)
                         _buildModuleCard(
@@ -608,6 +639,19 @@ class DashboardTab extends StatelessWidget {
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+
+  void _openCsReturn(BuildContext context, String category, String title, String createLabel) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => CsReturnScreen(
+          category: category,
+          title: title,
+          createLabel: createLabel,
         ),
       ),
     );

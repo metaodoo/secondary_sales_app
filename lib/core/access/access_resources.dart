@@ -42,6 +42,7 @@ class AppScreen {
   static const moduleCorporate = 'screen.module.corporate_sale';
   static const moduleInstitution = 'screen.module.institution_sale';
   static const corporateOrdersList = 'screen.corporate_sale.orders.list';
+  static const corporateReturnsList = 'screen.corporate_sale.returns.list';
   static const institutionOrdersList = 'screen.institution_sale.orders.list';
 
   // Modern Trade (MT - Primary Sales) screens.
@@ -208,6 +209,13 @@ class AppAction {
   // Primary sale orders and deliveries.
   static const primaryOrderCreate = 'action.primary_sale.orders.create';
   static const corporateOrderCreate = 'action.corporate_sale.orders.create';
+  static const corporateReturnCreate = 'action.corporate_sale.returns.create';
+  static const corporateReturnSubmitDm = 'action.corporate_sale.returns.submit_dm';
+  static const corporateReturnSubmitCoordinator =
+      'action.corporate_sale.returns.submit_coordinator';
+  static const corporateReturnSubmitSalesOperation =
+      'action.corporate_sale.returns.submit_sales_operation';
+  static const corporateReturnComplete = 'action.corporate_sale.returns.complete';
   static const institutionOrderCreate = 'action.institution_sale.orders.create';
   static const primaryOrderConfirm = 'action.primary_sale.orders.confirm';
   static const primaryOrderCancel = 'action.primary_sale.orders.cancel';
@@ -469,6 +477,48 @@ const List<AccessResource> accessCatalog = [
     'action',
     'corporate_sale',
     'Corporate Sales (CS) › Create Order',
+    _cs,
+  ),
+  AccessResource(
+    AppScreen.corporateReturnsList,
+    'screen',
+    'corporate_sale',
+    'Corporate Sales (CS) › Returns',
+    _cs,
+  ),
+  AccessResource(
+    AppAction.corporateReturnCreate,
+    'action',
+    'corporate_sale',
+    'Corporate Sales (CS) › Create Return',
+    _cs,
+  ),
+  AccessResource(
+    AppAction.corporateReturnSubmitDm,
+    'action',
+    'corporate_sale',
+    'Corporate Sales (CS) › Submit Return to Delivery Man',
+    _cs,
+  ),
+  AccessResource(
+    AppAction.corporateReturnSubmitCoordinator,
+    'action',
+    'corporate_sale',
+    'Corporate Sales (CS) › Submit Collected Return',
+    _cs,
+  ),
+  AccessResource(
+    AppAction.corporateReturnSubmitSalesOperation,
+    'action',
+    'corporate_sale',
+    'Corporate Sales (CS) › Verify Return',
+    _cs,
+  ),
+  AccessResource(
+    AppAction.corporateReturnComplete,
+    'action',
+    'corporate_sale',
+    'Corporate Sales (CS) › Validate Return Challan',
     _cs,
   ),
   AccessResource(
