@@ -343,36 +343,19 @@ class DashboardTab extends StatelessWidget {
                           circleColor: AppColors.primaryStrong,
                           onTap: () => onModuleSelected(AppShellIndex.sales),
                         ),
-                      if (businessType == 'cs' && showPrimarySalesModule) ...[
+                      if (businessType == 'cs' && showPrimarySalesModule)
                         _buildModuleCard(
-                          title: 'Non-Saleable',
-                          icon: Icons.recycling_outlined,
-                          iconColor: Colors.white,
-                          circleColor: const Color(0xFFDC2626),
-                          onTap: () => _openCsReturn(context, 'non_saleable', 'Non-Saleable Returns', 'New Non-Saleable'),
-                        ),
-                        _buildModuleCard(
-                          title: 'Short-Dated / Expired',
-                          icon: Icons.event_busy_outlined,
-                          iconColor: Colors.white,
-                          circleColor: const Color(0xFFD97706),
-                          onTap: () => _openCsReturn(context, 'short_dated', 'Short-Dated / Expired', 'New Short-Dated'),
-                        ),
-                        _buildModuleCard(
-                          title: 'Quality Issue',
-                          icon: Icons.verified_outlined,
-                          iconColor: Colors.white,
-                          circleColor: const Color(0xFF7C3AED),
-                          onTap: () => _openCsReturn(context, 'quality', 'Quality Issue Returns', 'New Quality Issue'),
-                        ),
-                        _buildModuleCard(
-                          title: 'Saleable Return',
+                          title: 'Return',
                           icon: Icons.assignment_return_outlined,
                           iconColor: Colors.white,
                           circleColor: const Color(0xFF2563EB),
-                          onTap: () => _openCsReturn(context, 'saleable', 'Saleable Returns', 'New Saleable'),
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(builder: (_) => const _CsReturnCategoriesScreen()),
+                            );
+                          },
                         ),
-                      ],
                       if ((businessType == 'cs' || businessType == 'is') &&
                           showPrimarySalesModule)
                         _buildModuleCard(
@@ -644,19 +627,6 @@ class DashboardTab extends StatelessWidget {
     );
   }
 
-  void _openCsReturn(BuildContext context, String category, String title, String createLabel) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) => CsReturnScreen(
-          category: category,
-          title: title,
-          createLabel: createLabel,
-        ),
-      ),
-    );
-  }
-
   Widget _buildModuleCard({
     required String title,
     required IconData icon,
@@ -710,6 +680,138 @@ class DashboardTab extends StatelessWidget {
                       fontSize: 14,
                       height: 1.2,
                     ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _CsReturnCategoriesScreen extends StatelessWidget {
+  const _CsReturnCategoriesScreen();
+
+  @override
+  Widget build(BuildContext context) {
+    final cards = [
+      (
+        'Non-Saleable',
+        Icons.recycling_outlined,
+        const Color(0xFFDC2626),
+        'non_saleable',
+        'Non-Saleable Returns',
+        'New Non-Saleable',
+      ),
+      (
+        'Short-Dated / Expired',
+        Icons.event_busy_outlined,
+        const Color(0xFFD97706),
+        'short_dated',
+        'Short-Dated / Expired',
+        'New Short-Dated',
+      ),
+      (
+        'Quality Issue',
+        Icons.verified_outlined,
+        const Color(0xFF7C3AED),
+        'quality',
+        'Quality Issue Returns',
+        'New Quality Issue',
+      ),
+      (
+        'Saleable Return',
+        Icons.assignment_return_outlined,
+        const Color(0xFF2563EB),
+        'saleable',
+        'Saleable Returns',
+        'New Saleable',
+      ),
+    ];
+    return Scaffold(
+      backgroundColor: const Color(0xFFF8FAFC),
+      appBar: AppBar(title: const Text('Return')),
+      body: GridView.count(
+        padding: const EdgeInsets.all(16),
+        crossAxisCount: 2,
+        crossAxisSpacing: 16,
+        mainAxisSpacing: 16,
+        childAspectRatio: 1.02,
+        children: [
+          for (final card in cards)
+            _CsReturnCategoryCard(
+              title: card.$1,
+              icon: card.$2,
+              circleColor: card.$3,
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => CsReturnScreen(
+                      category: card.$4,
+                      title: card.$5,
+                      createLabel: card.$6,
+                    ),
+                  ),
+                );
+              },
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CsReturnCategoryCard extends StatelessWidget {
+  const _CsReturnCategoryCard({
+    required this.title,
+    required this.icon,
+    required this.circleColor,
+    required this.onTap,
+  });
+
+  final String title;
+  final IconData icon;
+  final Color circleColor;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(AppRadii.xLarge),
+        border: Border.all(color: AppColors.borderSoft),
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(20),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Container(
+                  width: 58,
+                  height: 58,
+                  decoration: BoxDecoration(shape: BoxShape.circle, color: circleColor),
+                  child: Icon(icon, color: Colors.white, size: 28),
+                ),
+                const SizedBox(height: 10),
+                Text(
+                  title,
+                  textAlign: TextAlign.center,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: AppColors.textPrimary,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 14,
+                    height: 1.2,
                   ),
                 ),
               ],
