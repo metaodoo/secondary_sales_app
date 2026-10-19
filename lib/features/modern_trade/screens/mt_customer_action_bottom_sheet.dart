@@ -342,6 +342,23 @@ class _MtCustomerActionBottomSheetState extends State<MtCustomerActionBottomShee
   }
 
   Future<void> _handleStockAuditAction({bool directCreate = false}) async {
+    final provider = context.read<ModernTradeProvider>();
+    final isCheckedIn = provider.checkedInOutletId == widget.outlet.id || widget.outlet.isActiveCheckedIn;
+
+    if (!directCreate) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => MtStockAuditListScreen(
+            outletId: widget.outlet.id,
+            outletName: widget.outlet.name,
+            visitId: isCheckedIn ? provider.currentVisitId : null,
+          ),
+        ),
+      );
+      return;
+    }
+
     final allowed = await checkAttendanceRestriction(
       context,
       actionName: 'Stock Audit / Outlet Visit',
@@ -350,31 +367,15 @@ class _MtCustomerActionBottomSheetState extends State<MtCustomerActionBottomShee
     );
     if (!allowed || !mounted) return;
 
-    final provider = context.read<ModernTradeProvider>();
-    final isCheckedIn = provider.checkedInOutletId == widget.outlet.id || widget.outlet.isActiveCheckedIn;
-
     if (isCheckedIn) {
-      if (directCreate) {
-        Navigator.pop(context); // Close bottom sheet
-        if (!mounted) return;
-        await showMtAuditTypePicker(
-          context,
-          outletId: widget.outlet.id,
-          outletName: widget.outlet.name,
-          visitId: provider.currentVisitId,
-        );
-      } else {
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (_) => MtStockAuditListScreen(
-              outletId: widget.outlet.id,
-              outletName: widget.outlet.name,
-              visitId: provider.currentVisitId,
-            ),
-          ),
-        );
-      }
+      Navigator.pop(context); // Close bottom sheet
+      if (!mounted) return;
+      await showMtAuditTypePicker(
+        context,
+        outletId: widget.outlet.id,
+        outletName: widget.outlet.name,
+        visitId: provider.currentVisitId,
+      );
     } else {
       if (!mounted) return;
       showDialog(
@@ -394,27 +395,14 @@ class _MtCustomerActionBottomSheetState extends State<MtCustomerActionBottomShee
                 Navigator.pop(ctx);
                 final checkedIn = await _handleCheckIn();
                 if (checkedIn && mounted) {
-                  if (directCreate) {
-                    Navigator.pop(context);
-                    if (!mounted) return;
-                    await showMtAuditTypePicker(
-                      context,
-                      outletId: widget.outlet.id,
-                      outletName: widget.outlet.name,
-                      visitId: provider.currentVisitId,
-                    );
-                  } else {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => MtStockAuditListScreen(
-                          outletId: widget.outlet.id,
-                          outletName: widget.outlet.name,
-                          visitId: provider.currentVisitId,
-                        ),
-                      ),
-                    );
-                  }
+                  Navigator.pop(context);
+                  if (!mounted) return;
+                  await showMtAuditTypePicker(
+                    context,
+                    outletId: widget.outlet.id,
+                    outletName: widget.outlet.name,
+                    visitId: provider.currentVisitId,
+                  );
                 }
               },
               child: const Text('Check In Now'),

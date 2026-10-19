@@ -75,7 +75,7 @@ class PrimarySaleProvider with ChangeNotifier {
 
     try {
       _hubs = await _apiService.getDistributionHubs();
-      _products = await _apiService.getProducts();
+      _products = await _apiService.getProducts(businessType: _channelBusinessType);
       _warehouses = await _apiService.getWarehouses();
     } catch (e) {
       _error = e.toString();

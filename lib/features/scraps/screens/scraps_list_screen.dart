@@ -173,6 +173,9 @@ class _ScrapsListScreenState extends State<ScrapsListScreen> {
       if (returnReciptStatus == 'sales_operation_receipt') {
         return const Color(0xFF1E40AF); // Blue 800
       }
+      if (returnReciptStatus == 'qc_receipt') {
+        return const Color(0xFF7C3AED); // Violet 700
+      }
       return const Color(0xFFD97706); // Amber 800
     }
     return switch (state) {
@@ -197,6 +200,9 @@ class _ScrapsListScreenState extends State<ScrapsListScreen> {
       if (returnReciptStatus == 'sales_operation_receipt') {
         return const Color(0xFFDBEAFE); // Blue 100
       }
+      if (returnReciptStatus == 'qc_receipt') {
+        return const Color(0xFFEDE9FE); // Violet 100
+      }
       return const Color(0xFFFEF3C7); // Amber 100
     }
     return switch (state) {
@@ -220,6 +226,9 @@ class _ScrapsListScreenState extends State<ScrapsListScreen> {
             state == 'ready')) {
       if (returnReciptStatus == 'sales_operation_receipt') {
         return 'SALES OPERATION RECEIPT';
+      }
+      if (returnReciptStatus == 'qc_receipt') {
+        return 'QC RECEIPT';
       }
       return 'WAREHOUSE RECEIPT';
     }
@@ -273,6 +282,10 @@ class _ScrapsListScreenState extends State<ScrapsListScreen> {
                         DropdownMenuItem(
                           value: 'warehouse_receipt',
                           child: Text('Warehouse Receipt'),
+                        ),
+                        DropdownMenuItem(
+                          value: 'qc_receipt',
+                          child: Text('QC Receipt'),
                         ),
                         DropdownMenuItem(
                           value: 'sales_operation_receipt',
@@ -329,6 +342,7 @@ class _ScrapsListScreenState extends State<ScrapsListScreen> {
                 onChanged: (value) {
                   if (value != null) {
                     if (value == 'warehouse_receipt' ||
+                        value == 'qc_receipt' ||
                         value == 'sales_operation_receipt') {
                       setState(() {
                         _state = 'all';

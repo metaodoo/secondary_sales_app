@@ -76,6 +76,7 @@ extension CatalogApi on ApiService {
     int? categoryId,
     bool? inStockOnly,
     String? sortBy,
+    String? businessType,
   }) async {
     final res = await getProductsWithCount(
       search: search,
@@ -84,6 +85,7 @@ extension CatalogApi on ApiService {
       categoryId: categoryId,
       inStockOnly: inStockOnly,
       sortBy: sortBy,
+      businessType: businessType,
     );
     return res.products;
   }

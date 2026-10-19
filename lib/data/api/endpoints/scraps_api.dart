@@ -54,6 +54,7 @@ extension ScrapsApi on ApiService {
   Future<List<Map<String, dynamic>>> getScrapProducts({
     String? search,
     int? distributorId,
+    String? businessType,
   }) async {
     final params = <String, dynamic>{'employee_id': _activeEmployeeId};
     if (distributorId != null) {
@@ -61,6 +62,9 @@ extension ScrapsApi on ApiService {
     }
     if (search != null && search.isNotEmpty) {
       params['search'] = search;
+    }
+    if (businessType != null && businessType.isNotEmpty) {
+      params['business_type'] = businessType;
     }
 
     final result = await _post(
@@ -144,6 +148,7 @@ extension ScrapsApi on ApiService {
     required List<Map<String, dynamic>> lines,
     String? type,
     String? damageType,
+    bool sendToQc = false,
     bool sendToSalesOperation = false,
   }) async {
     final params = <String, dynamic>{
@@ -153,6 +158,9 @@ extension ScrapsApi on ApiService {
     if (type != null && type.isNotEmpty) params['type'] = type;
     if (damageType != null && damageType.isNotEmpty) {
       params['damage_type'] = damageType;
+    }
+    if (sendToQc) {
+      params['send_to_qc'] = true;
     }
     if (sendToSalesOperation) {
       params['send_to_sales_operation'] = true;

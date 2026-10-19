@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:intl/intl.dart';
 import 'package:secondary_sales/core/util/parse.dart';
 import 'package:secondary_sales/core/theme/app_theme.dart';
 import 'package:secondary_sales/features/hr/attendance_provider.dart';
@@ -373,12 +372,8 @@ class _AttendanceScreenContentState extends State<_AttendanceScreenContent>
   Widget _buildTodayActivityCard(Map<String, dynamic> todayLog) {
     final checkInVal = todayLog['check_in'];
     final checkOutVal = todayLog['check_out'];
-    final checkIn = (checkInVal is String && checkInVal.isNotEmpty && checkInVal != 'false')
-        ? checkInVal.split(' ').last
-        : '--:--:--';
-    final checkOut = (checkOutVal is String && checkOutVal.isNotEmpty && checkOutVal != 'false')
-        ? checkOutVal.split(' ').last
-        : '--:--:--';
+    final checkIn = formatDisplayTime(checkInVal);
+    final checkOut = formatDisplayTime(checkOutVal);
 
     final checkInAddrVal = todayLog['check_in_address'];
     final checkOutAddrVal = todayLog['check_out_address'];
@@ -567,11 +562,8 @@ class _AttendanceScreenContentState extends State<_AttendanceScreenContent>
     DateTime? parsedDate = asDateTime(dateStr);
     final formattedDate = parsedDate != null ? _formatRecordDate(parsedDate).split(' (').first : dateStr;
 
-    final checkInDt = asDateTime(log['check_in']);
-    final checkIn = checkInDt != null ? DateFormat('hh:mm a').format(checkInDt.toLocal()) : (log['check_in']?.toString().split(' ').last ?? '--:--');
-
-    final checkOutDt = asDateTime(log['check_out']);
-    final checkOut = checkOutDt != null ? DateFormat('hh:mm a').format(checkOutDt.toLocal()) : (log['check_out']?.toString().split(' ').last ?? '--:--');
+    final checkIn = formatDisplayTime(log['check_in']);
+    final checkOut = formatDisplayTime(log['check_out']);
     final isCurrentlyCheckedIn = log['check_out'] == null;
     final hours = (log['worked_hours'] as num?)?.toStringAsFixed(2) ?? '0.0';
     final checkInAddress = log['check_in_address'];

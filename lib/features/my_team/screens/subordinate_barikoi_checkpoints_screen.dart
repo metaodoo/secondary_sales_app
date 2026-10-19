@@ -6,6 +6,7 @@ import 'package:secondary_sales/core/widgets/ss_ui.dart';
 import 'package:secondary_sales/features/my_team/my_team_provider.dart';
 import 'package:maplibre_gl/maplibre_gl.dart';
 import 'package:intl/intl.dart';
+import 'package:secondary_sales/core/util/parse.dart';
 
 class ProcessedCheckpoint {
   final Checkpoint original;
@@ -893,14 +894,14 @@ class _SubordinateBarikoiCheckpointsScreenState
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                'Check-In: ${shift.checkIn != null ? shift.checkIn!.split(" ").last : "N/A"}',
+                'Check-In: ${formatDisplayTime(shift.checkIn, defaultValue: "N/A")}',
                 style: const TextStyle(
                   fontWeight: FontWeight.bold,
                   color: AppColors.primaryStrong,
                 ),
               ),
               Text(
-                'Check-Out: ${shift.checkOut != null ? shift.checkOut!.split(" ").last : "Active"}',
+                'Check-Out: ${shift.checkOut != null ? formatDisplayTime(shift.checkOut) : "Active"}',
                 style: const TextStyle(
                   fontWeight: FontWeight.bold,
                   color: AppColors.primaryStrong,
@@ -976,7 +977,7 @@ class _SubordinateBarikoiCheckpointsScreenState
                       const SizedBox(width: 12),
                       // Time
                       Text(
-                        pt.recordedAt?.split(" ").last ?? 'N/A',
+                        formatDisplayTime(pt.recordedAt, defaultValue: 'N/A'),
                         style: TextStyle(
                           fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
                           color: pt.isMock ? const Color(0xFFEF4444) : AppColors.textPrimary,

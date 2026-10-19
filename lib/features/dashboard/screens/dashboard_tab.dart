@@ -178,7 +178,7 @@ class DashboardTab extends StatelessWidget {
                         ),
                       if (auth.canView(AppScreen.mtSecOrdersList))
                         _buildModuleCard(
-                          title: 'Audit Orders',
+                          title: 'Audit Sales',
                           icon: Icons.receipt_long_outlined,
                           iconColor: Colors.white,
                           circleColor: AppColors.primaryStrong,

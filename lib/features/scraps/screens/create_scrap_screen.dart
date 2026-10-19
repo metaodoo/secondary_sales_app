@@ -263,6 +263,9 @@ class _CreateScrapScreenState extends State<CreateScrapScreen> {
                   ?.toDouble(),
               wNonsaleableQty: (ld['w_nonsaleable_qty'] as num?)?.toDouble(),
               wQcQty: (ld['w_qc_qty'] as num?)?.toDouble(),
+              qcTeamNonsaleableQty:
+                  (ld['qc_team_nonsaleable_qty'] as num?)?.toDouble(),
+              qcTeamQcQty: (ld['qc_team_qc_qty'] as num?)?.toDouble(),
               actualQcQty: (ld['actual_qc_qty'] as num?)?.toDouble(),
               qcNonsaleableQty: (ld['qc_nonsaleable_qty'] as num?)?.toDouble(),
             );
@@ -282,6 +285,10 @@ class _CreateScrapScreenState extends State<CreateScrapScreen> {
                 final wNonsaleableQty = (ll['w_nonsaleable_qty'] as num?)
                     ?.toDouble();
                 final wQcQty = (ll['w_qc_qty'] as num?)?.toDouble();
+                final qcTeamNonsaleableQty =
+                    (ll['qc_team_nonsaleable_qty'] as num?)?.toDouble();
+                final qcTeamQcQty =
+                    (ll['qc_team_qc_qty'] as num?)?.toDouble();
                 final actualQcQty = (ll['actual_qc_qty'] as num?)?.toDouble();
                 final qcNonsaleableQty = (ll['qc_nonsaleable_qty'] as num?)
                     ?.toDouble();
@@ -296,6 +303,8 @@ class _CreateScrapScreenState extends State<CreateScrapScreen> {
                   qcQty,
                   wNonsaleableQty ?? 0.0,
                   wQcQty ?? 0.0,
+                  qcTeamNonsaleableQty ?? 0.0,
+                  qcTeamQcQty ?? 0.0,
                   actualQcQty ?? 0.0,
                   qcNonsaleableQty ?? 0.0,
                 ].reduce((a, b) => a > b ? a : b);
@@ -317,6 +326,8 @@ class _CreateScrapScreenState extends State<CreateScrapScreen> {
                     ..qcQty = qcQty
                     ..wNonsaleableQty = wNonsaleableQty
                     ..wQcQty = wQcQty
+                    ..qcTeamNonsaleableQty = qcTeamNonsaleableQty
+                    ..qcTeamQcQty = qcTeamQcQty
                     ..actualQcQty = actualQcQty
                     ..qcNonsaleableQty = qcNonsaleableQty,
                 );
@@ -335,6 +346,8 @@ class _CreateScrapScreenState extends State<CreateScrapScreen> {
               entry.qcSaleableQty ?? 0.0,
               entry.qcNonsaleableQty ?? 0.0,
               entry.wQcQty ?? 0.0,
+              entry.qcTeamNonsaleableQty ?? 0.0,
+              entry.qcTeamQcQty ?? 0.0,
               entry.actualQcQty ?? 0.0,
             ].reduce((a, b) => a > b ? a : b);
             _recordedOnLoad[product.id] =
@@ -437,18 +450,75 @@ class _CreateScrapScreenState extends State<CreateScrapScreen> {
     return false;
   }
 
+  bool get _hasAnyWQcQty {
+    return _lines.any((line) {
+      if ((line.wQcQty ?? 0) > 0) return true;
+      return line.lotLines.any((l) => (l.wQcQty ?? 0) > 0);
+    });
+  }
+
+  bool _canShowSendToQc(AuthProvider auth) {
+    if (!auth.canSendToQcForScrap(widget.moduleType)) return false;
+    if (!_isTransitLeg) return false;
+    if (_returnReceiptStatus != 'warehouse_receipt') return false;
+    final bucket = _prepareData?['ss_stock_bucket'];
+    if (bucket == 'scrap_quality') return true;
+    if (_scrapSum) {
+      return _hasAnyWQcQty;
+    }
+    return false;
+  }
+
   bool _canShowSendToSalesOperation(AuthProvider auth) {
     if (!auth.canSendToSalesOperationScrapFor(widget.moduleType)) return false;
     if (!_isTransitLeg) return false;
-    return _returnReceiptStatus == 'warehouse_receipt';
+    if (_returnReceiptStatus == 'qc_receipt') {
+      return auth.canEditQcTeamQty;
+    }
+    if (_returnReceiptStatus == 'warehouse_receipt') {
+      final bucket = _prepareData?['ss_stock_bucket'];
+      if (bucket == 'scrap_quality') return false;
+      if (_scrapSum) {
+        return !_hasAnyWQcQty;
+      }
+      return true;
+    }
+    return false;
   }
 
   bool _canShowValidate(AuthProvider auth) {
     if (!auth.canValidateScrapFor(widget.moduleType)) return false;
     if (_isTransitLeg) {
-      return _returnReceiptStatus == 'sales_operation_receipt';
+      return _returnReceiptStatus == 'sales_operation_receipt' ||
+          _returnReceiptStatus == 'salesops_receipt';
     }
     return true;
+  }
+
+  bool _canShowCancel(AuthProvider auth) {
+    if (!auth.canCancelScrapFor(widget.moduleType)) return false;
+    if (_isReadOnly) return false;
+    final state = _prepareData?['state'];
+    if (state == 'done' || state == 'cancel') return false;
+
+    if (_isTransitLeg) {
+      if (_returnReceiptStatus == 'warehouse_receipt') {
+        return auth.canEditWarehouseQty;
+      }
+      if (_returnReceiptStatus == 'qc_receipt') {
+        return auth.canEditQcTeamQty;
+      }
+      if (_returnReceiptStatus == 'sales_operation_receipt' ||
+          _returnReceiptStatus == 'salesops_receipt') {
+        return auth.canValidateScrapFor(widget.moduleType);
+      }
+      return auth.canValidateScrapFor(widget.moduleType);
+    }
+
+    if (_returnReceiptStatus == null || _returnReceiptStatus == 'draft') {
+      return true;
+    }
+    return auth.canValidateScrapFor(widget.moduleType);
   }
 
   /// The most this line may carry, or null when the distributor's stock is not
@@ -644,6 +714,24 @@ class _CreateScrapScreenState extends State<CreateScrapScreen> {
     if (line.qcQty != null) {
       lotInput.qcQty = line.qcQty;
     }
+    if (line.wQcQty != null) {
+      lotInput.wQcQty = line.wQcQty;
+    }
+    if (line.wNonsaleableQty != null) {
+      lotInput.wNonsaleableQty = line.wNonsaleableQty;
+    }
+    if (line.qcTeamNonsaleableQty != null) {
+      lotInput.qcTeamNonsaleableQty = line.qcTeamNonsaleableQty;
+    }
+    if (line.qcTeamQcQty != null) {
+      lotInput.qcTeamQcQty = line.qcTeamQcQty;
+    }
+    if (line.actualQcQty != null) {
+      lotInput.actualQcQty = line.actualQcQty;
+    }
+    if (line.qcNonsaleableQty != null) {
+      lotInput.qcNonsaleableQty = line.qcNonsaleableQty;
+    }
   }
 
   double _submittedTrackedLotQty(TransferLotInput lotInput, AuthProvider auth) {
@@ -710,6 +798,12 @@ class _CreateScrapScreenState extends State<CreateScrapScreen> {
       'w_nonsaleable_qty': tracked
           ? _lotSum(line, (l) => l.wNonsaleableQty)
           : (line.wNonsaleableQty ?? 0.0),
+      'qc_team_nonsaleable_qty': tracked
+          ? _lotSum(line, (l) => l.qcTeamNonsaleableQty)
+          : (line.qcTeamNonsaleableQty ?? 0.0),
+      'qc_team_qc_qty': tracked
+          ? _lotSum(line, (l) => l.qcTeamQcQty)
+          : (line.qcTeamQcQty ?? 0.0),
       'actual_qc_qty': tracked
           ? _lotSum(line, (l) => l.actualQcQty)
           : (line.actualQcQty ?? 0.0),
@@ -770,6 +864,8 @@ class _CreateScrapScreenState extends State<CreateScrapScreen> {
                   if (l.soQty != null && l.soQty! > 0) 'so_qty': l.soQty,
                   'w_qc_qty': l.wQcQty ?? 0.0,
                   'w_nonsaleable_qty': l.wNonsaleableQty ?? 0.0,
+                  'qc_team_nonsaleable_qty': l.qcTeamNonsaleableQty ?? 0.0,
+                  'qc_team_qc_qty': l.qcTeamQcQty ?? 0.0,
                   'actual_qc_qty': l.actualQcQty ?? 0.0,
                   'qc_nonsaleable_qty': l.qcNonsaleableQty ?? 0.0,
                 },
@@ -799,7 +895,11 @@ class _CreateScrapScreenState extends State<CreateScrapScreen> {
     }).toList();
   }
 
-  Future<void> _createScrap({bool sendToSalesOperation = false}) async {
+  Future<void> _createScrap({
+    bool sendToQc = false,
+    bool sendToSalesOperation = false,
+    bool autoValidate = false,
+  }) async {
     final distributorId = _prepareData?['distributor']?['id'] as int?;
     if (distributorId == null) return;
 
@@ -868,6 +968,7 @@ class _CreateScrapScreenState extends State<CreateScrapScreen> {
         lines: linesData,
         type: widget.moduleType,
         damageType: _selectedDamageType,
+        sendToQc: sendToQc,
         sendToSalesOperation: sendToSalesOperation,
       );
     } else {
@@ -895,23 +996,74 @@ class _CreateScrapScreenState extends State<CreateScrapScreen> {
       return;
     }
 
-    if (sendToSalesOperation) {
+    if (sendToQc) {
+      setState(() {
+        _returnReceiptStatus = 'qc_receipt';
+      });
+    } else if (sendToSalesOperation) {
       setState(() {
         _returnReceiptStatus = 'sales_operation_receipt';
       });
     }
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          sendToSalesOperation
-              ? '${widget.title} sent to Sales Operation successfully!'
-              : '${widget.title} saved successfully!',
+    final dynamic rawId = result['id'] ?? result['scrap']?['id'] ?? result['transfer']?['id'];
+    final int? newScrapId =
+        rawId is int ? rawId : int.tryParse(rawId?.toString() ?? '');
+
+    if (autoValidate && newScrapId != null) {
+      final valRes = await context.read<ScrapProvider>().executeScrapAction(
+        newScrapId,
+        'validate',
+        type: widget.moduleType,
+      );
+      if (!mounted) return;
+      if (valRes == null) {
+        final err = context.read<ScrapProvider>().error ?? 'Validation failed';
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('${widget.title} created, but validation failed: $err'),
+            backgroundColor: Colors.orange,
+          ),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('${widget.title} created & validated successfully!'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            sendToQc
+                ? '${widget.title} sent to QC successfully!'
+                : (sendToSalesOperation
+                    ? '${widget.title} sent to Sales Operation successfully!'
+                    : (widget.scrapId == null
+                        ? '${widget.title} created successfully!'
+                        : '${widget.title} saved successfully!')),
+          ),
+          backgroundColor: Colors.green,
         ),
-        backgroundColor: Colors.green,
-      ),
-    );
-    Navigator.pop(context);
+      );
+    }
+
+    if (widget.scrapId == null && newScrapId != null) {
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (context) => CreateScrapScreen(
+            scrapId: newScrapId,
+            title: widget.title,
+            moduleType: widget.moduleType,
+          ),
+        ),
+      );
+    } else {
+      Navigator.pop(context);
+    }
   }
 
   Future<void> _runAction(String action) async {
@@ -987,8 +1139,10 @@ class _CreateScrapScreenState extends State<CreateScrapScreen> {
     final auth = context.watch<AuthProvider>();
     final canEditSoQty = auth.canEditSoQty;
     final canEditWarehouseQty = auth.canEditWarehouseQty;
+    final canEditQcTeamQty = auth.canEditQcTeamQty;
     final canEditEffectiveQty = auth.canEditEffectiveQty;
     final canEditQcQty = auth.canEditQcQty;
+    final canViewAllReturns = auth.canViewAllReturns;
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -1505,6 +1659,12 @@ class _CreateScrapScreenState extends State<CreateScrapScreen> {
                                         lotInput.qcQty = initVal;
                                       }
                                       lotInput.quantity = 0;
+                                    } else if (canEditQcTeamQty) {
+                                      if (lotInput.qcTeamQcQty == null ||
+                                          lotInput.qcTeamQcQty! <= 0) {
+                                        lotInput.qcTeamQcQty = initVal;
+                                      }
+                                      lotInput.quantity = 0;
                                     } else {
                                       if (lotInput.quantity <= 0) {
                                         lotInput.quantity = initVal;
@@ -1519,65 +1679,39 @@ class _CreateScrapScreenState extends State<CreateScrapScreen> {
                                   _changeLotQty(lotInput, double.infinity, 1),
                               onLotQtyInput: (lotInput, newQty) =>
                                   _setLotQty(lotInput, newQty),
-                              allocatedQty: _allocatedQty(line),
+                              allocatedQty: _scrapSum
+                                  ? (canEditQcQty
+                                      ? _lotSum(line, (l) => (l.actualQcQty ?? 0) + (l.qcNonsaleableQty ?? 0))
+                                      : (canEditQcTeamQty
+                                          ? _lotSum(line, (l) => (l.qcTeamQcQty ?? 0) + (l.qcTeamNonsaleableQty ?? 0))
+                                          : _lotSum(line, (l) => (l.wQcQty ?? 0) + (l.wNonsaleableQty ?? 0))))
+                                  : _allocatedQty(line),
                               isReadOnly: _isReadOnly,
                               canEditSoQty: canEditSoQty,
                               canEditWarehouseQty: canEditWarehouseQty,
+                              canEditQcTeamQty: canEditQcTeamQty,
                               canEditEffectiveQty: canEditEffectiveQty,
                               canEditQcQty: canEditQcQty,
+                              canViewAllReturns: canViewAllReturns,
+                              returnReceiptStatus: _returnReceiptStatus,
                               scrapSum: _scrapSum,
+                              qcColumns: qcColumnsFor('scrap_sum'),
                               allowOverstock: _isPrimaryTier,
-                              onWQcQtyChanged: (newQty) {
+                              onQcColumnChanged: (field, value) {
                                 setState(() {
-                                  line.wQcQty = newQty
-                                      .clamp(0, double.infinity)
-                                      .toDouble();
-                                  _syncSingleLotFromLine(line);
-                                });
-                              },
-                              onWNonsaleableQtyChanged: (newQty) {
-                                setState(() {
-                                  line.wNonsaleableQty = newQty
-                                      .clamp(0, double.infinity)
-                                      .toDouble();
-                                  _syncSingleLotFromLine(line);
-                                });
-                              },
-                              onActualQcQtyChanged: (newQty) {
-                                setState(() {
-                                  line.actualQcQty = newQty
-                                      .clamp(0, double.infinity)
-                                      .toDouble();
-                                  _syncSingleLotFromLine(line);
-                                });
-                              },
-                              onQcNonsaleableQtyChanged: (newQty) {
-                                setState(() {
-                                  line.qcNonsaleableQty = newQty
-                                      .clamp(0, double.infinity)
-                                      .toDouble();
+                                  line.setSsQty(
+                                    field,
+                                    value.clamp(0, double.infinity).toDouble(),
+                                  );
                                   _syncSingleLotFromLine(line);
                                 });
                               },
                               onLotFieldChanged: (lotInput, field, value) {
                                 setState(() {
-                                  final v = value
-                                      .clamp(0, double.infinity)
-                                      .toDouble();
-                                  switch (field) {
-                                    case 'w_qc_qty':
-                                      lotInput.wQcQty = v;
-                                      break;
-                                    case 'w_nonsaleable_qty':
-                                      lotInput.wNonsaleableQty = v;
-                                      break;
-                                    case 'actual_qc_qty':
-                                      lotInput.actualQcQty = v;
-                                      break;
-                                    case 'qc_nonsaleable_qty':
-                                      lotInput.qcNonsaleableQty = v;
-                                      break;
-                                  }
+                                  lotInput.setSsQty(
+                                    field,
+                                    value.clamp(0, double.infinity).toDouble(),
+                                  );
                                 });
                               },
                               onSoQtyChanged: (newQty) {
@@ -1641,25 +1775,54 @@ class _CreateScrapScreenState extends State<CreateScrapScreen> {
                   border: Border(top: BorderSide(color: Color(0xFFDDE6F2))),
                 ),
                 child: widget.scrapId == null
-                    ? SizedBox(
-                        width: double.infinity,
-                        height: 50,
-                        child: ElevatedButton.icon(
-                          onPressed: provider.isLoading ? null : _createScrap,
-                          icon: const Icon(Icons.inventory),
-                          label: const Text('Process Scrap'),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: AppColors.primary,
-                            foregroundColor: Colors.white,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(8),
+                    ? Row(
+                        children: [
+                          Expanded(
+                            child: SizedBox(
+                              height: 50,
+                              child: ElevatedButton.icon(
+                                onPressed: provider.isLoading
+                                    ? null
+                                    : () => _createScrap(),
+                                icon: const Icon(Icons.save),
+                                label: const Text('Save'),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: AppColors.primary,
+                                  foregroundColor: Colors.white,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                ),
+                              ),
                             ),
                           ),
-                        ),
+                          if (auth.canValidateScrapFor(widget.moduleType)) ...[
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: SizedBox(
+                                height: 50,
+                                child: ElevatedButton.icon(
+                                  onPressed: provider.isLoading
+                                      ? null
+                                      : () => _createScrap(autoValidate: true),
+                                  icon: const Icon(Icons.check_circle),
+                                  label: const Text('Save & Validate'),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: Colors.green,
+                                    foregroundColor: Colors.white,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ],
                       )
                     : Row(
                         children: [
-                          if (auth.canCancelScrapFor(widget.moduleType)) ...[
+                          if (_canShowCancel(auth)) ...[
                             Expanded(
                               flex: 1,
                               child: OutlinedButton(
@@ -1684,7 +1847,7 @@ class _CreateScrapScreenState extends State<CreateScrapScreen> {
                             ),
                           ],
                           if (auth.canSaveScrapFor(widget.moduleType)) ...[
-                            if (auth.canCancelScrapFor(widget.moduleType))
+                            if (_canShowCancel(auth))
                               const SizedBox(width: 8),
                             Expanded(
                               flex: 2,
@@ -1709,9 +1872,37 @@ class _CreateScrapScreenState extends State<CreateScrapScreen> {
                               ),
                             ),
                           ],
-                          if (_canShowSendToSalesOperation(auth)) ...[
-                            if (auth.canCancelScrapFor(widget.moduleType) ||
+                          if (_canShowSendToQc(auth)) ...[
+                            if (_canShowCancel(auth) ||
                                 auth.canSaveScrapFor(widget.moduleType))
+                              const SizedBox(width: 8),
+                            Expanded(
+                              flex: 2,
+                              child: ElevatedButton(
+                                onPressed: provider.isLoading
+                                    ? null
+                                    : () => _createScrap(sendToQc: true),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: const Color(0xFF2563EB),
+                                  foregroundColor: Colors.white,
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 14,
+                                  ),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                ),
+                                child: const Text(
+                                  'Send to QC',
+                                  style: TextStyle(fontWeight: FontWeight.bold),
+                                ),
+                              ),
+                            ),
+                          ],
+                          if (_canShowSendToSalesOperation(auth)) ...[
+                            if (_canShowCancel(auth) ||
+                                auth.canSaveScrapFor(widget.moduleType) ||
+                                _canShowSendToQc(auth))
                               const SizedBox(width: 8),
                             Expanded(
                               flex: 2,
@@ -1737,8 +1928,9 @@ class _CreateScrapScreenState extends State<CreateScrapScreen> {
                             ),
                           ],
                           if (_canShowValidate(auth)) ...[
-                            if (auth.canCancelScrapFor(widget.moduleType) ||
+                            if (_canShowCancel(auth) ||
                                 auth.canSaveScrapFor(widget.moduleType) ||
+                                _canShowSendToQc(auth) ||
                                 _canShowSendToSalesOperation(auth))
                               const SizedBox(width: 8),
                             Expanded(
@@ -1789,17 +1981,18 @@ class _ScrapLineCard extends StatelessWidget {
     this.isReadOnly = false,
     this.canEditSoQty = false,
     this.canEditWarehouseQty = false,
+    this.canEditQcTeamQty = false,
     this.canEditEffectiveQty = false,
     this.allowOverstock = false,
     this.canEditQcQty = false,
+    this.canViewAllReturns = false,
+    this.returnReceiptStatus,
     this.scrapSum = false,
+    this.qcColumns = const [],
     this.onQuantityChanged,
     this.onSoQtyChanged,
     this.onQcQtyChanged,
-    this.onWQcQtyChanged,
-    this.onWNonsaleableQtyChanged,
-    this.onActualQcQtyChanged,
-    this.onQcNonsaleableQtyChanged,
+    this.onQcColumnChanged,
     this.onLotQtyInput,
     this.onLotFieldChanged,
   });
@@ -1818,22 +2011,23 @@ class _ScrapLineCard extends StatelessWidget {
   final bool isReadOnly;
   final bool canEditSoQty;
   final bool canEditWarehouseQty;
+  final bool canEditQcTeamQty;
   final bool canEditEffectiveQty;
   final bool allowOverstock;
 
   /// Sales-operation permission over the Actual QC / QC Non-saleable pair.
   final bool canEditQcQty;
+  final bool canViewAllReturns;
+  final String? returnReceiptStatus;
 
-  /// Renders the four-column scrap form instead of the legacy
+  /// Renders the six-column scrap form instead of the legacy
   /// SO / Warehouse / Effective one. Set from the picking's `qc_mode`.
   final bool scrapSum;
+  final List<(String, String)> qcColumns;
   final ValueChanged<double>? onQuantityChanged;
   final ValueChanged<double>? onSoQtyChanged;
   final ValueChanged<double>? onQcQtyChanged;
-  final ValueChanged<double>? onWQcQtyChanged;
-  final ValueChanged<double>? onWNonsaleableQtyChanged;
-  final ValueChanged<double>? onActualQcQtyChanged;
-  final ValueChanged<double>? onQcNonsaleableQtyChanged;
+  final void Function(String field, double value)? onQcColumnChanged;
   final void Function(TransferLotInput lotInput, double quantity)?
   onLotQtyInput;
 
@@ -1981,9 +2175,15 @@ class _ScrapLineCard extends StatelessWidget {
                             : null,
                         canEditSoQty: canEditSoQty,
                         canEditWarehouseQty: canEditWarehouseQty,
+                        canEditQcTeamQty: canEditQcTeamQty,
                         canEditEffectiveQty: canEditEffectiveQty,
                         canEditQcQty: canEditQcQty,
+                        canViewAllReturns: canViewAllReturns,
+                        returnReceiptStatus: returnReceiptStatus,
                         scrapSum: scrapSum,
+                        qcColumns: qcColumns.isNotEmpty
+                            ? qcColumns
+                            : qcColumnsFor('scrap_sum'),
                         onLotFieldChanged: onLotFieldChanged,
                       ),
                     ),
@@ -2053,45 +2253,33 @@ class _ScrapLineCard extends StatelessWidget {
                     onChanged: onSoQtyChanged,
                   ),
                   if (scrapSum) ...[
-                    // Each role sees only its own pair. No maximum on any of
-                    // them: sales operation may declare more than the return
-                    // delivered, and the backend allows it.
-                    if (canEditWarehouseQty) ...[
-                      _buildQtyRow(
-                        title: 'Warehouse QC',
-                        value: line.wQcQty ?? 0,
-                        isReadOnly: isReadOnly,
-                        min: 0,
-                        max: double.infinity,
-                        onChanged: onWQcQtyChanged,
-                      ),
-                      _buildQtyRow(
-                        title: 'Warehouse Non-saleable',
-                        value: line.wNonsaleableQty ?? 0,
-                        isReadOnly: isReadOnly,
-                        min: 0,
-                        max: double.infinity,
-                        onChanged: onWNonsaleableQtyChanged,
-                      ),
-                    ],
-                    if (canEditQcQty) ...[
-                      _buildQtyRow(
-                        title: 'Actual QC',
-                        value: line.actualQcQty ?? 0,
-                        isReadOnly: isReadOnly,
-                        min: 0,
-                        max: double.infinity,
-                        onChanged: onActualQcQtyChanged,
-                      ),
-                      _buildQtyRow(
-                        title: 'QC Non-saleable',
-                        value: line.qcNonsaleableQty ?? 0,
-                        isReadOnly: isReadOnly,
-                        min: 0,
-                        max: double.infinity,
-                        onChanged: onQcNonsaleableQtyChanged,
-                      ),
-                    ],
+                    // Each role sees its authorized columns based on permissions and stage.
+                    for (final column in (qcColumns.isNotEmpty
+                        ? qcColumns
+                        : qcColumnsFor('scrap_sum')))
+                      if (isQcColumnVisible(
+                        field: column.$2,
+                        canViewAllReturns: canViewAllReturns,
+                        canEditWarehouseQty: canEditWarehouseQty,
+                        canEditQcTeamQty: canEditQcTeamQty,
+                        canEditQcQty: canEditQcQty,
+                      ))
+                        _buildQtyRow(
+                          title: column.$1,
+                          value: line.ssQty(column.$2) ?? 0,
+                          isReadOnly: !isQcColumnEditable(
+                            field: column.$2,
+                            returnReceiptStatus: returnReceiptStatus,
+                            isReadOnly: isReadOnly,
+                            canEditWarehouseQty: canEditWarehouseQty,
+                            canEditQcTeamQty: canEditQcTeamQty,
+                            canEditQcQty: canEditQcQty,
+                          ),
+                          min: 0,
+                          max: double.infinity,
+                          onChanged: (value) =>
+                              onQcColumnChanged?.call(column.$2, value),
+                        ),
                   ] else ...[
                     if (canEditWarehouseQty)
                       _buildQtyRow(
@@ -2186,9 +2374,13 @@ class _ScrapLotRow extends StatelessWidget {
     this.onQuantityChanged,
     required this.canEditSoQty,
     required this.canEditWarehouseQty,
+    this.canEditQcTeamQty = false,
     required this.canEditEffectiveQty,
     this.canEditQcQty = false,
+    this.canViewAllReturns = false,
+    this.returnReceiptStatus,
     this.scrapSum = false,
+    this.qcColumns = const [],
     this.onLotFieldChanged,
   });
 
@@ -2202,9 +2394,13 @@ class _ScrapLotRow extends StatelessWidget {
   final ValueChanged<double>? onQuantityChanged;
   final bool canEditSoQty;
   final bool canEditWarehouseQty;
+  final bool canEditQcTeamQty;
   final bool canEditEffectiveQty;
   final bool canEditQcQty;
+  final bool canViewAllReturns;
+  final String? returnReceiptStatus;
   final bool scrapSum;
+  final List<(String, String)> qcColumns;
 
   /// One callback for all four scrap quantities, keyed by wire field name.
   final void Function(TransferLotInput lotInput, String field, double value)?
@@ -2222,6 +2418,9 @@ class _ScrapLotRow extends StatelessWidget {
       label = 'SO Qty';
     } else if (canEditWarehouseQty) {
       activeQty = lotInput.qcQty ?? lotInput.quantity;
+      label = 'Warehouse Qty';
+    } else if (canEditQcTeamQty) {
+      activeQty = lotInput.qcTeamQcQty ?? lotInput.quantity;
       label = 'QC Qty';
     } else {
       activeQty = lotInput.quantity;
@@ -2440,33 +2639,43 @@ class _ScrapLotRow extends StatelessWidget {
             ),
           ],
           const SizedBox(height: 8),
-          // Each role sees only its own pair, as on the line-level rows.
-          if (canEditWarehouseQty) ...[
-            _splitField('Warehouse QC', lotInput.wQcQty, 'w_qc_qty'),
-            _splitField(
-              'Warehouse Non-saleable',
-              lotInput.wNonsaleableQty,
-              'w_nonsaleable_qty',
-            ),
-          ],
-          if (canEditQcQty) ...[
-            _splitField('Actual QC', lotInput.actualQcQty, 'actual_qc_qty'),
-            _splitField(
-              'QC Non-saleable',
-              lotInput.qcNonsaleableQty,
-              'qc_nonsaleable_qty',
-            ),
-          ],
+          for (final column in (qcColumns.isNotEmpty
+              ? qcColumns
+              : qcColumnsFor('scrap_sum')))
+            if (isQcColumnVisible(
+              field: column.$2,
+              canViewAllReturns: canViewAllReturns,
+              canEditWarehouseQty: canEditWarehouseQty,
+              canEditQcTeamQty: canEditQcTeamQty,
+              canEditQcQty: canEditQcQty,
+            ))
+              _splitField(
+                column.$1,
+                lotInput.ssQty(column.$2),
+                column.$2,
+                editable: isQcColumnEditable(
+                  field: column.$2,
+                  returnReceiptStatus: returnReceiptStatus,
+                  isReadOnly: isReadOnly,
+                  canEditWarehouseQty: canEditWarehouseQty,
+                  canEditQcTeamQty: canEditQcTeamQty,
+                  canEditQcQty: canEditQcQty,
+                ),
+              ),
         ],
       ),
     );
   }
 
-  /// One quantity input on a scrap lot row. Only called for fields the current
-  /// role owns, so there is no permission argument — visibility is the gate.
-  Widget _splitField(String label, double? value, String field) {
+  /// One quantity input on a scrap lot row.
+  Widget _splitField(
+    String label,
+    double? value,
+    String field, {
+    bool editable = true,
+  }) {
     final text = (value ?? 0).toStringAsFixed(0);
-    final enabled = !isReadOnly && onLotFieldChanged != null;
+    final enabled = editable && !isReadOnly && onLotFieldChanged != null;
     return Padding(
       padding: const EdgeInsets.only(bottom: 6),
       child: Row(

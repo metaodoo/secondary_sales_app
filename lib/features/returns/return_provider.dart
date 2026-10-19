@@ -77,6 +77,7 @@ class ReturnProvider with ChangeNotifier {
   Future<List<Map<String, dynamic>>> fetchReturnProducts({
     String? search,
     int? distributorId,
+    String? businessType,
     String endpoint = AppConstants.returnsEndpoint,
   }) async {
     _loadingCount++;
@@ -87,6 +88,7 @@ class ReturnProvider with ChangeNotifier {
       return await _apiService.getReturnProducts(
         search: search,
         distributorId: distributorId,
+        businessType: businessType,
         endpoint: endpoint,
       );
     } catch (e) {
@@ -179,6 +181,7 @@ class ReturnProvider with ChangeNotifier {
     String? type,
     String? challanNumber,
     String? damageType,
+    bool sendToQc = false,
     bool sendToSalesOperation = false,
     String endpoint = AppConstants.returnsEndpoint,
   }) async {
@@ -193,6 +196,7 @@ class ReturnProvider with ChangeNotifier {
         type: type,
         challanNumber: challanNumber,
         damageType: damageType,
+        sendToQc: sendToQc,
         sendToSalesOperation: sendToSalesOperation,
         endpoint: endpoint,
       );

@@ -69,6 +69,7 @@ class ScrapProvider with ChangeNotifier {
   Future<List<Map<String, dynamic>>?> getScrapProducts({
     String? search,
     int? distributorId,
+    String? businessType,
   }) async {
     _loadingCount++;
     _error = null;
@@ -78,6 +79,7 @@ class ScrapProvider with ChangeNotifier {
       return await _apiService.getScrapProducts(
         search: search,
         distributorId: distributorId,
+        businessType: businessType,
       );
     } catch (e) {
       _error = e.toString();
@@ -157,6 +159,7 @@ class ScrapProvider with ChangeNotifier {
     required List<Map<String, dynamic>> lines,
     String? type,
     String? damageType,
+    bool sendToQc = false,
     bool sendToSalesOperation = false,
   }) async {
     _loadingCount++;
@@ -169,6 +172,7 @@ class ScrapProvider with ChangeNotifier {
         lines: lines,
         type: type,
         damageType: damageType,
+        sendToQc: sendToQc,
         sendToSalesOperation: sendToSalesOperation,
       );
     } catch (e) {

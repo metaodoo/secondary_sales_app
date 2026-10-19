@@ -4,6 +4,7 @@ import 'package:secondary_sales/core/theme/app_theme.dart';
 import 'package:provider/provider.dart';
 import 'package:secondary_sales/features/auth/auth_provider.dart';
 import 'package:secondary_sales/data/api/api_service.dart';
+import 'package:secondary_sales/core/util/parse.dart';
 
 class OutletVisitHistoryScreen extends StatefulWidget {
   final int outletId;
@@ -114,7 +115,7 @@ class _OutletVisitHistoryScreenState extends State<OutletVisitHistoryScreen> {
               child: Icon(Icons.location_on, color: AppColors.primaryStrong),
             ),
             title: Text(
-              'Check-in: ${visit['check_in_time'] ?? 'N/A'}',
+              'Check-in: ${formatDisplayDateTime(visit['check_in_time'])}',
               style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
             ),
             subtitle: Column(
@@ -122,7 +123,7 @@ class _OutletVisitHistoryScreenState extends State<OutletVisitHistoryScreen> {
               children: [
                 const SizedBox(height: 4),
                 Text(
-                  'Check-out: ${visit['check_out_time'] ?? 'N/A'}',
+                  'Check-out: ${formatDisplayDateTime(visit['check_out_time'])}',
                   style: const TextStyle(fontSize: 13),
                 ),
                 const SizedBox(height: 4),

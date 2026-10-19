@@ -9,6 +9,7 @@ import 'package:secondary_sales/core/services/location_service.dart';
 import 'package:secondary_sales/core/services/offline_database_helper.dart';
 import 'package:secondary_sales/core/services/offline_sync_engine.dart';
 import 'package:secondary_sales/core/util/proximity_helper.dart';
+import 'package:secondary_sales/core/util/parse.dart';
 
 class RouteProvider with ChangeNotifier {
   final ApiService _apiService = ApiService.instance;
@@ -723,11 +724,7 @@ class RouteProvider with ChangeNotifier {
         _requiresVisitReason = activeVisit['requires_visit_reason'] == true;
         final checkInStr = activeVisit['check_in_time'];
         if (checkInStr != null) {
-          String parsedTimeStr = checkInStr;
-          if (!parsedTimeStr.endsWith('Z') && !parsedTimeStr.contains('+')) {
-            parsedTimeStr = '${parsedTimeStr.replaceAll(' ', 'T')}Z';
-          }
-          _checkInTime = DateTime.parse(parsedTimeStr).toLocal();
+          _checkInTime = asDateTime(checkInStr);
         }
       } else if (_checkedInOutletId != null && _checkedOutOutletIds.contains(_checkedInOutletId)) {
         _checkedInOutletId = null;

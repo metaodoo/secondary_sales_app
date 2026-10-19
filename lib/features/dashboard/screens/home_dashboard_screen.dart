@@ -21,9 +21,9 @@ import 'package:secondary_sales/features/my_team/screens/my_team_screen.dart';
 import 'package:secondary_sales/features/notifications/notification_provider.dart';
 import 'package:secondary_sales/features/notifications/widgets/notification_bell.dart';
 import 'package:secondary_sales/features/routes/route_provider.dart';
-import 'package:secondary_sales/features/settings/screens/settings_tab.dart';
 import 'package:secondary_sales/features/dashboard/module_launcher.dart';
 import 'package:secondary_sales/core/util/dialog_helper.dart';
+import 'package:secondary_sales/core/util/parse.dart';
 
 /// Post-login landing dashboard.
 ///
@@ -587,7 +587,7 @@ class _AttendanceHero extends StatelessWidget {
       icon = Icons.check_circle;
       title = 'Logged in';
       subtitle = summary?.checkInTime != null
-          ? 'Since ${summary!.checkInTime} · tap for history'
+          ? 'Since ${formatDisplayTime(summary!.checkInTime)} · tap for history'
           : 'On shift · tap for history';
     } else {
       bg = AppColors.warningSoft;

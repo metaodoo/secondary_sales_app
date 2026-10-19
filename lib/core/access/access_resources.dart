@@ -203,6 +203,11 @@ class AppAction {
   /// secondary return flows, which the split does not touch.
   static const returnsEditQcQty = 'action.return_delivery.edit_qc_qty';
 
+  /// Quality Control team grant to edit QC evaluation quantities
+  /// (qc_team_nonsaleable_qty and qc_team_qc_qty).
+  static const returnsEditQcTeamQty =
+      'action.return_delivery.edit_qc_team_qty';
+
   // Attendance behavior flag.
   static const attendanceSkipGeo = 'action.hr.attendance.skip_geo_fence';
 
@@ -236,6 +241,7 @@ class AppAction {
   // Primary return delivery.
   static const returnCreate = 'action.primary_sale.returns.create';
   static const returnsSave = 'action.primary_sale.returns.save';
+  static const returnsSendToQc = 'action.primary_sale.returns.send_to_qc';
   static const returnsSendToSalesOperation =
       'action.primary_sale.returns.send_to_sales_operation';
   static const returnsCancel = 'action.primary_sale.returns.cancel';
@@ -244,6 +250,7 @@ class AppAction {
   // Primary QC return delivery.
   static const qcReturnCreate = 'action.primary_sale.qc_returns.create';
   static const qcReturnsSave = 'action.primary_sale.qc_returns.save';
+  static const qcReturnsSendToQc = 'action.primary_sale.qc_returns.send_to_qc';
   static const qcReturnsSendToSalesOperation =
       'action.primary_sale.qc_returns.send_to_sales_operation';
   static const qcReturnsCancel = 'action.primary_sale.qc_returns.cancel';
@@ -259,6 +266,7 @@ class AppAction {
   // Primary return scrap.
   static const scrapCreate = 'action.primary_sale.scraps.create';
   static const scrapsSave = 'action.primary_sale.scraps.save';
+  static const scrapsSendToQc = 'action.primary_sale.scraps.send_to_qc';
   static const scrapsSendToSalesOperation =
       'action.primary_sale.scraps.send_to_sales_operation';
   static const scrapsCancel = 'action.primary_sale.scraps.cancel';
@@ -355,6 +363,9 @@ class AppAction {
   static String returnSaveFor(String moduleType) =>
       moduleType == 'secondary' ? secondaryReturnsSave : returnsSave;
 
+  static String returnSendToQcFor(String moduleType) =>
+      moduleType == 'secondary' ? '' : returnsSendToQc;
+
   static String returnSendToSalesOperationFor(String moduleType) =>
       returnsSendToSalesOperation;
 
@@ -372,6 +383,9 @@ class AppAction {
 
   static String scrapCancelFor(String moduleType) =>
       moduleType == 'secondary' ? secondaryScrapsCancel : scrapsCancel;
+
+  static String scrapSendToQcFor(String moduleType) =>
+      moduleType == 'secondary' ? '' : scrapsSendToQc;
 
   static String scrapSendToSalesOperationFor(String moduleType) =>
       moduleType == 'secondary' ? '' : scrapsSendToSalesOperation;
@@ -1007,6 +1021,13 @@ const List<AccessResource> accessCatalog = [
     'Returns (all tiers) › Edit QC quantities',
     _psSs,
   ),
+  AccessResource(
+    AppAction.returnsEditQcTeamQty,
+    'action',
+    'return_delivery',
+    'Returns (all tiers) › Edit QC team quantities',
+    _psSs,
+  ),
 
   // HR behavior.
   AccessResource(
@@ -1130,6 +1151,13 @@ const List<AccessResource> accessCatalog = [
     legacyKeys: ['action.returns.save'],
   ),
   AccessResource(
+    AppAction.returnsSendToQc,
+    'action',
+    'primary_sale',
+    'Primary Sales › Saleable Returns › Send to QC (button)',
+    _ps,
+  ),
+  AccessResource(
     AppAction.returnsSendToSalesOperation,
     'action',
     'primary_sale',
@@ -1166,6 +1194,13 @@ const List<AccessResource> accessCatalog = [
     'action',
     'primary_sale',
     'Primary Sales › Quality Returns › Save (button)',
+    _ps,
+  ),
+  AccessResource(
+    AppAction.qcReturnsSendToQc,
+    'action',
+    'primary_sale',
+    'Primary Sales › Quality Returns › Send to QC (button)',
     _ps,
   ),
   AccessResource(
@@ -1240,6 +1275,13 @@ const List<AccessResource> accessCatalog = [
     'Primary Sales › Non-Saleable Returns › Save (button)',
     _ps,
     legacyKeys: ['action.scraps.save'],
+  ),
+  AccessResource(
+    AppAction.scrapsSendToQc,
+    'action',
+    'primary_sale',
+    'Primary Sales › Non-Saleable Returns › Send to QC (button)',
+    _ps,
   ),
   AccessResource(
     AppAction.scrapsSendToSalesOperation,

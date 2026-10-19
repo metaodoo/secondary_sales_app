@@ -56,11 +56,15 @@ extension ReturnsApi on ApiService {
   Future<List<Map<String, dynamic>>> getReturnProducts({
     String? search,
     int? distributorId,
+    String? businessType,
     String endpoint = AppConstants.returnsEndpoint,
   }) async {
     final params = <String, dynamic>{'employee_id': _activeEmployeeId};
     if (search != null && search.isNotEmpty) params['search'] = search;
     if (distributorId != null) params['distributor_id'] = distributorId;
+    if (businessType != null && businessType.isNotEmpty) {
+      params['business_type'] = businessType;
+    }
 
     final result = await _post(
       '$endpoint/products',
@@ -153,12 +157,14 @@ extension ReturnsApi on ApiService {
     String? type,
     String? challanNumber,
     String? damageType,
+    bool sendToQc = false,
     bool sendToSalesOperation = false,
     String endpoint = AppConstants.returnsEndpoint,
   }) async {
     final params = <String, dynamic>{
       'employee_id': _activeEmployeeId,
       'lines': lines,
+      if (sendToQc) 'send_to_qc': true,
       'send_to_sales_operation': sendToSalesOperation,
     };
     if (type != null && type.isNotEmpty) params['type'] = type;

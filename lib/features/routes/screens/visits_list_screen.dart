@@ -7,6 +7,7 @@ import 'package:secondary_sales/core/widgets/ss_ui.dart';
 import 'package:secondary_sales/core/access/access_resources.dart';
 import 'package:secondary_sales/features/auth/auth_provider.dart';
 import 'package:secondary_sales/features/sales/screens/secondary_orders_list_screen.dart';
+import 'package:secondary_sales/core/util/parse.dart';
 
 class VisitsListScreen extends StatefulWidget {
   final int? routeId;
@@ -401,9 +402,9 @@ class _VisitListTabState extends State<_VisitListTab> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       const SizedBox(height: 4),
-                      Text('Check-in: ${visit['check_in_time'] ?? 'N/A'}'),
+                      Text('Check-in: ${formatDisplayDateTime(visit['check_in_time'])}'),
                       if (visit['check_out_time'] != null)
-                        Text('Check-out: ${visit['check_out_time']}'),
+                        Text('Check-out: ${formatDisplayDateTime(visit['check_out_time'])}'),
                       const SizedBox(height: 4),
                       Text(
                         'Employee: $empName',

@@ -90,18 +90,64 @@ DateTime? asDateTime(Object? value) {
     return parsed.toLocal();
   }
 
-  // Naive Odoo datetime string (treated as UTC and converted to local device/timezone):
-  final utc = DateTime.utc(
-    parsed.year,
-    parsed.month,
-    parsed.day,
-    parsed.hour,
-    parsed.minute,
-    parsed.second,
-    parsed.millisecond,
-    parsed.microsecond,
-  );
-  return utc.toLocal();
+  // Naive datetime (already localized from backend in user/Dhaka timezone):
+  return parsed;
+}
+
+/// Formats a time/datetime value as a user-friendly 12-hour time string (e.g. "09:30 AM").
+/// Accepts ISO strings, naive datetime strings, pure time strings, and DateTime objects.
+String formatDisplayTime(Object? value, {String defaultValue = '--:--'}) {
+  if (value == null || value == false) return defaultValue;
+  final raw = value.toString().trim();
+  if (raw.isEmpty || raw == 'false') return defaultValue;
+
+  // If it's pure time HH:mm or HH:mm:ss
+  if (RegExp(r'^\d{1,2}:\d{2}(:\d{2})?$').hasMatch(raw)) {
+    final parts = raw.split(':');
+    final h = int.tryParse(parts[0]) ?? 0;
+    final m = int.tryParse(parts[1]) ?? 0;
+    final period = h >= 12 ? 'PM' : 'AM';
+    final h12 = (h % 12 == 0) ? 12 : (h % 12);
+    final hStr = h12.toString().padLeft(2, '0');
+    final mStr = m.toString().padLeft(2, '0');
+    return '$hStr:$mStr $period';
+  }
+
+  final dt = asDateTime(raw);
+  if (dt != null) {
+    final h = dt.hour;
+    final m = dt.minute;
+    final period = h >= 12 ? 'PM' : 'AM';
+    final h12 = (h % 12 == 0) ? 12 : (h % 12);
+    final hStr = h12.toString().padLeft(2, '0');
+    final mStr = m.toString().padLeft(2, '0');
+    return '$hStr:$mStr $period';
+  }
+
+  return raw;
+}
+
+/// Formats a date/time value as "yyyy-MM-dd hh:mm a" (e.g. "2026-10-19 09:30 AM").
+String formatDisplayDateTime(Object? value, {String defaultValue = 'N/A'}) {
+  if (value == null || value == false) return defaultValue;
+  final raw = value.toString().trim();
+  if (raw.isEmpty || raw == 'false') return defaultValue;
+
+  final dt = asDateTime(raw);
+  if (dt != null) {
+    final y = dt.year.toString().padLeft(4, '0');
+    final mo = dt.month.toString().padLeft(2, '0');
+    final d = dt.day.toString().padLeft(2, '0');
+    final h = dt.hour;
+    final m = dt.minute;
+    final period = h >= 12 ? 'PM' : 'AM';
+    final h12 = (h % 12 == 0) ? 12 : (h % 12);
+    final hStr = h12.toString().padLeft(2, '0');
+    final mStr = m.toString().padLeft(2, '0');
+    return '$y-$mo-$d $hStr:$mStr $period';
+  }
+
+  return raw;
 }
 
 /// Coerces to a typed map, defaulting to an empty map.

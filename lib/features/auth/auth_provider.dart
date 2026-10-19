@@ -215,6 +215,12 @@ class AuthProvider with ChangeNotifier {
   /// [AppAction.returnsEditQcQty] enforced.
   bool get canEditQcQty =>
       _enforcedOr(AppAction.returnsEditQcQty, canEditEffectiveQty);
+
+  /// Quality Control team permission over evaluation quantities
+  /// (qc_team_nonsaleable_qty and qc_team_qc_qty).
+  bool get canEditQcTeamQty =>
+      _enforcedOr(AppAction.returnsEditQcTeamQty, false);
+
   bool get canSkipAttendanceGeo => _enforcedOr(
     AppAction.attendanceSkipGeo,
     user?.permissions?.skipAttendanceGeolocation ?? false,
@@ -222,11 +228,15 @@ class AuthProvider with ChangeNotifier {
 
   bool canSaveReturnFor(String moduleType) => _enforcedOr(
     AppAction.returnSaveFor(moduleType),
-    canEditSoQty || canEditWarehouseQty || canEditEffectiveQty,
+    canEditSoQty || canEditWarehouseQty || canEditQcTeamQty || canEditEffectiveQty,
+  );
+  bool canSendToQcFor(String moduleType) => _enforcedOr(
+    AppAction.returnSendToQcFor(moduleType),
+    canEditWarehouseQty,
   );
   bool canSendToSalesOperationFor(String moduleType) => _enforcedOr(
     AppAction.returnSendToSalesOperationFor(moduleType),
-    canEditWarehouseQty,
+    canEditWarehouseQty || canEditQcTeamQty,
   );
   bool canCancelReturnFor(String moduleType) => _enforcedOr(
     AppAction.returnCancelFor(moduleType),
@@ -236,11 +246,15 @@ class AuthProvider with ChangeNotifier {
       _enforcedOr(AppAction.returnValidateFor(moduleType), canEditWarehouseQty);
   bool canSaveScrapFor(String moduleType) => _enforcedOr(
     AppAction.scrapSaveFor(moduleType),
-    canEditSoQty || canEditWarehouseQty || canEditEffectiveQty,
+    canEditSoQty || canEditWarehouseQty || canEditQcTeamQty || canEditEffectiveQty,
+  );
+  bool canSendToQcForScrap(String moduleType) => _enforcedOr(
+    AppAction.scrapSendToQcFor(moduleType),
+    canEditWarehouseQty,
   );
   bool canSendToSalesOperationScrapFor(String moduleType) => _enforcedOr(
     AppAction.scrapSendToSalesOperationFor(moduleType),
-    canEditWarehouseQty,
+    canEditWarehouseQty || canEditQcTeamQty,
   );
   bool canCancelScrapFor(String moduleType) => _enforcedOr(
     AppAction.scrapCancelFor(moduleType),
@@ -250,10 +264,14 @@ class AuthProvider with ChangeNotifier {
       _enforcedOr(AppAction.scrapValidateFor(moduleType), canEditWarehouseQty);
 
   bool get canSaveReturn => canSaveReturnFor('primary');
+  bool get canSendToQc => canSendToQcFor('primary');
   bool get canSendToSalesOperation => canSendToSalesOperationFor('primary');
   bool get canCancelReturn => canCancelReturnFor('primary');
   bool get canValidateReturn => canValidateReturnFor('primary');
   bool get canSaveScrap => canSaveScrapFor('primary');
+  bool get canSendToQcScrap => canSendToQcForScrap('primary');
+  bool get canSendToSalesOperationScrap =>
+      canSendToSalesOperationScrapFor('primary');
   bool get canCancelScrap => canCancelScrapFor('primary');
   bool get canValidateScrap => canValidateScrapFor('primary');
 

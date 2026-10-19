@@ -161,6 +161,8 @@ class VirtualTransferLineEntry {
     this.qcSaleableQty,
     this.qcNonsaleableQty,
     this.wQcQty,
+    this.qcTeamNonsaleableQty,
+    this.qcTeamQcQty,
     this.actualQcQty,
     this.freshQty,
     this.scrapQty,
@@ -172,35 +174,41 @@ class VirtualTransferLineEntry {
   double quantity;
   double? soQty;
 
-  /// Warehouse **saleable** quantity — wire name `warehouse_qty`.
+  /// Warehouse **saleable** quantity — wire name `warehouse_qty` (Logistic SR).
   ///
   /// Named `qcQty` for historical reasons; it has never been a QC quantity.
   /// The sales-operation QC decision lives in [qcSaleableQty] /
   /// [qcNonsaleableQty].
   double? qcQty;
 
-  /// Warehouse non-saleable quantity — wire name `w_nonsaleable_qty`.
+  /// Warehouse non-saleable quantity — wire name `w_nonsaleable_qty` (Logistic Non-SR).
   double? wNonsaleableQty;
 
-  /// Sales-operation saleable decision — wire name `qc_saleable_qty`.
+  /// Sales-operation saleable decision — wire name `qc_saleable_qty` (Sales Ops SR).
   /// On a fresh return's transit leg this is what actually moves to warehouse
   /// stock; the app no longer sends `quantity` for those pickings.
   double? qcSaleableQty;
 
-  /// Sales-operation non-saleable decision — wire name `qc_nonsaleable_qty`.
+  /// Sales-operation non-saleable decision — wire name `qc_nonsaleable_qty` (Sales Ops Non-SR).
   ///
   /// On a fresh return this drives the auto-generated write-off to the company
   /// scrap location. On a damaged or quality return there is no write-off, so
   /// it is added to [actualQcQty] and the total is what moves.
   double? qcNonsaleableQty;
 
-  /// Damaged and quality returns only — wire name `w_qc_qty`.
+  /// Damaged and quality returns only — wire name `w_qc_qty` (Logistic QR).
   ///
   /// The coordinator's count. Separate from [qcQty] because that one means
   /// *saleable*, and nothing in a scrap return is.
   double? wQcQty;
 
-  /// Damaged and quality returns only — wire name `actual_qc_qty`.
+  /// Quality Control evaluation non-saleable quantity — wire name `qc_team_nonsaleable_qty` (QC- Non-SR).
+  double? qcTeamNonsaleableQty;
+
+  /// Quality Control evaluation quality quantity — wire name `qc_team_qc_qty` (QC- QR).
+  double? qcTeamQcQty;
+
+  /// Damaged and quality returns only — wire name `actual_qc_qty` (Sales Ops QR).
   /// Added to [qcNonsaleableQty] to give the quantity the transit leg moves.
   double? actualQcQty;
 
@@ -226,6 +234,8 @@ class TransferLotInput {
     this.qcSaleableQty,
     this.qcNonsaleableQty,
     this.wQcQty,
+    this.qcTeamNonsaleableQty,
+    this.qcTeamQcQty,
     this.actualQcQty,
     this.freshQty,
     this.scrapQty,
@@ -236,39 +246,97 @@ class TransferLotInput {
   double quantity;
   double? soQty;
 
-  /// Warehouse **saleable** quantity — wire name `warehouse_qty`. See
+  /// Warehouse **saleable** quantity — wire name `warehouse_qty` (Logistic SR). See
   /// [VirtualTransferLineEntry.qcQty] for why the name says `qc`.
   double? qcQty;
   double? wNonsaleableQty;
   double? qcSaleableQty;
   double? qcNonsaleableQty;
 
-  /// Scrap flavours only — wire names `w_qc_qty` and `actual_qc_qty`.
+  /// Scrap flavours only — wire names `w_qc_qty`, `qc_team_nonsaleable_qty`, `qc_team_qc_qty`, and `actual_qc_qty`.
   double? wQcQty;
+  double? qcTeamNonsaleableQty;
+  double? qcTeamQcQty;
   double? actualQcQty;
   double? freshQty;
   double? scrapQty;
   double? damagedQualityQty;
 }
 
-/// The four QC columns a picking uses, in display order, as (label, wire name).
+/// The QC columns a picking uses, in display order, as (label, wire name) matching Option B.
 ///
-/// Only the first and third differ between modes: nothing on a damaged or
-/// quality return is saleable, so those carry their own pair rather than
-/// reusing the fresh ones. Served by the backend as `qc_mode`.
+/// Served by the backend as `qc_mode`.
 List<(String, String)> qcColumnsFor(String? qcMode) => qcMode == 'scrap_sum'
     ? const [
-        ('Warehouse QC', 'w_qc_qty'),
-        ('Warehouse Non-saleable', 'w_nonsaleable_qty'),
-        ('Actual QC', 'actual_qc_qty'),
-        ('QC Non-saleable', 'qc_nonsaleable_qty'),
+        ('Logistic Non-SR', 'w_nonsaleable_qty'),
+        ('Logistic QR', 'w_qc_qty'),
+        ('QC- Non-SR', 'qc_team_nonsaleable_qty'),
+        ('QC- QR', 'qc_team_qc_qty'),
+        ('Sales Ops Non-SR', 'qc_nonsaleable_qty'),
+        ('Sales Ops QR', 'actual_qc_qty'),
       ]
     : const [
-        ('Warehouse Saleable', 'warehouse_qty'),
-        ('Warehouse Non-saleable', 'w_nonsaleable_qty'),
-        ('QC Saleable', 'qc_saleable_qty'),
-        ('QC Non-saleable', 'qc_nonsaleable_qty'),
+        ('Logistic SR', 'warehouse_qty'),
+        ('Logistic Non-SR', 'w_nonsaleable_qty'),
+        ('Sales Ops SR', 'qc_saleable_qty'),
+        ('Sales Ops Non-SR', 'qc_nonsaleable_qty'),
       ];
+
+/// Checks whether a specific QC column field is visible to the user.
+bool isQcColumnVisible({
+  required String field,
+  required bool canViewAllReturns,
+  required bool canEditWarehouseQty,
+  required bool canEditQcTeamQty,
+  required bool canEditQcQty,
+}) {
+  if (canViewAllReturns) return true;
+  if (field == 'warehouse_qty' ||
+      field == 'w_nonsaleable_qty' ||
+      field == 'w_qc_qty') {
+    return canEditWarehouseQty || canEditQcTeamQty || canEditQcQty;
+  }
+  if (field == 'qc_team_nonsaleable_qty' || field == 'qc_team_qc_qty') {
+    return canEditQcTeamQty || canEditQcQty;
+  }
+  if (field == 'qc_saleable_qty' ||
+      field == 'qc_nonsaleable_qty' ||
+      field == 'actual_qc_qty') {
+    return canEditQcQty;
+  }
+  return true;
+}
+
+/// Checks whether a specific QC column field is editable by the user in the current stage.
+bool isQcColumnEditable({
+  required String field,
+  required String? returnReceiptStatus,
+  required bool isReadOnly,
+  required bool canEditWarehouseQty,
+  required bool canEditQcTeamQty,
+  required bool canEditQcQty,
+}) {
+  if (isReadOnly) return false;
+  if (field == 'warehouse_qty' ||
+      field == 'w_nonsaleable_qty' ||
+      field == 'w_qc_qty') {
+    final isStage = returnReceiptStatus == null ||
+        returnReceiptStatus == 'warehouse_receipt';
+    return canEditWarehouseQty && isStage;
+  }
+  if (field == 'qc_team_nonsaleable_qty' || field == 'qc_team_qc_qty') {
+    final isStage = returnReceiptStatus == 'qc_receipt';
+    return canEditQcTeamQty && isStage;
+  }
+  if (field == 'qc_saleable_qty' ||
+      field == 'qc_nonsaleable_qty' ||
+      field == 'actual_qc_qty') {
+    final isStage = returnReceiptStatus == 'salesops_receipt' ||
+        returnReceiptStatus == 'sales_operation_receipt';
+    return canEditQcQty && isStage;
+  }
+  return false;
+}
 
 /// Read and write the SS quantity columns by wire name.
 ///
@@ -281,6 +349,8 @@ extension SsQtyAccess on VirtualTransferLineEntry {
     'qc_saleable_qty' => qcSaleableQty,
     'qc_nonsaleable_qty' => qcNonsaleableQty,
     'w_qc_qty' => wQcQty,
+    'qc_team_nonsaleable_qty' => qcTeamNonsaleableQty,
+    'qc_team_qc_qty' => qcTeamQcQty,
     'actual_qc_qty' => actualQcQty,
     'so_qty' => soQty,
     _ => null,
@@ -298,6 +368,10 @@ extension SsQtyAccess on VirtualTransferLineEntry {
         qcNonsaleableQty = value;
       case 'w_qc_qty':
         wQcQty = value;
+      case 'qc_team_nonsaleable_qty':
+        qcTeamNonsaleableQty = value;
+      case 'qc_team_qc_qty':
+        qcTeamQcQty = value;
       case 'actual_qc_qty':
         actualQcQty = value;
       case 'so_qty':
@@ -313,6 +387,8 @@ extension SsLotQtyAccess on TransferLotInput {
     'qc_saleable_qty' => qcSaleableQty,
     'qc_nonsaleable_qty' => qcNonsaleableQty,
     'w_qc_qty' => wQcQty,
+    'qc_team_nonsaleable_qty' => qcTeamNonsaleableQty,
+    'qc_team_qc_qty' => qcTeamQcQty,
     'actual_qc_qty' => actualQcQty,
     'so_qty' => soQty,
     _ => null,
@@ -330,6 +406,10 @@ extension SsLotQtyAccess on TransferLotInput {
         qcNonsaleableQty = value;
       case 'w_qc_qty':
         wQcQty = value;
+      case 'qc_team_nonsaleable_qty':
+        qcTeamNonsaleableQty = value;
+      case 'qc_team_qc_qty':
+        qcTeamQcQty = value;
       case 'actual_qc_qty':
         actualQcQty = value;
       case 'so_qty':
@@ -422,6 +502,8 @@ class VirtualTransferLine {
   final double quantity;
   final double soQty;
   final double warehouseQty;
+  final double qcTeamNonsaleableQty;
+  final double qcTeamQcQty;
   final double scrapQty;
   final double damagedQualityQty;
   final double priceUnit;
@@ -437,6 +519,8 @@ class VirtualTransferLine {
     required this.quantity,
     this.soQty = 0,
     this.warehouseQty = 0,
+    this.qcTeamNonsaleableQty = 0,
+    this.qcTeamQcQty = 0,
     required this.scrapQty,
     this.damagedQualityQty = 0,
     this.priceUnit = 0.0,
@@ -462,6 +546,8 @@ class VirtualTransferLine {
       quantity: asDouble(map['quantity']),
       soQty: asDouble(map['so_qty']),
       warehouseQty: asDouble(map['warehouse_qty']),
+      qcTeamNonsaleableQty: asDouble(map['qc_team_nonsaleable_qty']),
+      qcTeamQcQty: asDouble(map['qc_team_qc_qty']),
       scrapQty: asDouble(map['scrap_qty']),
       damagedQualityQty: asDouble(map['damaged_quality_qty']),
       priceUnit: pUnit,

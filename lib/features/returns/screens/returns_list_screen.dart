@@ -180,6 +180,9 @@ class _ReturnsListScreenState extends State<ReturnsListScreen> {
       if (returnReciptStatus == 'sales_operation_receipt') {
         return const Color(0xFF1D4ED8); // Blue 700
       }
+      if (returnReciptStatus == 'qc_receipt') {
+        return const Color(0xFF7C3AED); // Violet 700
+      }
       return const Color(0xFFD97706); // Amber 600
     }
     return switch (state) {
@@ -204,6 +207,9 @@ class _ReturnsListScreenState extends State<ReturnsListScreen> {
       if (returnReciptStatus == 'sales_operation_receipt') {
         return const Color(0xFFDBEAFE); // Blue 100
       }
+      if (returnReciptStatus == 'qc_receipt') {
+        return const Color(0xFFEDE9FE); // Violet 100
+      }
       return const Color(0xFFFEF3C7); // Amber 100
     }
     return switch (state) {
@@ -227,6 +233,9 @@ class _ReturnsListScreenState extends State<ReturnsListScreen> {
             state == 'ready')) {
       if (returnReciptStatus == 'sales_operation_receipt') {
         return 'SALES OPERATION RECEIPT';
+      }
+      if (returnReciptStatus == 'qc_receipt') {
+        return 'QC RECEIPT';
       }
       return 'WAREHOUSE RECEIPT';
     }
@@ -280,6 +289,10 @@ class _ReturnsListScreenState extends State<ReturnsListScreen> {
                         DropdownMenuItem(
                           value: 'warehouse_receipt',
                           child: Text('Warehouse Receipt'),
+                        ),
+                        DropdownMenuItem(
+                          value: 'qc_receipt',
+                          child: Text('QC Receipt'),
                         ),
                         DropdownMenuItem(
                           value: 'sales_operation_receipt',
@@ -336,6 +349,7 @@ class _ReturnsListScreenState extends State<ReturnsListScreen> {
                 onChanged: (value) {
                   if (value != null) {
                     if (value == 'warehouse_receipt' ||
+                        value == 'qc_receipt' ||
                         value == 'sales_operation_receipt') {
                       setState(() {
                         _state = 'all';

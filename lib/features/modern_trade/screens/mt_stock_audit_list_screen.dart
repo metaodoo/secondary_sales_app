@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 import 'package:secondary_sales/core/access/access_resources.dart';
 import 'package:secondary_sales/core/access/permission_gate.dart';
 import 'package:secondary_sales/core/theme/app_theme.dart';
+import 'package:secondary_sales/core/util/dialog_helper.dart';
 import 'package:secondary_sales/core/widgets/ss_ui.dart';
 import 'package:secondary_sales/data/models/modern_trade/mt_stock_audit.dart';
 import 'package:secondary_sales/features/modern_trade/modern_trade_provider.dart';
@@ -380,8 +381,25 @@ class _MtStockAuditListScreenState extends State<MtStockAuditListScreen> {
         child: FloatingActionButton.extended(
           onPressed: () async {
             final provider = context.read<ModernTradeProvider>();
+            if (widget.outletId != null && provider.checkedInOutletId != widget.outletId) {
+              showValidationErrorDialog(
+                context,
+                'You must check in to ${widget.outletName ?? 'the outlet'} before creating a stock audit.',
+                title: 'Check-in Required',
+              );
+              return;
+            }
+
             final targetOutletId = provider.checkedInOutletId ?? widget.outletId;
             if (targetOutletId != null) {
+              final allowed = await checkAttendanceRestriction(
+                context,
+                actionName: 'Stock Audit / Outlet Visit',
+                businessType: 'mt',
+                isMt: true,
+              );
+              if (!allowed || !context.mounted) return;
+
               final outlet = provider.outlets
                   .where((o) => o.id == targetOutletId)
                   .firstOrNull;
