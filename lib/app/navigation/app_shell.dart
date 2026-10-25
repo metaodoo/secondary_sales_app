@@ -268,6 +268,7 @@ class _AppShellState extends State<AppShell> {
               onSearchChanged: _onDistributorSearchChanged,
               onBack: _goBack,
               onOpenMenu: () => _scaffoldKey.currentState?.openEndDrawer(),
+              businessType: widget.businessType,
             ),
       () => SettingsTab(
         onBack: _goBack,

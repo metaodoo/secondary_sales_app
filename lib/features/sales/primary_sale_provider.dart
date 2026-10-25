@@ -532,6 +532,7 @@ class PrimarySaleProvider with ChangeNotifier {
     DateTime expectedDeliveryDate, {
     int? warehouseId,
     bool confirm = true,
+    String? note,
   }) async {
     _loadingCount++;
     notifyListeners();
@@ -544,6 +545,7 @@ class PrimarySaleProvider with ChangeNotifier {
         warehouseId: warehouseId,
         confirm: confirm,
         businessType: _channelBusinessType,
+        note: note,
       );
       await fetchRecentOrders();
       return true;
@@ -563,6 +565,7 @@ class PrimarySaleProvider with ChangeNotifier {
     DateTime expectedDeliveryDate, {
     int? warehouseId,
     bool confirm = true,
+    String? note,
   }) async {
     _loadingCount++;
     notifyListeners();
@@ -576,6 +579,7 @@ class PrimarySaleProvider with ChangeNotifier {
         confirm: confirm,
         warehouseId: warehouseId,
         businessType: _channelBusinessType,
+        note: note,
       );
       await fetchRecentOrders();
       return true;

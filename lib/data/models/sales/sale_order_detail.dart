@@ -10,6 +10,7 @@ class SaleOrderDetail {
     required this.dateOrder,
     this.dateTimeOrder,
     this.expectedDeliveryDate,
+    this.note,
     this.distributor,
     this.warehouse,
     required this.amounts,
@@ -26,6 +27,7 @@ class SaleOrderDetail {
   final String dateOrder;
   final DateTime? dateTimeOrder;
   final String? expectedDeliveryDate;
+  final String? note;
   final OrderPartner? distributor;
   final Warehouse? warehouse;
   final OrderAmounts amounts;
@@ -49,6 +51,7 @@ class SaleOrderDetail {
       dateTimeOrder: dtOrder,
       dateOrder: formattedDateOrder,
       expectedDeliveryDate: asNullableString(map['expected_delivery_date']),
+      note: asNullableString(map['note']),
       distributor: distributor is Map
           ? OrderPartner.fromMap(distributor.cast<String, dynamic>())
           : null,

@@ -154,6 +154,7 @@ extension SalesApi on ApiService {
     bool confirm = true,
     int? warehouseId,
     String businessType = 'gt',
+    String? note,
   }) async {
     final params = {
       'employee_id': _activeEmployeeId,
@@ -175,6 +176,9 @@ extension SalesApi on ApiService {
     };
     if (warehouseId != null) {
       params['warehouse_id'] = warehouseId;
+    }
+    if (note != null) {
+      params['note'] = note;
     }
 
     final result = await _post(_createSaleOrderPath(businessType), params);
@@ -229,6 +233,7 @@ extension SalesApi on ApiService {
     bool confirm = true,
     int? warehouseId,
     String businessType = 'gt',
+    String? note,
   }) async {
     final params = {
       'employee_id': _activeEmployeeId,
@@ -249,6 +254,9 @@ extension SalesApi on ApiService {
     };
     if (warehouseId != null) {
       params['warehouse_id'] = warehouseId;
+    }
+    if (note != null) {
+      params['note'] = note;
     }
 
     final result = await _post(

@@ -116,6 +116,10 @@ class AppConstants {
   static const String csReturnsCreateEndpoint = '$apiPrefix/cs/returns/create';
   static const String csReturnsProductsEndpoint = '$apiPrefix/cs/returns/products';
   static const String csReturnsCustomersEndpoint = '$apiPrefix/cs/returns/customers';
+  static const String isReturnsEndpoint = '$apiPrefix/is/returns';
+  static const String isReturnsCreateEndpoint = '$apiPrefix/is/returns/create';
+  static const String isReturnsProductsEndpoint = '$apiPrefix/is/returns/products';
+  static const String isReturnsCustomersEndpoint = '$apiPrefix/is/returns/customers';
   static const String qcReturnsEndpoint = '$apiPrefix/qc_returns';
   static const String scrapsEndpoint = '$apiPrefix/scraps';
   static const String accessPermissionsEndpoint = '$apiPrefix/access/permissions';

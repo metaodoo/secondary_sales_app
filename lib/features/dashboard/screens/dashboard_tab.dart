@@ -19,6 +19,7 @@ import 'package:secondary_sales/features/modern_trade/screens/mt_stock_audit_lis
 import 'package:secondary_sales/features/modern_trade/screens/mt_sec_orders_list_screen.dart';
 import 'package:secondary_sales/features/modern_trade/screens/mt_returns_list_screen.dart';
 import 'package:secondary_sales/features/corporate_institutional_sale/screens/cs_return_screen.dart';
+import 'package:secondary_sales/features/corporate_institutional_sale/screens/is_return_screen.dart';
 
 class DashboardTab extends StatelessWidget {
   const DashboardTab({
@@ -353,6 +354,19 @@ class DashboardTab extends StatelessWidget {
                             Navigator.push(
                               context,
                               MaterialPageRoute(builder: (_) => const _CsReturnCategoriesScreen()),
+                            );
+                          },
+                        ),
+                      if (businessType == 'is' && showPrimarySalesModule)
+                        _buildModuleCard(
+                          title: 'Return',
+                          icon: Icons.assignment_return_outlined,
+                          iconColor: Colors.white,
+                          circleColor: const Color(0xFF0F766E),
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(builder: (_) => const _IsReturnCategoriesScreen()),
                             );
                           },
                         ),
@@ -753,6 +767,67 @@ class _CsReturnCategoriesScreen extends StatelessWidget {
                       category: card.$4,
                       title: card.$5,
                       createLabel: card.$6,
+                    ),
+                  ),
+                );
+              },
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _IsReturnCategoriesScreen extends StatelessWidget {
+  const _IsReturnCategoriesScreen();
+
+  @override
+  Widget build(BuildContext context) {
+    final cards = [
+      (
+        'Non-Saleable',
+        Icons.recycling_outlined,
+        const Color(0xFFDC2626),
+        'non_saleable',
+        'Non-Saleable Returns',
+      ),
+      (
+        'Quality Issue',
+        Icons.verified_outlined,
+        const Color(0xFF7C3AED),
+        'quality',
+        'Quality Issue Returns',
+      ),
+      (
+        'Saleable Return',
+        Icons.assignment_return_outlined,
+        const Color(0xFF2563EB),
+        'saleable',
+        'Saleable Returns',
+      ),
+    ];
+    return Scaffold(
+      backgroundColor: const Color(0xFFF8FAFC),
+      appBar: AppBar(title: const Text('Return')),
+      body: GridView.count(
+        padding: const EdgeInsets.all(16),
+        crossAxisCount: 2,
+        crossAxisSpacing: 16,
+        mainAxisSpacing: 16,
+        childAspectRatio: 1.02,
+        children: [
+          for (final card in cards)
+            _CsReturnCategoryCard(
+              title: card.$1,
+              icon: card.$2,
+              circleColor: card.$3,
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => IsReturnScreen(
+                      category: card.$4,
+                      title: card.$5,
                     ),
                   ),
                 );

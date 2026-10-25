@@ -31,6 +31,8 @@ class _CreatePrimarySaleScreenState extends State<CreatePrimarySaleScreen> {
   late DistributionHub _hub;
   final List<OrderLineEntry> _lines = [];
   bool _isInitLoaded = false;
+  DateTime? _requestedDeliveryDate;
+  final TextEditingController _remarks = TextEditingController();
 
   @override
   void initState() {
@@ -83,9 +85,20 @@ class _CreatePrimarySaleScreenState extends State<CreatePrimarySaleScreen> {
             );
           }
         }
+        final rawDate = detail.expectedDeliveryDate;
+        if (rawDate != null && rawDate.isNotEmpty) {
+          _requestedDeliveryDate = DateTime.tryParse(rawDate);
+        }
+        _remarks.text = detail.note ?? '';
         _isInitLoaded = true;
       });
     }
+  }
+
+  @override
+  void dispose() {
+    _remarks.dispose();
+    super.dispose();
   }
 
   double get _subtotal {
@@ -101,7 +114,11 @@ class _CreatePrimarySaleScreenState extends State<CreatePrimarySaleScreen> {
   Future<void> _openProductPicker() async {
     final provider = context.read<PrimarySaleProvider>();
     if (provider.products.isEmpty) {
-      await provider.searchProducts('', partnerId: _hub.id);
+      await provider.searchProducts(
+        '',
+        partnerId: _hub.id,
+        businessType: provider.channelBusinessType,
+      );
     }
     if (!mounted) return;
 
@@ -110,6 +127,8 @@ class _CreatePrimarySaleScreenState extends State<CreatePrimarySaleScreen> {
       MaterialPageRoute(
         builder: (_) => ProductSelectionScreen(
           partnerId: _hub.id,
+          businessType: provider.channelBusinessType,
+          saleType: 'primary',
         ),
       ),
     );
@@ -151,21 +170,35 @@ class _CreatePrimarySaleScreenState extends State<CreatePrimarySaleScreen> {
         .toList();
 
     final provider = context.read<PrimarySaleProvider>();
+    final isInstitution = provider.channelBusinessType == 'is';
+    if (isInstitution && _requestedDeliveryDate == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Requested delivery date is required.'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+    final deliveryDate = _requestedDeliveryDate ?? DateTime.now().add(const Duration(days: 1));
+    final note = isInstitution ? _remarks.text.trim() : null;
     bool success;
     if (widget.editOrderId != null) {
       success = await provider.editOrder(
         widget.editOrderId!,
         _hub.id,
         payloadLines,
-        DateTime.now().add(const Duration(days: 1)),
+        deliveryDate,
         confirm: confirm,
+        note: note,
       );
     } else {
       success = await provider.submitOrder(
         _hub.id,
         payloadLines,
-        DateTime.now().add(const Duration(days: 1)),
+        deliveryDate,
         confirm: confirm,
+        note: note,
       );
     }
 
@@ -440,6 +473,38 @@ class _CreatePrimarySaleScreenState extends State<CreatePrimarySaleScreen> {
                           ],
                         ),
                         const SizedBox(height: 20),
+                        if (provider.channelBusinessType == 'is') ...[
+                          ListTile(
+                            contentPadding: EdgeInsets.zero,
+                            title: const Text('Requested Delivery Date *'),
+                            subtitle: Text(
+                              _requestedDeliveryDate == null
+                                  ? 'Select a date'
+                                  : '${_requestedDeliveryDate!.day.toString().padLeft(2, '0')}/${_requestedDeliveryDate!.month.toString().padLeft(2, '0')}/${_requestedDeliveryDate!.year}',
+                            ),
+                            trailing: const Icon(Icons.calendar_today_outlined),
+                            onTap: () async {
+                              final picked = await showDatePicker(
+                                context: context,
+                                initialDate: _requestedDeliveryDate ?? DateTime.now(),
+                                firstDate: DateTime.now().subtract(const Duration(days: 1)),
+                                lastDate: DateTime.now().add(const Duration(days: 365)),
+                              );
+                              if (picked != null) {
+                                setState(() => _requestedDeliveryDate = picked);
+                              }
+                            },
+                          ),
+                          TextField(
+                            controller: _remarks,
+                            maxLines: 2,
+                            decoration: const InputDecoration(
+                              labelText: 'Remarks',
+                              hintText: 'Optional',
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                        ],
                         if (provider.channelBusinessType == 'cs' ||
                             provider.channelBusinessType == 'is') ...[
                           SizedBox(

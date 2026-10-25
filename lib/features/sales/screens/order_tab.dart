@@ -15,7 +15,10 @@ class OrderTab extends StatelessWidget {
     required this.onSearchChanged,
     this.onBack,
     this.onOpenMenu,
+    this.businessType = 'gt',
   });
+
+  final String businessType;
 
   final TextEditingController searchController;
   final ValueChanged<String> onSearchChanged;
@@ -86,6 +89,7 @@ class OrderTab extends StatelessWidget {
                                 saleType: 'primary',
                                 partnerId: hub.id,
                                 hub: hub,
+                                businessType: businessType,
                               ),
                             ),
                           );

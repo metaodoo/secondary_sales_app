@@ -214,6 +214,7 @@ class AppAction {
   // Primary sale orders and deliveries.
   static const primaryOrderCreate = 'action.primary_sale.orders.create';
   static const corporateOrderCreate = 'action.corporate_sale.orders.create';
+  static const corporateDeliveryValidate = 'action.corporate_sale.deliveries.validate';
   static const corporateReturnCreate = 'action.corporate_sale.returns.create';
   static const corporateReturnSubmitDm = 'action.corporate_sale.returns.submit_dm';
   static const corporateReturnSubmitCoordinator =
@@ -222,6 +223,15 @@ class AppAction {
       'action.corporate_sale.returns.submit_sales_operation';
   static const corporateReturnComplete = 'action.corporate_sale.returns.complete';
   static const institutionOrderCreate = 'action.institution_sale.orders.create';
+  static const institutionDeliveryValidate = 'action.institution_sale.deliveries.validate';
+  static const institutionReturnList = 'screen.institution_sale.returns.list';
+  static const institutionReturnCreate = 'action.institution_sale.returns.create';
+  static const institutionReturnSubmitDm = 'action.institution_sale.returns.submit_dm';
+  static const institutionReturnSubmitCoordinator =
+      'action.institution_sale.returns.submit_coordinator';
+  static const institutionReturnSubmitSalesOperation =
+      'action.institution_sale.returns.submit_sales_operation';
+  static const institutionReturnComplete = 'action.institution_sale.returns.complete';
   static const primaryOrderConfirm = 'action.primary_sale.orders.confirm';
   static const primaryOrderCancel = 'action.primary_sale.orders.cancel';
   static const primaryDeliveryValidate =
@@ -349,8 +359,8 @@ class AppAction {
   }
 
   static String deliveryValidateFor(String saleType, [String? businessType]) {
-    if (businessType == 'cs') return corporateOrderCreate;
-    if (businessType == 'is') return institutionOrderCreate;
+    if (businessType == 'cs') return corporateDeliveryValidate;
+    if (businessType == 'is') return institutionDeliveryValidate;
     if (businessType == 'mt' || saleType == 'mt' || saleType == 'modern_trade') {
       return mtDeliveryValidate;
     }
@@ -494,6 +504,13 @@ const List<AccessResource> accessCatalog = [
     _cs,
   ),
   AccessResource(
+    AppAction.corporateDeliveryValidate,
+    'action',
+    'corporate_sale',
+    'Corporate Sales (CS) › Confirm Delivery',
+    _cs,
+  ),
+  AccessResource(
     AppScreen.corporateReturnsList,
     'screen',
     'corporate_sale',
@@ -554,6 +571,55 @@ const List<AccessResource> accessCatalog = [
     'action',
     'institution_sale',
     'Institution Sales (IS) › Create Order',
+    _is,
+  ),
+  AccessResource(
+    AppAction.institutionDeliveryValidate,
+    'action',
+    'institution_sale',
+    'Institution Sales (IS) › Confirm Delivery',
+    _is,
+  ),
+  AccessResource(
+    AppAction.institutionReturnList,
+    'screen',
+    'institution_sale',
+    'Institution Sales (IS) › Returns',
+    _is,
+  ),
+  AccessResource(
+    AppAction.institutionReturnCreate,
+    'action',
+    'institution_sale',
+    'Institution Sales (IS) › Create Return',
+    _is,
+  ),
+  AccessResource(
+    AppAction.institutionReturnSubmitDm,
+    'action',
+    'institution_sale',
+    'Institution Sales (IS) › Submit Return to Delivery Man',
+    _is,
+  ),
+  AccessResource(
+    AppAction.institutionReturnSubmitCoordinator,
+    'action',
+    'institution_sale',
+    'Institution Sales (IS) › Submit Collected Return',
+    _is,
+  ),
+  AccessResource(
+    AppAction.institutionReturnSubmitSalesOperation,
+    'action',
+    'institution_sale',
+    'Institution Sales (IS) › Verify Return',
+    _is,
+  ),
+  AccessResource(
+    AppAction.institutionReturnComplete,
+    'action',
+    'institution_sale',
+    'Institution Sales (IS) › Validate Return Challan',
     _is,
   ),
   AccessResource(
