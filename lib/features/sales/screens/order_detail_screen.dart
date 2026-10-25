@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:secondary_sales/core/util/parse.dart';
 import 'package:printing/printing.dart';
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import 'package:secondary_sales/data/models/sales/sale_order_detail.dart';
 import 'package:secondary_sales/features/sales/primary_sale_provider.dart';
@@ -110,23 +111,53 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     return (bytes: bytes, filename: filename);
   }
 
+  String _orderShareText(SaleOrderDetail order) {
+    final lines = order.lines.map((line) {
+      final code = line.product?.defaultCode;
+      final name = line.product?.name ?? 'Product';
+      final title = (code == null || code.isEmpty) ? name : '[$code] $name';
+      final uom = (line.uomName == null || line.uomName!.isEmpty) ? '' : ' ${line.uomName}';
+      return '$title\nOrdered: ${formatQty(line.orderedQty)}$uom\nPrice: ${_money(order, line.priceUnit)}\nAmount: ${_money(order, line.priceSubtotal)}';
+    }).join('\n\n');
+    final customer = order.distributor?.name;
+    return [
+      order.name,
+      if (customer != null && customer.isNotEmpty) customer,
+      'Status: ${order.state}',
+      'Created: ${order.dateOrder}',
+      if (order.expectedDeliveryDate != null)
+        'Expected Delivery: ${_formatServerDate(asDateTime(order.expectedDeliveryDate))}',
+      if (lines.isNotEmpty) 'Products:\n$lines',
+      'Subtotal: ${_money(order, order.amounts.untaxed)}',
+      'Total: ${_money(order, order.amounts.total)}',
+    ].join('\n');
+  }
+
   Future<void> _shareWhatsApp() async {
     if (_isDownloading || _isSharingWhatsApp) return;
-    setState(() => _isSharingWhatsApp = true);
-
-    try {
-      final pdfData = await _getOrFetchPdf();
-      if (!mounted || pdfData == null) return;
-
-      await Printing.sharePdf(
-        bytes: pdfData.bytes,
-        filename: pdfData.filename,
+    final order = context.read<PrimarySaleProvider>().selectedOrder;
+    if (order == null || order.id != widget.orderId) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Order details are still loading.')),
       );
+      return;
+    }
+    setState(() => _isSharingWhatsApp = true);
+    try {
+      final uri = Uri.parse(
+        'https://wa.me/?text=${Uri.encodeComponent(_orderShareText(order))}',
+      );
+      final opened = await launchUrl(uri, mode: LaunchMode.externalApplication);
+      if (!opened && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Could not open WhatsApp.')),
+        );
+      }
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Failed to share PDF: $e')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to share on WhatsApp: $e')),
+      );
     } finally {
       if (mounted) setState(() => _isSharingWhatsApp = false);
     }
