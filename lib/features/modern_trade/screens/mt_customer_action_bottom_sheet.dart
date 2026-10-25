@@ -6,6 +6,7 @@ import 'package:secondary_sales/core/access/access_resources.dart';
 import 'package:secondary_sales/core/services/location_service.dart';
 import 'package:secondary_sales/core/theme/app_theme.dart';
 import 'package:secondary_sales/core/util/dialog_helper.dart';
+import 'package:secondary_sales/core/widgets/ss_ui.dart';
 import 'package:secondary_sales/data/models/modern_trade/mt_outlet.dart';
 import 'package:secondary_sales/features/auth/auth_provider.dart';
 import 'package:secondary_sales/features/modern_trade/modern_trade_provider.dart';
@@ -15,6 +16,7 @@ import 'package:secondary_sales/data/models/routes/visit_reason.dart';
 import 'package:secondary_sales/features/routes/screens/visit_reason_dialog.dart';
 import 'package:secondary_sales/features/sales/screens/product_selection_screen.dart';
 import 'package:secondary_sales/features/sales/screens/secondary_orders_list_screen.dart';
+import 'package:secondary_sales/features/modern_trade/screens/mt_outlet_detail_screen.dart';
 import 'package:secondary_sales/features/modern_trade/screens/mt_stock_audit_list_screen.dart';
 import 'package:secondary_sales/features/modern_trade/screens/mt_stock_audit_type_sheet.dart';
 import 'package:secondary_sales/core/util/proximity_helper.dart';
@@ -260,11 +262,22 @@ class _MtCustomerActionBottomSheetState extends State<MtCustomerActionBottomShee
       return false;
     } catch (e) {
       if (mounted) {
-        showValidationErrorDialog(
-          context,
-          e.toString().replaceAll('Exception: ', ''),
-          title: 'Check-in Error',
-        );
+        final errorMsg = e.toString().replaceAll('Exception: ', '');
+        final isGeofenceError = errorMsg.contains('away from') || errorMsg.contains('radius');
+        if (isGeofenceError) {
+          ssShowLocationErrorDialog(
+            context,
+            errorMsg,
+            actionLabel: 'Update GPS',
+            onAction: _handleRecalibrateLocation,
+          );
+        } else {
+          showValidationErrorDialog(
+            context,
+            errorMsg,
+            title: 'Check-in Error',
+          );
+        }
       }
       return false;
     } finally {
@@ -337,6 +350,108 @@ class _MtCustomerActionBottomSheetState extends State<MtCustomerActionBottomShee
         if (mounted) {
           setState(() => _isCheckingOut = false);
         }
+      }
+    }
+  }
+
+  bool _isRecalibratingGps = false;
+
+  Future<void> _handleRecalibrateLocation() async {
+    if (_isRecalibratingGps) return;
+
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Row(
+          children: [
+            Icon(Icons.edit_location_alt_outlined, color: AppColors.primaryStrong),
+            SizedBox(width: 8),
+            Text('Update GPS Location', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+          ],
+        ),
+        content: Text(
+          'Are you currently physically standing at "${widget.outlet.name}"?\n\n'
+          'This will overwrite the outlet\'s saved coordinates with your current high-precision GPS position so future check-ins will work accurately.',
+          style: const TextStyle(fontSize: 14, height: 1.4),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primaryStrong,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Update Now'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm != true || !mounted) return;
+
+    setState(() => _isRecalibratingGps = true);
+    try {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Row(
+            children: [
+              SizedBox(
+                width: 16,
+                height: 16,
+                child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+              ),
+              SizedBox(width: 12),
+              Text('Acquiring high-accuracy satellite GPS fix…'),
+            ],
+          ),
+          duration: Duration(seconds: 4),
+        ),
+      );
+
+      final position = await LocationService.getAccuratePosition(
+        desiredAccuracyInMeters: 25.0,
+        maxAcceptableAccuracyInMeters: 35.0,
+        timeLimit: const Duration(seconds: 15),
+      );
+
+      if (!mounted) return;
+
+      final provider = context.read<ModernTradeProvider>();
+      final result = await provider.updateOutletLocation(
+        widget.outlet.id,
+        latitude: position.latitude,
+        longitude: position.longitude,
+      );
+
+      if (!mounted) return;
+
+      if (result != null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Location updated to ±${position.accuracy.round()}m accuracy! You can now check in.',
+            ),
+            backgroundColor: const Color(0xFF10B981),
+          ),
+        );
+      } else {
+        throw Exception(provider.error ?? 'Failed to update location');
+      }
+    } catch (e) {
+      if (mounted) {
+        ssShowLocationErrorDialog(
+          context,
+          'Could not calibrate GPS: ${e.toString().replaceAll('Exception: ', '')}',
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isRecalibratingGps = false);
       }
     }
   }
@@ -677,6 +792,38 @@ class _MtCustomerActionBottomSheetState extends State<MtCustomerActionBottomShee
         Icons.phone_outlined,
         'Call',
         onTap: _makeCall,
+      ),
+    );
+
+    actionButtons.add(
+      _buildActionBtn(
+        Icons.storefront_outlined,
+        'Outlet Details',
+        iconColor: AppColors.primaryStrong,
+        onTap: () async {
+          final nav = Navigator.of(context);
+          final provider = context.read<ModernTradeProvider>();
+          final updated = await nav.push<bool>(
+            MaterialPageRoute(
+              builder: (_) => MtOutletDetailScreen(
+                outletId: widget.outlet.id,
+                initialOutlet: widget.outlet,
+              ),
+            ),
+          );
+          if (updated == true && mounted) {
+            provider.fetchOutlets();
+          }
+        },
+      ),
+    );
+
+    actionButtons.add(
+      _buildActionBtn(
+        Icons.edit_location_alt_outlined,
+        'Update GPS',
+        iconColor: const Color(0xFF0284C7),
+        onTap: _handleRecalibrateLocation,
       ),
     );
 

@@ -5,6 +5,8 @@ import 'package:secondary_sales/core/services/offline_database_helper.dart';
 import 'package:secondary_sales/data/api/api_service.dart';
 import 'package:secondary_sales/data/models/modern_trade/mt_outlet.dart';
 import 'package:secondary_sales/data/models/modern_trade/mt_stock_audit.dart';
+import 'package:secondary_sales/data/models/contacts/outlet_class.dart';
+import 'package:secondary_sales/data/models/contacts/outlet_type.dart';
 import 'package:secondary_sales/data/models/sales/product_category.dart';
 import 'package:secondary_sales/core/services/location_service.dart';
 import 'package:secondary_sales/core/util/proximity_helper.dart';
@@ -350,6 +352,127 @@ class ModernTradeProvider with ChangeNotifier {
   void setRequiresVisitReason(bool value) {
     _requiresVisitReason = value;
     notifyListeners();
+  }
+
+  Future<Map<String, dynamic>?> updateOutletLocation(
+    int outletId, {
+    required double latitude,
+    required double longitude,
+  }) async {
+    _loadingCount++;
+    _error = null;
+    notifyListeners();
+
+    try {
+      final updated = await _apiService.updateOutlet(
+        outletId,
+        partnerLatitude: latitude,
+        partnerLongitude: longitude,
+      );
+
+      final index = _outlets.indexWhere((o) => o.id == outletId);
+      if (index != -1) {
+        _outlets[index] = _outlets[index].copyWith(
+          latitude: latitude,
+          longitude: longitude,
+        );
+      }
+
+      return updated;
+    } catch (e) {
+      _error = e.toString().replaceAll('Exception: ', '');
+      rethrow;
+    } finally {
+      if (_loadingCount > 0) _loadingCount--;
+      notifyListeners();
+    }
+  }
+
+  List<OutletType> _outletTypes = [];
+  List<OutletClass> _outletClasses = [];
+
+  List<OutletType> get outletTypes => _outletTypes;
+  List<OutletClass> get outletClasses => _outletClasses;
+
+  Future<void> fetchOutletTypes() async {
+    try {
+      _outletTypes = await _apiService.getOutletTypes();
+      notifyListeners();
+    } catch (_) {}
+  }
+
+  Future<void> fetchOutletClasses() async {
+    try {
+      _outletClasses = await _apiService.getOutletClasses();
+      notifyListeners();
+    } catch (_) {}
+  }
+
+  Future<Map<String, dynamic>> fetchOutletDetail(int outletId) async {
+    return await _apiService.getContactDetail(outletId, customerType: 'outlet');
+  }
+
+  Future<Map<String, dynamic>?> updateOutlet(
+    int outletId, {
+    String? name,
+    String? ownerName,
+    String? mobile,
+    String? phone,
+    String? email,
+    String? street,
+    String? street2,
+    String? city,
+    String? zip,
+    String? vat,
+    int? outletClassId,
+    int? outletTypeId,
+    int? chainShopId,
+    double? latitude,
+    double? longitude,
+  }) async {
+    _loadingCount++;
+    _error = null;
+    notifyListeners();
+
+    try {
+      final updated = await _apiService.updateOutlet(
+        outletId,
+        name: name,
+        ownerName: ownerName,
+        mobile: mobile,
+        phone: phone,
+        email: email,
+        street: street,
+        street2: street2,
+        city: city,
+        zip: zip,
+        vat: vat,
+        outletClassId: outletClassId,
+        outletTypeId: outletTypeId,
+        chainShopId: chainShopId,
+        partnerLatitude: latitude,
+        partnerLongitude: longitude,
+      );
+
+      final index = _outlets.indexWhere((o) => o.id == outletId);
+      if (index != -1) {
+        _outlets[index] = _outlets[index].copyWith(
+          name: name ?? _outlets[index].name,
+          phone: mobile ?? phone ?? _outlets[index].phone,
+          street: street ?? _outlets[index].street,
+          latitude: latitude ?? _outlets[index].latitude,
+          longitude: longitude ?? _outlets[index].longitude,
+        );
+      }
+
+      return updated;
+    } catch (e) {
+      _error = e.toString().replaceAll('Exception: ', '');
+      rethrow;
+    } finally {
+      if (_loadingCount > 0) _loadingCount--;
+      notifyListeners();
+    }
   }
 
   // ─── Modern Trade Stock Audits ──────────────────────────────────────────

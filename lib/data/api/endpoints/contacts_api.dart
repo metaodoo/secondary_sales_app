@@ -192,6 +192,18 @@ extension ContactsApi on ApiService {
     throw Exception(result['message'] ?? 'Failed to create outlet');
   }
 
+  Future<Map<String, dynamic>> getContactDetail(int id, {String customerType = 'outlet'}) async {
+    final result = await _post('${AppConstants.contactsEndpoint}/$id', {
+      'customer_type': customerType,
+    });
+    if (result['success'] == true) {
+      final data = result['data'];
+      if (data is Map) return Map<String, dynamic>.from(data);
+      return <String, dynamic>{};
+    }
+    throw Exception(result['message'] ?? 'Failed to load contact');
+  }
+
   Future<Map<String, dynamic>> updateOutlet(
     int id, {
     String? name,
@@ -206,6 +218,7 @@ extension ContactsApi on ApiService {
     String? vat,
     int? outletClassId,
     int? outletTypeId,
+    int? chainShopId,
     double? partnerLatitude,
     double? partnerLongitude,
   }) async {
@@ -225,6 +238,7 @@ extension ContactsApi on ApiService {
       if (vat != null && vat.trim().isNotEmpty) 'vat': vat.trim(),
       if (outletClassId != null) 'outlet_class_id': outletClassId,
       if (outletTypeId != null) 'outlet_type_id': outletTypeId,
+      if (chainShopId != null) 'chain_shop_id': chainShopId,
       if (partnerLatitude != null) 'partner_latitude': partnerLatitude,
       if (partnerLongitude != null) 'partner_longitude': partnerLongitude,
     };

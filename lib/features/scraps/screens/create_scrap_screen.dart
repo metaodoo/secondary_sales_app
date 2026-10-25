@@ -2241,7 +2241,7 @@ class _ScrapLineCard extends StatelessWidget {
                     onChanged: null,
                   ),
                   _buildQtyRow(
-                    title: 'SO Qty',
+                    title: 'Db entry',
                     value: line.soQty ?? 0,
                     // On a transit leg the SO figure was fixed at creation and
                     // is shown for reference only.
@@ -2415,7 +2415,7 @@ class _ScrapLotRow extends StatelessWidget {
     String label = 'Scrap Qty';
     if (canEditSoQty) {
       activeQty = lotInput.soQty ?? lotInput.quantity;
-      label = 'SO Qty';
+      label = 'Db entry';
     } else if (canEditWarehouseQty) {
       activeQty = lotInput.qcQty ?? lotInput.quantity;
       label = 'Warehouse Qty';
@@ -2454,7 +2454,7 @@ class _ScrapLotRow extends StatelessWidget {
                   children: [
                     if (lotInput.soQty != null && lotInput.soQty! > 0)
                       Text(
-                        'SO Qty: ${lotInput.soQty!.toStringAsFixed(0)}',
+                        'Db entry: ${lotInput.soQty!.toStringAsFixed(0)}',
                         style: const TextStyle(
                           color: Color(0xFF2563EB),
                           fontWeight: FontWeight.bold,
@@ -2630,7 +2630,7 @@ class _ScrapLotRow extends StatelessWidget {
           if (lotInput.soQty != null && lotInput.soQty! > 0) ...[
             const SizedBox(height: 6),
             Text(
-              'SO Qty: ${lotInput.soQty!.toStringAsFixed(0)}',
+              'Db entry: ${lotInput.soQty!.toStringAsFixed(0)}',
               style: const TextStyle(
                 color: Color(0xFF2563EB),
                 fontWeight: FontWeight.bold,

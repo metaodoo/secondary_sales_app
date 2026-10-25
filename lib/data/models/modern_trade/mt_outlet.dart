@@ -83,4 +83,46 @@ class MtOutlet {
     'business_type': businessType,
     if (requiresVisitReason != null) 'requires_visit_reason': requiresVisitReason,
   };
+
+  MtOutlet copyWith({
+    int? id,
+    String? name,
+    String? ssCode,
+    String? phone,
+    String? street,
+    double? latitude,
+    double? longitude,
+    double? outletRadius,
+    bool? isRecommended,
+    bool? isAllowed,
+    bool? isVisited,
+    bool? isActiveCheckedIn,
+    int? activeVisitId,
+    DateTime? activeCheckInTime,
+    String? justificationStatus,
+    int? justificationRequestId,
+    String? businessType,
+    bool? requiresVisitReason,
+  }) {
+    return MtOutlet(
+      id: id ?? this.id,
+      name: name ?? this.name,
+      ssCode: ssCode ?? this.ssCode,
+      phone: phone ?? this.phone,
+      street: street ?? this.street,
+      latitude: latitude ?? this.latitude,
+      longitude: longitude ?? this.longitude,
+      outletRadius: outletRadius ?? this.outletRadius,
+      isRecommended: isRecommended ?? this.isRecommended,
+      isAllowed: isAllowed ?? this.isAllowed,
+      isVisited: isVisited ?? this.isVisited,
+      isActiveCheckedIn: isActiveCheckedIn ?? this.isActiveCheckedIn,
+      activeVisitId: activeVisitId ?? this.activeVisitId,
+      activeCheckInTime: activeCheckInTime ?? this.activeCheckInTime,
+      justificationStatus: justificationStatus ?? this.justificationStatus,
+      justificationRequestId: justificationRequestId ?? this.justificationRequestId,
+      businessType: businessType ?? this.businessType,
+      requiresVisitReason: requiresVisitReason ?? this.requiresVisitReason,
+    );
+  }
 }
