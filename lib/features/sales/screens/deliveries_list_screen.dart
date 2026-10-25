@@ -169,6 +169,9 @@ class _DeliveriesListScreenState extends State<DeliveriesListScreen>
   }
 
   bool get _isMt {
+    if (widget.businessType == 'cs' || widget.businessType == 'is') {
+      return false;
+    }
     if (widget.businessType == 'mt' ||
         widget.moduleType == 'modern_trade' ||
         widget.moduleType == 'mt_primary') {
