@@ -262,6 +262,7 @@ void main() {
         'PENDING',
         errorCode: 'TIMEOUT',
         errorMessage: 'SocketException: Connection timed out (OS Error: ETIMEDOUT, errno = 110)',
+        countAttempt: true,
       );
 
       // 3. Assert: Item remains in PENDING with incremented retry count

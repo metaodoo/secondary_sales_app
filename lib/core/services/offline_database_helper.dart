@@ -306,11 +306,15 @@ class OfflineDatabaseHelper {
   }
 
   /// Updates status and error details of an operation.
+  ///
+  /// Pass [countAttempt] only when a delivery attempt has finished and failed,
+  /// so `retry_count` grows once per attempt rather than once per status change.
   Future<void> updateOperationStatus(
     String operationUuid,
     String status, {
     String? errorCode,
     String? errorMessage,
+    bool countAttempt = false,
   }) async {
     final db = await database;
     final nowIso = DateTime.now().toUtc().toIso8601String();
@@ -319,13 +323,13 @@ class OfflineDatabaseHelper {
       '''
       UPDATE $tableOutbox
       SET status = ?,
-          retry_count = retry_count + 1,
+          retry_count = retry_count + ?,
           error_code = ?,
           error_message = ?,
           last_attempt_at = ?
       WHERE operation_uuid = ?
     ''',
-      [status, errorCode, errorMessage, nowIso, operationUuid],
+      [status, countAttempt ? 1 : 0, errorCode, errorMessage, nowIso, operationUuid],
     );
   }
 
@@ -377,6 +381,7 @@ class OfflineDatabaseHelper {
   Future<void> markOperationQuarantined(
     String operationUuid, {
     required String reason,
+    String errorCode = 'BUSINESS_CONFLICT',
   }) async {
     final db = await database;
     final nowIso = DateTime.now().toUtc().toIso8601String();
@@ -385,7 +390,7 @@ class OfflineDatabaseHelper {
       tableOutbox,
       {
         'status': 'QUARANTINED',
-        'error_code': 'BUSINESS_CONFLICT',
+        'error_code': errorCode,
         'error_message': reason,
         'last_attempt_at': nowIso,
       },

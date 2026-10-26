@@ -1,7 +1,9 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 import 'dart:math';
 import 'package:connectivity_plus/connectivity_plus.dart';
+import 'package:http/http.dart' as http;
 import 'package:flutter/widgets.dart';
 import 'package:secondary_sales/core/services/master_data_sync_service.dart';
 import 'package:secondary_sales/core/services/offline_database_helper.dart';
@@ -249,27 +251,8 @@ class OfflineSyncEngine with WidgetsBindingObserver {
         );
         return true;
       } else {
-        final isFatalBusinessError = _isNonTransientError(errorMsg);
-
-        if (isFatalBusinessError || currentRetries >= kMaxOutboxRetries) {
-          // Non-transient business conflict or retry threshold exceeded -> quarantine so queue doesn't stall
-          final reason = currentRetries >= kMaxOutboxRetries
-              ? 'Exceeded max retries ($kMaxOutboxRetries). Error: $errorMsg'
-              : errorMsg;
-          await _dbHelper.markOperationQuarantined(opUuid, reason: reason);
-          debugPrint(
-            '[OfflineSyncEngine] Quarantined op $opUuid: $reason',
-          );
-          return true; // continue next item
-        } else {
-          // Transient error -> leave PENDING and pause sync loop
-          await _dbHelper.updateOperationStatus(
-            opUuid,
-            'PENDING',
-            errorMessage: errorMsg,
-          );
-          return false;
-        }
+        // The server was reached and rejected the operation.
+        return _handleServerRejection(opUuid, errorMsg, currentRetries);
       }
     } catch (e) {
       final errStr = e.toString();
@@ -277,22 +260,74 @@ class OfflineSyncEngine with WidgetsBindingObserver {
         '[OfflineSyncEngine] Network/server exception on $opUuid: $errStr',
       );
 
-      if (_isNonTransientError(errStr) || currentRetries >= kMaxOutboxRetries) {
-        final reason = currentRetries >= kMaxOutboxRetries
-            ? 'Exceeded max retries ($kMaxOutboxRetries). Error: $errStr'
-            : errStr;
-        await _dbHelper.markOperationQuarantined(opUuid, reason: reason);
-        return true; // continue next item
-      } else {
-        // Transient network error (timeout, socket exception, 502/503)
+      if (_isTemporaryFailure(e)) {
+        // No usable response (no signal, timeout, dropped connection, gateway
+        // down) or a dead session: never quarantine for this, however often it
+        // repeats -- the operation is valid and waits for the next sync pass.
         await _dbHelper.updateOperationStatus(
           opUuid,
           'PENDING',
           errorMessage: errStr,
+          countAttempt: true,
         );
         return false; // pause sync pass
       }
+      return _handleServerRejection(opUuid, errStr, currentRetries);
     }
+  }
+
+  /// A server response that is neither success nor a temporary failure.
+  /// Permanent conflicts are quarantined at once; anything else is retried
+  /// until [kMaxOutboxRetries] attempts have failed, so a rejection that keeps
+  /// recurring cannot block the queue behind it forever.
+  Future<bool> _handleServerRejection(
+    String opUuid,
+    String errorMsg,
+    int currentRetries,
+  ) async {
+    if (_isNonTransientError(errorMsg)) {
+      await _dbHelper.markOperationQuarantined(opUuid, reason: errorMsg);
+      debugPrint('[OfflineSyncEngine] Quarantined op $opUuid: $errorMsg');
+      return true; // continue next item
+    }
+
+    final attempts = currentRetries + 1;
+    if (attempts >= kMaxOutboxRetries) {
+      final reason =
+          'Rejected $attempts times by the server. Last error: $errorMsg';
+      await _dbHelper.markOperationQuarantined(
+        opUuid,
+        reason: reason,
+        errorCode: 'MAX_RETRIES',
+      );
+      debugPrint('[OfflineSyncEngine] Quarantined op $opUuid: $reason');
+      return true; // continue next item
+    }
+
+    await _dbHelper.updateOperationStatus(
+      opUuid,
+      'PENDING',
+      errorMessage: errorMsg,
+      countAttempt: true,
+    );
+    return false; // pause sync pass
+  }
+
+  /// True when the failure says nothing about the operation itself: no usable
+  /// server response (no connection, timeout, dropped or reset connection, TLS
+  /// failure, a gateway that could not reach Odoo -- HTTP 502/503/504), or a
+  /// session the token refresh could not revive (HTTP 401/403). Treating the
+  /// latter as a business conflict used to quarantine every queued operation
+  /// in turn while the rep was signed out.
+  bool _isTemporaryFailure(Object error) {
+    if (error is SocketException ||
+        error is TimeoutException ||
+        error is HandshakeException ||
+        error is http.ClientException) {
+      return true;
+    }
+    final message = error.toString();
+    return RegExp(r'HTTP (50[234]|40[13])\b').hasMatch(message);
   }
 
   /// Determines if an error is a permanent business validation failure
