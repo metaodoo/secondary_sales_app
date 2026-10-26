@@ -336,7 +336,11 @@ class DashboardTab extends StatelessWidget {
                           },
                         ),
                     ] else if (moduleType == 'primary') ...[
-                      if (showPrimarySalesModule)
+                      if (businessType == 'cs'
+                          ? auth.canView(AppScreen.corporateOrdersList)
+                          : businessType == 'is'
+                              ? auth.canView(AppScreen.institutionOrdersList)
+                              : showPrimarySalesModule)
                         _buildModuleCard(
                           title: 'Sales',
                           icon: Icons.bar_chart,
@@ -344,7 +348,7 @@ class DashboardTab extends StatelessWidget {
                           circleColor: AppColors.primaryStrong,
                           onTap: () => onModuleSelected(AppShellIndex.sales),
                         ),
-                      if (businessType == 'cs' && showPrimarySalesModule)
+                      if (businessType == 'cs' && auth.canView(AppScreen.corporateReturnsList))
                         _buildModuleCard(
                           title: 'Return',
                           icon: Icons.assignment_return_outlined,
@@ -357,7 +361,7 @@ class DashboardTab extends StatelessWidget {
                             );
                           },
                         ),
-                      if (businessType == 'is' && showPrimarySalesModule)
+                      if (businessType == 'is' && auth.canView(AppScreen.institutionReturnsList))
                         _buildModuleCard(
                           title: 'Return',
                           icon: Icons.assignment_return_outlined,
@@ -370,8 +374,10 @@ class DashboardTab extends StatelessWidget {
                             );
                           },
                         ),
-                      if ((businessType == 'cs' || businessType == 'is') &&
-                          showPrimarySalesModule)
+                      if ((businessType == 'cs' &&
+                              auth.canView(AppScreen.corporateDeliveriesList)) ||
+                          (businessType == 'is' &&
+                              auth.canView(AppScreen.institutionDeliveriesList)))
                         _buildModuleCard(
                           title: 'Delivery',
                           icon: Icons.local_shipping_outlined,

@@ -43,7 +43,10 @@ class AppScreen {
   static const moduleInstitution = 'screen.module.institution_sale';
   static const corporateOrdersList = 'screen.corporate_sale.orders.list';
   static const corporateReturnsList = 'screen.corporate_sale.returns.list';
+  static const corporateDeliveriesList = 'screen.corporate_sale.deliveries.list';
   static const institutionOrdersList = 'screen.institution_sale.orders.list';
+  static const institutionReturnsList = 'screen.institution_sale.returns.list';
+  static const institutionDeliveriesList = 'screen.institution_sale.deliveries.list';
 
   // Modern Trade (MT - Primary Sales) screens.
   static const mtOutletsList = 'screen.modern_trade.outlets.list';
@@ -493,7 +496,7 @@ const List<AccessResource> accessCatalog = [
     AppScreen.corporateOrdersList,
     'screen',
     'corporate_sale',
-    'Corporate Sales (CS) › Orders',
+    'Corporate Sales (CS) › Sales',
     _cs,
   ),
   AccessResource(
@@ -501,6 +504,13 @@ const List<AccessResource> accessCatalog = [
     'action',
     'corporate_sale',
     'Corporate Sales (CS) › Create Order',
+    _cs,
+  ),
+  AccessResource(
+    AppScreen.corporateDeliveriesList,
+    'screen',
+    'corporate_sale',
+    'Corporate Sales (CS) › Delivery',
     _cs,
   ),
   AccessResource(
@@ -514,7 +524,7 @@ const List<AccessResource> accessCatalog = [
     AppScreen.corporateReturnsList,
     'screen',
     'corporate_sale',
-    'Corporate Sales (CS) › Returns',
+    'Corporate Sales (CS) › Return',
     _cs,
   ),
   AccessResource(
@@ -563,7 +573,7 @@ const List<AccessResource> accessCatalog = [
     AppScreen.institutionOrdersList,
     'screen',
     'institution_sale',
-    'Institution Sales (IS) › Orders',
+    'Institution Sales (IS) › Sales',
     _is,
   ),
   AccessResource(
@@ -574,6 +584,13 @@ const List<AccessResource> accessCatalog = [
     _is,
   ),
   AccessResource(
+    AppScreen.institutionDeliveriesList,
+    'screen',
+    'institution_sale',
+    'Institution Sales (IS) › Delivery',
+    _is,
+  ),
+  AccessResource(
     AppAction.institutionDeliveryValidate,
     'action',
     'institution_sale',
@@ -581,10 +598,10 @@ const List<AccessResource> accessCatalog = [
     _is,
   ),
   AccessResource(
-    AppAction.institutionReturnList,
+    AppScreen.institutionReturnsList,
     'screen',
     'institution_sale',
-    'Institution Sales (IS) › Returns',
+    'Institution Sales (IS) › Return',
     _is,
   ),
   AccessResource(
