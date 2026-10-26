@@ -9,6 +9,7 @@ import 'package:secondary_sales/core/services/media_storage_service.dart';
 import 'package:secondary_sales/core/services/location_service.dart';
 import 'package:secondary_sales/core/services/location_tracking_service.dart';
 import 'package:secondary_sales/core/services/offline_database_helper.dart';
+import 'package:secondary_sales/core/services/offline_sync_engine.dart';
 import 'package:secondary_sales/data/api/api_service.dart';
 import 'package:secondary_sales/features/auth/auth_provider.dart';
 
@@ -300,6 +301,12 @@ class AttendanceProvider extends ChangeNotifier {
 
   Future<bool> performAction(String action, {BuildContext? context}) async {
     if (_employeeId == 0) return false;
+    // Attendance is online-only: check before the selfie is taken.
+    if (!OfflineSyncEngine.instance.isOnline) {
+      _errorMessage = 'Attendance needs an internet connection. Connect and try again.';
+      notifyListeners();
+      return false;
+    }
     _isActionLoading = true;
     _errorMessage = null;
     _loadingMessage = action == 'check_in' ? 'Opening camera for selfie...' : 'Processing log-out...';

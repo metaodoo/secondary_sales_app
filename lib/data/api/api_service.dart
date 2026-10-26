@@ -244,6 +244,8 @@ class ApiService {
     throw Exception('Odoo response did not include a result object.');
   }
 
+  // Attendance (`/hr/attendance/action`) is deliberately not here: punching
+  // in or out requires a live connection, so it is never queued offline.
   bool _isWriteEndpoint(String path) {
     return path.contains('/visits/create') ||
         (path.contains('/visits/') && path.contains('/update')) ||
@@ -251,7 +253,6 @@ class ApiService {
         path.contains('/returns') ||
         path.contains('/qc_returns') ||
         path.contains('/scraps') ||
-        path.contains('/hr/attendance/action') ||
         path.contains('/hr/expense/sheet/create') ||
         path.contains('/contacts/create') ||
         (path.contains('/contacts/') && path.contains('/update')) ||
