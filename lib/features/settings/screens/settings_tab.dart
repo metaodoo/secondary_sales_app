@@ -3,6 +3,7 @@ import 'package:secondary_sales/core/theme/app_theme.dart';
 import 'package:provider/provider.dart';
 
 import 'package:secondary_sales/features/auth/auth_provider.dart';
+import 'package:secondary_sales/features/auth/logout_guard.dart';
 import 'package:secondary_sales/features/auth/screens/connection_setup_screen.dart';
 import 'package:secondary_sales/core/access/access_resources.dart';
 import 'package:secondary_sales/features/employees/screens/sales_officer_list_screen.dart';
@@ -279,8 +280,8 @@ class SettingsTab extends StatelessWidget {
                     titleColor: Colors.red.shade700,
                     iconColor: Colors.red.shade700,
                     onTap: () async {
-                      await context.read<AuthProvider>().logout();
-                      if (context.mounted) {
+                      final signedOut = await logoutWithUnsyncedGuard(context);
+                      if (signedOut && context.mounted) {
                         Navigator.of(
                           context,
                         ).popUntil((route) => route.isFirst);

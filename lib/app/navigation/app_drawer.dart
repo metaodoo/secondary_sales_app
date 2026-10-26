@@ -6,6 +6,7 @@ import 'package:secondary_sales/app/navigation/menu_catalog.dart';
 import 'package:secondary_sales/core/theme/app_theme.dart';
 import 'package:secondary_sales/core/widgets/ss_ui.dart';
 import 'package:secondary_sales/features/auth/auth_provider.dart';
+import 'package:secondary_sales/features/auth/logout_guard.dart';
 
 import 'package:secondary_sales/app/navigation/app_shell.dart';
 import 'package:secondary_sales/features/settings/screens/settings_tab.dart';
@@ -117,10 +118,10 @@ class AppDrawer extends StatelessWidget {
               label: 'Logout',
               iconColor: Colors.red.shade600,
               textColor: Colors.red.shade700,
-              onTap: () async {
-                Navigator.of(context).pop();
-                await context.read<AuthProvider>().logout();
-              },
+              onTap: () => logoutWithUnsyncedGuard(
+                context,
+                onBeforeLogout: () => Navigator.of(context).pop(),
+              ),
             ),
           ),
         ],

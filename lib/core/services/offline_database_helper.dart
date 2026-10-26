@@ -415,6 +415,17 @@ class OfflineDatabaseHelper {
     return Sqflite.firstIntValue(res) ?? 0;
   }
 
+  /// Returns count of operations that have not reached the server yet:
+  /// pending, mid-sync, or quarantined awaiting the user's review.
+  Future<int> getUnsyncedCount() async {
+    final db = await database;
+    final res = await db.rawQuery(
+      'SELECT COUNT(*) as cnt FROM $tableOutbox WHERE status IN (?, ?, ?)',
+      ['PENDING', 'SYNCING', 'QUARANTINED'],
+    );
+    return Sqflite.firstIntValue(res) ?? 0;
+  }
+
   // ---------------------------------------------------------------------------
   // MASTER DATA CACHING OPERATIONS
   // ---------------------------------------------------------------------------

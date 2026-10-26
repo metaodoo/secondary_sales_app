@@ -511,7 +511,7 @@ class AuthProvider with ChangeNotifier {
         // request's `unauthorized`, or this refresh's own 401.
         await logout(
           callServer: false,
-          reason: ApiService.lastAuthFailureReason,
+          reason: ApiService.lastAuthFailureReason ?? 'session_expired',
         ); // logout() notifies.
         return false;
       }
@@ -577,21 +577,33 @@ class AuthProvider with ChangeNotifier {
     ApiService.instance.updateEmployeeId(session.user.employeeId);
   }
 
+  /// Number of offline operations that have not reached the server yet.
+  /// Sign-out is refused while this is above zero.
+  Future<int> unsyncedOperationCount() =>
+      OfflineDatabaseHelper.instance.getUnsyncedCount();
+
   /// Sign out. Pass [reason] for an involuntary sign-out (a revoked or expired
   /// session) so the login screen can explain what happened; leave it null for
   /// a sign-out the user asked for.
-  Future<void> logout({bool callServer = true, String? reason}) async {
-    // Shift-Lock Guard: Prevent involuntary logouts from stranding un-synced offline orders
-    if (reason != null) {
-      final pendingCount = await OfflineDatabaseHelper.instance.getPendingCount();
-      if (pendingCount > 0) {
+  ///
+  /// Returns false, without signing out, while unsynced offline operations
+  /// exist: signing out would strand them on the device.
+  Future<bool> logout({bool callServer = true, String? reason}) async {
+    // Shift-Lock Guard: never sign out over un-synced offline documents
+    final unsyncedCount = await unsyncedOperationCount();
+    if (unsyncedCount > 0) {
+      if (reason != null) {
         debugPrint(
-          '[AuthProvider] Involuntary logout suppressed: $pendingCount pending offline operations exist.',
+          '[AuthProvider] Involuntary logout suppressed: $unsyncedCount unsynced offline operations exist.',
         );
         _tokenRefreshFailed = true;
         notifyListeners();
-        return;
+      } else {
+        debugPrint(
+          '[AuthProvider] Logout refused: $unsyncedCount unsynced offline operations exist.',
+        );
       }
+      return false;
     }
 
     final accessToken = _session?.accessToken;
@@ -629,6 +641,7 @@ class AuthProvider with ChangeNotifier {
       }
     }
     _authService.updateSessionId(sessionId);
+    return true;
   }
 
   Future<void> _storeSession(MobileAuthSession session) async {
