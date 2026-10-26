@@ -303,6 +303,10 @@ class AppAction {
   static const mtOrderCancel = 'action.modern_trade.orders.cancel';
   static const mtDeliveryValidate = 'action.modern_trade.deliveries.validate';
   static const mtDeliveriesViewAll = 'action.modern_trade.deliveries.view_all';
+  static const mtDeliveriesEditActualQty =
+      'action.modern_trade.deliveries.edit_actual_qty';
+  static const mtDeliveriesCreateReturn =
+      'action.modern_trade.deliveries.create_return';
   static const mtSaleableReturnCreate =
       'action.modern_trade.saleable_returns.create';
   static const mtNonSaleableReturnCreate =
@@ -1695,6 +1699,20 @@ const List<AccessResource> accessCatalog = [
     'Modern Trade › Deliveries › View All Deliveries',
     _mt,
     legacyKeys: ['action.delivery.view_all'],
+  ),
+  AccessResource(
+    AppAction.mtDeliveriesEditActualQty,
+    'action',
+    'modern_trade',
+    'Modern Trade › Deliveries › Edit Actual Delivered Count',
+    _mt,
+  ),
+  AccessResource(
+    AppAction.mtDeliveriesCreateReturn,
+    'action',
+    'modern_trade',
+    'Modern Trade › Deliveries › Create / Update Delivery Return',
+    _mt,
   ),
   AccessResource(
     AppAction.mtSaleableReturnCreate,

@@ -59,6 +59,26 @@ class _ValidateDeliveryScreenState extends State<ValidateDeliveryScreen> {
     );
   }
 
+  bool get _canEditActualQty {
+    if (!mounted) return false;
+    final auth = context.read<AuthProvider>();
+    return auth.canDo(AppAction.mtDeliveriesEditActualQty);
+  }
+
+  bool get _canCreateReturn {
+    if (!mounted) return false;
+    final auth = context.read<AuthProvider>();
+    return auth.canDo(AppAction.mtDeliveriesCreateReturn);
+  }
+
+  bool get _isMtReturnMode =>
+      _isMt &&
+      (widget.pickingState.toLowerCase() == 'done' ||
+          _prepare?.picking.state.toLowerCase() == 'done');
+
+  bool get _isDeliveryCountLocked =>
+      _prepare?.picking.isDeliveryCountLocked ?? false;
+
   bool get isReadOnly =>
       widget.isReceipt ||
       widget.pickingState.toLowerCase() == 'done' ||
@@ -527,6 +547,218 @@ class _ValidateDeliveryScreenState extends State<ValidateDeliveryScreen> {
     });
   }
 
+  Future<void> _openCreateOrUpdateReturnDialog() async {
+    for (final input in _inputs) {
+      if (input.actualDeliveredQty < 0) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Actual delivered quantity cannot be negative for ${input.move.product?.name ?? 'item'}.',
+            ),
+            backgroundColor: Colors.red,
+          ),
+        );
+        return;
+      }
+      if (input.actualDeliveredQty > input.quantityDone) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Actual delivered (${formatQty(input.actualDeliveredQty)}) cannot exceed validated (${formatQty(input.quantityDone)}) for ${input.move.product?.name ?? 'item'}.',
+            ),
+            backgroundColor: Colors.red,
+          ),
+        );
+        return;
+      }
+    }
+
+    final returnLines = _inputs.where((i) => i.returnQty > 0).toList();
+    final isUpdate = _prepare?.picking.hasDeliveryReturn == true;
+    final noteController = TextEditingController();
+
+    final confirmed = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) {
+        return Container(
+          padding: EdgeInsets.only(
+            left: 20,
+            right: 20,
+            top: 20,
+            bottom: MediaQuery.of(ctx).viewInsets.bottom + 20,
+          ),
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+          ),
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(
+                  child: Container(
+                    width: 40,
+                    height: 4,
+                    margin: const EdgeInsets.only(bottom: 16),
+                    decoration: BoxDecoration(
+                      color: AppColors.borderSoft,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                ),
+                Row(
+                  children: [
+                    Icon(
+                      isUpdate ? Icons.sync : Icons.assignment_return,
+                      color: const Color(0xFFD97706),
+                      size: 24,
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        isUpdate ? 'Update Delivery Return' : 'Create Delivery Return',
+                        style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF1E3A8A),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                if (returnLines.isEmpty)
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF3F4F6),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Text(
+                      'All items marked as fully accepted. If an existing return picking exists, its return lines will be cleared.',
+                      style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
+                    ),
+                  )
+                else ...[
+                  const Text(
+                    'Shortage items to return to warehouse:',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w600,
+                      fontSize: 13,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Container(
+                    decoration: BoxDecoration(
+                      border: Border.all(color: AppColors.borderSoft),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: ListView.separated(
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      itemCount: returnLines.length,
+                      separatorBuilder: (context, index) => const Divider(height: 1),
+                      itemBuilder: (c, idx) {
+                        final item = returnLines[idx];
+                        return ListTile(
+                          dense: true,
+                          title: Text(
+                            item.move.product?.name ?? 'Product',
+                            style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+                          ),
+                          subtitle: Text(
+                            'Validated: ${formatQty(item.quantityDone)} | Accepted: ${formatQty(item.actualDeliveredQty)}',
+                            style: const TextStyle(fontSize: 11),
+                          ),
+                          trailing: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFFEF3C7),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Text(
+                              'Return: ${formatQty(item.returnQty)}',
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFFB45309),
+                                fontSize: 12,
+                              ),
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                ],
+                const SizedBox(height: 16),
+                TextField(
+                  controller: noteController,
+                  maxLines: 2,
+                  decoration: ssInputDecoration(
+                    'Reason / Return note (optional)...',
+                    Icons.note_alt_outlined,
+                  ),
+                ),
+                const SizedBox(height: 20),
+                SizedBox(
+                  width: double.infinity,
+                  height: 48,
+                  child: FilledButton(
+                    onPressed: () => Navigator.pop(ctx, true),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: const Color(0xFFD97706),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(9),
+                      ),
+                    ),
+                    child: Text(
+                      isUpdate ? 'Confirm & Update Return' : 'Confirm & Create Return',
+                      style: const TextStyle(fontWeight: FontWeight.w800),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+
+    if (confirmed == true && mounted) {
+      final provider = context.read<PrimarySaleProvider>();
+      final res = await provider.createOrUpdateDeliveryReturn(
+        pickingId: widget.pickingId,
+        lines: _inputs,
+        note: noteController.text.trim(),
+      );
+      if (!mounted) return;
+      if (res != null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              isUpdate
+                  ? 'Delivery return updated successfully.'
+                  : 'Delivery return created successfully.',
+            ),
+            backgroundColor: const Color(0xFF16C083),
+          ),
+        );
+        _load();
+      } else if (provider.error != null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(provider.error!),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final provider = context.watch<PrimarySaleProvider>();
@@ -538,7 +770,9 @@ class _ValidateDeliveryScreenState extends State<ValidateDeliveryScreen> {
         child: Column(
           children: [
             BlueHeader(
-              title: isReadOnly ? 'Delivery Details' : 'Validate Delivery',
+              title: _isMtReturnMode
+                  ? 'Delivery & Return'
+                  : (isReadOnly ? 'Delivery Details' : 'Validate Delivery'),
               subtitle: '${widget.orderName} • ${widget.pickingName}',
               leading: IconButton(
                 onPressed: () => Navigator.pop(context),
@@ -688,6 +922,79 @@ class _ValidateDeliveryScreenState extends State<ValidateDeliveryScreen> {
                           ),
                         ),
                       ),
+                    if (_isMtReturnMode && prepare.picking.hasDeliveryReturn)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 16),
+                        child: Container(
+                          padding: const EdgeInsets.all(14),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFEFF6FF),
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(color: const Color(0xFFBFDBFE)),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  const Icon(
+                                    Icons.assignment_return,
+                                    color: Color(0xFF2563EB),
+                                    size: 20,
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: Text(
+                                      'Return: ${prepare.picking.returnPickingName ?? ''}',
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 14,
+                                        color: Color(0xFF1E40AF),
+                                      ),
+                                    ),
+                                  ),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 8,
+                                      vertical: 3,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: _isDeliveryCountLocked
+                                          ? const Color(0xFFDCFCE7)
+                                          : const Color(0xFFFEF3C7),
+                                      borderRadius: BorderRadius.circular(6),
+                                    ),
+                                    child: Text(
+                                      (prepare.picking.deliveryReturnState ??
+                                              'draft')
+                                          .toUpperCase(),
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 11,
+                                        color: _isDeliveryCountLocked
+                                            ? const Color(0xFF166534)
+                                            : const Color(0xFFB45309),
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 6),
+                              Text(
+                                _isDeliveryCountLocked
+                                    ? 'Return picking has been validated by Supply Chain. Delivery count and returns are permanently locked.'
+                                    : 'Pending Supply Chain validation. You can update delivery counts if recounted.',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: _isDeliveryCountLocked
+                                      ? const Color(0xFF166534)
+                                      : const Color(0xFF1E40AF),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
                     ..._inputs.map((input) {
                       final productId = input.move.product?.id ?? 0;
                       return Padding(
@@ -695,6 +1002,14 @@ class _ValidateDeliveryScreenState extends State<ValidateDeliveryScreen> {
                         child: _DeliveryLinePanel(
                           input: input,
                           isReadOnly: isReadOnly,
+                          showActualDeliveredQty: _isMtReturnMode,
+                          canEditActualQty: _canEditActualQty,
+                          isDeliveryCountLocked: _isDeliveryCountLocked,
+                          onActualDeliveredQtyChanged: (newVal) {
+                            setState(() {
+                              input.actualDeliveredQty = newVal;
+                            });
+                          },
                           lots: _lotsByProduct[productId] ?? [],
                           isLoadingLots: _isLoadingLots,
                           isReassigning: _isReassigning[productId] ?? false,
@@ -842,6 +1157,41 @@ class _ValidateDeliveryScreenState extends State<ValidateDeliveryScreen> {
                           ),
                         ),
                       ),
+              )
+            else if (_isMtReturnMode && _canCreateReturn && !_isDeliveryCountLocked)
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: const BoxDecoration(
+                  color: Colors.white,
+                  border: Border(top: BorderSide(color: Color(0xFFDDE6F2))),
+                ),
+                child: SizedBox(
+                  width: double.infinity,
+                  height: 50,
+                  child: FilledButton.icon(
+                    onPressed: provider.isLoading ? null : _openCreateOrUpdateReturnDialog,
+                    icon: Icon(
+                      prepare?.picking.hasDeliveryReturn == true
+                          ? Icons.sync
+                          : Icons.assignment_return,
+                    ),
+                    label: Text(
+                      prepare?.picking.hasDeliveryReturn == true
+                          ? 'Update Return'
+                          : 'Create Return',
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w800,
+                        fontSize: 16,
+                      ),
+                    ),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: const Color(0xFFD97706),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(9),
+                      ),
+                    ),
+                  ),
+                ),
               ),
           ],
         ),
@@ -1108,6 +1458,10 @@ class _DeliveryLinePanel extends StatelessWidget {
     this.onQuantityInput,
     this.onLotQtyInput,
     this.hideLots = false,
+    this.showActualDeliveredQty = false,
+    this.canEditActualQty = false,
+    this.isDeliveryCountLocked = false,
+    this.onActualDeliveredQtyChanged,
   });
 
   final DeliveryLineInput input;
@@ -1130,6 +1484,10 @@ class _DeliveryLinePanel extends StatelessWidget {
   final void Function(DeliveryLotInput lotInput, double quantity)?
   onLotQtyInput;
   final bool hideLots;
+  final bool showActualDeliveredQty;
+  final bool canEditActualQty;
+  final bool isDeliveryCountLocked;
+  final ValueChanged<double>? onActualDeliveredQtyChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -1292,6 +1650,103 @@ class _DeliveryLinePanel extends StatelessWidget {
                   ),
                 ),
             ],
+          ],
+          if (showActualDeliveredQty) ...[
+            const Divider(height: 24),
+            Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Actual Delivered',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w800,
+                          fontSize: 14,
+                        ),
+                      ),
+                      if (input.returnQty > 0)
+                        Text(
+                          'Shortage: ${formatQty(input.returnQty)} $uomName',
+                          style: const TextStyle(
+                            color: Color(0xFFD97706),
+                            fontWeight: FontWeight.w600,
+                            fontSize: 12,
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+                if (canEditActualQty && !isDeliveryCountLocked)
+                  SmallStepper(
+                    value: formatQty(input.actualDeliveredQty),
+                    onMinus: () {
+                      final next = (input.actualDeliveredQty - 1).clamp(
+                        0.0,
+                        input.quantityDone,
+                      );
+                      onActualDeliveredQtyChanged?.call(next);
+                    },
+                    onPlus: () {
+                      final next = (input.actualDeliveredQty + 1).clamp(
+                        0.0,
+                        input.quantityDone,
+                      );
+                      onActualDeliveredQtyChanged?.call(next);
+                    },
+                    onValueInput: (val) {
+                      final parsed = double.tryParse(val);
+                      if (parsed != null) {
+                        final next = parsed.clamp(0.0, input.quantityDone);
+                        onActualDeliveredQtyChanged?.call(next);
+                      }
+                    },
+                  )
+                else
+                  Text(
+                    '${formatQty(input.actualDeliveredQty)} $uomName',
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                      color: Color(0xFF1E3A8A),
+                    ),
+                  ),
+              ],
+            ),
+            if (input.returnQty > 0)
+              Container(
+                margin: const EdgeInsets.only(top: 10),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 6,
+                ),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFEF3C7),
+                  borderRadius: BorderRadius.circular(6),
+                  border: Border.all(color: const Color(0xFFFCD34D)),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(
+                      Icons.assignment_return,
+                      size: 16,
+                      color: Color(0xFFB45309),
+                    ),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        'Difference of ${formatQty(input.returnQty)} $uomName will return to warehouse',
+                        style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFFB45309),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
           ],
         ],
       ),

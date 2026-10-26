@@ -145,10 +145,17 @@ class _MtReturnCreateScreenState extends State<MtReturnCreateScreen> {
   }
 
   void _onAddProduct() async {
+    if (_selectedOutletId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please select an outlet first')),
+      );
+      return;
+    }
     final result = await MtReturnProductSelectionSheet.show(
       context,
       returnBucket: _selectedBucket,
       state: 'kao',
+      outletId: _selectedOutletId,
     );
     if (result != null) {
       setState(() {
@@ -164,6 +171,7 @@ class _MtReturnCreateScreenState extends State<MtReturnCreateScreen> {
       returnBucket: _selectedBucket,
       initialLine: currentLine,
       state: 'kao',
+      outletId: _selectedOutletId,
     );
     if (result != null) {
       setState(() {
@@ -186,7 +194,11 @@ class _MtReturnCreateScreenState extends State<MtReturnCreateScreen> {
       : _totalNonSaleableQty + _totalQualityQty;
   double get _totalAmount => _lines.fold(0.0, (sum, l) {
     final prod = l['product'] as Map?;
-    final price = prod != null ? (prod['list_price'] as num?)?.toDouble() ?? 0.0 : 0.0;
+    final price = prod != null
+        ? ((prod['has_reward_discount'] == true && prod['reward_price'] != null)
+            ? (prod['reward_price'] as num).toDouble()
+            : (prod['list_price'] as num?)?.toDouble() ?? 0.0)
+        : 0.0;
     final qty = _selectedBucket == 'saleable'
         ? ((l['saleable_qty'] as num?)?.toDouble() ?? 0.0) + ((l['non_saleable_qty'] as num?)?.toDouble() ?? 0.0)
         : ((l['non_saleable_qty'] as num?)?.toDouble() ?? 0.0) + ((l['quality_qty'] as num?)?.toDouble() ?? 0.0);
@@ -746,7 +758,9 @@ class _MtReturnCreateScreenState extends State<MtReturnCreateScreen> {
                   final nonSaleableQty = line['non_saleable_qty'] as double? ?? 0.0;
                   final qualityQty = line['quality_qty'] as double? ?? 0.0;
                   final totalLineQty = isSaleable ? saleableQty + nonSaleableQty : nonSaleableQty + qualityQty;
-                  final price = (product['list_price'] as num?)?.toDouble() ?? 0.0;
+                  final price = (product['has_reward_discount'] == true && product['reward_price'] != null)
+                      ? (product['reward_price'] as num).toDouble()
+                      : (product['list_price'] as num?)?.toDouble() ?? 0.0;
                   final subtotal = price * totalLineQty;
 
                   return Material(

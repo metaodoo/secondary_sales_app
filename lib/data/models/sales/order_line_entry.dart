@@ -46,4 +46,9 @@ class OrderLineEntry {
   double get grossAmount => product.price * payableQty;
   double get discountAmount => grossAmount * (discountPercent / 100);
   double get totalAmount => grossAmount - discountAmount;
+
+  /// Effective amounts taking into account promotional loyalty reward prices
+  double get effectiveGrossAmount => product.effectivePrice * payableQty;
+  double get effectiveDiscountAmount => effectiveGrossAmount * (discountPercent / 100);
+  double get effectiveTotalAmount => effectiveGrossAmount - effectiveDiscountAmount;
 }

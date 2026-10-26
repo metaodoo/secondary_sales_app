@@ -5,6 +5,9 @@ class Product {
   final String name;
   final String? code;
   final double price;
+  final double? rewardPrice;
+  final double? rewardDiscountRate;
+  final bool hasRewardDiscount;
   final String? uom;
   final double? stock;
   final double? distributorStock;
@@ -17,6 +20,9 @@ class Product {
     required this.name,
     this.code,
     required this.price,
+    this.rewardPrice,
+    this.rewardDiscountRate,
+    this.hasRewardDiscount = false,
     this.uom,
     this.stock,
     this.distributorStock,
@@ -25,13 +31,25 @@ class Product {
     this.categoryName,
   });
 
+  /// The effective price after promotional loyalty rewards (if any), otherwise standard base price.
+  double get effectivePrice =>
+      (hasRewardDiscount && rewardPrice != null && rewardPrice! > 0) ? rewardPrice! : price;
+
   factory Product.fromMap(Map<String, dynamic> map) {
     final categ = map['category'] ?? map['categ'];
+    final basePrice = asDouble(map['list_price'] ?? map['base_price']);
+    final rewPrice = _nullableDouble(map['reward_price'] ?? map['display_price']);
+    final rewRate = _nullableDouble(map['reward_discount_rate']);
+    final hasReward = map['has_reward_discount'] == true;
+
     return Product(
       id: asInt(map['id']),
       name: map['name'] ?? '',
       code: map['default_code'],
-      price: asDouble(map['list_price']),
+      price: basePrice,
+      rewardPrice: rewPrice,
+      rewardDiscountRate: rewRate,
+      hasRewardDiscount: hasReward,
       uom: map['uom_name'] ?? map['uom']?['name'] ?? 'Unit',
       stock: _nullableDouble(map['qty_available'] ?? map['stock']),
       distributorStock: _nullableDouble(map['distributor_qty_available']),

@@ -477,11 +477,12 @@ extension ModernTradeApi on ApiService {
   }
 
   /// Fetch products for Modern Trade return requests
-  Future<List<Map<String, dynamic>>> getMtReturnProducts({String? search, int? appCategoryId}) async {
+  Future<List<Map<String, dynamic>>> getMtReturnProducts({String? search, int? appCategoryId, int? outletId}) async {
     final params = <String, dynamic>{
       'employee_id': _activeEmployeeId,
       if (search != null && search.isNotEmpty) 'search': search,
       if (appCategoryId != null) 'app_categ_id': appCategoryId,
+      if (outletId != null && outletId > 0) 'outlet_id': outletId,
     };
 
     final result = await _post(

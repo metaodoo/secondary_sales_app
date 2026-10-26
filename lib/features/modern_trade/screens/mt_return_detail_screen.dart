@@ -133,6 +133,7 @@ class _MtReturnDetailScreenState extends State<MtReturnDetailScreen> {
       context,
       returnBucket: rr.returnBucket,
       state: rr.state,
+      outletId: rr.partnerId,
     );
     if (result != null && mounted) {
       final existingLinesPayload = rr.lines.map((l) => {

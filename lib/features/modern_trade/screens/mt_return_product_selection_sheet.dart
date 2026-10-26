@@ -11,12 +11,14 @@ class MtReturnProductSelectionSheet extends StatefulWidget {
   final String returnBucket;
   final Map<String, dynamic>? initialLine;
   final String? state;
+  final int? outletId;
 
   const MtReturnProductSelectionSheet({
     super.key,
     required this.returnBucket,
     this.initialLine,
     this.state,
+    this.outletId,
   });
 
   static Future<Map<String, dynamic>?> show(
@@ -24,6 +26,7 @@ class MtReturnProductSelectionSheet extends StatefulWidget {
     required String returnBucket,
     Map<String, dynamic>? initialLine,
     String? state,
+    int? outletId,
   }) {
     return showModalBottomSheet<Map<String, dynamic>>(
       context: context,
@@ -33,6 +36,7 @@ class MtReturnProductSelectionSheet extends StatefulWidget {
         returnBucket: returnBucket,
         initialLine: initialLine,
         state: state,
+        outletId: outletId,
       ),
     );
   }
@@ -87,7 +91,9 @@ class _MtReturnProductSelectionSheetState extends State<MtReturnProductSelection
     } else {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         context.read<MtReturnProvider>().fetchAppCategories();
-        context.read<MtReturnProvider>().fetchReturnProducts();
+        context.read<MtReturnProvider>().fetchReturnProducts(
+          outletId: widget.outletId,
+        );
       });
     }
   }
@@ -109,6 +115,7 @@ class _MtReturnProductSelectionSheetState extends State<MtReturnProductSelection
         context.read<MtReturnProvider>().fetchReturnProducts(
           search: val.trim(),
           appCategoryId: _selectedAppCategoryId,
+          outletId: widget.outletId,
         );
       }
     });
@@ -200,6 +207,7 @@ class _MtReturnProductSelectionSheetState extends State<MtReturnProductSelection
                                 provider.fetchReturnProducts(
                                   search: _searchController.text.trim(),
                                   appCategoryId: null,
+                                  outletId: widget.outletId,
                                 );
                               },
                             );
@@ -219,6 +227,7 @@ class _MtReturnProductSelectionSheetState extends State<MtReturnProductSelection
                               provider.fetchReturnProducts(
                                 search: _searchController.text.trim(),
                                 appCategoryId: cat.id,
+                                outletId: widget.outletId,
                               );
                             },
                           );
@@ -424,6 +433,7 @@ class _MtReturnProductSelectionSheetState extends State<MtReturnProductSelection
                         provider.fetchReturnProducts(
                           search: '',
                           appCategoryId: _selectedAppCategoryId,
+                          outletId: widget.outletId,
                         );
                       },
                     )
@@ -506,6 +516,7 @@ class _MtReturnProductSelectionSheetState extends State<MtReturnProductSelection
                                 provider.fetchReturnProducts(
                                   search: _searchController.text.trim(),
                                   appCategoryId: null,
+                                  outletId: widget.outletId,
                                 );
                               },
                             ),
@@ -538,6 +549,7 @@ class _MtReturnProductSelectionSheetState extends State<MtReturnProductSelection
                               provider.fetchReturnProducts(
                                 search: _searchController.text.trim(),
                                 appCategoryId: cat.id,
+                                outletId: widget.outletId,
                               );
                             },
                           ),
@@ -568,6 +580,10 @@ class _MtReturnProductSelectionSheetState extends State<MtReturnProductSelection
                         final name = p['name']?.toString() ?? '';
                         final code = p['default_code']?.toString() ?? '';
                         final uom = p['uom'] is Map ? p['uom']['name']?.toString() ?? 'Unit' : 'Unit';
+                        final price = (p['has_reward_discount'] == true && p['reward_price'] != null)
+                            ? (p['reward_price'] as num).toDouble()
+                            : (p['list_price'] as num?)?.toDouble();
+                        final priceStr = price != null && price > 0 ? ' • ৳${price.toStringAsFixed(2)}' : '';
 
                         return ListTile(
                           contentPadding: const EdgeInsets.symmetric(vertical: 2, horizontal: 8),
@@ -576,7 +592,7 @@ class _MtReturnProductSelectionSheetState extends State<MtReturnProductSelection
                             style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
                           ),
                           subtitle: Text(
-                            code.isNotEmpty ? 'Code: $code • UoM: $uom' : 'UoM: $uom',
+                            code.isNotEmpty ? 'Code: $code • UoM: $uom$priceStr' : 'UoM: $uom$priceStr',
                             style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
                           ),
                           trailing: const Icon(Icons.chevron_right, size: 20, color: Colors.grey),

@@ -67,6 +67,7 @@ class SaleOrderDetail {
           .map(
             (item) => SaleOrderDetailLine.fromMap(item.cast<String, dynamic>()),
           )
+          .where((line) => !line.isRewardLine && line.priceUnit >= 0)
           .toList(),
       deliveryOrders: ((map['delivery_orders'] as List?) ?? [])
           .whereType<Map>()
@@ -154,6 +155,7 @@ class SaleOrderDetailLine {
     required this.damagedExpiredQty,
     required this.damageQualityQty,
     this.adjustWithBill = false,
+    this.isRewardLine = false,
     this.uomName,
     required this.priceUnit,
     required this.discount,
@@ -170,6 +172,7 @@ class SaleOrderDetailLine {
   final double damagedExpiredQty;
   final double damageQualityQty;
   final bool adjustWithBill;
+  final bool isRewardLine;
   final String? uomName;
   final double priceUnit;
   final double discount;
@@ -191,6 +194,7 @@ class SaleOrderDetailLine {
       damagedExpiredQty: asDouble(map['damaged_expired_qty'] ?? 0.0),
       damageQualityQty: asDouble(map['damage_quality_qty'] ?? 0.0),
       adjustWithBill: asBool(map['ss_adjust_with_bill']),
+      isRewardLine: asBool(map['is_reward_line']),
       uomName: uom is Map ? asNullableString(uom['name']) : null,
       priceUnit: asDouble(map['price_unit']),
       discount: asDouble(map['discount']),

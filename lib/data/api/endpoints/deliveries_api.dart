@@ -229,4 +229,23 @@ extension DeliveriesApi on ApiService {
     }
     throw Exception(result['message'] ?? 'Failed to auto-assign lots');
   }
+
+  Future<Map<String, dynamic>> createOrUpdateDeliveryReturn({
+    required int pickingId,
+    required List<Map<String, dynamic>> lines,
+    String? note,
+  }) async {
+    final result = await _post(
+      '${AppConstants.deliveriesEndpoint}/$pickingId/return',
+      {
+        'employee_id': _activeEmployeeId,
+        'lines': lines,
+        if (note != null && note.isNotEmpty) 'note': note,
+      },
+    );
+    if (result['success'] == true) {
+      return (result['data'] as Map?)?.cast<String, dynamic>() ?? {};
+    }
+    throw Exception(result['message'] ?? 'Failed to process delivery return');
+  }
 }

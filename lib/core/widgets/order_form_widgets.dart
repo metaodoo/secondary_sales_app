@@ -117,7 +117,7 @@ class OrderLineCard extends StatelessWidget {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      '৳${line.product.price.toStringAsFixed(2)}',
+                      '৳${line.product.effectivePrice.toStringAsFixed(2)}',
                       style: const TextStyle(
                         fontWeight: FontWeight.bold,
                         fontSize: 15,
@@ -236,7 +236,7 @@ class ProductCard extends StatelessWidget {
                   ),
                 ),
                 Text(
-                  '৳${product.price.toStringAsFixed(2)}',
+                  '৳${product.effectivePrice.toStringAsFixed(2)}',
                   style: const TextStyle(fontWeight: FontWeight.w900),
                 ),
               ],

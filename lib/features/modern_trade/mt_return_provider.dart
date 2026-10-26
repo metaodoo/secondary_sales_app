@@ -176,7 +176,7 @@ class MtReturnProvider extends ChangeNotifier {
     }
   }
 
-  Future<void> fetchReturnProducts({String? search, int? appCategoryId}) async {
+  Future<void> fetchReturnProducts({String? search, int? appCategoryId, int? outletId}) async {
     _isLoadingProducts = true;
     notifyListeners();
 
@@ -184,6 +184,7 @@ class MtReturnProvider extends ChangeNotifier {
       _availableProducts = await _api.getMtReturnProducts(
         search: search,
         appCategoryId: appCategoryId,
+        outletId: outletId ?? _selectedOutletId,
       );
     } catch (e) {
       _errorMessage = e.toString().replaceAll('Exception: ', '');

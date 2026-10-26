@@ -17,6 +17,9 @@ class OrderLineModel {
   final int productId;
   final String productName;
   final double unitPrice;
+  final double? rewardPrice;
+  final double? rewardDiscountRate;
+  final bool hasRewardDiscount;
   final int dbStock;
   final int vanStock;
   final String? uom;
@@ -38,6 +41,9 @@ class OrderLineModel {
     required this.productId,
     required this.productName,
     required this.unitPrice,
+    this.rewardPrice,
+    this.rewardDiscountRate,
+    this.hasRewardDiscount = false,
     this.dbStock = 0,
     this.vanStock = 0,
     this.uom,
@@ -58,7 +64,10 @@ class OrderLineModel {
   // -----------------------------------------------------------------
   int get billableQty => payableQty;
 
-  double get lineTotal => unitPrice * payableQty;
+  double get effectiveUnitPrice =>
+      (hasRewardDiscount && rewardPrice != null && rewardPrice! > 0) ? rewardPrice! : unitPrice;
+
+  double get lineTotal => effectiveUnitPrice * payableQty;
 }
 
 class OrderCreationScreen extends StatefulWidget {
@@ -109,6 +118,9 @@ class _OrderCreationScreenState extends State<OrderCreationScreen> {
             productId: entry.product.id,
             productName: entry.product.name,
             unitPrice: entry.product.price,
+            rewardPrice: entry.product.rewardPrice,
+            rewardDiscountRate: entry.product.rewardDiscountRate,
+            hasRewardDiscount: entry.product.hasRewardDiscount,
             dbStock: entry.product.distributorStock?.toInt() ?? 0,
             vanStock: entry.product.stock?.toInt() ?? 0,
             uom: entry.product.uom,
@@ -902,7 +914,7 @@ class _OrderCreationScreenState extends State<OrderCreationScreen> {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      'Unit Price: $_currencySymbol${line.unitPrice.toStringAsFixed(2)}',
+                      'Unit Price: $_currencySymbol${line.effectiveUnitPrice.toStringAsFixed(2)}',
                       style: const TextStyle(
                         fontSize: 12,
                         color: AppColors.textSecondary,

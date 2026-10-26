@@ -53,6 +53,11 @@ class DeliveryPicking {
     this.destinationLocationId,
     this.destinationLocationName,
     required this.lines,
+    this.hasDeliveryReturn = false,
+    this.returnPickingId,
+    this.returnPickingName,
+    this.deliveryReturnState,
+    this.isDeliveryCountLocked = false,
   });
 
   final int id;
@@ -63,6 +68,11 @@ class DeliveryPicking {
   final int? destinationLocationId;
   final String? destinationLocationName;
   final List<DeliveryMoveLine> lines;
+  final bool hasDeliveryReturn;
+  final int? returnPickingId;
+  final String? returnPickingName;
+  final String? deliveryReturnState;
+  final bool isDeliveryCountLocked;
 
   factory DeliveryPicking.fromMap(Map<String, dynamic> map) {
     final sourceLoc = map['source_location'];
@@ -80,10 +90,14 @@ class DeliveryPicking {
       destinationLocationId: destLoc is Map
           ? asNonZeroInt(destLoc['id'])
           : null,
-
       destinationLocationName: destLoc is Map
           ? asNullableString(destLoc['name'])
           : null,
+      hasDeliveryReturn: map['has_delivery_return'] == true,
+      returnPickingId: asNonZeroInt(map['return_picking_id']),
+      returnPickingName: asNullableString(map['return_picking_name']),
+      deliveryReturnState: asNullableString(map['delivery_return_state']),
+      isDeliveryCountLocked: map['is_delivery_count_locked'] == true,
       lines: ((map['lines'] as List?) ?? [])
           .whereType<Map>()
           .map((item) => DeliveryMoveLine.fromMap(item.cast<String, dynamic>()))
@@ -106,6 +120,8 @@ class DeliveryMoveLine {
     this.availableQty = 0.0,
     this.damagedExpiredQty = 0.0,
     this.damageQualityQty = 0.0,
+    this.actualDeliveredQty = 0.0,
+    this.returnQty = 0.0,
   });
 
   final int moveId;
@@ -120,6 +136,8 @@ class DeliveryMoveLine {
   final double availableQty;
   final double damagedExpiredQty;
   final double damageQualityQty;
+  final double actualDeliveredQty;
+  final double returnQty;
 
   String get tracking => product?.tracking ?? 'none';
   bool get requiresLots => tracking != 'none';
@@ -145,6 +163,8 @@ class DeliveryMoveLine {
       availableQty: asDouble(map['available_qty']),
       damagedExpiredQty: asDouble(map['damaged_expired_qty'] ?? 0.0),
       damageQualityQty: asDouble(map['damage_quality_qty'] ?? 0.0),
+      actualDeliveredQty: asDouble(map['actual_delivered_qty'] ?? 0.0),
+      returnQty: asDouble(map['return_qty'] ?? 0.0),
     );
   }
 }
@@ -183,12 +203,23 @@ class DeliveryLineInput {
   DeliveryLineInput({
     required this.move,
     required this.quantityDone,
+    double? actualDeliveredQty,
     List<DeliveryLotInput>? lots,
-  }) : lots = lots ?? [];
+  })  : actualDeliveredQty = actualDeliveredQty ??
+            (move.actualDeliveredQty > 0
+                ? move.actualDeliveredQty
+                : (move.quantityDone > 0 ? move.quantityDone : quantityDone)),
+        lots = lots ?? [];
 
   final DeliveryMoveLine move;
   double quantityDone;
+  double actualDeliveredQty;
   final List<DeliveryLotInput> lots;
+
+  double get returnQty {
+    final diff = quantityDone - actualDeliveredQty;
+    return diff > 0 ? double.parse(diff.toStringAsFixed(2)) : 0.0;
+  }
 
   Map<String, dynamic> toPayload() {
     return {
@@ -199,6 +230,13 @@ class DeliveryLineInput {
             .where((lot) => lot.lot != null && lot.quantity > 0)
             .map((lot) => {'lot_id': lot.lot!.lotId, 'quantity': lot.quantity})
             .toList(),
+    };
+  }
+
+  Map<String, dynamic> toReturnPayload() {
+    return {
+      'move_id': move.moveId,
+      'actual_delivered_qty': actualDeliveredQty,
     };
   }
 }

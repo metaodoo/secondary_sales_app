@@ -547,6 +547,31 @@ class PrimarySaleProvider with ChangeNotifier {
     }
   }
 
+  Future<Map<String, dynamic>?> createOrUpdateDeliveryReturn({
+    required int pickingId,
+    required List<DeliveryLineInput> lines,
+    String? note,
+  }) async {
+    _loadingCount++;
+    _error = null;
+    notifyListeners();
+
+    try {
+      final res = await _apiService.createOrUpdateDeliveryReturn(
+        pickingId: pickingId,
+        lines: lines.map((l) => l.toReturnPayload()).toList(),
+        note: note,
+      );
+      return res;
+    } catch (e) {
+      _error = e.toString();
+      return null;
+    } finally {
+      if (_loadingCount > 0) _loadingCount--;
+      notifyListeners();
+    }
+  }
+
   Future<bool> submitOrder(
     int hubId,
     List<Map<String, dynamic>> items,
