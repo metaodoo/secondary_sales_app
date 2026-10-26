@@ -165,8 +165,12 @@ class OfflineDatabaseHelper {
     return false;
   }
 
+  /// How close together two identical submissions must be to count as one
+  /// rage-click rather than two real operations.
+  static const Duration rageClickWindow = Duration(seconds: 5);
+
   /// Enqueues a write transaction atomically into SQLite.
-  /// Automatically debounces duplicate rage-clicks within recent operations.
+  /// Automatically debounces duplicate rage-clicks of the latest operation.
   Future<String> enqueueOperation({
     required String entityType,
     required String endpoint,
@@ -176,22 +180,47 @@ class OfflineDatabaseHelper {
   }) async {
     final db = await database;
 
-    // 1. Debounce check: Prevent duplicate submissions from rapid multi-tapping
-    final recentOps = await db.query(
+    // 1. Same submission retried: the client UUID already has an operation.
+    // Return it untouched -- the insert below would otherwise replace it,
+    // even mid-sync.
+    if (clientUuid != null && clientUuid.isNotEmpty) {
+      final existing = await db.query(
+        tableOutbox,
+        columns: ['operation_uuid'],
+        where: 'operation_uuid = ?',
+        whereArgs: [clientUuid],
+        limit: 1,
+      );
+      if (existing.isNotEmpty) {
+        debugPrint('[OfflineDB] Operation $clientUuid already queued: reusing it');
+        return clientUuid;
+      }
+    }
+
+    // 2. Debounce check: Prevent duplicate submissions from rapid multi-tapping.
+    // Only the latest operation of this kind, and only within
+    // [rageClickWindow]: a repeat after that (split shift, second visit or
+    // identical order later in the day) is a real operation.
+    final latestOps = await db.query(
       tableOutbox,
       where: 'entity_type = ? AND endpoint = ? AND status IN (?, ?)',
       whereArgs: [entityType, endpoint, 'PENDING', 'SYNCING'],
       orderBy: 'id DESC',
-      limit: 3,
+      limit: 1,
     );
 
-    for (final recent in recentOps) {
-      final recentPayloadStr = recent['payload_json'] as String?;
-      if (recentPayloadStr != null) {
+    if (latestOps.isNotEmpty) {
+      final latest = latestOps.first;
+      final createdAt = DateTime.tryParse(latest['created_at']?.toString() ?? '');
+      final age = createdAt == null ? null : DateTime.now().toUtc().difference(createdAt);
+      // A negative age means the device clock moved back; don't trust it.
+      final isRecent = age != null && !age.isNegative && age <= rageClickWindow;
+      final latestPayloadStr = latest['payload_json'] as String?;
+      if (isRecent && latestPayloadStr != null) {
         try {
-          final recentPayload = jsonDecode(recentPayloadStr) as Map<String, dynamic>;
-          if (_isDuplicatePayload(payload, recentPayload, entityType)) {
-            final existingUuid = recent['operation_uuid'] as String;
+          final latestPayload = jsonDecode(latestPayloadStr) as Map<String, dynamic>;
+          if (_isDuplicatePayload(payload, latestPayload, entityType)) {
+            final existingUuid = latest['operation_uuid'] as String;
             debugPrint(
               '[OfflineDB] Debounced duplicate rage-click: reusing $existingUuid',
             );
