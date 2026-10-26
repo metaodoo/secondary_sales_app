@@ -217,6 +217,7 @@ class AppAction {
   // Primary sale orders and deliveries.
   static const primaryOrderCreate = 'action.primary_sale.orders.create';
   static const corporateOrderCreate = 'action.corporate_sale.orders.create';
+  static const corporateOrderDelete = 'action.corporate_sale.orders.delete';
   static const corporateDeliveryValidate = 'action.corporate_sale.deliveries.validate';
   static const corporateReturnCreate = 'action.corporate_sale.returns.create';
   static const corporateReturnSubmitDm = 'action.corporate_sale.returns.submit_dm';
@@ -226,6 +227,7 @@ class AppAction {
       'action.corporate_sale.returns.submit_sales_operation';
   static const corporateReturnComplete = 'action.corporate_sale.returns.complete';
   static const institutionOrderCreate = 'action.institution_sale.orders.create';
+  static const institutionOrderDelete = 'action.institution_sale.orders.delete';
   static const institutionDeliveryValidate = 'action.institution_sale.deliveries.validate';
   static const institutionReturnList = 'screen.institution_sale.returns.list';
   static const institutionReturnCreate = 'action.institution_sale.returns.create';
@@ -507,6 +509,13 @@ const List<AccessResource> accessCatalog = [
     _cs,
   ),
   AccessResource(
+    AppAction.corporateOrderDelete,
+    'action',
+    'corporate_sale',
+    'Corporate Sales (CS) › Delete Order',
+    _cs,
+  ),
+  AccessResource(
     AppScreen.corporateDeliveriesList,
     'screen',
     'corporate_sale',
@@ -581,6 +590,13 @@ const List<AccessResource> accessCatalog = [
     'action',
     'institution_sale',
     'Institution Sales (IS) › Create Order',
+    _is,
+  ),
+  AccessResource(
+    AppAction.institutionOrderDelete,
+    'action',
+    'institution_sale',
+    'Institution Sales (IS) › Delete Order',
     _is,
   ),
   AccessResource(

@@ -340,6 +340,27 @@ class PrimarySaleProvider with ChangeNotifier {
     }
   }
 
+  Future<bool> deleteOrder(int orderId, {String saleType = 'primary'}) async {
+    _loadingCount++;
+    _error = null;
+    notifyListeners();
+
+    try {
+      await _apiService.deletePrimarySaleOrder(
+        orderId,
+        saleType: saleType,
+        businessType: _channelBusinessType,
+      );
+      return true;
+    } catch (e) {
+      _error = e.toString();
+      return false;
+    } finally {
+      if (_loadingCount > 0) _loadingCount--;
+      notifyListeners();
+    }
+  }
+
   Future<SaleOrderDetail?> cancelOrder(
     int orderId, {
     String saleType = 'primary',

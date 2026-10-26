@@ -110,11 +110,13 @@ class SalesOrderCard extends StatelessWidget {
     required this.order,
     required this.onTap,
     this.onEditTap,
+    this.onDeleteTap,
   });
 
   final PrimaryOrder order;
   final VoidCallback onTap;
   final VoidCallback? onEditTap;
+  final VoidCallback? onDeleteTap;
 
   @override
   Widget build(BuildContext context) {
@@ -182,6 +184,19 @@ class SalesOrderCard extends StatelessWidget {
                           ),
                           onPressed: onEditTap,
                         ),
+                      if (isEditable && onDeleteTap != null) ...[
+                        const SizedBox(width: 8),
+                        IconButton(
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints(),
+                          icon: const Icon(
+                            Icons.delete_outline,
+                            size: 20,
+                            color: Color(0xFFDC2626),
+                          ),
+                          onPressed: onDeleteTap,
+                        ),
+                      ],
                     ],
                   ),
                   const SizedBox(height: 12),

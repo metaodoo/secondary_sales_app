@@ -106,6 +106,29 @@ extension SalesApi on ApiService {
     throw Exception(result['message'] ?? 'Failed to load order detail');
   }
 
+  Future<void> deletePrimarySaleOrder(
+    int orderId, {
+    String saleType = 'primary',
+    String? businessType,
+  }) async {
+    final payload = <String, dynamic>{
+      'employee_id': _activeEmployeeId,
+      'sale_type': saleType,
+      'action': 'delete',
+    };
+    if (businessType != null) {
+      payload['business_type'] = businessType;
+    }
+    final result = await _post(
+      '${AppConstants.saleOrdersEndpoint}/$orderId/action',
+      payload,
+    );
+    if (result['success'] == true) {
+      return;
+    }
+    throw Exception(result['message'] ?? 'Failed to delete order');
+  }
+
   Future<SaleOrderDetail> cancelPrimarySaleOrder(int orderId, {String saleType = 'primary'}) async {
     final result = await _post(
       '${AppConstants.saleOrdersEndpoint}/$orderId/action',

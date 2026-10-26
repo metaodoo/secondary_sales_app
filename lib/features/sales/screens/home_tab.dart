@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import 'package:secondary_sales/data/models/contacts/distribution_hub.dart';
+import 'package:secondary_sales/data/models/sales/primary_order.dart';
 import 'package:secondary_sales/features/sales/primary_sale_provider.dart';
 import 'package:secondary_sales/features/auth/auth_provider.dart';
 import 'package:secondary_sales/core/access/access_resources.dart';
@@ -45,6 +46,53 @@ class HomeTab extends StatelessWidget {
   final VoidCallback onClearStatus;
   final VoidCallback onClearAllFilters;
 
+  Future<void> _deleteOrder(
+    BuildContext context,
+    PrimaryOrder order, {
+    required String search,
+    required String status,
+    required DateTime? dateFrom,
+    required DateTime? dateTo,
+  }) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Delete order'),
+        content: Text('Delete ${order.name}?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !context.mounted) {
+      return;
+    }
+    final provider = context.read<PrimarySaleProvider>();
+    final deleted = await provider.deleteOrder(order.id);
+    if (!context.mounted) {
+      return;
+    }
+    if (!deleted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(provider.error ?? 'Could not delete this order')),
+      );
+      return;
+    }
+    await provider.fetchRecentOrders(
+      search: search,
+      status: status,
+      dateFrom: dateFrom,
+      dateTo: dateTo,
+    );
+  }
+
   String _getStatusLabel(String state) {
     switch (state.toLowerCase()) {
       case 'draft':
@@ -82,6 +130,11 @@ class HomeTab extends StatelessWidget {
         : channel == 'is'
             ? auth.canDo(AppAction.institutionOrderCreate)
             : auth.canView(AppScreen.createPrimarySale);
+    final canDelete = channel == 'cs'
+        ? auth.canDo(AppAction.corporateOrderDelete)
+        : channel == 'is'
+            ? auth.canDo(AppAction.institutionOrderDelete)
+            : false;
 
     final bool hasDateFilter = dateFromFilter != null && dateToFilter != null;
     final bool hasStatusFilter = statusFilter != 'all';
@@ -400,6 +453,16 @@ class HomeTab extends StatelessWidget {
                           );
                         }
                       },
+                      onDeleteTap: canDelete
+                          ? () => _deleteOrder(
+                                context,
+                                order,
+                                search: orderSearchController.text,
+                                status: statusFilter,
+                                dateFrom: dateFromFilter,
+                                dateTo: dateToFilter,
+                              )
+                          : null,
                       onEditTap: () async {
                         final hub = provider.hubs.firstWhere(
                           (h) => h.name == order.hubName,
