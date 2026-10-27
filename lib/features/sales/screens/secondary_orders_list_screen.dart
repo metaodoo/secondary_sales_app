@@ -512,12 +512,15 @@ class _SecondaryOrdersListScreenState extends State<SecondaryOrdersListScreen> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  const Text(
-                    "Sales Orders",
-                    style: TextStyle(
-                      color: AppColors.textPrimary,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 22,
+                  const Flexible(
+                    child: Text(
+                      "Sales Orders",
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: AppColors.textPrimary,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 22,
+                      ),
                     ),
                   ),
                   Container(

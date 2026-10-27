@@ -200,6 +200,7 @@ class _CreateSalesOfficerScreenState extends State<CreateSalesOfficerScreen> {
                   ? 'Update details and route assignments'
                   : 'Register a new sales officer',
               leading: IconButton(
+                tooltip: 'Back',
                 onPressed: () => Navigator.pop(context),
                 icon: const Icon(Icons.arrow_back, color: Colors.white),
               ),
@@ -248,6 +249,7 @@ class _CreateSalesOfficerScreenState extends State<CreateSalesOfficerScreen> {
                     ),
                     const SizedBox(height: 8),
                     DropdownButtonFormField<DistributionHub>(
+                      isExpanded: true,
                       initialValue: _selectedDistributor,
                       hint: const Text('Select Distributor'),
                       decoration: InputDecoration(

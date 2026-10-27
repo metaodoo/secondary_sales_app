@@ -335,6 +335,7 @@ class _CreateRouteScreenState extends State<CreateRouteScreen> {
                 ),
                 const SizedBox(height: 6),
                 DropdownButtonFormField<DistributionHub>(
+                  isExpanded: true,
                   decoration: ssInputDecoration(
                     'Select a authorized dealer',
                     Icons.arrow_drop_down,
@@ -440,6 +441,7 @@ class _CreateRouteScreenState extends State<CreateRouteScreen> {
                                   ),
                                 ),
                                 trailing: IconButton(
+                                  tooltip: 'Delete',
                                   icon: const Icon(
                                     Icons.delete_outline,
                                     color: Color(0xFFEF4444),

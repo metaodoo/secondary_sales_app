@@ -645,12 +645,15 @@ class _OrderCreationScreenState extends State<OrderCreationScreen> {
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              const Text(
-                                'Added Products',
-                                style: TextStyle(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.bold,
-                                  color: AppColors.textPrimary,
+                              const Flexible(
+                                child: Text(
+                                  'Added Products',
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.bold,
+                                    color: AppColors.textPrimary,
+                                  ),
                                 ),
                               ),
                               TextButton.icon(
@@ -733,12 +736,17 @@ class _OrderCreationScreenState extends State<OrderCreationScreen> {
                                     mainAxisAlignment:
                                         MainAxisAlignment.spaceBetween,
                                     children: [
-                                      const Text(
-                                        'Net Total',
-                                        style: TextStyle(
-                                          fontSize: 18,
-                                          fontWeight: FontWeight.w500,
-                                          color: AppColors.textPrimary,
+                                      // The label gives way; the amount is
+                                      // always shown in full.
+                                      const Flexible(
+                                        child: Text(
+                                          'Net Total',
+                                          overflow: TextOverflow.ellipsis,
+                                          style: TextStyle(
+                                            fontSize: 18,
+                                            fontWeight: FontWeight.w500,
+                                            color: AppColors.textPrimary,
+                                          ),
                                         ),
                                       ),
                                       Text(
@@ -924,6 +932,7 @@ class _OrderCreationScreenState extends State<OrderCreationScreen> {
                 ),
               ),
               IconButton(
+                tooltip: 'Delete',
                 onPressed: () {
                   setState(() {
                     lines.remove(line);
@@ -965,10 +974,10 @@ class _OrderCreationScreenState extends State<OrderCreationScreen> {
 
           // Qty Controls: Branch by businessType -> saleType
           if (widget.businessType == 'gt' && widget.saleType == 'secondary') ...[
-            Row(
-              children: [
-                Expanded(
-                  child: _buildQtyControl(
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final controls = [
+                  _buildQtyControl(
                     label: 'Customer Order Qty',
                     value: line.customerOrderQty,
                     onChanged: (val) {
@@ -977,10 +986,7 @@ class _OrderCreationScreenState extends State<OrderCreationScreen> {
                       });
                     },
                   ),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: _buildQtyControl(
+                  _buildQtyControl(
                     label: 'Damaged Expire Qty',
                     value: line.damagedExpiredQty,
                     onChanged: (val) {
@@ -989,14 +995,7 @@ class _OrderCreationScreenState extends State<OrderCreationScreen> {
                       });
                     },
                   ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                Expanded(
-                  child: _buildQtyControl(
+                  _buildQtyControl(
                     label: 'Damage Quality Qty',
                     value: line.damageQualityQty,
                     onChanged: (val) {
@@ -1005,10 +1004,40 @@ class _OrderCreationScreenState extends State<OrderCreationScreen> {
                       });
                     },
                   ),
-                ),
-                const SizedBox(width: 16),
-                const Expanded(child: SizedBox()),
-              ],
+                ];
+                // Two per row needs room for two steppers with 48 dp
+                // buttons; on narrower phones they stack.
+                if (constraints.maxWidth < 290) {
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      for (var i = 0; i < controls.length; i++) ...[
+                        if (i > 0) const SizedBox(height: 12),
+                        controls[i],
+                      ],
+                    ],
+                  );
+                }
+                return Column(
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(child: controls[0]),
+                        const SizedBox(width: 16),
+                        Expanded(child: controls[1]),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        Expanded(child: controls[2]),
+                        const SizedBox(width: 16),
+                        const Expanded(child: SizedBox()),
+                      ],
+                    ),
+                  ],
+                );
+              },
             ),
             // --- OLD FLOW (Deprecated): Adjust return toggle ---
             // if (line.damagedExpiredQty > 0 || line.damageQualityQty > 0) ...[

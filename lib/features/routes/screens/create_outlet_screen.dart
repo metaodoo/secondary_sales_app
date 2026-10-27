@@ -539,6 +539,7 @@ class _CreateOutletScreenState extends State<CreateOutletScreen> {
         backgroundColor: AppColors.background,
         elevation: 0,
         leading: IconButton(
+          tooltip: 'Back',
           icon: const Icon(Icons.arrow_back, color: AppColors.textPrimary),
           onPressed: () => Navigator.pop(context),
         ),
@@ -620,32 +621,36 @@ class _CreateOutletScreenState extends State<CreateOutletScreen> {
                           ),
                         ),
                         child: _capturedPhoto == null
-                            ? Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  const Icon(
-                                    Icons.camera_alt_outlined,
-                                    size: 48,
-                                    color: AppColors.textSecondary,
-                                  ),
-                                  const SizedBox(height: 12),
-                                  const Text(
-                                    'Capture Live Outlet Photo *',
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 15,
-                                      color: AppColors.textPrimary,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 4),
-                                  const Text(
-                                    'Restricted to direct device camera',
-                                    style: TextStyle(
-                                      fontSize: 12,
+                            // Scales down to the fixed box with large text.
+                            ? FittedBox(
+                                fit: BoxFit.scaleDown,
+                                child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    const Icon(
+                                      Icons.camera_alt_outlined,
+                                      size: 48,
                                       color: AppColors.textSecondary,
                                     ),
-                                  ),
-                                ],
+                                    const SizedBox(height: 12),
+                                    const Text(
+                                      'Capture Live Outlet Photo *',
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 15,
+                                        color: AppColors.textPrimary,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 4),
+                                    const Text(
+                                      'Restricted to direct device camera',
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        color: AppColors.textSecondary,
+                                      ),
+                                    ),
+                                  ],
+                                ),
                               )
                             : ClipRRect(
                                 borderRadius: BorderRadius.circular(10),
@@ -834,6 +839,7 @@ class _CreateOutletScreenState extends State<CreateOutletScreen> {
                             ),
                             const SizedBox(height: 8),
                             DropdownButtonFormField<int>(
+                              isExpanded: true,
                               value: _selectedOutletTypeId,
                               validator: (val) => val == null
                                   ? 'Outlet Type is required'
@@ -852,7 +858,10 @@ class _CreateOutletScreenState extends State<CreateOutletScreen> {
                               items: types.map((t) {
                                 return DropdownMenuItem<int>(
                                   value: t.id,
-                                  child: Text(t.name),
+                                  child: Text(
+                                    t.name,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
                                 );
                               }).toList(),
                               onChanged: types.isEmpty
@@ -895,7 +904,7 @@ class _CreateOutletScreenState extends State<CreateOutletScreen> {
                               const Expanded(
                                 child: Text(
                                   'ASSIGNED ROUTE & DISTRIBUTOR',
-                                  maxLines: 1,
+                                  maxLines: 2,
                                   overflow: TextOverflow.ellipsis,
                                   style: TextStyle(
                                     color: AppColors.primaryStrong,

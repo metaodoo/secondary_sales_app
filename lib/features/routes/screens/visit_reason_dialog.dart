@@ -111,183 +111,224 @@ class _VisitReasonDialogState extends State<VisitReasonDialog> {
         left: 20,
         right: 20,
       ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Header Bar
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: AppColors.primarySoft,
-                  borderRadius: BorderRadius.circular(12),
+      // Scrolls when the sheet is taller than the space left: phones held
+      // sideways, or a 720p phone with the keyboard open.
+      child: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Header Bar
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: AppColors.primarySoft,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Icon(
+                    Icons.location_on_rounded,
+                    color: AppColors.primaryStrong,
+                    size: 24,
+                  ),
                 ),
-                child: const Icon(
-                  Icons.location_on_rounded,
-                  color: AppColors.primaryStrong,
-                  size: 24,
-                ),
-              ),
-              const SizedBox(width: 12),
-              const Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Check-Out Visit Reason',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: AppColors.textPrimary,
+                const SizedBox(width: 12),
+                const Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Check-Out Visit Reason',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.textPrimary,
+                        ),
                       ),
-                    ),
-                    SizedBox(height: 2),
+                      SizedBox(height: 2),
+                      Text(
+                        'Select a reason to complete visit check-out',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                IconButton(
+                  tooltip: 'Close',
+                  onPressed: () => Navigator.pop(context),
+                  icon: const Icon(Icons.close, color: AppColors.textSecondary),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            const Divider(height: 1, color: AppColors.borderSoft),
+            const SizedBox(height: 16),
+
+            // Main Content
+            if (_isLoading)
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 36),
+                child: Center(child: CircularProgressIndicator()),
+              )
+            else if (_error != null)
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 24),
+                child: Column(
+                  children: [
+                    const Icon(Icons.error_outline, color: Colors.red, size: 36),
+                    const SizedBox(height: 8),
                     Text(
-                      'Select a reason to complete visit check-out',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: AppColors.textSecondary,
+                      'Failed to load visit reasons: $_error',
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(color: Colors.red, fontSize: 13),
+                    ),
+                    const SizedBox(height: 12),
+                    ElevatedButton.icon(
+                      onPressed: _loadReasons,
+                      icon: const Icon(Icons.refresh, size: 16),
+                      label: const Text('Retry'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primaryStrong,
+                        foregroundColor: Colors.white,
                       ),
                     ),
                   ],
                 ),
-              ),
-              IconButton(
-                onPressed: () => Navigator.pop(context),
-                icon: const Icon(Icons.close, color: AppColors.textSecondary),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          const Divider(height: 1, color: AppColors.borderSoft),
-          const SizedBox(height: 16),
-
-          // Main Content
-          if (_isLoading)
-            const Padding(
-              padding: EdgeInsets.symmetric(vertical: 36),
-              child: Center(child: CircularProgressIndicator()),
-            )
-          else if (_error != null)
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 24),
-              child: Column(
-                children: [
-                  const Icon(Icons.error_outline, color: Colors.red, size: 36),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Failed to load visit reasons: $_error',
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(color: Colors.red, fontSize: 13),
-                  ),
-                  const SizedBox(height: 12),
-                  ElevatedButton.icon(
-                    onPressed: _loadReasons,
-                    icon: const Icon(Icons.refresh, size: 16),
-                    label: const Text('Retry'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.primaryStrong,
-                      foregroundColor: Colors.white,
-                    ),
-                  ),
-                ],
-              ),
-            )
-          else if (reasons.isEmpty)
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 24),
-              child: Column(
-                children: [
-                  const Icon(
-                    Icons.info_outline,
-                    color: AppColors.textSecondary,
-                    size: 36,
-                  ),
-                  const SizedBox(height: 8),
-                  const Text(
-                    'No visit reasons found on Odoo. Please create visit reasons in Odoo Configuration.',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
+              )
+            else if (reasons.isEmpty)
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 24),
+                child: Column(
+                  children: [
+                    const Icon(
+                      Icons.info_outline,
                       color: AppColors.textSecondary,
-                      fontSize: 13,
+                      size: 36,
                     ),
-                  ),
-                  const SizedBox(height: 12),
-                  ElevatedButton.icon(
-                    onPressed: _loadReasons,
-                    icon: const Icon(Icons.refresh, size: 16),
-                    label: const Text('Reload'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.primaryStrong,
-                      foregroundColor: Colors.white,
+                    const SizedBox(height: 8),
+                    const Text(
+                      'No visit reasons found on Odoo. Please create visit reasons in Odoo Configuration.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: AppColors.textSecondary,
+                        fontSize: 13,
+                      ),
                     ),
-                  ),
-                ],
-              ),
-            )
-          else ...[
-            // Visit Reason Dropdown
-            const Text(
-              'Select Reason',
-              style: TextStyle(
-                fontWeight: FontWeight.w700,
-                fontSize: 13,
-                color: AppColors.textPrimary,
-              ),
-            ),
-            const SizedBox(height: 6),
-            DropdownButtonFormField<VisitReason>(
-              initialValue: reasons.contains(_selectedReason)
-                  ? _selectedReason
-                  : reasons.first,
-              decoration: InputDecoration(
-                prefixIcon: const Icon(
-                  Icons.assignment_outlined,
-                  color: AppColors.primaryStrong,
-                ),
-                contentPadding: const EdgeInsets.symmetric(
-                  horizontal: 14,
-                  vertical: 12,
-                ),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: const BorderSide(color: AppColors.borderSoft),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: const BorderSide(
-                    color: AppColors.primaryStrong,
-                    width: 1.8,
-                  ),
-                ),
-              ),
-              items: reasons.map((reason) {
-                return DropdownMenuItem<VisitReason>(
-                  value: reason,
-                  child: Text(
-                    reason.name,
-                    style: const TextStyle(
-                      fontWeight: FontWeight.w600,
-                      fontSize: 14,
-                      color: AppColors.textPrimary,
+                    const SizedBox(height: 12),
+                    ElevatedButton.icon(
+                      onPressed: _loadReasons,
+                      icon: const Icon(Icons.refresh, size: 16),
+                      label: const Text('Reload'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primaryStrong,
+                        foregroundColor: Colors.white,
+                      ),
                     ),
-                  ),
-                );
-              }).toList(),
-              onChanged: (val) {
-                if (val != null) {
-                  setState(() => _selectedReason = val);
-                }
-              },
-            ),
-            if (_selectedReason?.isSale == true &&
-                context.watch<AuthProvider>().canDo(AppAction.visitSaleAmount) &&
-                context.watch<AuthProvider>().canView(AppScreen.newJointVisit)) ...[
-              const SizedBox(height: 16),
+                  ],
+                ),
+              )
+            else ...[
+              // Visit Reason Dropdown
               const Text(
-                'Sale Amount (৳)',
+                'Select Reason',
+                style: TextStyle(
+                  fontWeight: FontWeight.w700,
+                  fontSize: 13,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+              const SizedBox(height: 6),
+              DropdownButtonFormField<VisitReason>(
+                isExpanded: true,
+                initialValue: reasons.contains(_selectedReason)
+                    ? _selectedReason
+                    : reasons.first,
+                decoration: InputDecoration(
+                  prefixIcon: const Icon(
+                    Icons.assignment_outlined,
+                    color: AppColors.primaryStrong,
+                  ),
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 12,
+                  ),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: const BorderSide(color: AppColors.borderSoft),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: const BorderSide(
+                      color: AppColors.primaryStrong,
+                      width: 1.8,
+                    ),
+                  ),
+                ),
+                items: reasons.map((reason) {
+                  return DropdownMenuItem<VisitReason>(
+                    value: reason,
+                    child: Text(
+                      reason.name,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w600,
+                        fontSize: 14,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+                  );
+                }).toList(),
+                onChanged: (val) {
+                  if (val != null) {
+                    setState(() => _selectedReason = val);
+                  }
+                },
+              ),
+              if (_selectedReason?.isSale == true &&
+                  context.watch<AuthProvider>().canDo(AppAction.visitSaleAmount) &&
+                  context.watch<AuthProvider>().canView(AppScreen.newJointVisit)) ...[
+                const SizedBox(height: 16),
+                const Text(
+                  'Sale Amount (৳)',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w700,
+                    fontSize: 13,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                TextField(
+                  controller: _saleAmountController,
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  decoration: InputDecoration(
+                    hintText: 'Enter sale amount...',
+                    prefixIcon: const Icon(
+                      Icons.payments_outlined,
+                      color: AppColors.primaryStrong,
+                    ),
+                    contentPadding: const EdgeInsets.all(12),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                      borderSide: const BorderSide(color: AppColors.borderSoft),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                      borderSide: const BorderSide(
+                        color: AppColors.primaryStrong,
+                        width: 1.5,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+              const SizedBox(height: 16),
+
+              // Additional Notes Field
+              const Text(
+                'Notes / Remarks (Optional)',
                 style: TextStyle(
                   fontWeight: FontWeight.w700,
                   fontSize: 13,
@@ -296,14 +337,10 @@ class _VisitReasonDialogState extends State<VisitReasonDialog> {
               ),
               const SizedBox(height: 6),
               TextField(
-                controller: _saleAmountController,
-                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                controller: _notesController,
+                maxLines: 2,
                 decoration: InputDecoration(
-                  hintText: 'Enter sale amount...',
-                  prefixIcon: const Icon(
-                    Icons.payments_outlined,
-                    color: AppColors.primaryStrong,
-                  ),
+                  hintText: 'Enter any additional visit notes...',
                   contentPadding: const EdgeInsets.all(12),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(10),
@@ -319,73 +356,42 @@ class _VisitReasonDialogState extends State<VisitReasonDialog> {
                 ),
               ),
             ],
-            const SizedBox(height: 16),
 
-            // Additional Notes Field
-            const Text(
-              'Notes / Remarks (Optional)',
-              style: TextStyle(
-                fontWeight: FontWeight.w700,
-                fontSize: 13,
-                color: AppColors.textPrimary,
-              ),
-            ),
-            const SizedBox(height: 6),
-            TextField(
-              controller: _notesController,
-              maxLines: 2,
-              decoration: InputDecoration(
-                hintText: 'Enter any additional visit notes...',
-                contentPadding: const EdgeInsets.all(12),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(10),
-                  borderSide: const BorderSide(color: AppColors.borderSoft),
+            const SizedBox(height: 20),
+
+            // Confirm Button
+            SizedBox(
+              width: double.infinity,
+              height: 52,
+              child: ElevatedButton.icon(
+                onPressed: _selectedReason != null ? _confirm : null,
+                icon: const Icon(
+                  Icons.logout_rounded,
+                  color: Colors.white,
+                  size: 20,
                 ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(10),
-                  borderSide: const BorderSide(
-                    color: AppColors.primaryStrong,
-                    width: 1.5,
+                label: const Text(
+                  'Confirm & Check Out',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
+                    letterSpacing: 0.3,
+                  ),
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF059669),
+                  disabledBackgroundColor: AppColors.borderSoft,
+                  elevation: 3,
+                  shadowColor: const Color(0xFF059669).withOpacity(0.35),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
                   ),
                 ),
               ),
             ),
           ],
-
-          const SizedBox(height: 20),
-
-          // Confirm Button
-          SizedBox(
-            width: double.infinity,
-            height: 52,
-            child: ElevatedButton.icon(
-              onPressed: _selectedReason != null ? _confirm : null,
-              icon: const Icon(
-                Icons.logout_rounded,
-                color: Colors.white,
-                size: 20,
-              ),
-              label: const Text(
-                'Confirm & Check Out',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 16,
-                  letterSpacing: 0.3,
-                ),
-              ),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF059669),
-                disabledBackgroundColor: AppColors.borderSoft,
-                elevation: 3,
-                shadowColor: const Color(0xFF059669).withOpacity(0.35),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(14),
-                ),
-              ),
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }

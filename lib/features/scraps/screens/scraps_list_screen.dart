@@ -273,6 +273,7 @@ class _ScrapsListScreenState extends State<ScrapsListScreen> {
               ),
               const SizedBox(height: 16),
               DropdownButtonFormField<String>(
+                isExpanded: true,
                 value: currentFilterValue,
                 decoration: ssInputDecoration('Status', Icons.filter_list),
                 items: _isPrimary && showsTransitLegs
@@ -380,6 +381,7 @@ class _ScrapsListScreenState extends State<ScrapsListScreen> {
         elevation: 0,
         scrolledUnderElevation: 0,
         leading: IconButton(
+          tooltip: 'Back',
           icon: const Icon(
             Icons.arrow_back,
             color: AppColors.textPrimary,

@@ -515,6 +515,25 @@ class _SmallStepperState extends State<SmallStepper> {
   @override
   Widget build(BuildContext context) {
     final bool enabled = widget.onValueInput != null;
+    // The number box gives up width first, so both buttons stay whole in
+    // narrow places (two steppers side by side on a 360 dp phone).
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        const buttons = 2 * _buttonWidth;
+        final fieldWidth = constraints.hasBoundedWidth
+            ? (constraints.maxWidth - buttons).clamp(_minFieldWidth, _fieldWidth)
+            : _fieldWidth;
+        return _buildStepper(enabled, fieldWidth);
+      },
+    );
+  }
+
+  // 48 dp wide: the Material touch-target size.
+  static const double _buttonWidth = 48;
+  static const double _fieldWidth = 75;
+  static const double _minFieldWidth = 32;
+
+  Widget _buildStepper(bool enabled, double fieldWidth) {
     return Container(
       height: 38,
       decoration: BoxDecoration(
@@ -526,11 +545,16 @@ class _SmallStepperState extends State<SmallStepper> {
         children: [
           IconButton(
             onPressed: widget.onMinus,
+            style: IconButton.styleFrom(
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            ),
             icon: const Icon(Icons.remove, size: 18),
-            visualDensity: VisualDensity.compact,
+            tooltip: 'Less',
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints.tightFor(width: _buttonWidth, height: 38),
           ),
           SizedBox(
-            width: 75,
+            width: fieldWidth,
             child: TextField(
               controller: _controller,
               focusNode: _focusNode,
@@ -572,8 +596,13 @@ class _SmallStepperState extends State<SmallStepper> {
           ),
           IconButton(
             onPressed: widget.onPlus,
+            style: IconButton.styleFrom(
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            ),
             icon: const Icon(Icons.add, size: 18),
-            visualDensity: VisualDensity.compact,
+            tooltip: 'More',
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints.tightFor(width: _buttonWidth, height: 38),
           ),
         ],
       ),

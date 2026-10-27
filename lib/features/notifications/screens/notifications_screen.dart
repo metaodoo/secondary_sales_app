@@ -82,7 +82,9 @@ class _NotificationsScreenState extends State<NotificationsScreen>
                 children: [
                   const Icon(Icons.notifications_outlined, size: 18),
                   const SizedBox(width: 6),
-                  const Text('Notifications'),
+                  const Flexible(
+                    child: Text('Notifications', overflow: TextOverflow.ellipsis),
+                  ),
                   if (notifUnread > 0) ...[
                     const SizedBox(width: 6),
                     _CountBadge(count: notifUnread),
@@ -96,7 +98,9 @@ class _NotificationsScreenState extends State<NotificationsScreen>
                 children: [
                   const Icon(Icons.campaign_outlined, size: 18),
                   const SizedBox(width: 6),
-                  const Text('Notice Board'),
+                  const Flexible(
+                    child: Text('Notice Board', overflow: TextOverflow.ellipsis),
+                  ),
                   if (noticeUnread > 0) ...[
                     const SizedBox(width: 6),
                     _CountBadge(count: noticeUnread),

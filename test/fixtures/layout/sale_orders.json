@@ -1,0 +1,316 @@
+{
+ "success": true,
+ "api_version": "v1",
+ "message": "OK",
+ "data": [
+  {
+   "id": 102579,
+   "name": "Test Outlet General & Variety Store and Mobile Recharge Point 51",
+   "sale_type": "secondary",
+   "business_type": "gt",
+   "state": "sale",
+   "delivery_status": "pending",
+   "warehouse": {
+    "id": 1,
+    "name": "Test Distributor Varieties Store and Distribution House 52"
+   },
+   "date_order": "2026-10-27T06:28:54Z",
+   "client_order_ref": null,
+   "client_order_uuid": "81926c5d-b15f-429b-8e01-8d5dc48b3434",
+   "visit_uuid": "9f5bf506-2916-4fc5-b377-9058bde567b1",
+   "visit_id": 8,
+   "distributor": {
+    "id": 108595,
+    "name": "Test Distributor Varieties Store and Distribution House 53",
+    "customer_stock_location": {
+     "id": 5,
+     "name": "Test Outlet General & Variety Store and Mobile Recharge Point 54",
+     "display_name": "Test Outlet General & Variety Store and Mobile Recharge Point 55",
+     "usage": "Synthetic text value for layout testing 56"
+    }
+   },
+   "employee": {
+    "id": 208,
+    "name": "Md. Test Employee Long Full Name Number (57)"
+   },
+   "amount_untaxed": 3.13,
+   "amount_tax": 0.47,
+   "amount_total": 3.6,
+   "currency_symbol": "৳",
+   "lines": [
+    {
+     "id": 995676,
+     "product": {
+      "id": 10667,
+      "name": "[30058] Test Brand+ Premium Mango Yogurt Family Pack 1000ml (Buy 2 Get 1)",
+      "default_code": "30107"
+     },
+     "product_uom_qty": 1.0,
+     "damaged_expired_qty": 0.0,
+     "damage_quality_qty": 0.0,
+     "product_uom": {
+      "id": 1,
+      "name": "Test Outlet General & Variety Store and Mobile Recharge Point 59"
+     },
+     "price_unit": 3.13,
+     "base_price": 3.13,
+     "reward_price": 3.13,
+     "reward_discount_rate": 0.0,
+     "has_reward_discount": false,
+     "discount": 0.0,
+     "price_subtotal": 3.13,
+     "price_total": 3.6,
+     "is_reward_line": false
+    }
+   ],
+   "delivery_orders": [
+    {
+     "id": 366821,
+     "name": "Test Outlet General & Variety Store and Mobile Recharge Point 60",
+     "state": "assigned",
+     "source_location": {
+      "id": 28,
+      "name": "Test Outlet General & Variety Store and Mobile Recharge Point 61"
+     },
+     "destination_location": {
+      "id": 5,
+      "name": "Test Outlet General & Variety Store and Mobile Recharge Point 62"
+     }
+    }
+   ]
+  },
+  {
+   "id": 102578,
+   "name": "Test Outlet General & Variety Store and Mobile Recharge Point 63",
+   "sale_type": "secondary",
+   "business_type": "gt",
+   "state": "sale",
+   "delivery_status": "pending",
+   "warehouse": {
+    "id": 1,
+    "name": "Test Distributor Varieties Store and Distribution House 64"
+   },
+   "date_order": "2026-10-27T05:58:59Z",
+   "client_order_ref": null,
+   "client_order_uuid": "1f7bdbfa-ed18-4401-8c5a-a3b3bea3dc6d",
+   "visit_uuid": "f3ac35bb-11ff-49ad-93ad-1d580b250489",
+   "visit_id": 7,
+   "distributor": {
+    "id": 108595,
+    "name": "Test Distributor Varieties Store and Distribution House 65",
+    "customer_stock_location": {
+     "id": 5,
+     "name": "Test Outlet General & Variety Store and Mobile Recharge Point 66",
+     "display_name": "Test Outlet General & Variety Store and Mobile Recharge Point 67",
+     "usage": "Synthetic text value for layout testing 68"
+    }
+   },
+   "employee": {
+    "id": 208,
+    "name": "Md. Test Employee Long Full Name Number (69)"
+   },
+   "amount_untaxed": 3.13,
+   "amount_tax": 0.47,
+   "amount_total": 3.6,
+   "currency_symbol": "৳",
+   "lines": [
+    {
+     "id": 995675,
+     "product": {
+      "id": 10667,
+      "name": "[30070] Test Brand+ Premium Mango Yogurt Family Pack 1000ml (Buy 2 Get 1)",
+      "default_code": "30107"
+     },
+     "product_uom_qty": 1.0,
+     "damaged_expired_qty": 0.0,
+     "damage_quality_qty": 0.0,
+     "product_uom": {
+      "id": 1,
+      "name": "Test Outlet General & Variety Store and Mobile Recharge Point 71"
+     },
+     "price_unit": 3.13,
+     "base_price": 3.13,
+     "reward_price": 3.13,
+     "reward_discount_rate": 0.0,
+     "has_reward_discount": false,
+     "discount": 0.0,
+     "price_subtotal": 3.13,
+     "price_total": 3.6,
+     "is_reward_line": false
+    }
+   ],
+   "delivery_orders": [
+    {
+     "id": 366820,
+     "name": "Test Outlet General & Variety Store and Mobile Recharge Point 72",
+     "state": "assigned",
+     "source_location": {
+      "id": 28,
+      "name": "Test Outlet General & Variety Store and Mobile Recharge Point 73"
+     },
+     "destination_location": {
+      "id": 5,
+      "name": "Test Outlet General & Variety Store and Mobile Recharge Point 74"
+     }
+    }
+   ]
+  },
+  {
+   "id": 102575,
+   "name": "Test Outlet General & Variety Store and Mobile Recharge Point 75",
+   "sale_type": "secondary",
+   "business_type": "gt",
+   "state": "cancel",
+   "delivery_status": "no",
+   "warehouse": {
+    "id": 1,
+    "name": "Test Distributor Varieties Store and Distribution House 76"
+   },
+   "date_order": "2026-10-26T11:13:07Z",
+   "client_order_ref": null,
+   "client_order_uuid": "6b155075-c0ec-4640-89f4-fa394f48faa4",
+   "visit_uuid": false,
+   "visit_id": 4,
+   "distributor": {
+    "id": 103802,
+    "name": "Test Distributor Varieties Store and Distribution House 77",
+    "customer_stock_location": {
+     "id": 5,
+     "name": "Test Outlet General & Variety Store and Mobile Recharge Point 78",
+     "display_name": "Test Outlet General & Variety Store and Mobile Recharge Point 79",
+     "usage": "Synthetic text value for layout testing 80"
+    }
+   },
+   "employee": {
+    "id": 208,
+    "name": "Md. Test Employee Long Full Name Number (81)"
+   },
+   "amount_untaxed": 30.27,
+   "amount_tax": 4.54,
+   "amount_total": 34.81,
+   "currency_symbol": "৳",
+   "lines": [
+    {
+     "id": 995670,
+     "product": {
+      "id": 5345,
+      "name": "[30082] Test Brand+ Premium Mango Yogurt Family Pack 1000ml (Buy 2 Get 1)",
+      "default_code": "30012"
+     },
+     "product_uom_qty": 3.0,
+     "damaged_expired_qty": 0.0,
+     "damage_quality_qty": 0.0,
+     "product_uom": {
+      "id": 1,
+      "name": "Test Outlet General & Variety Store and Mobile Recharge Point 83"
+     },
+     "price_unit": 10.09,
+     "base_price": 10.09,
+     "reward_price": 10.09,
+     "reward_discount_rate": 0.0,
+     "has_reward_discount": false,
+     "discount": 0.0,
+     "price_subtotal": 30.27,
+     "price_total": 34.81,
+     "is_reward_line": false
+    }
+   ],
+   "delivery_orders": [
+    {
+     "id": 366815,
+     "name": "Test Outlet General & Variety Store and Mobile Recharge Point 84",
+     "state": "cancel",
+     "source_location": {
+      "id": 28,
+      "name": "Test Outlet General & Variety Store and Mobile Recharge Point 85"
+     },
+     "destination_location": {
+      "id": 5,
+      "name": "Test Outlet General & Variety Store and Mobile Recharge Point 86"
+     }
+    }
+   ]
+  },
+  {
+   "id": 102574,
+   "name": "Test Outlet General & Variety Store and Mobile Recharge Point 87",
+   "sale_type": "secondary",
+   "business_type": "gt",
+   "state": "cancel",
+   "delivery_status": "no",
+   "warehouse": {
+    "id": 1,
+    "name": "Test Distributor Varieties Store and Distribution House 88"
+   },
+   "date_order": "2026-10-26T11:06:12Z",
+   "client_order_ref": null,
+   "client_order_uuid": "aae4e0f6-e715-4c15-8b72-2fc1afa64f51",
+   "visit_uuid": false,
+   "visit_id": 4,
+   "distributor": {
+    "id": 103802,
+    "name": "Test Distributor Varieties Store and Distribution House 89",
+    "customer_stock_location": {
+     "id": 5,
+     "name": "Test Outlet General & Variety Store and Mobile Recharge Point 90",
+     "display_name": "Test Outlet General & Variety Store and Mobile Recharge Point 91",
+     "usage": "Synthetic text value for layout testing 92"
+    }
+   },
+   "employee": {
+    "id": 208,
+    "name": "Md. Test Employee Long Full Name Number (93)"
+   },
+   "amount_untaxed": 15.65,
+   "amount_tax": 2.35,
+   "amount_total": 18.0,
+   "currency_symbol": "৳",
+   "lines": [
+    {
+     "id": 995669,
+     "product": {
+      "id": 10667,
+      "name": "[30094] Test Brand+ Premium Mango Yogurt Family Pack 1000ml (Buy 2 Get 1)",
+      "default_code": "30107"
+     },
+     "product_uom_qty": 5.0,
+     "damaged_expired_qty": 0.0,
+     "damage_quality_qty": 0.0,
+     "product_uom": {
+      "id": 1,
+      "name": "Test Outlet General & Variety Store and Mobile Recharge Point 95"
+     },
+     "price_unit": 3.13,
+     "base_price": 3.13,
+     "reward_price": 3.13,
+     "reward_discount_rate": 0.0,
+     "has_reward_discount": false,
+     "discount": 0.0,
+     "price_subtotal": 15.65,
+     "price_total": 18.0,
+     "is_reward_line": false
+    }
+   ],
+   "delivery_orders": [
+    {
+     "id": 366814,
+     "name": "Test Outlet General & Variety Store and Mobile Recharge Point 96",
+     "state": "cancel",
+     "source_location": {
+      "id": 28,
+      "name": "Test Outlet General & Variety Store and Mobile Recharge Point 97"
+     },
+     "destination_location": {
+      "id": 5,
+      "name": "Test Outlet General & Variety Store and Mobile Recharge Point 98"
+     }
+    }
+   ]
+  }
+ ],
+ "pagination": {
+  "page": 1,
+  "page_size": 20,
+  "total": 4
+ }
+}

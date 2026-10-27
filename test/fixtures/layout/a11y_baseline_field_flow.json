@@ -1,0 +1,30 @@
+{
+  "CreateOutletScreen": {
+    "tap_target_48dp": "SemanticsNode#40(Rect.fromLTRB(189.1, 18.3, 249.2, 58.3), actions: [focus, tap], flags: [isButton, hasEnabledState, isEnabled, isFocusable], label: \"ENABLE\", textDirection: ltr): expected tap target size of at least Size(48.0, 48.0), but found Size(60.1, 40.0) | See also: https://support.google.com/accessibility/android/answer/7101858?hl=en | ",
+    "tap_target_label": "SemanticsNode#36(Rect.fromLTRB(306.0, 9.0, 344.0, 47.0), actions: [tap]): expected tappable node to have semantic label, but none was found. | ",
+    "text_contrast": "SemanticsNode#13(Rect.fromLTRB(47.0, 345.6, 189.1, 373.6), label: \"Will be captured when photo is taken\", textDirection: ltr): | Expected contrast ratio of at least 4.5 but found 3.96 for a font size of 11.0. | The computed colors was:"
+  },
+  "CustomerActionBottomSheet": {
+    "text_contrast": "SemanticsNode#11(Rect.fromLTRB(109.0, 200.0, 210.0, 269.0), actions: [tap], label: \"Directions\", textDirection: ltr): | Expected contrast ratio of at least 4.5 but found 1.33 for a font size of 11.0. | The computed colors was:"
+  },
+  "OfficerRouteSelectionScreen": {
+    "tap_target_48dp": "SemanticsNode#8(Rect.fromLTRB(306.0, 9.0, 344.0, 47.0), actions: [tap]): expected tap target size of at least Size(48.0, 48.0), but found Size(38.0, 38.0) | See also: https://support.google.com/accessibility/android/answer/7101858?hl=en",
+    "tap_target_label": "SemanticsNode#8(Rect.fromLTRB(306.0, 9.0, 344.0, 47.0), actions: [tap]): expected tappable node to have semantic label, but none was found."
+  },
+  "OrderCreationScreen": {
+    "tap_target_48dp": "SemanticsNode#17(Rect.fromLTRB(37.0, 462.0, 85.0, 500.0), actions: [focus, tap], flags: [isButton, hasEnabledState, isEnabled, isFocusable], traversalParentIdentifier: _OverlayPortalState#0d1e3, tooltip: \"Less\", textDirection: ltr): expected tap target size of at least Size(48.0, 48.0), but found Size(48.0, 38.0) | See also: https://support.google.com/accessibility/android/answer/7101858?hl=en | SemanticsNode#18(Rect.fromLTRB(85.0, 464.5, 160.0, 497.5), actions: [focus, tap], flags: [isTextField, hasEnabledState, isEnabled, isFocusable], value: \"12345\", textDirection: ltr, currentValueLength: 5, inputType: text): expected tap target size of at least Size(48.0, 48.0), but found Size(75.0, 33.0)",
+    "tap_target_label": "SemanticsNode#103(Rect.fromLTRB(306.0, 9.0, 344.0, 47.0), actions: [tap]): expected tappable node to have semantic label, but none was found.",
+    "text_contrast": "SemanticsNode#8(Rect.fromLTRB(101.0, 165.0, 315.0, 182.0), label: \"Client ID: #103802 • Selected Outlet\", textDirection: ltr): | Expected contrast ratio of at least 4.5 but found 4.19 for a font size of 12.0. | The computed colors was:"
+  },
+  "ProductSelectionScreen": {
+    "tap_target_48dp": "SemanticsNode#17(Rect.fromLTRB(306.0, 9.0, 344.0, 47.0), actions: [tap]): expected tap target size of at least Size(48.0, 48.0), but found Size(38.0, 38.0) | See also: https://support.google.com/accessibility/android/answer/7101858?hl=en",
+    "tap_target_label": "SemanticsNode#17(Rect.fromLTRB(306.0, 9.0, 344.0, 47.0), actions: [tap]): expected tappable node to have semantic label, but none was found."
+  },
+  "SecondaryOrdersListScreen": {
+    "tap_target_48dp": "SemanticsNode#19(Rect.fromLTRB(306.0, 9.0, 344.0, 47.0), actions: [tap]): expected tap target size of at least Size(48.0, 48.0), but found Size(38.0, 38.0) | See also: https://support.google.com/accessibility/android/answer/7101858?hl=en | ",
+    "tap_target_label": "SemanticsNode#19(Rect.fromLTRB(306.0, 9.0, 344.0, 47.0), actions: [tap]): expected tappable node to have semantic label, but none was found. | "
+  },
+  "VisitReasonDialog": {
+    "text_contrast": "SemanticsNode#6(Rect.fromLTRB(56.0, 28.0, 272.0, 62.0), label: \"Select a reason to complete visit check-out\", textDirection: ltr): | Expected contrast ratio of at least 4.5 but found 3.41 for a font size of 12.0. | The computed colors was:"
+  }
+}

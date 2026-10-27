@@ -190,6 +190,7 @@ class _VirtualTransferListScreenState extends State<VirtualTransferListScreen> {
               title: 'Virtual Transfers',
               subtitle: 'Distributor stock to van loading',
               leading: IconButton(
+                tooltip: 'Back',
                 onPressed: () => Navigator.pop(context),
                 icon: const Icon(Icons.arrow_back, color: Colors.white),
               ),
@@ -218,6 +219,7 @@ class _VirtualTransferListScreenState extends State<VirtualTransferListScreen> {
                     ),
                     const SizedBox(height: 12),
                     DropdownButtonFormField<String>(
+                      isExpanded: true,
                       initialValue: _state,
                       decoration: ssInputDecoration('', Icons.filter_list),
                       items: const [

@@ -1,0 +1,20 @@
+{
+ "success": true,
+ "api_version": "v1",
+ "message": "OK",
+ "data": {
+  "active_visit": {
+   "id": 9,
+   "employee_id": 208,
+   "outlet_id": 108591,
+   "check_in_time": "2026-10-27 12:27:56",
+   "visit_type": "join",
+   "requires_visit_reason": true
+  },
+  "checked_out_outlet_ids": [
+   108591,
+   108595,
+   108595
+  ]
+ }
+}

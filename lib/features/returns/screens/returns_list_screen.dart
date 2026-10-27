@@ -280,6 +280,7 @@ class _ReturnsListScreenState extends State<ReturnsListScreen> {
               ),
               const SizedBox(height: 16),
               DropdownButtonFormField<String>(
+                isExpanded: true,
                 value: currentFilterValue,
                 decoration: ssInputDecoration('Status', Icons.filter_list),
                 items: _isPrimary && showsTransitLegs
@@ -387,6 +388,7 @@ class _ReturnsListScreenState extends State<ReturnsListScreen> {
         elevation: 0,
         scrolledUnderElevation: 0,
         leading: IconButton(
+          tooltip: 'Back',
           icon: const Icon(
             Icons.arrow_back,
             color: AppColors.textPrimary,

@@ -1,0 +1,20 @@
+{
+ "success": true,
+ "api_version": "v1",
+ "message": "OK",
+ "data": {
+  "contact_id": 103802,
+  "contact_name": "Synthetic text value for layout testing 674",
+  "visit_logs": [
+   {
+    "id": 4,
+    "employee_id": 208,
+    "employee_name": "Synthetic text value for layout testing 675",
+    "check_in_time": "2026-10-26 17:04:19",
+    "check_out_time": "2026-10-26 17:15:37",
+    "visit_type": "join"
+   }
+  ],
+  "past_orders": []
+ }
+}

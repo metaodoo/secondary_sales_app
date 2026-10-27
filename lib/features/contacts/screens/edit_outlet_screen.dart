@@ -198,6 +198,7 @@ class _EditOutletScreenState extends State<EditOutletScreen> {
         backgroundColor: AppColors.background,
         elevation: 0,
         leading: IconButton(
+          tooltip: 'Back',
           icon: const Icon(Icons.arrow_back, color: AppColors.textPrimary),
           onPressed: () => Navigator.pop(context),
         ),
@@ -328,6 +329,7 @@ class _EditOutletScreenState extends State<EditOutletScreen> {
                             ),
                             const SizedBox(height: 8),
                             DropdownButtonFormField<int>(
+                              isExpanded: true,
                               value: _selectedOutletTypeId,
                               validator: (val) => val == null
                                   ? 'Outlet Type is required'

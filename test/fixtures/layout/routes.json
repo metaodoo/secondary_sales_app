@@ -1,0 +1,726 @@
+{
+ "success": true,
+ "api_version": "v1",
+ "message": "OK",
+ "data": [
+  {
+   "id": 2804,
+   "name": "Test Outlet General & Variety Store and Mobile Recharge Point 100",
+   "active": true,
+   "distributor": {
+    "id": 59646,
+    "name": "Test Distributor Varieties Store and Distribution House 101"
+   },
+   "employees": [
+    {
+     "id": 7395,
+     "name": "Md. Test Employee Long Full Name Number (102)"
+    }
+   ],
+   "planned_days": [],
+   "outlet_count": 55
+  },
+  {
+   "id": 2797,
+   "name": "Test Outlet General & Variety Store and Mobile Recharge Point 103",
+   "active": true,
+   "distributor": {
+    "id": 59646,
+    "name": "Test Distributor Varieties Store and Distribution House 104"
+   },
+   "employees": [
+    {
+     "id": 7184,
+     "name": "Md. Test Employee Long Full Name Number (105)"
+    }
+   ],
+   "planned_days": [],
+   "outlet_count": 38
+  },
+  {
+   "id": 2591,
+   "name": "Test Outlet General & Variety Store and Mobile Recharge Point 106",
+   "active": true,
+   "distributor": {
+    "id": 93792,
+    "name": "Test Distributor Varieties Store and Distribution House 107"
+   },
+   "employees": [
+    {
+     "id": 6949,
+     "name": "Md. Test Employee Long Full Name Number (108)"
+    }
+   ],
+   "planned_days": [],
+   "outlet_count": 11
+  },
+  {
+   "id": 2889,
+   "name": "Test Outlet General & Variety Store and Mobile Recharge Point 109",
+   "active": true,
+   "distributor": {
+    "id": 8533,
+    "name": "Test Distributor Varieties Store and Distribution House 110"
+   },
+   "employees": [
+    {
+     "id": 7100,
+     "name": "Md. Test Employee Long Full Name Number (111)"
+    }
+   ],
+   "planned_days": [],
+   "outlet_count": 60
+  },
+  {
+   "id": 2587,
+   "name": "Test Outlet General & Variety Store and Mobile Recharge Point 112",
+   "active": true,
+   "distributor": {
+    "id": 93792,
+    "name": "Test Distributor Varieties Store and Distribution House 113"
+   },
+   "employees": [
+    {
+     "id": 6949,
+     "name": "Md. Test Employee Long Full Name Number (114)"
+    }
+   ],
+   "planned_days": [],
+   "outlet_count": 56
+  },
+  {
+   "id": 2890,
+   "name": "Test Outlet General & Variety Store and Mobile Recharge Point 115",
+   "active": true,
+   "distributor": {
+    "id": 8533,
+    "name": "Test Distributor Varieties Store and Distribution House 116"
+   },
+   "employees": [
+    {
+     "id": 7100,
+     "name": "Md. Test Employee Long Full Name Number (117)"
+    }
+   ],
+   "planned_days": [],
+   "outlet_count": 30
+  },
+  {
+   "id": 2603,
+   "name": "Test Outlet General & Variety Store and Mobile Recharge Point 118",
+   "active": true,
+   "distributor": {
+    "id": 57364,
+    "name": "Test Distributor Varieties Store and Distribution House 119"
+   },
+   "employees": [
+    {
+     "id": 7007,
+     "name": "Md. Test Employee Long Full Name Number (120)"
+    }
+   ],
+   "planned_days": [],
+   "outlet_count": 63
+  },
+  {
+   "id": 2885,
+   "name": "Test Outlet General & Variety Store and Mobile Recharge Point 121",
+   "active": true,
+   "distributor": {
+    "id": 8533,
+    "name": "Test Distributor Varieties Store and Distribution House 122"
+   },
+   "employees": [
+    {
+     "id": 6994,
+     "name": "Md. Test Employee Long Full Name Number (123)"
+    }
+   ],
+   "planned_days": [],
+   "outlet_count": 6
+  },
+  {
+   "id": 2718,
+   "name": "Test Outlet General & Variety Store and Mobile Recharge Point 124",
+   "active": true,
+   "distributor": {
+    "id": 57364,
+    "name": "Test Distributor Varieties Store and Distribution House 125"
+   },
+   "employees": [
+    {
+     "id": 6808,
+     "name": "Md. Test Employee Long Full Name Number (126)"
+    }
+   ],
+   "planned_days": [],
+   "outlet_count": 51
+  },
+  {
+   "id": 2880,
+   "name": "Test Outlet General & Variety Store and Mobile Recharge Point 127",
+   "active": true,
+   "distributor": {
+    "id": 8533,
+    "name": "Test Distributor Varieties Store and Distribution House 128"
+   },
+   "employees": [
+    {
+     "id": 6994,
+     "name": "Md. Test Employee Long Full Name Number (129)"
+    }
+   ],
+   "planned_days": [],
+   "outlet_count": 40
+  },
+  {
+   "id": 2886,
+   "name": "Test Outlet General & Variety Store and Mobile Recharge Point 130",
+   "active": true,
+   "distributor": {
+    "id": 8533,
+    "name": "Test Distributor Varieties Store and Distribution House 131"
+   },
+   "employees": [
+    {
+     "id": 7100,
+     "name": "Md. Test Employee Long Full Name Number (132)"
+    }
+   ],
+   "planned_days": [],
+   "outlet_count": 50
+  },
+  {
+   "id": 2589,
+   "name": "Test Outlet General & Variety Store and Mobile Recharge Point 133",
+   "active": true,
+   "distributor": {
+    "id": 93792,
+    "name": "Test Distributor Varieties Store and Distribution House 134"
+   },
+   "employees": [
+    {
+     "id": 6949,
+     "name": "Md. Test Employee Long Full Name Number (135)"
+    }
+   ],
+   "planned_days": [],
+   "outlet_count": 15
+  },
+  {
+   "id": 2588,
+   "name": "Test Outlet General & Variety Store and Mobile Recharge Point 136",
+   "active": true,
+   "distributor": {
+    "id": 93792,
+    "name": "Test Distributor Varieties Store and Distribution House 137"
+   },
+   "employees": [
+    {
+     "id": 6949,
+     "name": "Md. Test Employee Long Full Name Number (138)"
+    }
+   ],
+   "planned_days": [],
+   "outlet_count": 15
+  },
+  {
+   "id": 2887,
+   "name": "Test Outlet General & Variety Store and Mobile Recharge Point 139",
+   "active": true,
+   "distributor": {
+    "id": 8533,
+    "name": "Test Distributor Varieties Store and Distribution House 140"
+   },
+   "employees": [
+    {
+     "id": 7100,
+     "name": "Md. Test Employee Long Full Name Number (141)"
+    }
+   ],
+   "planned_days": [],
+   "outlet_count": 30
+  },
+  {
+   "id": 2599,
+   "name": "Test Outlet General & Variety Store and Mobile Recharge Point 142",
+   "active": true,
+   "distributor": {
+    "id": 57364,
+    "name": "Test Distributor Varieties Store and Distribution House 143"
+   },
+   "employees": [
+    {
+     "id": 7007,
+     "name": "Md. Test Employee Long Full Name Number (144)"
+    }
+   ],
+   "planned_days": [],
+   "outlet_count": 51
+  },
+  {
+   "id": 2805,
+   "name": "Test Outlet General & Variety Store and Mobile Recharge Point 145",
+   "active": true,
+   "distributor": {
+    "id": 59646,
+    "name": "Test Distributor Varieties Store and Distribution House 146"
+   },
+   "employees": [
+    {
+     "id": 7395,
+     "name": "Md. Test Employee Long Full Name Number (147)"
+    }
+   ],
+   "planned_days": [],
+   "outlet_count": 45
+  },
+  {
+   "id": 2882,
+   "name": "Test Outlet General & Variety Store and Mobile Recharge Point 148",
+   "active": true,
+   "distributor": {
+    "id": 8533,
+    "name": "Test Distributor Varieties Store and Distribution House 149"
+   },
+   "employees": [
+    {
+     "id": 6994,
+     "name": "Md. Test Employee Long Full Name Number (150)"
+    }
+   ],
+   "planned_days": [],
+   "outlet_count": 61
+  },
+  {
+   "id": 2601,
+   "name": "Test Outlet General & Variety Store and Mobile Recharge Point 151",
+   "active": true,
+   "distributor": {
+    "id": 57364,
+    "name": "Test Distributor Varieties Store and Distribution House 152"
+   },
+   "employees": [
+    {
+     "id": 7007,
+     "name": "Md. Test Employee Long Full Name Number (153)"
+    }
+   ],
+   "planned_days": [],
+   "outlet_count": 53
+  },
+  {
+   "id": 2806,
+   "name": "Test Outlet General & Variety Store and Mobile Recharge Point 154",
+   "active": true,
+   "distributor": {
+    "id": 59646,
+    "name": "Test Distributor Varieties Store and Distribution House 155"
+   },
+   "employees": [
+    {
+     "id": 7395,
+     "name": "Md. Test Employee Long Full Name Number (156)"
+    }
+   ],
+   "planned_days": [],
+   "outlet_count": 47
+  },
+  {
+   "id": 2802,
+   "name": "Test Outlet General & Variety Store and Mobile Recharge Point 157",
+   "active": true,
+   "distributor": {
+    "id": 59646,
+    "name": "Test Distributor Varieties Store and Distribution House 158"
+   },
+   "employees": [
+    {
+     "id": 7395,
+     "name": "Md. Test Employee Long Full Name Number (159)"
+    }
+   ],
+   "planned_days": [],
+   "outlet_count": 51
+  },
+  {
+   "id": 2884,
+   "name": "Test Outlet General & Variety Store and Mobile Recharge Point 160",
+   "active": true,
+   "distributor": {
+    "id": 8533,
+    "name": "Test Distributor Varieties Store and Distribution House 161"
+   },
+   "employees": [
+    {
+     "id": 6994,
+     "name": "Md. Test Employee Long Full Name Number (162)"
+    }
+   ],
+   "planned_days": [],
+   "outlet_count": 3
+  },
+  {
+   "id": 2720,
+   "name": "Test Outlet General & Variety Store and Mobile Recharge Point 163",
+   "active": true,
+   "distributor": {
+    "id": 57364,
+    "name": "Test Distributor Varieties Store and Distribution House 164"
+   },
+   "employees": [
+    {
+     "id": 6808,
+     "name": "Md. Test Employee Long Full Name Number (165)"
+    }
+   ],
+   "planned_days": [],
+   "outlet_count": 42
+  },
+  {
+   "id": 2723,
+   "name": "Test Outlet General & Variety Store and Mobile Recharge Point 166",
+   "active": true,
+   "distributor": {
+    "id": 57364,
+    "name": "Test Distributor Varieties Store and Distribution House 167"
+   },
+   "employees": [
+    {
+     "id": 6808,
+     "name": "Md. Test Employee Long Full Name Number (168)"
+    }
+   ],
+   "planned_days": [],
+   "outlet_count": 39
+  },
+  {
+   "id": 2586,
+   "name": "Test Outlet General & Variety Store and Mobile Recharge Point 169",
+   "active": true,
+   "distributor": {
+    "id": 93792,
+    "name": "Test Distributor Varieties Store and Distribution House 170"
+   },
+   "employees": [
+    {
+     "id": 6949,
+     "name": "Md. Test Employee Long Full Name Number (171)"
+    }
+   ],
+   "planned_days": [],
+   "outlet_count": 3
+  },
+  {
+   "id": 2888,
+   "name": "Test Outlet General & Variety Store and Mobile Recharge Point 172",
+   "active": true,
+   "distributor": {
+    "id": 8533,
+    "name": "Test Distributor Varieties Store and Distribution House 173"
+   },
+   "employees": [
+    {
+     "id": 7100,
+     "name": "Md. Test Employee Long Full Name Number (174)"
+    }
+   ],
+   "planned_days": [],
+   "outlet_count": 60
+  },
+  {
+   "id": 2883,
+   "name": "Test Outlet General & Variety Store and Mobile Recharge Point 175",
+   "active": true,
+   "distributor": {
+    "id": 8533,
+    "name": "Test Distributor Varieties Store and Distribution House 176"
+   },
+   "employees": [
+    {
+     "id": 6994,
+     "name": "Md. Test Employee Long Full Name Number (177)"
+    }
+   ],
+   "planned_days": [],
+   "outlet_count": 21
+  },
+  {
+   "id": 2807,
+   "name": "Test Outlet General & Variety Store and Mobile Recharge Point 178",
+   "active": true,
+   "distributor": {
+    "id": 59646,
+    "name": "Test Distributor Varieties Store and Distribution House 179"
+   },
+   "employees": [
+    {
+     "id": 7395,
+     "name": "Md. Test Employee Long Full Name Number (180)"
+    }
+   ],
+   "planned_days": [],
+   "outlet_count": 43
+  },
+  {
+   "id": 2796,
+   "name": "Test Outlet General & Variety Store and Mobile Recharge Point 181",
+   "active": true,
+   "distributor": {
+    "id": 59646,
+    "name": "Test Distributor Varieties Store and Distribution House 182"
+   },
+   "employees": [
+    {
+     "id": 7184,
+     "name": "Md. Test Employee Long Full Name Number (183)"
+    }
+   ],
+   "planned_days": [],
+   "outlet_count": 62
+  },
+  {
+   "id": 2598,
+   "name": "Test Outlet General & Variety Store and Mobile Recharge Point 184",
+   "active": true,
+   "distributor": {
+    "id": 57364,
+    "name": "Test Distributor Varieties Store and Distribution House 185"
+   },
+   "employees": [
+    {
+     "id": 7007,
+     "name": "Md. Test Employee Long Full Name Number (186)"
+    }
+   ],
+   "planned_days": [],
+   "outlet_count": 37
+  },
+  {
+   "id": 2798,
+   "name": "Test Outlet General & Variety Store and Mobile Recharge Point 187",
+   "active": true,
+   "distributor": {
+    "id": 59646,
+    "name": "Test Distributor Varieties Store and Distribution House 188"
+   },
+   "employees": [
+    {
+     "id": 7184,
+     "name": "Md. Test Employee Long Full Name Number (189)"
+    }
+   ],
+   "planned_days": [],
+   "outlet_count": 68
+  },
+  {
+   "id": 2891,
+   "name": "Test Outlet General & Variety Store and Mobile Recharge Point 190",
+   "active": true,
+   "distributor": {
+    "id": 8533,
+    "name": "Test Distributor Varieties Store and Distribution House 191"
+   },
+   "employees": [
+    {
+     "id": 7100,
+     "name": "Md. Test Employee Long Full Name Number (192)"
+    }
+   ],
+   "planned_days": [],
+   "outlet_count": 44
+  },
+  {
+   "id": 2600,
+   "name": "Test Outlet General & Variety Store and Mobile Recharge Point 193",
+   "active": true,
+   "distributor": {
+    "id": 57364,
+    "name": "Test Distributor Varieties Store and Distribution House 194"
+   },
+   "employees": [
+    {
+     "id": 7007,
+     "name": "Md. Test Employee Long Full Name Number (195)"
+    }
+   ],
+   "planned_days": [],
+   "outlet_count": 46
+  },
+  {
+   "id": 2719,
+   "name": "Test Outlet General & Variety Store and Mobile Recharge Point 196",
+   "active": true,
+   "distributor": {
+    "id": 57364,
+    "name": "Test Distributor Varieties Store and Distribution House 197"
+   },
+   "employees": [
+    {
+     "id": 6808,
+     "name": "Md. Test Employee Long Full Name Number (198)"
+    }
+   ],
+   "planned_days": [],
+   "outlet_count": 36
+  },
+  {
+   "id": 2801,
+   "name": "Test Outlet General & Variety Store and Mobile Recharge Point 199",
+   "active": true,
+   "distributor": {
+    "id": 59646,
+    "name": "Test Distributor Varieties Store and Distribution House 200"
+   },
+   "employees": [
+    {
+     "id": 7184,
+     "name": "Md. Test Employee Long Full Name Number (201)"
+    }
+   ],
+   "planned_days": [],
+   "outlet_count": 58
+  },
+  {
+   "id": 2721,
+   "name": "Test Outlet General & Variety Store and Mobile Recharge Point 202",
+   "active": true,
+   "distributor": {
+    "id": 57364,
+    "name": "Test Distributor Varieties Store and Distribution House 203"
+   },
+   "employees": [
+    {
+     "id": 6808,
+     "name": "Md. Test Employee Long Full Name Number (204)"
+    }
+   ],
+   "planned_days": [],
+   "outlet_count": 41
+  },
+  {
+   "id": 2800,
+   "name": "Test Outlet General & Variety Store and Mobile Recharge Point 205",
+   "active": true,
+   "distributor": {
+    "id": 59646,
+    "name": "Test Distributor Varieties Store and Distribution House 206"
+   },
+   "employees": [
+    {
+     "id": 7184,
+     "name": "Md. Test Employee Long Full Name Number (207)"
+    }
+   ],
+   "planned_days": [],
+   "outlet_count": 58
+  },
+  {
+   "id": 2803,
+   "name": "Test Outlet General & Variety Store and Mobile Recharge Point 208",
+   "active": true,
+   "distributor": {
+    "id": 59646,
+    "name": "Test Distributor Varieties Store and Distribution House 209"
+   },
+   "employees": [
+    {
+     "id": 7395,
+     "name": "Md. Test Employee Long Full Name Number (210)"
+    }
+   ],
+   "planned_days": [],
+   "outlet_count": 49
+  },
+  {
+   "id": 2799,
+   "name": "Test Outlet General & Variety Store and Mobile Recharge Point 211",
+   "active": true,
+   "distributor": {
+    "id": 59646,
+    "name": "Test Distributor Varieties Store and Distribution House 212"
+   },
+   "employees": [
+    {
+     "id": 7184,
+     "name": "Md. Test Employee Long Full Name Number (213)"
+    }
+   ],
+   "planned_days": [],
+   "outlet_count": 47
+  },
+  {
+   "id": 2602,
+   "name": "Test Outlet General & Variety Store and Mobile Recharge Point 214",
+   "active": true,
+   "distributor": {
+    "id": 57364,
+    "name": "Test Distributor Varieties Store and Distribution House 215"
+   },
+   "employees": [
+    {
+     "id": 7007,
+     "name": "Md. Test Employee Long Full Name Number (216)"
+    }
+   ],
+   "planned_days": [],
+   "outlet_count": 48
+  },
+  {
+   "id": 2722,
+   "name": "Test Outlet General & Variety Store and Mobile Recharge Point 217",
+   "active": true,
+   "distributor": {
+    "id": 57364,
+    "name": "Test Distributor Varieties Store and Distribution House 218"
+   },
+   "employees": [
+    {
+     "id": 6808,
+     "name": "Md. Test Employee Long Full Name Number (219)"
+    }
+   ],
+   "planned_days": [],
+   "outlet_count": 33
+  },
+  {
+   "id": 2881,
+   "name": "Test Outlet General & Variety Store and Mobile Recharge Point 220",
+   "active": true,
+   "distributor": {
+    "id": 8533,
+    "name": "Test Distributor Varieties Store and Distribution House 221"
+   },
+   "employees": [
+    {
+     "id": 6994,
+     "name": "Md. Test Employee Long Full Name Number (222)"
+    }
+   ],
+   "planned_days": [],
+   "outlet_count": 42
+  },
+  {
+   "id": 2590,
+   "name": "Test Outlet General & Variety Store and Mobile Recharge Point 223",
+   "active": true,
+   "distributor": {
+    "id": 93792,
+    "name": "Test Distributor Varieties Store and Distribution House 224"
+   },
+   "employees": [
+    {
+     "id": 6949,
+     "name": "Md. Test Employee Long Full Name Number (225)"
+    }
+   ],
+   "planned_days": [],
+   "outlet_count": 26
+  }
+ ],
+ "pagination": {
+  "page": 1,
+  "page_size": 100,
+  "total": 42
+ }
+}
