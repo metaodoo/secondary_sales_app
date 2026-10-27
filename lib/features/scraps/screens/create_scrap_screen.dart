@@ -2265,6 +2265,7 @@ class _ScrapLineCard extends StatelessWidget {
                         canViewAllReturns: canViewAllReturns,
                         canEditWarehouseQty: canEditWarehouseQty,
                         canEditQcTeamQty: canEditQcTeamQty,
+                        canEditEffectiveQty: canEditEffectiveQty,
                         canEditQcQty: canEditQcQty,
                       ))
                         _buildQtyRow(
@@ -2276,6 +2277,7 @@ class _ScrapLineCard extends StatelessWidget {
                             isReadOnly: isReadOnly,
                             canEditWarehouseQty: canEditWarehouseQty,
                             canEditQcTeamQty: canEditQcTeamQty,
+                            canEditEffectiveQty: canEditEffectiveQty,
                             canEditQcQty: canEditQcQty,
                           ),
                           min: 0,
@@ -2651,6 +2653,7 @@ class _ScrapLotRow extends StatelessWidget {
               canViewAllReturns: canViewAllReturns,
               canEditWarehouseQty: canEditWarehouseQty,
               canEditQcTeamQty: canEditQcTeamQty,
+              canEditEffectiveQty: canEditEffectiveQty,
               canEditQcQty: canEditQcQty,
             ))
               _splitField(
@@ -2663,6 +2666,7 @@ class _ScrapLotRow extends StatelessWidget {
                   isReadOnly: isReadOnly,
                   canEditWarehouseQty: canEditWarehouseQty,
                   canEditQcTeamQty: canEditQcTeamQty,
+                  canEditEffectiveQty: canEditEffectiveQty,
                   canEditQcQty: canEditQcQty,
                 ),
               ),

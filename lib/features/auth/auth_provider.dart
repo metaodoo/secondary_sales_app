@@ -186,40 +186,18 @@ class AuthProvider with ChangeNotifier {
   bool _enforcedOr(String key, bool legacy) =>
       access.enforced.contains(key) ? access.allows(key) : legacy;
 
-  // Returns/scrap field permissions — hybrid: the registry when the action is
-  // enforced, else the group's permission flags from the login payload.
-  bool get canViewAllReturns => _enforcedOr(
-    AppAction.returnsViewAll,
-    user?.permissions?.canViewAllReturns ?? false,
-  );
-  bool get canEditSoQty => _enforcedOr(
-    AppAction.returnsEditSoQty,
-    user?.permissions?.canEditSoQty ?? false,
-  );
-  bool get canEditWarehouseQty => _enforcedOr(
-    AppAction.returnsEditWarehouseQty,
-    user?.permissions?.canEditWarehouseQty ?? false,
-  );
-  bool get canEditEffectiveQty => _enforcedOr(
-    AppAction.returnsEditEffectiveQty,
-    user?.permissions?.canEditEffectiveQty ?? false,
-  );
-
-  /// Sales-operation permission over the QC saleable/non-saleable pair on a
-  /// fresh return's transit leg.
-  ///
-  /// There is no `can_edit_qc_qty` group flag on the backend -- group booleans
-  /// are the pre-catalog mechanism and a new permission should not revive them.
-  /// So the fallback is the effective-qty flag, which identifies the same
-  /// sales-operation role, and it applies only until the catalog sync makes
-  /// [AppAction.returnsEditQcQty] enforced.
-  bool get canEditQcQty =>
-      _enforcedOr(AppAction.returnsEditQcQty, canEditEffectiveQty);
+  // Returns/scrap field permissions — strictly governed by UI action access keys.
+  bool get canViewAllReturns => access.allows(AppAction.returnsViewAll);
+  bool get canEditSoQty => access.allows(AppAction.returnsEditSoQty);
+  bool get canEditWarehouseQty => access.allows(AppAction.returnsEditWarehouseQty);
+  bool get canEditEffectiveQty => access.allows(AppAction.returnsEditEffectiveQty);
 
   /// Quality Control team permission over evaluation quantities
   /// (qc_team_nonsaleable_qty and qc_team_qc_qty).
-  bool get canEditQcTeamQty =>
-      _enforcedOr(AppAction.returnsEditQcTeamQty, false);
+  bool get canEditQcTeamQty => access.allows(AppAction.returnsEditQcTeamQty);
+
+  /// Sales Operations decision fields (legacy alias mapped to effective qty)
+  bool get canEditQcQty => canEditEffectiveQty;
 
   bool get canSkipAttendanceGeo => _enforcedOr(
     AppAction.attendanceSkipGeo,
@@ -240,10 +218,31 @@ class AuthProvider with ChangeNotifier {
   );
   bool canCancelReturnFor(String moduleType) => _enforcedOr(
     AppAction.returnCancelFor(moduleType),
-    canEditSoQty || canEditWarehouseQty,
+    canEditSoQty || canEditWarehouseQty || canEditEffectiveQty,
   );
   bool canValidateReturnFor(String moduleType) =>
-      _enforcedOr(AppAction.returnValidateFor(moduleType), canEditWarehouseQty);
+      _enforcedOr(AppAction.returnValidateFor(moduleType), canEditEffectiveQty);
+
+  // Quality Returns (qc_returns) actions
+  bool canSaveQcReturnFor(String moduleType) => _enforcedOr(
+    AppAction.qcReturnsSave,
+    canEditSoQty || canEditWarehouseQty || canEditQcTeamQty || canEditEffectiveQty,
+  );
+  bool canSendToQcQcReturnFor(String moduleType) => _enforcedOr(
+    AppAction.qcReturnsSendToQc,
+    canEditWarehouseQty,
+  );
+  bool canSendToSalesOperationQcReturnFor(String moduleType) => _enforcedOr(
+    AppAction.qcReturnsSendToSalesOperation,
+    canEditWarehouseQty || canEditQcTeamQty,
+  );
+  bool canCancelQcReturnFor(String moduleType) => _enforcedOr(
+    AppAction.qcReturnsCancel,
+    canEditSoQty || canEditWarehouseQty || canEditEffectiveQty,
+  );
+  bool canValidateQcReturnFor(String moduleType) =>
+      _enforcedOr(AppAction.qcReturnsValidate, canEditEffectiveQty);
+
   bool canSaveScrapFor(String moduleType) => _enforcedOr(
     AppAction.scrapSaveFor(moduleType),
     canEditSoQty || canEditWarehouseQty || canEditQcTeamQty || canEditEffectiveQty,
@@ -258,16 +257,22 @@ class AuthProvider with ChangeNotifier {
   );
   bool canCancelScrapFor(String moduleType) => _enforcedOr(
     AppAction.scrapCancelFor(moduleType),
-    canEditSoQty || canEditWarehouseQty,
+    canEditSoQty || canEditWarehouseQty || canEditEffectiveQty,
   );
   bool canValidateScrapFor(String moduleType) =>
-      _enforcedOr(AppAction.scrapValidateFor(moduleType), canEditWarehouseQty);
+      _enforcedOr(AppAction.scrapValidateFor(moduleType), canEditEffectiveQty);
 
   bool get canSaveReturn => canSaveReturnFor('primary');
   bool get canSendToQc => canSendToQcFor('primary');
   bool get canSendToSalesOperation => canSendToSalesOperationFor('primary');
   bool get canCancelReturn => canCancelReturnFor('primary');
   bool get canValidateReturn => canValidateReturnFor('primary');
+  bool get canSaveQcReturn => canSaveQcReturnFor('primary');
+  bool get canSendToQcQcReturn => canSendToQcQcReturnFor('primary');
+  bool get canSendToSalesOperationQcReturn =>
+      canSendToSalesOperationQcReturnFor('primary');
+  bool get canCancelQcReturn => canCancelQcReturnFor('primary');
+  bool get canValidateQcReturn => canValidateQcReturnFor('primary');
   bool get canSaveScrap => canSaveScrapFor('primary');
   bool get canSendToQcScrap => canSendToQcForScrap('primary');
   bool get canSendToSalesOperationScrap =>

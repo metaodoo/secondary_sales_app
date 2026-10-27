@@ -288,21 +288,22 @@ bool isQcColumnVisible({
   required bool canViewAllReturns,
   required bool canEditWarehouseQty,
   required bool canEditQcTeamQty,
-  required bool canEditQcQty,
+  required bool canEditEffectiveQty,
+  bool canEditQcQty = false,
 }) {
   if (canViewAllReturns) return true;
   if (field == 'warehouse_qty' ||
       field == 'w_nonsaleable_qty' ||
       field == 'w_qc_qty') {
-    return canEditWarehouseQty || canEditQcTeamQty || canEditQcQty;
+    return canEditWarehouseQty || canEditQcTeamQty || canEditEffectiveQty;
   }
   if (field == 'qc_team_nonsaleable_qty' || field == 'qc_team_qc_qty') {
-    return canEditQcTeamQty || canEditQcQty;
+    return canEditQcTeamQty;
   }
   if (field == 'qc_saleable_qty' ||
       field == 'qc_nonsaleable_qty' ||
       field == 'actual_qc_qty') {
-    return canEditQcQty;
+    return canEditEffectiveQty;
   }
   return true;
 }
@@ -314,7 +315,8 @@ bool isQcColumnEditable({
   required bool isReadOnly,
   required bool canEditWarehouseQty,
   required bool canEditQcTeamQty,
-  required bool canEditQcQty,
+  required bool canEditEffectiveQty,
+  bool canEditQcQty = false,
 }) {
   if (isReadOnly) return false;
   if (field == 'warehouse_qty' ||
@@ -333,7 +335,7 @@ bool isQcColumnEditable({
       field == 'actual_qc_qty') {
     final isStage = returnReceiptStatus == 'salesops_receipt' ||
         returnReceiptStatus == 'sales_operation_receipt';
-    return canEditQcQty && isStage;
+    return canEditEffectiveQty && isStage;
   }
   return false;
 }

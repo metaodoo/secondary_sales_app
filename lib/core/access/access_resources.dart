@@ -200,12 +200,6 @@ class AppAction {
   static const returnsEditEffectiveQty =
       'action.return_delivery.edit_effective_qty';
 
-  /// Sales operation's grant over the QC saleable/non-saleable pair on a fresh
-  /// return's transit leg. Separate from [returnsEditEffectiveQty]: that one
-  /// still gates the legacy single "effective" quantity on the QC, damaged and
-  /// secondary return flows, which the split does not touch.
-  static const returnsEditQcQty = 'action.return_delivery.edit_qc_qty';
-
   /// Quality Control team grant to edit QC evaluation quantities
   /// (qc_team_nonsaleable_qty and qc_team_qc_qty).
   static const returnsEditQcTeamQty =
@@ -1164,13 +1158,6 @@ const List<AccessResource> accessCatalog = [
     'Returns (all tiers) › Edit effective quantity',
     _psSs,
     legacyKeys: ['action.returns.edit_effective_qty'],
-  ),
-  AccessResource(
-    AppAction.returnsEditQcQty,
-    'action',
-    'return_delivery',
-    'Returns (all tiers) › Edit QC quantities',
-    _psSs,
   ),
   AccessResource(
     AppAction.returnsEditQcTeamQty,

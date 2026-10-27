@@ -110,6 +110,8 @@ class _CreateReturnScreenState extends State<CreateReturnScreen> {
         !ep.contains('damaged');
   }
 
+  bool get _isQcReturn => widget.endpoint.toLowerCase().contains('qc_returns');
+
   /// Which QC rule this picking carries, as reported by the backend:
   /// `fresh_split`, `scrap_sum`, or null for a leg the decision does not apply
   /// to. Served rather than derived so the rule lives in one place.
@@ -513,7 +515,10 @@ class _CreateReturnScreenState extends State<CreateReturnScreen> {
   }
 
   bool _canShowSendToQc(AuthProvider auth) {
-    if (!auth.canSendToQcFor(widget.moduleType)) return false;
+    final canSend = _isQcReturn
+        ? auth.canSendToQcQcReturnFor(widget.moduleType)
+        : auth.canSendToQcFor(widget.moduleType);
+    if (!canSend) return false;
     if (!_isTransitLeg) return false;
     if (_returnReceiptStatus != 'warehouse_receipt') return false;
     final bucket = _prepareData?['ss_stock_bucket'];
@@ -525,7 +530,10 @@ class _CreateReturnScreenState extends State<CreateReturnScreen> {
   }
 
   bool _canShowSendToSalesOperation(AuthProvider auth) {
-    if (!auth.canSendToSalesOperationFor(widget.moduleType)) return false;
+    final canSend = _isQcReturn
+        ? auth.canSendToSalesOperationQcReturnFor(widget.moduleType)
+        : auth.canSendToSalesOperationFor(widget.moduleType);
+    if (!canSend) return false;
     if (!_isTransitLeg) return false;
     if (_returnReceiptStatus == 'qc_receipt') {
       return auth.canEditQcTeamQty;
@@ -542,7 +550,10 @@ class _CreateReturnScreenState extends State<CreateReturnScreen> {
   }
 
   bool _canShowValidate(AuthProvider auth) {
-    if (!auth.canValidateReturnFor(widget.moduleType)) return false;
+    final canVal = _isQcReturn
+        ? auth.canValidateQcReturnFor(widget.moduleType)
+        : auth.canValidateReturnFor(widget.moduleType);
+    if (!canVal) return false;
     if (_isTransitLeg) {
       return _returnReceiptStatus == 'sales_operation_receipt' ||
           _returnReceiptStatus == 'salesops_receipt';
@@ -551,7 +562,10 @@ class _CreateReturnScreenState extends State<CreateReturnScreen> {
   }
 
   bool _canShowCancel(AuthProvider auth) {
-    if (!auth.canCancelReturnFor(widget.moduleType)) return false;
+    final canCancel = _isQcReturn
+        ? auth.canCancelQcReturnFor(widget.moduleType)
+        : auth.canCancelReturnFor(widget.moduleType);
+    if (!canCancel) return false;
     if (_isReadOnly) return false;
     final state = _prepareData?['state'];
     if (state == 'done' || state == 'cancel') return false;
@@ -565,15 +579,15 @@ class _CreateReturnScreenState extends State<CreateReturnScreen> {
       }
       if (_returnReceiptStatus == 'sales_operation_receipt' ||
           _returnReceiptStatus == 'salesops_receipt') {
-        return auth.canValidateReturnFor(widget.moduleType);
+        return _canShowValidate(auth);
       }
-      return auth.canValidateReturnFor(widget.moduleType);
+      return _canShowValidate(auth);
     }
 
     if (_returnReceiptStatus == null || _returnReceiptStatus == 'draft') {
       return true;
     }
-    return auth.canValidateReturnFor(widget.moduleType);
+    return _canShowValidate(auth);
   }
 
   /// The most this line may carry, or null when the distributor's stock is not
@@ -1943,7 +1957,9 @@ class _CreateReturnScreenState extends State<CreateReturnScreen> {
                                   ),
                                 ),
                               ),
-                              if (auth.canValidateReturnFor(widget.moduleType)) ...[
+                              if (_isQcReturn
+                                  ? auth.canValidateQcReturnFor(widget.moduleType)
+                                  : auth.canValidateReturnFor(widget.moduleType)) ...[
                                 const SizedBox(width: 8),
                                 Expanded(
                                   child: SizedBox(
@@ -1993,7 +2009,9 @@ class _CreateReturnScreenState extends State<CreateReturnScreen> {
                               ),
                             ),
                           ],
-                          if (auth.canSaveReturnFor(widget.moduleType)) ...[
+                          if (_isQcReturn
+                              ? auth.canSaveQcReturnFor(widget.moduleType)
+                              : auth.canSaveReturnFor(widget.moduleType)) ...[
                             if (_canShowCancel(auth))
                               const SizedBox(width: 8),
                             Expanded(
@@ -2424,6 +2442,7 @@ class _ReturnLineCard extends StatelessWidget {
                         canViewAllReturns: canViewAllReturns,
                         canEditWarehouseQty: canEditWarehouseQty,
                         canEditQcTeamQty: canEditQcTeamQty,
+                        canEditEffectiveQty: canEditEffectiveQty,
                         canEditQcQty: canEditQcQty,
                       ))
                         _buildQtyRow(
@@ -2435,6 +2454,7 @@ class _ReturnLineCard extends StatelessWidget {
                             isReadOnly: isReadOnly,
                             canEditWarehouseQty: canEditWarehouseQty,
                             canEditQcTeamQty: canEditQcTeamQty,
+                            canEditEffectiveQty: canEditEffectiveQty,
                             canEditQcQty: canEditQcQty,
                           ),
                           min: 0,
@@ -2819,6 +2839,7 @@ class _ReturnLotRow extends StatelessWidget {
               canViewAllReturns: canViewAllReturns,
               canEditWarehouseQty: canEditWarehouseQty,
               canEditQcTeamQty: canEditQcTeamQty,
+              canEditEffectiveQty: canEditEffectiveQty,
               canEditQcQty: canEditQcQty,
             ))
               _splitField(
@@ -2831,6 +2852,7 @@ class _ReturnLotRow extends StatelessWidget {
                   isReadOnly: isReadOnly,
                   canEditWarehouseQty: canEditWarehouseQty,
                   canEditQcTeamQty: canEditQcTeamQty,
+                  canEditEffectiveQty: canEditEffectiveQty,
                   canEditQcQty: canEditQcQty,
                 ),
               ),

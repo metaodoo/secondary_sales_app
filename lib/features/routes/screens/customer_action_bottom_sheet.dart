@@ -496,6 +496,8 @@ class _CustomerActionBottomSheetState extends State<CustomerActionBottomSheet> {
   Widget build(BuildContext context) {
     final routeProv = Provider.of<RouteProvider>(context);
     final isCheckedIn = routeProv.checkedInOutletId == widget.outletId;
+    final auth = context.watch<AuthProvider>();
+    final canCreateOrder = auth.canDo(AppAction.orderCreate) && auth.canView(AppScreen.orderCreate);
 
     return Container(
       decoration: const BoxDecoration(
@@ -741,9 +743,10 @@ class _CustomerActionBottomSheetState extends State<CustomerActionBottomSheet> {
               );
             },
           ),
-          const SizedBox(height: 32),
+          if (canCreateOrder) ...[
+            const SizedBox(height: 32),
 
-          ElevatedButton(
+            ElevatedButton(
             onPressed: (_isCheckingIn || _isCheckingOut)
                 ? null
                 : () async {
@@ -849,6 +852,7 @@ class _CustomerActionBottomSheetState extends State<CustomerActionBottomSheet> {
                     ),
                   ),
           ),
+          ],
           const SizedBox(height: 16),
 
           // Arrival Time / Countdown
