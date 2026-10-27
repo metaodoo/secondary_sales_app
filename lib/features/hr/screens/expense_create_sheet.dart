@@ -133,6 +133,9 @@ class _ExpenseCreateSheetState extends State<ExpenseCreateSheet> {
   void _openAddItemDialog() {
     showDialog(
       context: context,
+      // A tap outside would close the box and lose what was typed; close it
+      // with Cancel instead.
+      barrierDismissible: false,
       builder: (ctx) => ChangeNotifierProvider.value(
         value: context.read<ExpenseProvider>(),
         child: _ExpenseItemDialog(
@@ -726,6 +729,9 @@ class _ExpenseItemDialogState extends State<_ExpenseItemDialog> {
         width: MediaQuery.of(context).size.width * 0.9,
         child: Form(
           key: _dialogFormKey,
+          // After a failed save, each error clears as soon as its field is
+          // filled, not only on the next save.
+          autovalidateMode: AutovalidateMode.onUserInteraction,
           child: SingleChildScrollView(
             child: Column(
               mainAxisSize: MainAxisSize.min,

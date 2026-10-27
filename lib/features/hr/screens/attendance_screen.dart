@@ -594,7 +594,8 @@ class _AttendanceScreenContentState extends State<_AttendanceScreenContent>
 
     final checkIn = formatDisplayTime(log['check_in']);
     final checkOut = formatDisplayTime(log['check_out']);
-    final isCurrentlyCheckedIn = log['check_out'] == null;
+    // The server sends an empty string, not null, while still logged in.
+    final isCurrentlyCheckedIn = (log['check_out']?.toString() ?? '').isEmpty;
     final hours = (log['worked_hours'] as num?)?.toStringAsFixed(2) ?? '0.0';
     final checkInAddress = log['check_in_address'];
     final checkOutAddress = log['check_out_address'];

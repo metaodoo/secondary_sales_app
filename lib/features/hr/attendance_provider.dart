@@ -321,7 +321,7 @@ class AttendanceProvider extends ChangeNotifier {
             photo = await AppCameraCaptureDialog.capture(
               context,
               title: 'Attendance Selfie',
-              helperTip: 'Take a clear selfie for attendance check-in',
+              helperTip: 'Take a clear selfie to log in',
               initialLensDirection: CameraLensDirection.front,
             );
           } else {
@@ -406,7 +406,8 @@ class AttendanceProvider extends ChangeNotifier {
         // optional grants, so nothing is asked at this point.
         // Reload everything on success ( _loadStatus starts/stops tracking).
         await _loadStatus();
-        await _loadHistory();
+        // From page 1: the new log-in or log-out changes the newest record.
+        await _loadHistory(reset: true);
         return true;
       } else {
         _errorMessage = response['message'] ?? 'Action failed.';
