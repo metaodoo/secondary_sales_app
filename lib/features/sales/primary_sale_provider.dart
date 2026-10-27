@@ -436,6 +436,7 @@ class PrimarySaleProvider with ChangeNotifier {
     int orderId, {
     int? pickingId,
     String? saleType,
+    String? businessType,
   }) async {
     _loadingCount++;
     _error = null;
@@ -446,6 +447,7 @@ class PrimarySaleProvider with ChangeNotifier {
         orderId,
         pickingId: pickingId,
         saleType: saleType,
+        businessType: businessType,
       );
       _warehouses = _deliveryPrepare!.warehouses;
       return _deliveryPrepare;
@@ -514,6 +516,7 @@ class PrimarySaleProvider with ChangeNotifier {
     required List<DeliveryLineInput> lines,
     bool createBackorder = true,
     String saleType = 'primary',
+    String? businessType,
     String action = 'validate',
     bool skipExpired = false,
   }) async {
@@ -530,6 +533,7 @@ class PrimarySaleProvider with ChangeNotifier {
         lines: lines,
         createBackorder: createBackorder,
         saleType: saleType,
+        businessType: businessType,
         action: action,
         skipExpired: skipExpired,
       );

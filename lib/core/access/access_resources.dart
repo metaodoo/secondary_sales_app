@@ -219,6 +219,10 @@ class AppAction {
   static const corporateOrderCreate = 'action.corporate_sale.orders.create';
   static const corporateOrderDelete = 'action.corporate_sale.orders.delete';
   static const corporateDeliveryValidate = 'action.corporate_sale.deliveries.validate';
+  static const corporateDeliveriesEditActualQty =
+      'action.corporate_sale.deliveries.edit_actual_qty';
+  static const corporateDeliveriesCreateReturn =
+      'action.corporate_sale.deliveries.create_return';
   static const corporateReturnCreate = 'action.corporate_sale.returns.create';
   static const corporateReturnSubmitDm = 'action.corporate_sale.returns.submit_dm';
   static const corporateReturnSubmitCoordinator =
@@ -229,6 +233,10 @@ class AppAction {
   static const institutionOrderCreate = 'action.institution_sale.orders.create';
   static const institutionOrderDelete = 'action.institution_sale.orders.delete';
   static const institutionDeliveryValidate = 'action.institution_sale.deliveries.validate';
+  static const institutionDeliveriesEditActualQty =
+      'action.institution_sale.deliveries.edit_actual_qty';
+  static const institutionDeliveriesCreateReturn =
+      'action.institution_sale.deliveries.create_return';
   static const institutionReturnList = 'screen.institution_sale.returns.list';
   static const institutionReturnCreate = 'action.institution_sale.returns.create';
   static const institutionReturnSubmitDm = 'action.institution_sale.returns.submit_dm';
@@ -365,6 +373,18 @@ class AppAction {
   static String orderCancelFor(String saleType, [String? businessType]) {
     if (businessType == 'mt' || saleType == 'mt') return mtOrderCancel;
     return saleType == 'secondary' ? orderCancel : primaryOrderCancel;
+  }
+
+  static String deliveryEditActualQtyFor(String? businessType) {
+    if (businessType == 'cs') return corporateDeliveriesEditActualQty;
+    if (businessType == 'is') return institutionDeliveriesEditActualQty;
+    return mtDeliveriesEditActualQty;
+  }
+
+  static String deliveryCreateReturnFor(String? businessType) {
+    if (businessType == 'cs') return corporateDeliveriesCreateReturn;
+    if (businessType == 'is') return institutionDeliveriesCreateReturn;
+    return mtDeliveriesCreateReturn;
   }
 
   static String deliveryValidateFor(String saleType, [String? businessType]) {
@@ -534,6 +554,20 @@ const List<AccessResource> accessCatalog = [
     _cs,
   ),
   AccessResource(
+    AppAction.corporateDeliveriesEditActualQty,
+    'action',
+    'corporate_sale',
+    'Corporate Sales (CS) › Edit Actual Delivered Qty',
+    _cs,
+  ),
+  AccessResource(
+    AppAction.corporateDeliveriesCreateReturn,
+    'action',
+    'corporate_sale',
+    'Corporate Sales (CS) › Create Delivery Return',
+    _cs,
+  ),
+  AccessResource(
     AppScreen.corporateReturnsList,
     'screen',
     'corporate_sale',
@@ -615,6 +649,20 @@ const List<AccessResource> accessCatalog = [
     'action',
     'institution_sale',
     'Institution Sales (IS) › Confirm Delivery',
+    _is,
+  ),
+  AccessResource(
+    AppAction.institutionDeliveriesEditActualQty,
+    'action',
+    'institution_sale',
+    'Institution Sales (IS) › Edit Actual Delivered Qty',
+    _is,
+  ),
+  AccessResource(
+    AppAction.institutionDeliveriesCreateReturn,
+    'action',
+    'institution_sale',
+    'Institution Sales (IS) › Create Delivery Return',
     _is,
   ),
   AccessResource(

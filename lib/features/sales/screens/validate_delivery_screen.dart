@@ -62,17 +62,17 @@ class _ValidateDeliveryScreenState extends State<ValidateDeliveryScreen> {
   bool get _canEditActualQty {
     if (!mounted) return false;
     final auth = context.read<AuthProvider>();
-    return auth.canDo(AppAction.mtDeliveriesEditActualQty);
+    return auth.canDo(AppAction.deliveryEditActualQtyFor(widget.businessType));
   }
 
   bool get _canCreateReturn {
     if (!mounted) return false;
     final auth = context.read<AuthProvider>();
-    return auth.canDo(AppAction.mtDeliveriesCreateReturn);
+    return auth.canDo(AppAction.deliveryCreateReturnFor(widget.businessType));
   }
 
-  bool get _isMtReturnMode =>
-      _isMt &&
+  bool get _isDeliveryReturnMode =>
+      (_isMt || _isChannelSale) &&
       (widget.pickingState.toLowerCase() == 'done' ||
           _prepare?.picking.state.toLowerCase() == 'done');
 
@@ -110,6 +110,7 @@ class _ValidateDeliveryScreenState extends State<ValidateDeliveryScreen> {
       widget.orderId,
       pickingId: widget.pickingId,
       saleType: widget.saleType,
+      businessType: widget.businessType,
     );
     if (!mounted || prepare == null) return;
 
@@ -394,6 +395,7 @@ class _ValidateDeliveryScreenState extends State<ValidateDeliveryScreen> {
             productName: input.move.product?.name ?? 'Unknown',
             enteredQty: extraQty,
             availableQty: input.move.availableQty,
+            uomName: input.move.uomName ?? 'Pcs',
           ));
         }
         continue;
@@ -408,6 +410,7 @@ class _ValidateDeliveryScreenState extends State<ValidateDeliveryScreen> {
           productName: input.move.product?.name ?? 'Unknown',
           enteredQty: input.quantityDone,
           availableQty: effectiveAvailable,
+          uomName: input.move.uomName ?? 'Pcs',
         ));
       }
     }
@@ -427,6 +430,7 @@ class _ValidateDeliveryScreenState extends State<ValidateDeliveryScreen> {
         locationId: _locationId,
         lines: _inputs,
         saleType: widget.saleType,
+        businessType: widget.businessType,
         action: 'save',
       );
       if (!mounted) return;
@@ -452,6 +456,7 @@ class _ValidateDeliveryScreenState extends State<ValidateDeliveryScreen> {
         lines: _inputs,
         createBackorder: false,
         saleType: widget.saleType,
+        businessType: widget.businessType,
         skipExpired: false,
       );
     } on ExpiredLotsConfirmationException catch (e) {
@@ -469,6 +474,7 @@ class _ValidateDeliveryScreenState extends State<ValidateDeliveryScreen> {
             lines: _inputs,
             createBackorder: false,
             saleType: widget.saleType,
+            businessType: widget.businessType,
             skipExpired: true,
           );
         } catch (e) {
@@ -770,7 +776,7 @@ class _ValidateDeliveryScreenState extends State<ValidateDeliveryScreen> {
         child: Column(
           children: [
             BlueHeader(
-              title: _isMtReturnMode
+              title: _isDeliveryReturnMode
                   ? 'Delivery & Return'
                   : (isReadOnly ? 'Delivery Details' : 'Validate Delivery'),
               subtitle: '${widget.orderName} • ${widget.pickingName}',
@@ -922,7 +928,7 @@ class _ValidateDeliveryScreenState extends State<ValidateDeliveryScreen> {
                           ),
                         ),
                       ),
-                    if (_isMtReturnMode && prepare.picking.hasDeliveryReturn)
+                    if (_isDeliveryReturnMode && prepare.picking.hasDeliveryReturn)
                       Padding(
                         padding: const EdgeInsets.only(bottom: 16),
                         child: Container(
@@ -1002,7 +1008,7 @@ class _ValidateDeliveryScreenState extends State<ValidateDeliveryScreen> {
                         child: _DeliveryLinePanel(
                           input: input,
                           isReadOnly: isReadOnly,
-                          showActualDeliveredQty: _isMtReturnMode,
+                          showActualDeliveredQty: _isDeliveryReturnMode,
                           canEditActualQty: _canEditActualQty,
                           isDeliveryCountLocked: _isDeliveryCountLocked,
                           onActualDeliveredQtyChanged: (newVal) {
@@ -1158,7 +1164,7 @@ class _ValidateDeliveryScreenState extends State<ValidateDeliveryScreen> {
                         ),
                       ),
               )
-            else if (_isMtReturnMode && _canCreateReturn && !_isDeliveryCountLocked)
+            else if (_isDeliveryReturnMode && _canCreateReturn && !_isDeliveryCountLocked)
               Container(
                 padding: const EdgeInsets.all(16),
                 decoration: const BoxDecoration(

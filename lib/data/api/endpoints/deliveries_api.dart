@@ -7,12 +7,15 @@ extension DeliveriesApi on ApiService {
     int orderId, {
     int? pickingId,
     String? saleType,
+    String? businessType,
   }) async {
     final result = await _post('${AppConstants.deliveriesEndpoint}/prepare', {
       'employee_id': _activeEmployeeId,
       if (orderId > 0) 'sale_order_id': orderId,
       if (pickingId != null) 'picking_id': pickingId,
       if (saleType != null) 'sale_type': saleType,
+      if (businessType != null && businessType.isNotEmpty)
+        'business_type': businessType,
     });
     if (result['success'] == true) {
       return DeliveryPrepare.fromMap(result['data'] ?? <String, dynamic>{});
@@ -28,6 +31,7 @@ extension DeliveriesApi on ApiService {
     required List<DeliveryLineInput> lines,
     bool createBackorder = true,
     String? saleType,
+    String? businessType,
     String action = 'validate',
     bool skipExpired = false,
   }) async {
@@ -41,6 +45,8 @@ extension DeliveriesApi on ApiService {
           'create_backorder': createBackorder,
           'lines': lines.map((line) => line.toPayload()).toList(),
           if (saleType != null) 'sale_type': saleType,
+          if (businessType != null && businessType.isNotEmpty)
+            'business_type': businessType,
           if (skipExpired) 'skip_expired': true,
         });
     if (result['requires_confirmation'] == true &&
