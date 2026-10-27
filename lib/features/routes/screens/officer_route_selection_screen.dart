@@ -6,7 +6,7 @@ import 'package:provider/provider.dart';
 import 'package:secondary_sales/features/employees/employee_provider.dart';
 import 'package:secondary_sales/core/widgets/ss_ui.dart';
 
-class OfficerRouteSelectionScreen extends StatelessWidget {
+class OfficerRouteSelectionScreen extends StatefulWidget {
   const OfficerRouteSelectionScreen({
     super.key,
     this.onProfileTap,
@@ -17,6 +17,28 @@ class OfficerRouteSelectionScreen extends StatelessWidget {
   final VoidCallback? onProfileTap;
   final VoidCallback? onBack;
   final VoidCallback? onOpenMenu;
+
+  @override
+  State<OfficerRouteSelectionScreen> createState() =>
+      _OfficerRouteSelectionScreenState();
+}
+
+class _OfficerRouteSelectionScreenState
+    extends State<OfficerRouteSelectionScreen> {
+  // Loaded once, not on every build: a load started in build ran again on
+  // each rebuild and notified listeners while the screen was building.
+  late Future<List<Map<String, dynamic>>> _routes = _loadRoutes();
+
+  Future<List<Map<String, dynamic>>> _loadRoutes() {
+    final employees = context.read<EmployeeProvider>();
+    // After the current build, so its notifyListeners does not land in it.
+    return Future(employees.fetchRoutes);
+  }
+
+  Future<void> _refresh() async {
+    setState(() => _routes = _loadRoutes());
+    await _routes;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -39,7 +61,7 @@ class OfficerRouteSelectionScreen extends StatelessWidget {
             size: 28,
           ),
           onPressed:
-              onBack ??
+              widget.onBack ??
               () {
                 if (Navigator.canPop(context)) {
                   Navigator.pop(context);
@@ -58,7 +80,7 @@ class OfficerRouteSelectionScreen extends StatelessWidget {
         actions: [
           Padding(
             padding: const EdgeInsets.only(right: 16),
-            child: ProfileAvatar(onTap: onOpenMenu),
+            child: ProfileAvatar(onTap: widget.onOpenMenu),
           ),
         ],
         bottom: PreferredSize(
@@ -67,10 +89,7 @@ class OfficerRouteSelectionScreen extends StatelessWidget {
         ),
       ),
       body: FutureBuilder<List<Map<String, dynamic>>>(
-        future: Provider.of<EmployeeProvider>(
-          context,
-          listen: false,
-        ).fetchRoutes(),
+        future: _routes,
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
@@ -82,10 +101,7 @@ class OfficerRouteSelectionScreen extends StatelessWidget {
           final routes = snapshot.data ?? [];
 
           return RefreshIndicator(
-            onRefresh: () => Provider.of<EmployeeProvider>(
-              context,
-              listen: false,
-            ).fetchRoutes(),
+            onRefresh: _refresh,
             child: ListView(
               padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
               children: [

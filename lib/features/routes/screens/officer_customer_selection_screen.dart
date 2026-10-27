@@ -18,6 +18,7 @@ import 'package:secondary_sales/core/services/location_service.dart';
 import 'package:secondary_sales/core/util/proximity_helper.dart';
 import 'package:secondary_sales/core/util/dialog_helper.dart';
 import 'package:secondary_sales/core/widgets/app_camera_capture_dialog.dart';
+import 'package:secondary_sales/core/widgets/ss_list_row.dart';
 import 'package:secondary_sales/core/widgets/ss_ui.dart';
 import 'package:secondary_sales/core/services/gps_lock_service.dart';
 import 'package:secondary_sales/core/widgets/gps_status_banner.dart';
@@ -57,7 +58,8 @@ class _OfficerCustomerSelectionScreenState
       context,
       listen: false,
     );
-    _routeFuture = routeProv.fetchRouteDetail(widget.routeId);
+    // After the current build, so its notifyListeners does not land in it.
+    _routeFuture = Future(() => routeProv.fetchRouteDetail(widget.routeId));
     _startGpsMonitoring();
   }
 
@@ -281,6 +283,194 @@ class _OfficerCustomerSelectionScreenState
     );
   }
 
+  /// Mobile first, as before; either may be missing or blank.
+  String? _outletPhone(RouteOutlet outlet) {
+    final mobile = outlet.mobile?.trim() ?? '';
+    return mobile.isNotEmpty ? mobile : outlet.phone;
+  }
+
+  Future<void> _checkOut(RouteOutlet outlet) async {
+    final routeProv = context.read<RouteProvider>();
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Check Out'),
+        content: Text('Are you sure you want to check out from ${outlet.name}?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Check Out'),
+          ),
+        ],
+      ),
+    );
+    if (confirm == true) {
+      VisitReasonSelection? selection;
+      if (routeProv.requiresVisitReason) {
+        if (!mounted) return;
+        selection =
+            await VisitReasonDialog.show(
+              context,
+            );
+        if (selection == null) return;
+      }
+      setState(() => _checkingOutOutletId = outlet.id);
+      try {
+        await routeProv.checkOut(
+          visitReasonId:
+              selection?.reasonId,
+          reasonNotes: selection?.notes,
+          saleAmount: selection?.saleAmount,
+        );
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(
+            SnackBar(
+              content: Text(
+                'Check-out failed: ${e.toString().replaceAll('Exception: ', '')}',
+              ),
+            ),
+          );
+        }
+      } finally {
+        if (mounted) {
+          setState(() => _checkingOutOutletId = null);
+        }
+      }
+    }
+  }
+
+  Future<void> _checkIn(RouteOutlet outlet) async {
+    final routeProv = context.read<RouteProvider>();
+    final auth = context.read<AuthProvider>();
+    final employeeId = auth.employeeId;
+    if (employeeId == null) return;
+    if (routeProv.checkedInOutletId != null &&
+        routeProv.checkedInOutletId != outlet.id) {
+      showValidationErrorDialog(
+        context,
+        'You are already checked in at another outlet. Please check out before checking in to "${outlet.name}".',
+        title: 'Active Check-in Exists',
+      );
+      return;
+    }
+    setState(() => _checkingInOutletId = outlet.id);
+    try {
+       // 1. Acquire GPS position with fast-converging resolver (re-using fresh route position if available)
+       Position? position;
+       final routeProv = context.read<RouteProvider>();
+       try {
+         position = await LocationService.resolveCheckInPosition(
+           cachedPosition: routeProv.currentPosition,
+           desiredAccuracy: 25.0,
+           maxAcceptableAccuracy: 70.0,
+           burstTimeout: const Duration(seconds: 4),
+         );
+       } catch (e) {
+         if (!auth.canSkipAttendanceGeo) {
+           rethrow;
+         }
+       }
+
+       // 2. Validate Geofence FIRST before letting user take a photo
+       if (!auth.canSkipAttendanceGeo &&
+           outlet.partnerLatitude != null &&
+           outlet.partnerLongitude != null &&
+           outlet.partnerLatitude != 0.0 &&
+           outlet.partnerLongitude != 0.0 &&
+           position != null) {
+         final double distanceMeters = Geolocator.distanceBetween(
+           position.latitude,
+           position.longitude,
+           outlet.partnerLatitude!,
+           outlet.partnerLongitude!,
+         );
+         final double allowedRadius = outlet.outletRadius ?? 50.0;
+         if (!ProximityHelper.isGeofenceSatisfied(
+           distanceMeters: distanceMeters,
+           accuracyMeters: position.accuracy,
+           allowedRadius: allowedRadius,
+         )) {
+           throw Exception(
+             'You are ${distanceMeters.round()}m away from "${outlet.name}". Allowed radius is ${allowedRadius.round()}m (GPS accuracy: ±${position.accuracy.round()}m).',
+           );
+         }
+       }
+
+       String? imageB64;
+       if (auth.canView(AppScreen.newJointVisit)) {
+         if (!mounted) return;
+         final XFile? photo = await AppCameraCaptureDialog.capture(
+           context,
+           title: 'Joint Visit Check-in',
+           helperTip: 'Take a check-in photo with the outlet owner',
+         );
+         if (photo == null) {
+           if (mounted) {
+             ScaffoldMessenger.of(context).showSnackBar(
+               const SnackBar(
+                 content: Text('A check-in photo is required for joint visits.'),
+               ),
+             );
+           }
+           return;
+         }
+         final persistentFile = await MediaStorageService.persistPickedFile(
+           photo,
+           category: MediaCategory.visits,
+           customPrefix: 'joint_visit',
+         );
+         final bytes = persistentFile != null
+             ? await persistentFile.readAsBytes()
+             : await photo.readAsBytes();
+         imageB64 = base64Encode(bytes);
+       }
+
+      await routeProv.checkIn(
+        employeeId,
+        outlet.id,
+        position: position,
+        image1920: imageB64,
+      );
+      if (mounted) {
+        _openActionModalFor(
+          outlet.id,
+          outlet.name,
+          outletCode: outlet.code,
+          phone: outlet.phone,
+          mobile: outlet.mobile,
+          latitude: outlet.partnerLatitude,
+          longitude: outlet.partnerLongitude,
+          outletRadius: outlet.outletRadius,
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        final errorMsg = e.toString().replaceAll(
+          'Exception: ',
+          '',
+        );
+        final isGeofenceError = errorMsg.contains('away from') || errorMsg.contains('radius');
+        ssShowLocationErrorDialog(
+          context,
+          errorMsg,
+          actionLabel: isGeofenceError ? 'Update GPS' : null,
+          onAction: isGeofenceError ? () => _recalibrateOutletLocation(outlet) : null,
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _checkingInOutletId = null);
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -338,802 +528,429 @@ class _OfficerCustomerSelectionScreenState
               );
 
               return Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(20.0, 12.0, 20.0, 4.0),
-                    child: Container(
-                      padding: const EdgeInsets.all(14),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(14),
-                        border: Border.all(color: AppColors.borderSoft),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.02),
-                            blurRadius: 6,
-                            offset: const Offset(0, 2),
-                          ),
-                        ],
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
+                  Expanded(
+                    // One scroll for the header and the outlets: on short
+                    // screens (landscape, large text) the header scrolls
+                    // away instead of squeezing out the list.
+                    child: CustomScrollView(
+                      slivers: [
+                        SliverToBoxAdapter(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Container(
-                                padding: const EdgeInsets.all(8),
-                                decoration: BoxDecoration(
-                                  color: AppColors.primarySoft,
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                child: const Icon(
-                                  Icons.alt_route_rounded,
-                                  size: 18,
-                                  color: AppColors.primaryStrong,
+                              Padding(
+                                padding: const EdgeInsets.fromLTRB(20.0, 12.0, 20.0, 4.0),
+                                child: Container(
+                                  padding: const EdgeInsets.all(14),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white,
+                                    borderRadius: BorderRadius.circular(14),
+                                    border: Border.all(color: AppColors.borderSoft),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: Colors.black.withValues(alpha: 0.02),
+                                        blurRadius: 6,
+                                        offset: const Offset(0, 2),
+                                      ),
+                                    ],
+                                  ),
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Row(
+                                        children: [
+                                          Container(
+                                            padding: const EdgeInsets.all(8),
+                                            decoration: BoxDecoration(
+                                              color: AppColors.primarySoft,
+                                              borderRadius: BorderRadius.circular(8),
+                                            ),
+                                            child: const Icon(
+                                              Icons.alt_route_rounded,
+                                              size: 18,
+                                              color: AppColors.primaryStrong,
+                                            ),
+                                          ),
+                                          const SizedBox(width: 10),
+                                          Expanded(
+                                            child: Column(
+                                              crossAxisAlignment: CrossAxisAlignment.start,
+                                              children: [
+                                                const Text(
+                                                  'ROUTE',
+                                                  style: TextStyle(
+                                                    color: AppColors.primaryStrong,
+                                                    fontSize: 10,
+                                                    fontWeight: FontWeight.bold,
+                                                    letterSpacing: 0.8,
+                                                  ),
+                                                ),
+                                                const SizedBox(height: 2),
+                                                Text(
+                                                  widget.routeName,
+                                                  style: const TextStyle(
+                                                    color: AppColors.textPrimary,
+                                                    fontSize: 15,
+                                                    fontWeight: FontWeight.bold,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      if (routeDetail?.distributorName != null &&
+                                          routeDetail!.distributorName!.isNotEmpty) ...[
+                                        const SizedBox(height: 10),
+                                        const Divider(height: 1, color: AppColors.borderMuted),
+                                        const SizedBox(height: 8),
+                                        Row(
+                                          children: [
+                                            const Icon(
+                                              Icons.business_outlined,
+                                              size: 15,
+                                              color: Color(0xFF0D9488),
+                                            ),
+                                            const SizedBox(width: 6),
+                                            const Text(
+                                              'Distributor (DB): ',
+                                              style: TextStyle(
+                                                color: AppColors.textSecondary,
+                                                fontSize: 12,
+                                                fontWeight: FontWeight.w600,
+                                              ),
+                                            ),
+                                            Expanded(
+                                              child: Text(
+                                                routeDetail.distributorName!,
+                                                style: const TextStyle(
+                                                  color: Color(0xFF1E293B),
+                                                  fontSize: 12,
+                                                  fontWeight: FontWeight.w700,
+                                                ),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ],
+                                    ],
+                                  ),
                                 ),
                               ),
-                              const SizedBox(width: 10),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    const Text(
-                                      'ROUTE',
-                                      style: TextStyle(
-                                        color: AppColors.primaryStrong,
-                                        fontSize: 10,
-                                        fontWeight: FontWeight.bold,
-                                        letterSpacing: 0.8,
+
+                              // Non-intrusive GPS Satellite Lock Status Banner
+                              GpsStatusBanner(
+                                lockStateNotifier: _gpsLockService.stateNotifier,
+                                onRefresh: _startGpsMonitoring,
+                              ),
+
+                              Padding(
+                                padding: const EdgeInsets.fromLTRB(20.0, 6.0, 20.0, 8.0),
+                                child: TextField(
+                                  controller: _searchController,
+                                  onChanged: (val) {
+                                    setState(() {
+                                      _searchQuery = val.trim().toLowerCase();
+                                    });
+                                  },
+                                  decoration: InputDecoration(
+                                    hintText: 'Search by Code, Name, Phone, Owner...',
+                                    hintStyle: const TextStyle(
+                                      color: AppColors.textSecondary,
+                                    ),
+                                    prefixIcon: const Icon(
+                                      Icons.search,
+                                      color: AppColors.textSecondary,
+                                    ),
+                                    suffixIcon: _searchQuery.isNotEmpty
+                                        ? IconButton(
+                                            tooltip: 'Clear',
+                                            icon: const Icon(Icons.clear, size: 20),
+                                            onPressed: () {
+                                              _searchController.clear();
+                                              setState(() {
+                                                _searchQuery = '';
+                                              });
+                                            },
+                                          )
+                                        : null,
+                                    filled: true,
+                                    fillColor: Colors.white,
+                                    contentPadding: const EdgeInsets.symmetric(
+                                      vertical: 16,
+                                    ),
+                                    border: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                      borderSide: const BorderSide(
+                                        color: AppColors.borderSoft,
                                       ),
                                     ),
-                                    const SizedBox(height: 2),
-                                    Text(
-                                      widget.routeName,
-                                      style: const TextStyle(
-                                        color: AppColors.textPrimary,
-                                        fontSize: 15,
-                                        fontWeight: FontWeight.bold,
+                                    enabledBorder: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                      borderSide: const BorderSide(
+                                        color: AppColors.borderSoft,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              // Proximity & GPS Toolbar
+                              Padding(
+                                padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 2.0),
+                                // Wraps to two lines with large text.
+                                child: Wrap(
+                                  alignment: WrapAlignment.spaceBetween,
+                                  spacing: AppSpacing.sm,
+                                  children: [
+                                    // Sort Nearest Toggle Button
+                                    InkWell(
+                                      onTap: () {
+                                        routeProvider.toggleSortByNearest();
+                                        if (routeProvider.sortByNearest && routeProvider.currentPosition == null) {
+                                          routeProvider.refreshGpsPosition(requireFresh: false);
+                                        }
+                                      },
+                                      borderRadius: BorderRadius.circular(20),
+                                      child: ConstrainedBox(
+                                        constraints: const BoxConstraints(minHeight: AppSizes.touchTarget),
+                                        child: Center(
+                                          widthFactor: 1,
+                                          child: AnimatedContainer(
+                                            duration: const Duration(milliseconds: 200),
+                                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                            decoration: BoxDecoration(
+                                              color: routeProvider.sortByNearest
+                                                  ? AppColors.primaryStrong
+                                                  : Colors.white,
+                                              borderRadius: BorderRadius.circular(20),
+                                              border: Border.all(
+                                                color: routeProvider.sortByNearest
+                                                    ? AppColors.primaryStrong
+                                                    : AppColors.borderSoft,
+                                              ),
+                                            ),
+                                            child: Row(
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                Icon(
+                                                  Icons.near_me,
+                                                  size: 14,
+                                                  color: routeProvider.sortByNearest
+                                                      ? Colors.white
+                                                      : AppColors.textSecondary,
+                                                ),
+                                                const SizedBox(width: 6),
+                                                Text(
+                                                  routeProvider.sortByNearest ? 'Nearest First' : 'Sequence Order',
+                                                  style: TextStyle(
+                                                    fontSize: 12,
+                                                    fontWeight: FontWeight.w600,
+                                                    color: routeProvider.sortByNearest
+                                                        ? Colors.white
+                                                        : AppColors.textSecondary,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                    // Refresh GPS Button
+                                    InkWell(
+                                      onTap: routeProvider.isGpsRefreshing
+                                          ? null
+                                          : () async {
+                                              final pos = await routeProvider.refreshGpsPosition(requireFresh: true);
+                                              if (pos != null && mounted) {
+                                                ScaffoldMessenger.of(context).showSnackBar(
+                                                  const SnackBar(
+                                                    content: Text('GPS location updated.'),
+                                                    duration: Duration(seconds: 1),
+                                                  ),
+                                                );
+                                              }
+                                            },
+                                      borderRadius: BorderRadius.circular(20),
+                                      child: ConstrainedBox(
+                                        constraints: const BoxConstraints(minHeight: AppSizes.touchTarget),
+                                        child: Center(
+                                          widthFactor: 1,
+                                          child: Container(
+                                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                            decoration: BoxDecoration(
+                                              color: Colors.white,
+                                              borderRadius: BorderRadius.circular(20),
+                                              border: Border.all(color: AppColors.borderSoft),
+                                            ),
+                                            child: Row(
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                if (routeProvider.isGpsRefreshing)
+                                                  const SizedBox(
+                                                    width: 12,
+                                                    height: 12,
+                                                    child: CircularProgressIndicator(strokeWidth: 2),
+                                                  )
+                                                else
+                                                  const Icon(
+                                                    Icons.my_location,
+                                                    size: 14,
+                                                    color: AppColors.primaryStrong,
+                                                  ),
+                                                const SizedBox(width: 5),
+                                                Text(
+                                                  routeProvider.isGpsRefreshing ? 'Updating...' : 'Refresh GPS',
+                                                  style: const TextStyle(
+                                                    fontSize: 12,
+                                                    fontWeight: FontWeight.w600,
+                                                    color: AppColors.primaryStrong,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                        ),
                                       ),
                                     ),
                                   ],
                                 ),
                               ),
+                              const SizedBox(height: 8),
+                              Padding(
+                                padding: const EdgeInsets.symmetric(horizontal: 20.0),
+                                child: Text(
+                                  _searchQuery.isEmpty
+                                      ? 'AVAILABLE OUTLETS (${outlets.length})'
+                                      : 'FOUND OUTLETS (${sortedOutlets.length})',
+                                  style: const TextStyle(
+                                    color: AppColors.textSecondary,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 11,
+                                    letterSpacing: 1,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(height: 12),
                             ],
                           ),
-                          if (routeDetail?.distributorName != null &&
-                              routeDetail!.distributorName!.isNotEmpty) ...[
-                            const SizedBox(height: 10),
-                            const Divider(height: 1, color: AppColors.borderMuted),
-                            const SizedBox(height: 8),
-                            Row(
-                              children: [
-                                const Icon(
-                                  Icons.business_outlined,
-                                  size: 15,
-                                  color: Color(0xFF0D9488),
-                                ),
-                                const SizedBox(width: 6),
-                                const Text(
-                                  'Distributor (DB): ',
-                                  style: TextStyle(
-                                    color: AppColors.textSecondary,
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                                Expanded(
-                                  child: Text(
-                                    routeDetail.distributorName!,
-                                    style: const TextStyle(
-                                      color: Color(0xFF1E293B),
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.w700,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ],
-                        ],
-                      ),
-                    ),
-                  ),
-
-                  // Non-intrusive GPS Satellite Lock Status Banner
-                  GpsStatusBanner(
-                    lockStateNotifier: _gpsLockService.stateNotifier,
-                    onRefresh: _startGpsMonitoring,
-                  ),
-
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(20.0, 6.0, 20.0, 8.0),
-                    child: TextField(
-                      controller: _searchController,
-                      onChanged: (val) {
-                        setState(() {
-                          _searchQuery = val.trim().toLowerCase();
-                        });
-                      },
-                      decoration: InputDecoration(
-                        hintText: 'Search by Code, Name, Phone, Owner...',
-                        hintStyle: const TextStyle(
-                          color: AppColors.textSecondary,
                         ),
-                        prefixIcon: const Icon(
-                          Icons.search,
-                          color: AppColors.textSecondary,
-                        ),
-                        suffixIcon: _searchQuery.isNotEmpty
-                            ? IconButton(
-                                tooltip: 'Clear',
-                                icon: const Icon(Icons.clear, size: 20),
-                                onPressed: () {
-                                  _searchController.clear();
-                                  setState(() {
-                                    _searchQuery = '';
-                                  });
-                                },
-                              )
-                            : null,
-                        filled: true,
-                        fillColor: Colors.white,
-                        contentPadding: const EdgeInsets.symmetric(
-                          vertical: 16,
-                        ),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: const BorderSide(
-                            color: AppColors.borderSoft,
-                          ),
-                        ),
-                        enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: const BorderSide(
-                            color: AppColors.borderSoft,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                  // Proximity & GPS Toolbar
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 2.0),
-                    child: Row(
-                      children: [
-                        // Sort Nearest Toggle Button
-                        InkWell(
-                          onTap: () {
-                            routeProvider.toggleSortByNearest();
-                            if (routeProvider.sortByNearest && routeProvider.currentPosition == null) {
-                              routeProvider.refreshGpsPosition(requireFresh: false);
-                            }
-                          },
-                          borderRadius: BorderRadius.circular(20),
-                          child: AnimatedContainer(
-                            duration: const Duration(milliseconds: 200),
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                            decoration: BoxDecoration(
-                              color: routeProvider.sortByNearest
-                                  ? AppColors.primaryStrong
-                                  : Colors.white,
-                              borderRadius: BorderRadius.circular(20),
-                              border: Border.all(
-                                color: routeProvider.sortByNearest
-                                    ? AppColors.primaryStrong
-                                    : AppColors.borderSoft,
+                        if (sortedOutlets.isEmpty)
+                          SliverFillRemaining(
+                            hasScrollBody: false,
+                            child: Center(
+                              child: Text(
+                                _searchQuery.isEmpty
+                                    ? 'No outlets assigned to this route.'
+                                    : 'No outlets match "$_searchQuery".',
+                                style: const TextStyle(color: AppColors.textSecondary),
                               ),
                             ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(
-                                  Icons.near_me,
-                                  size: 14,
-                                  color: routeProvider.sortByNearest
-                                      ? Colors.white
-                                      : AppColors.textSecondary,
-                                ),
-                                const SizedBox(width: 6),
-                                Text(
-                                  routeProvider.sortByNearest ? 'Nearest First' : 'Sequence Order',
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w600,
-                                    color: routeProvider.sortByNearest
-                                        ? Colors.white
-                                        : AppColors.textSecondary,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                        const Spacer(),
-                        // Refresh GPS Button
-                        InkWell(
-                          onTap: routeProvider.isGpsRefreshing
-                              ? null
-                              : () async {
-                                  final pos = await routeProvider.refreshGpsPosition(requireFresh: true);
-                                  if (pos != null && mounted) {
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      const SnackBar(
-                                        content: Text('GPS location updated.'),
-                                        duration: Duration(seconds: 1),
+                          )
+                        else
+                          SliverPadding(
+                            padding: const EdgeInsets.fromLTRB(20, 0, 20, kSsFabScrollPadding),
+                            sliver: SliverList.builder(
+                            itemCount: sortedOutlets.length,
+                            itemBuilder: (context, index) {
+                              final outlet = sortedOutlets[index];
+                              final routeProv = routeProvider;
+
+                              final isCheckedIn =
+                                  routeProv.checkedInOutletId == outlet.id;
+
+                              final isCheckedOut = routeProv.checkedOutOutletIds
+                                  .contains(outlet.id);
+
+                              final distanceMeters = ProximityHelper.calculateDistance(
+                                userLat: routeProv.currentPosition?.latitude,
+                                userLng: routeProv.currentPosition?.longitude,
+                                outletLat: outlet.partnerLatitude,
+                                outletLng: outlet.partnerLongitude,
+                              );
+
+                              return Padding(
+                                padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+                                child: SsListRow(
+                                  title: outlet.name,
+                                  details: [
+                                    [
+                                      outlet.code,
+                                      _outletPhone(outlet),
+                                    ]
+                                        .map((part) => part?.trim() ?? '')
+                                        .where((part) => part.isNotEmpty)
+                                        .join(' · '),
+                                    if (outlet.ownerName?.trim().isNotEmpty ?? false)
+                                      'Owner: ${outlet.ownerName!.trim()}',
+                                    outlet.street ?? 'No address provided',
+                                  ],
+                                  selected: isCheckedIn,
+                                  status: [
+                                    if (distanceMeters != null)
+                                      _buildDistanceBadge(
+                                        distanceMeters,
+                                        outlet: outlet,
+                                        userPosition: routeProvider.currentPosition,
                                       ),
-                                    );
-                                  }
-                                },
-                          borderRadius: BorderRadius.circular(20),
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              borderRadius: BorderRadius.circular(20),
-                              border: Border.all(color: AppColors.borderSoft),
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                if (routeProvider.isGpsRefreshing)
-                                  const SizedBox(
-                                    width: 12,
-                                    height: 12,
-                                    child: CircularProgressIndicator(strokeWidth: 2),
-                                  )
-                                else
-                                  const Icon(
-                                    Icons.my_location,
-                                    size: 14,
-                                    color: AppColors.primaryStrong,
-                                  ),
-                                const SizedBox(width: 5),
-                                Text(
-                                  routeProvider.isGpsRefreshing ? 'Updating...' : 'Refresh GPS',
-                                  style: const TextStyle(
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w600,
-                                    color: AppColors.primaryStrong,
+                                    if (isCheckedIn)
+                                      SsStatusPill(
+                                        label: routeProv.checkInTime != null
+                                            ? 'Checked in at ${_formatTime(routeProv.checkInTime!)}'
+                                            : 'Checked in',
+                                        color: AppColors.success,
+                                        background: AppColors.successSoft,
+                                      )
+                                    else if (isCheckedOut)
+                                      const SsStatusPill(
+                                        label: 'Checked out',
+                                        color: AppColors.textSecondary,
+                                        background: AppColors.surfaceTint,
+                                      ),
+                                  ],
+                                  action: isCheckedIn
+                                      ? SsRowAction(
+                                          label: 'Check Out',
+                                          icon: Icons.logout_rounded,
+                                          color: AppColors.danger,
+                                          busy: _checkingOutOutletId == outlet.id,
+                                          onPressed: _checkingOutOutletId != null
+                                              ? null
+                                              : () => _checkOut(outlet),
+                                        )
+                                      : SsRowAction(
+                                          label: 'Check In',
+                                          icon: Icons.location_on_rounded,
+                                          color: AppColors.success,
+                                          busy: _checkingInOutletId == outlet.id,
+                                          onPressed: _checkingInOutletId != null
+                                              ? null
+                                              : () => _checkIn(outlet),
+                                        ),
+                                  onTap: () => _openActionModalFor(
+                                    outlet.id,
+                                    outlet.name,
+                                    outletCode: outlet.code,
+                                    phone: outlet.phone,
+                                    mobile: outlet.mobile,
+                                    latitude: outlet.partnerLatitude,
+                                    longitude: outlet.partnerLongitude,
+                                    outletRadius: outlet.outletRadius,
                                   ),
                                 ),
-                              ],
-                            ),
+                              );
+                            },
                           ),
                         ),
                       ],
                     ),
                   ),
-                  const SizedBox(height: 8),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 20.0),
-                    child: Text(
-                      _searchQuery.isEmpty
-                          ? 'AVAILABLE OUTLETS (${outlets.length})'
-                          : 'FOUND OUTLETS (${sortedOutlets.length})',
-                      style: const TextStyle(
-                        color: AppColors.textSecondary,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 11,
-                        letterSpacing: 1,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  if (sortedOutlets.isEmpty)
-                    Expanded(
-                      child: Center(
-                        child: Text(
-                          _searchQuery.isEmpty
-                              ? 'No outlets assigned to this route.'
-                              : 'No outlets match "$_searchQuery".',
-                          style: const TextStyle(color: AppColors.textSecondary),
-                        ),
-                      ),
-                    )
-                  else
-                    Expanded(
-                      child: ListView.builder(
-                        padding: const EdgeInsets.fromLTRB(
-                          20,
-                          0,
-                          20,
-                          kSsFabScrollPadding,
-                        ),
-                        itemCount: sortedOutlets.length,
-                        itemBuilder: (context, index) {
-                          final outlet = sortedOutlets[index];
-                          final routeProv = routeProvider;
-                          final auth = Provider.of<AuthProvider>(
-                            context,
-                            listen: false,
-                          );
-                          final employeeId = auth.employeeId;
-
-                          final isCheckedIn =
-                              routeProv.checkedInOutletId == outlet.id;
-
-                          final isCheckedOut = routeProv.checkedOutOutletIds
-                              .contains(outlet.id);
-
-                          final distanceMeters = ProximityHelper.calculateDistance(
-                            userLat: routeProv.currentPosition?.latitude,
-                            userLng: routeProv.currentPosition?.longitude,
-                            outletLat: outlet.partnerLatitude,
-                            outletLng: outlet.partnerLongitude,
-                          );
-
-                          return GestureDetector(
-                            behavior: HitTestBehavior.opaque,
-                            onTap: () {
-                              _openActionModalFor(
-                                outlet.id,
-                                outlet.name,
-                                outletCode: outlet.code,
-                                phone: outlet.phone,
-                                mobile: outlet.mobile,
-                                latitude: outlet.partnerLatitude,
-                                longitude: outlet.partnerLongitude,
-                                outletRadius: outlet.outletRadius,
-                              );
-                            },
-                            child: Container(
-                              margin: const EdgeInsets.only(bottom: 12),
-                              padding: const EdgeInsets.all(16),
-                              decoration: BoxDecoration(
-                                color: Colors.white,
-                                borderRadius: BorderRadius.circular(12),
-                                border: Border.all(
-                                  color: isCheckedIn
-                                      ? const Color(0xFF10B981)
-                                      : AppColors.borderSoft,
-                                  width: isCheckedIn ? 2 : 1,
-                                ),
-                              ),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Row(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Container(
-                                        padding: const EdgeInsets.all(10),
-                                        decoration: BoxDecoration(
-                                          color: AppColors.primarySoft,
-                                          borderRadius: BorderRadius.circular(20),
-                                        ),
-                                        child: const Icon(
-                                          Icons.storefront,
-                                          color: Color(0xFF3B82F6),
-                                          size: 20,
-                                        ),
-                                      ),
-                                      const SizedBox(width: 12),
-                                      Expanded(
-                                        child: Column(
-                                          crossAxisAlignment: CrossAxisAlignment.start,
-                                          children: [
-                                        // Primary: Outlet Name with full width, naturally wraps row by row
-                                        Text(
-                                          outlet.name,
-                                          softWrap: true,
-                                          style: const TextStyle(
-                                            fontWeight: FontWeight.bold,
-                                            fontSize: 15,
-                                            height: 1.25,
-                                            color: AppColors.textPrimary,
-                                          ),
-                                        ),
-                                        // Secondary: SS Code + Distance Badge (Wrap prevents squishing on narrow screens)
-                                        const SizedBox(height: 4),
-                                        Wrap(
-                                          spacing: 6,
-                                          runSpacing: 4,
-                                          crossAxisAlignment: WrapCrossAlignment.center,
-                                          children: [
-                                            if (outlet.code != null &&
-                                                outlet.code!.trim().isNotEmpty)
-                                              Text(
-                                                'SS Code: ${outlet.code!.trim()}',
-                                                maxLines: 1,
-                                                overflow: TextOverflow.ellipsis,
-                                                style: const TextStyle(
-                                                  color: AppColors.primary,
-                                                  fontWeight: FontWeight.w600,
-                                                  fontSize: 12,
-                                                ),
-                                              ),
-                                            if (distanceMeters != null)
-                                              _buildDistanceBadge(
-                                                distanceMeters,
-                                                outlet: outlet,
-                                                userPosition: routeProvider.currentPosition,
-                                              ),
-                                          ],
-                                        ),
-                                        if (outlet.ownerName != null &&
-                                            outlet.ownerName!.trim().isNotEmpty) ...[
-                                          const SizedBox(height: 2),
-                                          Text(
-                                            'Owner: ${outlet.ownerName!.trim()}',
-                                            maxLines: 1,
-                                            overflow: TextOverflow.ellipsis,
-                                            style: const TextStyle(
-                                              color: AppColors.textSecondary,
-                                              fontWeight: FontWeight.w500,
-                                              fontSize: 12,
-                                            ),
-                                          ),
-                                        ],
-                                        if ((outlet.mobile != null &&
-                                                outlet.mobile!.trim().isNotEmpty) ||
-                                            (outlet.phone != null &&
-                                                outlet.phone!.trim().isNotEmpty)) ...[
-                                          const SizedBox(height: 2),
-                                          Text(
-                                            'Phone: ${outlet.mobile ?? outlet.phone}',
-                                            maxLines: 1,
-                                            overflow: TextOverflow.ellipsis,
-                                            style: const TextStyle(
-                                              color: AppColors.textSecondary,
-                                              fontSize: 12,
-                                            ),
-                                          ),
-                                        ],
-                                        const SizedBox(height: 3),
-                                        Text(
-                                          outlet.street ??
-                                              'No address provided',
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
-                                          style: const TextStyle(
-                                            color: AppColors.textSecondary,
-                                            fontSize: 12,
-                                          ),
-                                        ),
-                                        if (isCheckedIn) ...[
-                                          const SizedBox(height: 5),
-                                          Row(
-                                            children: [
-                                              Container(
-                                                width: 7,
-                                                height: 7,
-                                                decoration: const BoxDecoration(
-                                                  color: Color(0xFF10B981),
-                                                  shape: BoxShape.circle,
-                                                ),
-                                              ),
-                                              const SizedBox(width: 5),
-                                              Expanded(
-                                                child: Text(
-                                                  routeProv.checkInTime != null
-                                                      ? 'Checked In at ${_formatTime(routeProv.checkInTime!)}'
-                                                      : 'Checked In',
-                                                  maxLines: 1,
-                                                  overflow: TextOverflow.ellipsis,
-                                                  style: const TextStyle(
-                                                    color: Color(0xFF10B981),
-                                                    fontSize: 11.5,
-                                                    fontWeight: FontWeight.w600,
-                                                  ),
-                                                ),
-                                              ),
-                                            ],
-                                          ),
-                                        ] else if (isCheckedOut) ...[
-                                          const SizedBox(height: 5),
-                                          Row(
-                                            children: [
-                                              Container(
-                                                width: 7,
-                                                height: 7,
-                                                decoration: const BoxDecoration(
-                                                  color:
-                                                      AppColors.textSecondary,
-                                                  shape: BoxShape.circle,
-                                                ),
-                                              ),
-                                              const SizedBox(width: 5),
-                                              const Expanded(
-                                                child: Text(
-                                                  'Checked Out',
-                                                  maxLines: 1,
-                                                  overflow: TextOverflow.ellipsis,
-                                                  style: TextStyle(
-                                                    color:
-                                                        AppColors.textSecondary,
-                                                    fontSize: 11.5,
-                                                    fontWeight: FontWeight.w600,
-                                                  ),
-                                                ),
-                                              ),
-                                            ],
-                                          ),
-                                        ],
-                                      ],
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 12),
-                              if (isCheckedIn)
-                                SizedBox(
-                                  width: double.infinity,
-                                  child: ElevatedButton.icon(
-                                      onPressed: _checkingOutOutletId != null
-                                           ? null
-                                           : () async {
-                                               final confirm = await showDialog<bool>(
-                                                 context: context,
-                                                 builder: (ctx) => AlertDialog(
-                                                   title: const Text('Check Out'),
-                                                   content: Text('Are you sure you want to check out from ${outlet.name}?'),
-                                                   actions: [
-                                                     TextButton(
-                                                       onPressed: () => Navigator.pop(ctx, false),
-                                                       child: const Text('Cancel'),
-                                                     ),
-                                                     ElevatedButton(
-                                                       onPressed: () => Navigator.pop(ctx, true),
-                                                       child: const Text('Check Out'),
-                                                     ),
-                                                   ],
-                                                 ),
-                                               );
-                                               if (confirm == true) {
-                                                 VisitReasonSelection? selection;
-                                                 if (routeProv.requiresVisitReason) {
-                                                   if (!context.mounted) return;
-                                                   selection =
-                                                       await VisitReasonDialog.show(
-                                                         context,
-                                                       );
-                                                   if (selection == null) return;
-                                                 }
-                                                 setState(() => _checkingOutOutletId = outlet.id);
-                                                 try {
-                                                   await routeProv.checkOut(
-                                                     visitReasonId:
-                                                         selection?.reasonId,
-                                                     reasonNotes: selection?.notes,
-                                                     saleAmount: selection?.saleAmount,
-                                                   );
-                                                 } catch (e) {
-                                                   if (context.mounted) {
-                                                     ScaffoldMessenger.of(
-                                                       context,
-                                                     ).showSnackBar(
-                                                       SnackBar(
-                                                         content: Text(
-                                                           'Check-out failed: ${e.toString().replaceAll('Exception: ', '')}',
-                                                         ),
-                                                       ),
-                                                     );
-                                                   }
-                                                 } finally {
-                                                   if (mounted) {
-                                                     setState(() => _checkingOutOutletId = null);
-                                                   }
-                                                 }
-                                               }
-                                             },
-                                      icon: _checkingOutOutletId == outlet.id
-                                           ? const SizedBox(
-                                               width: 14,
-                                               height: 14,
-                                               child: CircularProgressIndicator(
-                                                 strokeWidth: 2,
-                                                 color: Colors.white,
-                                               ),
-                                             )
-                                           : const Icon(
-                                               Icons.logout_rounded,
-                                               size: 14,
-                                             ),
-                                      label: const Text(
-                                        'Check Out',
-                                        style: TextStyle(
-                                          fontSize: 11.5,
-                                          fontWeight: FontWeight.w700,
-                                        ),
-                                      ),
-                                      style: ElevatedButton.styleFrom(
-                                        backgroundColor: const Color(
-                                          0xFFDC2626,
-                                        ),
-                                        foregroundColor: Colors.white,
-                                        padding: const EdgeInsets.symmetric(
-                                          horizontal: 10,
-                                          vertical: 8,
-                                        ),
-                                        elevation: 2,
-                                        shadowColor: const Color(
-                                          0xFFDC2626,
-                                        ).withOpacity(0.3),
-                                        shape: RoundedRectangleBorder(
-                                          borderRadius: BorderRadius.circular(
-                                            10,
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                  )
-                                  else
-                                    SizedBox(
-                                      width: double.infinity,
-                                      child: ElevatedButton.icon(
-                                       onPressed: _checkingInOutletId != null
-                                           ? null
-                                           : () async {
-                                               if (employeeId == null) return;
-                                               if (routeProv.checkedInOutletId != null &&
-                                                   routeProv.checkedInOutletId != outlet.id) {
-                                                 showValidationErrorDialog(
-                                                   context,
-                                                   'You are already checked in at another outlet. Please check out before checking in to "${outlet.name}".',
-                                                   title: 'Active Check-in Exists',
-                                                 );
-                                                 return;
-                                               }
-                                               setState(() => _checkingInOutletId = outlet.id);
-                                               try {
-                                                  // 1. Acquire GPS position with fast-converging resolver (re-using fresh route position if available)
-                                                  Position? position;
-                                                  final routeProv = context.read<RouteProvider>();
-                                                  try {
-                                                    position = await LocationService.resolveCheckInPosition(
-                                                      cachedPosition: routeProv.currentPosition,
-                                                      desiredAccuracy: 25.0,
-                                                      maxAcceptableAccuracy: 70.0,
-                                                      burstTimeout: const Duration(seconds: 4),
-                                                    );
-                                                  } catch (e) {
-                                                    if (!auth.canSkipAttendanceGeo) {
-                                                      rethrow;
-                                                    }
-                                                  }
-
-                                                  // 2. Validate Geofence FIRST before letting user take a photo
-                                                  if (!auth.canSkipAttendanceGeo &&
-                                                      outlet.partnerLatitude != null &&
-                                                      outlet.partnerLongitude != null &&
-                                                      outlet.partnerLatitude != 0.0 &&
-                                                      outlet.partnerLongitude != 0.0 &&
-                                                      position != null) {
-                                                    final double distanceMeters = Geolocator.distanceBetween(
-                                                      position.latitude,
-                                                      position.longitude,
-                                                      outlet.partnerLatitude!,
-                                                      outlet.partnerLongitude!,
-                                                    );
-                                                    final double allowedRadius = outlet.outletRadius ?? 50.0;
-                                                    if (!ProximityHelper.isGeofenceSatisfied(
-                                                      distanceMeters: distanceMeters,
-                                                      accuracyMeters: position.accuracy,
-                                                      allowedRadius: allowedRadius,
-                                                    )) {
-                                                      throw Exception(
-                                                        'You are ${distanceMeters.round()}m away from "${outlet.name}". Allowed radius is ${allowedRadius.round()}m (GPS accuracy: ±${position.accuracy.round()}m).',
-                                                      );
-                                                    }
-                                                  }
-
-                                                  String? imageB64;
-                                                  if (auth.canView(AppScreen.newJointVisit)) {
-                                                    final XFile? photo = await AppCameraCaptureDialog.capture(
-                                                      context,
-                                                      title: 'Joint Visit Check-in',
-                                                      helperTip: 'Take a check-in photo with the outlet owner',
-                                                    );
-                                                    if (photo == null) {
-                                                      if (context.mounted) {
-                                                        ScaffoldMessenger.of(context).showSnackBar(
-                                                          const SnackBar(
-                                                            content: Text('A check-in photo is required for joint visits.'),
-                                                          ),
-                                                        );
-                                                      }
-                                                      return;
-                                                    }
-                                                    final persistentFile = await MediaStorageService.persistPickedFile(
-                                                      photo,
-                                                      category: MediaCategory.visits,
-                                                      customPrefix: 'joint_visit',
-                                                    );
-                                                    final bytes = persistentFile != null
-                                                        ? await persistentFile.readAsBytes()
-                                                        : await photo.readAsBytes();
-                                                    imageB64 = base64Encode(bytes);
-                                                  }
-
-                                                 await routeProv.checkIn(
-                                                   employeeId,
-                                                   outlet.id,
-                                                   position: position,
-                                                   image1920: imageB64,
-                                                 );
-                                                 if (context.mounted) {
-                                                   _openActionModalFor(
-                                                     outlet.id,
-                                                     outlet.name,
-                                                     outletCode: outlet.code,
-                                                     phone: outlet.phone,
-                                                     mobile: outlet.mobile,
-                                                     latitude: outlet.partnerLatitude,
-                                                     longitude: outlet.partnerLongitude,
-                                                     outletRadius: outlet.outletRadius,
-                                                   );
-                                                 }
-                                               } catch (e) {
-                                                 if (context.mounted) {
-                                                   final errorMsg = e.toString().replaceAll(
-                                                     'Exception: ',
-                                                     '',
-                                                   );
-                                                   final isGeofenceError = errorMsg.contains('away from') || errorMsg.contains('radius');
-                                                   ssShowLocationErrorDialog(
-                                                     context,
-                                                     errorMsg,
-                                                     actionLabel: isGeofenceError ? 'Update GPS' : null,
-                                                     onAction: isGeofenceError ? () => _recalibrateOutletLocation(outlet) : null,
-                                                   );
-                                                 }
-                                               } finally {
-                                                 if (mounted) {
-                                                   setState(() => _checkingInOutletId = null);
-                                                 }
-                                               }
-                                             },
-                                      icon: _checkingInOutletId == outlet.id
-                                           ? const SizedBox(
-                                               width: 14,
-                                               height: 14,
-                                               child: CircularProgressIndicator(
-                                                 strokeWidth: 2,
-                                                 color: Colors.white,
-                                               ),
-                                             )
-                                           : const Icon(
-                                               Icons.location_on_rounded,
-                                               size: 14,
-                                             ),
-                                      label: const Text(
-                                        'Check In',
-                                        style: TextStyle(
-                                          fontSize: 11.5,
-                                          fontWeight: FontWeight.w700,
-                                        ),
-                                      ),
-                                      style: ElevatedButton.styleFrom(
-                                        backgroundColor: const Color(
-                                          0xFF059669,
-                                        ),
-                                        foregroundColor: Colors.white,
-                                        padding: const EdgeInsets.symmetric(
-                                          horizontal: 10,
-                                          vertical: 8,
-                                        ),
-                                        elevation: 2,
-                                        shadowColor: const Color(
-                                          0xFF059669,
-                                        ).withOpacity(0.35),
-                                        shape: RoundedRectangleBorder(
-                                          borderRadius: BorderRadius.circular(
-                                            10,
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          );
-                        },
-                      ),
-                    ),
                   Container(
-                    padding: const EdgeInsets.all(20),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: AppSpacing.screen,
+                      vertical: AppSpacing.sm,
+                    ),
                     decoration: const BoxDecoration(
                       color: AppColors.background,
                     ),
@@ -1168,20 +985,26 @@ class _OfficerCustomerSelectionScreenState
                             side: const BorderSide(
                               color: AppColors.primaryStrong,
                             ),
-                            padding: const EdgeInsets.symmetric(vertical: 16),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(8),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: AppSpacing.lg,
+                              vertical: AppSpacing.md,
                             ),
-                            minimumSize: const Size(double.infinity, 50),
+                            minimumSize: const Size(
+                              double.infinity,
+                              AppSizes.touchTarget,
+                            ),
                           ),
                           child: const Row(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              Text(
-                                'Create New Outlet',
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.bold,
+                              Flexible(
+                                child: Text(
+                                  'Create New Outlet',
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(
+                                    fontSize: AppTextSizes.bodyLarge,
+                                    fontWeight: FontWeight.bold,
+                                  ),
                                 ),
                               ),
                               SizedBox(width: 8),

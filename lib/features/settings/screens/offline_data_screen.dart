@@ -265,12 +265,13 @@ class _OfflineDataScreenState extends State<OfflineDataScreen>
           // Filter Chips
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
-            child: Row(
+            // Wraps to a second line on narrow screens and large text.
+            child: Wrap(
+              spacing: AppSpacing.sm,
+              runSpacing: AppSpacing.sm,
               children: [
                 _filterChip('ALL', 'All (${_outboxList.length})'),
-                const SizedBox(width: 8),
                 _filterChip('PENDING', 'Waiting ($_pendingCount)'),
-                const SizedBox(width: 8),
                 _filterChip('QUARANTINED', 'Problems ($_quarantinedCount)'),
               ],
             ),

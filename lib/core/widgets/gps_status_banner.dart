@@ -163,7 +163,6 @@ class GpsStatusBanner extends StatelessWidget {
                 TextButton(
                   onPressed: () => Geolocator.openLocationSettings(),
                   style: TextButton.styleFrom(
-                    visualDensity: VisualDensity.compact,
                     padding: const EdgeInsets.symmetric(horizontal: 8),
                   ),
                   child: const Text('ENABLE', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11)),
@@ -200,7 +199,6 @@ class GpsStatusBanner extends StatelessWidget {
                 TextButton(
                   onPressed: () => Geolocator.openAppSettings(),
                   style: TextButton.styleFrom(
-                    visualDensity: VisualDensity.compact,
                     padding: const EdgeInsets.symmetric(horizontal: 8),
                   ),
                   child: const Text('SETTINGS', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11)),

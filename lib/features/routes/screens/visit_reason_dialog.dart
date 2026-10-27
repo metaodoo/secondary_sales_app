@@ -380,10 +380,10 @@ class _VisitReasonDialogState extends State<VisitReasonDialog> {
                   ),
                 ),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF059669),
+                  backgroundColor: AppColors.success,
                   disabledBackgroundColor: AppColors.borderSoft,
                   elevation: 3,
-                  shadowColor: const Color(0xFF059669).withOpacity(0.35),
+                  shadowColor: AppColors.success.withOpacity(0.35),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(14),
                   ),

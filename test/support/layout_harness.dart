@@ -8,6 +8,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:provider/provider.dart';
 import 'package:secondary_sales/core/theme/app_theme.dart';
+import 'package:secondary_sales/data/api/api_service.dart';
 import 'package:secondary_sales/features/auth/auth_provider.dart';
 import 'package:secondary_sales/features/dashboard/dashboard_provider.dart';
 import 'package:secondary_sales/features/employees/employee_provider.dart';
@@ -63,21 +64,20 @@ final accessibilityChecks = <String, AccessibilityGuideline>{
   'text_contrast': textContrastGuideline,
 };
 
-/// Renders [build] at [size] and [textScale] inside the app's providers and
-/// theme, with every request answered by [client], and reports overflows.
-/// With [accessibility], also runs [accessibilityChecks] on the screen.
-Future<ScreenReport> checkScreen(
+/// Shows [build] at [size] and [textScale] inside the app's providers and
+/// theme, with every request answered by [client], and lets it load. The
+/// screen stays on display (for checks or a screenshot); finish with
+/// [removeScreen].
+Future<void> pumpAppScreen(
   WidgetTester tester,
   Widget Function() build, {
   required Size size,
   required double textScale,
   required http.Client client,
-  bool accessibility = false,
 }) async {
   tester.view.physicalSize = size * 3;
   tester.view.devicePixelRatio = 3;
   addTearDown(tester.view.reset);
-  final semantics = accessibility ? tester.ensureSemantics() : null;
   // No GPS in tests: the location plugin reports location off, so screens
   // that track GPS show their normal "location off" state.
   const gps = MethodChannel('flutter.baseflow.com/geolocator');
@@ -89,9 +89,75 @@ Future<ScreenReport> checkScreen(
     };
   });
   addTearDown(() => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(gps, null));
-  // Never disposed: the app keeps its providers for its whole life, and
-  // screens may finish loading after the test ends.
-  final auth = AuthProvider();
+  await http.runWithClient(() async {
+    // Everything below runs inside runWithClient: the API client is made on
+    // first use and keeps the HTTP client it gets then.
+    // Never disposed: the app keeps its providers for its whole life, and
+    // screens may finish loading after the test ends.
+    final auth = AuthProvider();
+    final providers = [
+      ChangeNotifierProvider.value(value: auth),
+      ChangeNotifierProvider.value(value: PrimarySaleProvider()),
+      ChangeNotifierProvider.value(value: TransferProvider()),
+      ChangeNotifierProvider.value(value: ReturnProvider()),
+      ChangeNotifierProvider.value(value: ScrapProvider()),
+      ChangeNotifierProvider.value(value: EmployeeProvider()),
+      ChangeNotifierProvider.value(value: RouteProvider()),
+      ChangeNotifierProvider.value(value: ModernTradeProvider()),
+      ChangeNotifierProvider.value(value: MtReturnProvider()),
+      ChangeNotifierProvider.value(value: MyTeamProvider()),
+      ChangeNotifierProvider.value(value: DashboardProvider()),
+      ChangeNotifierProvider.value(value: NotificationProvider()),
+      ChangeNotifierProvider.value(value: NoticeProvider()),
+      ChangeNotifierProvider.value(value: LeaveProvider(auth)),
+      ChangeNotifierProvider.value(value: AttendanceProvider(auth)),
+    ];
+    // A signed-in employee: without one the API client refuses every call
+    // and screens show their empty state. Set after the providers, which
+    // copy the (empty) signed-in employee into the API client when made.
+    ApiService.instance.updateEmployeeId(208);
+    await tester.pumpWidget(MultiProvider(
+      providers: providers,
+      child: MaterialApp(
+        debugShowCheckedModeBanner: false,
+        theme: buildAppTheme(),
+        builder: (context, child) => MediaQuery(
+          data: MediaQuery.of(context)
+              .copyWith(textScaler: TextScaler.linear(textScale)),
+          child: child!,
+        ),
+        home: build(),
+      ),
+    ));
+    // Screens read the local database first. That is real I/O, which does
+    // not finish on the test's fake clock, so let real time pass between
+    // frames until the screen has loaded.
+    for (var i = 0; i < 8; i++) {
+      await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 30)));
+      await tester.pump(const Duration(milliseconds: 200));
+    }
+  }, () => _NoFontDownloads(client));
+}
+
+/// Removes the screen and lets its timers run out (some one-shot timers in
+/// the app last longer than a few seconds), so they do not fail the test
+/// after it ends. Test time is fake, so this costs nothing.
+Future<void> removeScreen(WidgetTester tester) async {
+  await tester.pumpWidget(const SizedBox());
+  await tester.pump(const Duration(minutes: 5));
+}
+
+/// Shows [build] like [pumpAppScreen] and reports overflows. With
+/// [accessibility], also runs [accessibilityChecks] on the screen.
+Future<ScreenReport> checkScreen(
+  WidgetTester tester,
+  Widget Function() build, {
+  required Size size,
+  required double textScale,
+  required http.Client client,
+  bool accessibility = false,
+}) async {
+  final semantics = accessibility ? tester.ensureSemantics() : null;
   final report = ScreenReport();
   final previous = FlutterError.onError;
   FlutterError.onError = (details) {
@@ -103,39 +169,7 @@ Future<ScreenReport> checkScreen(
     }
   };
   try {
-    await http.runWithClient(() async {
-      await tester.pumpWidget(MultiProvider(
-        providers: [
-          ChangeNotifierProvider.value(value: auth),
-          ChangeNotifierProvider.value(value: PrimarySaleProvider()),
-          ChangeNotifierProvider.value(value: TransferProvider()),
-          ChangeNotifierProvider.value(value: ReturnProvider()),
-          ChangeNotifierProvider.value(value: ScrapProvider()),
-          ChangeNotifierProvider.value(value: EmployeeProvider()),
-          ChangeNotifierProvider.value(value: RouteProvider()),
-          ChangeNotifierProvider.value(value: ModernTradeProvider()),
-          ChangeNotifierProvider.value(value: MtReturnProvider()),
-          ChangeNotifierProvider.value(value: MyTeamProvider()),
-          ChangeNotifierProvider.value(value: DashboardProvider()),
-          ChangeNotifierProvider.value(value: NotificationProvider()),
-          ChangeNotifierProvider.value(value: NoticeProvider()),
-          ChangeNotifierProvider.value(value: LeaveProvider(auth)),
-          ChangeNotifierProvider.value(value: AttendanceProvider(auth)),
-        ],
-        child: MaterialApp(
-          theme: buildAppTheme(),
-          builder: (context, child) => MediaQuery(
-            data: MediaQuery.of(context)
-                .copyWith(textScaler: TextScaler.linear(textScale)),
-            child: child!,
-          ),
-          home: build(),
-        ),
-      ));
-      for (var i = 0; i < 5; i++) {
-        await tester.pump(const Duration(milliseconds: 200));
-      }
-    }, () => _NoFontDownloads(client));
+    await pumpAppScreen(tester, build, size: size, textScale: textScale, client: client);
     if (accessibility) {
       for (final MapEntry(key: name, value: check) in accessibilityChecks.entries) {
         final result = await check.evaluate(tester);
@@ -146,17 +180,13 @@ Future<ScreenReport> checkScreen(
     FlutterError.onError = previous;
     semantics?.dispose();
   }
-  // Remove the screen and let its timers run out (some one-shot timers in
-  // the app last longer than a few seconds), so they do not fail the test
-  // after it ends. Test time is fake, so this costs nothing.
-  await tester.pumpWidget(const SizedBox());
-  await tester.pump(const Duration(minutes: 5));
+  await removeScreen(tester);
   return report;
 }
 
 /// Known accessibility problems per screen: a baseline, as large teams keep
 /// for lint (Android Lint's baseline.xml). Known problems are listed in
-/// test/fixtures/layout/a11y_baseline_<suite>.json for review but do not
+/// `test/fixtures/layout/a11y_baseline_<suite>.json` for review but do not
 /// fail; a new problem fails, and so does a fixed problem still listed, so
 /// the list can only shrink. Run with UPDATE_A11Y_BASELINE=1 to rewrite it.
 class AccessibilityBaseline {
@@ -210,6 +240,17 @@ class AccessibilityBaseline {
     };
     _file.writeAsStringSync('${const JsonEncoder.withIndent('  ').convert(sorted)}\n');
   }
+}
+
+/// Loads Material Icons from the Flutter SDK, so screenshots show icons
+/// instead of empty boxes. Skipped when the SDK path is unknown.
+Future<void> loadMaterialIcons() async {
+  final root = Platform.environment['FLUTTER_ROOT'];
+  final file = File('$root/bin/cache/artifacts/material_fonts/MaterialIcons-Regular.otf');
+  if (root == null || !file.existsSync()) return;
+  final loader = FontLoader('MaterialIcons')
+    ..addFont(Future.value(file.readAsBytesSync().buffer.asByteData()));
+  await loader.load();
 }
 
 /// Loads the app's font (Inter) under the names google_fonts uses, so text
