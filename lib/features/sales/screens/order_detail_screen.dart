@@ -275,7 +275,12 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                     else if (order == null)
                       const EmptyPanel(message: 'Order not found')
                     else ...[
-                      _OrderStatusPanel(order: order),
+                      _OrderStatusPanel(
+                        order: order,
+                        // The distributor's balance is for distributor
+                        // (primary) orders, not outlet orders.
+                        showDistributorDue: widget.saleType != 'secondary',
+                      ),
                       const SizedBox(height: 16),
                       _OrderLinesPanel(order: order),
                       const SizedBox(height: 16),
@@ -414,9 +419,15 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
 }
 
 class _OrderStatusPanel extends StatelessWidget {
-  const _OrderStatusPanel({required this.order});
+  const _OrderStatusPanel({
+    required this.order,
+    required this.showDistributorDue,
+  });
 
   final SaleOrderDetail order;
+
+  /// Shows the distributor's current balance (due).
+  final bool showDistributorDue;
 
   @override
   Widget build(BuildContext context) {
@@ -458,7 +469,7 @@ class _OrderStatusPanel extends StatelessWidget {
               'Expected Delivery: ${_formatServerDate(asDateTime(order.expectedDeliveryDate))}',
             ),
           ],
-          if (order.distributor?.totalDue != null) ...[
+          if (showDistributorDue && order.distributor?.totalDue != null) ...[
             const SizedBox(height: 10),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
