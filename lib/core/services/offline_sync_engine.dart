@@ -136,11 +136,16 @@ class OfflineSyncEngine with WidgetsBindingObserver {
         '[OfflineSyncEngine] Processing ${pendingOps.length} pending operations...',
       );
 
-      for (final op in pendingOps) {
+      for (final listed in pendingOps) {
         if (!_isOnline) {
           debugPrint('[OfflineSyncEngine] Network lost during sync. Pausing.');
           break;
         }
+
+        // Re-read the row: an earlier operation in this pass may have patched
+        // it (server visit or outlet ID), or it may be gone or no longer pending.
+        final op = await _dbHelper.getOperation(listed['operation_uuid'] as String);
+        if (op == null || op['status'] != 'PENDING') continue;
 
         final opUuid = op['operation_uuid'] as String;
         final endpoint = op['endpoint'] as String;
@@ -194,7 +199,9 @@ class OfflineSyncEngine with WidgetsBindingObserver {
     try {
       // Direct raw execution without triggering offline capture interception.
       // Clean internal routing metadata (e.g. _temp_outlet_id) before transmission.
-      final networkPayload = Map<String, dynamic>.from(payload)..remove('_temp_outlet_id');
+      final networkPayload = Map<String, dynamic>.from(payload)
+        ..remove('_temp_outlet_id')
+        ..remove('_temp_visit_id');
       final response = await ApiService.instance.executeRawPost(
         endpoint,
         networkPayload,
@@ -232,6 +239,10 @@ class OfflineSyncEngine with WidgetsBindingObserver {
                   : int.tryParse(respData['visit_id']?.toString() ?? respData['id']?.toString() ?? '');
               if (visitId != null && visitId > 0) {
                 await _dbHelper.patchChildVisitId(opUuid, visitId);
+                final tempVisitId = int.tryParse(payload['_temp_visit_id']?.toString() ?? '');
+                if (tempVisitId != null && tempVisitId > 0) {
+                  await _dbHelper.patchVisitId(tempVisitId, visitId);
+                }
               }
             } else if (entityType == 'outlet') {
               final tempId = payload['_temp_outlet_id'] is int
@@ -252,7 +263,12 @@ class OfflineSyncEngine with WidgetsBindingObserver {
         return true;
       } else {
         // The server was reached and rejected the operation.
-        return _handleServerRejection(opUuid, errorMsg, currentRetries);
+        return _handleServerRejection(
+          opUuid,
+          errorMsg,
+          currentRetries,
+          errorCode: response['error']?.toString(),
+        );
       }
     } catch (e) {
       final errStr = e.toString();
@@ -276,16 +292,43 @@ class OfflineSyncEngine with WidgetsBindingObserver {
     }
   }
 
+  /// `error` codes of a mobile-API rejection (`success: false`) that will not
+  /// change on a retry: Odoo validation, user, access and missing-record
+  /// errors (`validation_error`) and refused requests.
+  static const Set<String> _permanentErrorCodes = {
+    'validation_error',
+    'access_denied',
+    'missing_employee_id',
+    'bad_request',
+  };
+
   /// A server response that is neither success nor a temporary failure.
-  /// Permanent conflicts are quarantined at once; anything else is retried
-  /// until [kMaxOutboxRetries] attempts have failed, so a rejection that keeps
-  /// recurring cannot block the queue behind it forever.
+  /// The response's `error` code decides when there is one: a dead session
+  /// (`unauthorized`) pauses the queue, permanent codes are quarantined at
+  /// once, and anything else (`server_error`, unknown) is retried until
+  /// [kMaxOutboxRetries] attempts have failed, so a rejection that keeps
+  /// recurring cannot block the queue behind it forever. Without a code the
+  /// message text is the only signal.
   Future<bool> _handleServerRejection(
     String opUuid,
     String errorMsg,
-    int currentRetries,
-  ) async {
-    if (_isNonTransientError(errorMsg)) {
+    int currentRetries, {
+    String? errorCode,
+  }) async {
+    if (errorCode == 'unauthorized') {
+      // The operation is fine; the session is not. Wait for a new sign-in.
+      await _dbHelper.updateOperationStatus(
+        opUuid,
+        'PENDING',
+        errorMessage: 'Your login has ended. Log in again to send this.',
+      );
+      return false; // pause sync pass
+    }
+
+    final isPermanent = errorCode != null && errorCode.isNotEmpty
+        ? _permanentErrorCodes.contains(errorCode)
+        : _isNonTransientError(errorMsg);
+    if (isPermanent) {
       await _dbHelper.markOperationQuarantined(opUuid, reason: errorMsg);
       debugPrint('[OfflineSyncEngine] Quarantined op $opUuid: $errorMsg');
       return true; // continue next item
@@ -293,8 +336,7 @@ class OfflineSyncEngine with WidgetsBindingObserver {
 
     final attempts = currentRetries + 1;
     if (attempts >= kMaxOutboxRetries) {
-      final reason =
-          'Rejected $attempts times by the server. Last error: $errorMsg';
+      final reason = 'Could not send after $attempts tries. Server said: $errorMsg';
       await _dbHelper.markOperationQuarantined(
         opUuid,
         reason: reason,

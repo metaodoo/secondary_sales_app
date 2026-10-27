@@ -311,6 +311,18 @@ class OfflineDatabaseHelper {
   }
 
   /// Retrieves pending operations sorted chronologically (FIFO).
+  /// The current row of one outbox operation, or null if it is gone.
+  Future<Map<String, dynamic>?> getOperation(String operationUuid) async {
+    final db = await database;
+    final rows = await db.query(
+      tableOutbox,
+      where: 'operation_uuid = ?',
+      whereArgs: [operationUuid],
+      limit: 1,
+    );
+    return rows.isEmpty ? null : rows.first;
+  }
+
   Future<List<Map<String, dynamic>>> getPendingOperations({
     int limit = 50,
     int? employeeId,
@@ -401,6 +413,40 @@ class OfflineDatabaseHelper {
         );
       } catch (e) {
         debugPrint('[OfflineDB] Error patching child payload for $childUuid: $e');
+      }
+    }
+  }
+
+  /// Replaces a visit's temporary offline ID with its server ID in queued
+  /// operations: in the endpoint (`/visits/<id>/update`) and in `visit_id`.
+  /// Quarantined operations are patched too, so a manual retry can succeed.
+  Future<void> patchVisitId(int temporaryVisitId, int serverVisitId) async {
+    final db = await database;
+    final pathPattern = RegExp('/visits/$temporaryVisitId(?=/|\$)');
+    final ops = await db.query(
+      tableOutbox,
+      where: 'status IN (?, ?)',
+      whereArgs: ['PENDING', 'QUARANTINED'],
+    );
+
+    for (final op in ops) {
+      final opUuid = op['operation_uuid'] as String;
+      final endpoint = op['endpoint'] as String;
+      try {
+        final payload = jsonDecode(op['payload_json'] as String) as Map<String, dynamic>;
+        final newEndpoint = endpoint.replaceAll(pathPattern, '/visits/$serverVisitId');
+        final patchPayload = payload['visit_id']?.toString() == temporaryVisitId.toString();
+        if (newEndpoint == endpoint && !patchPayload) continue;
+        if (patchPayload) payload['visit_id'] = serverVisitId;
+        await db.update(
+          tableOutbox,
+          {'endpoint': newEndpoint, 'payload_json': jsonEncode(payload)},
+          where: 'operation_uuid = ?',
+          whereArgs: [opUuid],
+        );
+        debugPrint('[OfflineDB] Patched visit $temporaryVisitId -> $serverVisitId on op $opUuid');
+      } catch (e) {
+        debugPrint('[OfflineDB] Failed to patch visit ID on op $opUuid: $e');
       }
     }
   }

@@ -313,6 +313,11 @@ class ApiService {
     if (entityType == 'outlet') {
       params['_temp_outlet_id'] = nowEpoch ~/ 1000;
     }
+    // The temporary visit ID returned below ends up in later URLs
+    // (`/visits/<id>/update`); the sync engine swaps it for the server ID.
+    if (entityType == 'visit') {
+      params['_temp_visit_id'] = nowEpoch ~/ 1000;
+    }
 
     final clientUuid = params['client_uuid']?.toString();
     final opUuid = await OfflineDatabaseHelper.instance.enqueueOperation(

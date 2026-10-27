@@ -9,7 +9,7 @@ import 'package:secondary_sales/core/services/offline_database_helper.dart';
 import 'package:secondary_sales/core/services/offline_sync_engine.dart';
 import 'package:secondary_sales/data/api/api_service.dart';
 
-/// F4: retry counting and quarantine policy of the outbox replay.
+/// F4 and N1: retry counting and quarantine policy of the outbox replay.
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
   sqfliteFfiInit();
@@ -126,12 +126,12 @@ void main() {
     expect(second['retry_count'], 0);
   });
 
-  test('quarantines a recurring server rejection after the retry limit', () async {
+  test('quarantines a recurring server error after the retry limit', () async {
     await insertOp('op-1');
     onOrderCreate = () async => rpcResult({
           'success': false,
-          'error': 'validation_error',
-          'message': 'Something went wrong on the server.',
+          'error': 'server_error',
+          'message': 'An unexpected error occurred.',
         });
 
     await syncPasses(OfflineSyncEngine.kMaxOutboxRetries - 1);
@@ -158,5 +158,78 @@ void main() {
     final op = await readOp('op-1');
     expect(op['status'], 'QUARANTINED');
     expect(op['error_code'], 'BUSINESS_CONFLICT');
+  });
+
+  group('N1: classification by error code', () {
+    test('a validation error is quarantined at once, whatever its wording', () async {
+      await insertOp('op-1');
+      await insertOp('op-2');
+      var calls = 0;
+      // Messages seen on the device on 2026-10-27; neither matches a phrase.
+      onOrderCreate = () async => ++calls == 1
+          ? rpcResult({
+              'success': false,
+              'error': 'validation_error',
+              'message': 'No visit was found for the provided id.',
+            })
+          : rpcResult({'success': true, 'data': {'id': 1}});
+
+      await syncPasses(1);
+
+      final first = await readOp('op-1');
+      expect(first['status'], 'QUARANTINED');
+      expect(first['error_code'], 'BUSINESS_CONFLICT');
+      expect(first['error_message'], 'No visit was found for the provided id.');
+      // The queue was not blocked: the next operation went out in the same pass.
+      final db = await dbHelper.database;
+      final rest = await db.query(
+        OfflineDatabaseHelper.tableOutbox,
+        where: 'operation_uuid = ?',
+        whereArgs: ['op-2'],
+      );
+      expect(rest, isEmpty);
+    });
+
+    test('an access refusal is quarantined at once', () async {
+      await insertOp('op-1');
+      onOrderCreate = () async => rpcResult({
+            'success': false,
+            'error': 'access_denied',
+            'message': 'You do not have access to this operation.',
+          });
+
+      await syncPasses(1);
+
+      expect((await readOp('op-1'))['error_code'], 'BUSINESS_CONFLICT');
+    });
+
+    test('an ended session (HTTP 200 unauthorized) pauses without counting', () async {
+      await insertOp('op-1');
+      await insertOp('op-2');
+      onOrderCreate = () async => rpcResult({
+            'success': false,
+            'error': 'unauthorized',
+            'message': 'Session has ended.',
+          });
+
+      await syncPasses(OfflineSyncEngine.kMaxOutboxRetries + 1);
+
+      final first = await readOp('op-1');
+      expect(first['status'], 'PENDING');
+      expect(first['retry_count'], 0);
+      expect((await readOp('op-2'))['status'], 'PENDING');
+    });
+
+    test('without an error code the message text still decides', () async {
+      await insertOp('op-1');
+      onOrderCreate = () async => rpcResult({
+            'success': false,
+            'message': 'The customer is archived.',
+          });
+
+      await syncPasses(1);
+
+      expect((await readOp('op-1'))['error_code'], 'BUSINESS_CONFLICT');
+    });
   });
 }
