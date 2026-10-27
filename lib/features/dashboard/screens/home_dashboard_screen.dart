@@ -99,6 +99,8 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
   /// state. Surfaces geofence / permission failures as a snackbar.
   Future<void> _toggleAttendance(bool currentlyCheckedIn) async {
     final attendance = context.read<AttendanceProvider>();
+    if (currentlyCheckedIn && !await confirmAttendanceLogOut(context)) return;
+    if (!mounted) return;
     final ok = await attendance.performAction(
       currentlyCheckedIn ? 'check_out' : 'check_in',
       context: context,
@@ -128,8 +130,12 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
 
   Future<void> _refresh() => _fetchDashboard();
 
-  void _open(Widget screen) {
-    Navigator.push(context, MaterialPageRoute(builder: (_) => screen));
+  /// Opens [screen], then reloads the summary: work done there (attendance,
+  /// orders, visits) changes it, and the home card showed old data until a
+  /// pull-to-refresh.
+  Future<void> _open(Widget screen) async {
+    await Navigator.push(context, MaterialPageRoute(builder: (_) => screen));
+    if (mounted) await _fetchDashboard();
   }
 
   void _scheduleModuleVisibilityCheck() {

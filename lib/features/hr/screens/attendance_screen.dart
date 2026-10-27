@@ -6,6 +6,29 @@ import 'package:secondary_sales/core/theme/app_theme.dart';
 import 'package:secondary_sales/features/hr/attendance_provider.dart';
 import 'package:secondary_sales/core/widgets/ss_ui.dart';
 
+/// Asks before an attendance log-out: it is one tap, and easy to mix up
+/// with logging out of the app.
+Future<bool> confirmAttendanceLogOut(BuildContext context) async {
+  final yes = await showDialog<bool>(
+    context: context,
+    builder: (ctx) => AlertDialog(
+      title: const Text('Log out of attendance?'),
+      content: const Text('Your log-out time will be saved as now.'),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(ctx, false),
+          child: const Text('Cancel'),
+        ),
+        ElevatedButton(
+          onPressed: () => Navigator.pop(ctx, true),
+          child: const Text('Log Out'),
+        ),
+      ],
+    ),
+  );
+  return yes ?? false;
+}
+
 class AttendanceScreen extends StatelessWidget {
   const AttendanceScreen({super.key});
 
@@ -276,7 +299,11 @@ class _AttendanceScreenContentState extends State<_AttendanceScreenContent>
                       ),
                       onPressed: provider.isActionLoading
                           ? null
-                          : () {
+                          : () async {
+                              if (isCheckedIn && !await confirmAttendanceLogOut(context)) {
+                                return;
+                              }
+                              if (!mounted || !context.mounted) return;
                               provider.performAction(
                                 isCheckedIn ? 'check_out' : 'check_in',
                                 context: context,
