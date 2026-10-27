@@ -725,6 +725,23 @@ InputDecoration ssInputDecoration(String hint, IconData icon) {
   );
 }
 
+/// Layout for grids of menu tiles: tiles keep a fixed [height] (grown with
+/// the text size) and wider screens get more columns. A width-based aspect
+/// ratio made tiles grow with the screen, past the screen height in landscape.
+SliverGridDelegate ssTileGridDelegate(
+  BuildContext context, {
+  required double height,
+  double spacing = 16,
+}) {
+  final textScale = MediaQuery.textScalerOf(context).scale(1).clamp(1.0, 1.5);
+  return SliverGridDelegateWithMaxCrossAxisExtent(
+    maxCrossAxisExtent: 200,
+    mainAxisExtent: height * textScale,
+    crossAxisSpacing: spacing,
+    mainAxisSpacing: spacing,
+  );
+}
+
 BoxDecoration ssPanelDecoration() {
   return BoxDecoration(
     color: AppColors.surface,

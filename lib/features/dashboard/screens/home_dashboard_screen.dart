@@ -409,10 +409,12 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
               ),
               Text(
                 userName ?? 'User',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
                 style: const TextStyle(
                   color: AppColors.textPrimary,
                   fontWeight: FontWeight.bold,
-                  fontSize: 28,
+                  fontSize: 22,
                 ),
               ),
               const SizedBox(height: 8),
@@ -783,31 +785,37 @@ class _RangeSelector extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Wrap(
-      spacing: 8,
-      runSpacing: 8,
+    // One row of equal parts: a wrapping row put "Custom" on its own line
+    // on 360 dp (720p) phones.
+    final chips = [
+      _RangeChip(
+        label: 'Today',
+        selected: preset == 'today',
+        onTap: () => onSelect('today'),
+      ),
+      _RangeChip(
+        label: 'Week',
+        selected: preset == 'week',
+        onTap: () => onSelect('week'),
+      ),
+      _RangeChip(
+        label: 'Month',
+        selected: preset == 'month',
+        onTap: () => onSelect('month'),
+      ),
+      _RangeChip(
+        label: 'Custom',
+        selected: preset == 'custom',
+        icon: Icons.date_range_outlined,
+        onTap: () => onSelect('custom'),
+      ),
+    ];
+    return Row(
       children: [
-        _RangeChip(
-          label: 'Today',
-          selected: preset == 'today',
-          onTap: () => onSelect('today'),
-        ),
-        _RangeChip(
-          label: 'Week',
-          selected: preset == 'week',
-          onTap: () => onSelect('week'),
-        ),
-        _RangeChip(
-          label: 'Month',
-          selected: preset == 'month',
-          onTap: () => onSelect('month'),
-        ),
-        _RangeChip(
-          label: 'Custom',
-          selected: preset == 'custom',
-          icon: Icons.date_range_outlined,
-          onTap: () => onSelect('custom'),
-        ),
+        for (var i = 0; i < chips.length; i++) ...[
+          if (i > 0) const SizedBox(width: 6),
+          Expanded(child: chips[i]),
+        ],
       ],
     );
   }
@@ -835,33 +843,38 @@ class _RangeChip extends StatelessWidget {
         onTap: onTap,
         borderRadius: BorderRadius.circular(999),
         child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 10),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(999),
             border: Border.all(
               color: selected ? AppColors.primaryStrong : AppColors.borderSoft,
             ),
           ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              if (icon != null) ...[
-                Icon(
-                  icon,
-                  size: 16,
-                  color: selected ? Colors.white : AppColors.textSecondary,
+          // Shrinks the label a little on narrow phones instead of cutting it.
+          child: FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (icon != null) ...[
+                  Icon(
+                    icon,
+                    size: 16,
+                    color: selected ? Colors.white : AppColors.textSecondary,
+                  ),
+                  const SizedBox(width: 4),
+                ],
+                Text(
+                  label,
+                  maxLines: 1,
+                  style: TextStyle(
+                    color: selected ? Colors.white : AppColors.textPrimary,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 13,
+                  ),
                 ),
-                const SizedBox(width: 6),
               ],
-              Text(
-                label,
-                style: TextStyle(
-                  color: selected ? Colors.white : AppColors.textPrimary,
-                  fontWeight: FontWeight.w700,
-                  fontSize: 13,
-                ),
-              ),
-            ],
+            ),
           ),
         ),
       ),
@@ -1639,15 +1652,14 @@ class _ModulesGrid extends StatelessWidget {
     return LayoutBuilder(
       builder: (context, constraints) {
         final isNarrow = constraints.maxWidth < 350;
-        final textScale = MediaQuery.textScalerOf(context).scale(1);
-        final aspectRatio = isNarrow || textScale > 1.1 ? 1.2 : 1.35;
-        return GridView.count(
-          crossAxisCount: 2,
-          crossAxisSpacing: isNarrow ? 10 : 14,
-          mainAxisSpacing: isNarrow ? 10 : 14,
+        return GridView(
+          gridDelegate: ssTileGridDelegate(
+            context,
+            height: isNarrow ? 68 : 80,
+            spacing: isNarrow ? 10 : 14,
+          ),
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
-          childAspectRatio: aspectRatio,
           children: items
               .map(
                 (item) => Container(

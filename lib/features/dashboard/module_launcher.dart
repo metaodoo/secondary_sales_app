@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -223,13 +225,22 @@ class _ModuleLauncherFabState extends State<ModuleLauncherFab> {
     final padding = MediaQuery.of(context).padding;
     const buttonSize = 48.0;
 
-    // Default position: top left corner
+    // Default position: bottom left. Top left covered the first line of
+    // every screen; bottom right is where tabs put their own button.
     final defaultOffset = Offset(
       16,
-      padding.top + 60,
+      screenSize.height - padding.bottom - buttonSize - 24,
     );
 
-    final currentPosition = _globalFabOffset ?? defaultOffset;
+    // A position dragged in one orientation can be off screen in the other.
+    final saved = _globalFabOffset ?? defaultOffset;
+    final currentPosition = Offset(
+      saved.dx.clamp(12.0, math.max(12.0, screenSize.width - buttonSize - 12.0)),
+      saved.dy.clamp(
+        padding.top + 10.0,
+        math.max(padding.top + 10.0, screenSize.height - padding.bottom - buttonSize - 20.0),
+      ),
+    );
 
     return AnimatedPositioned(
       duration: _isDragging ? Duration.zero : const Duration(milliseconds: 250),
@@ -248,7 +259,7 @@ class _ModuleLauncherFabState extends State<ModuleLauncherFab> {
               });
             },
             onPanUpdate: (details) {
-              final pos = _globalFabOffset ?? defaultOffset;
+              final pos = _globalFabOffset ?? currentPosition;
               final newX = (pos.dx + details.delta.dx).clamp(
                 12.0,
                 screenSize.width - buttonSize - 12.0,
@@ -262,7 +273,7 @@ class _ModuleLauncherFabState extends State<ModuleLauncherFab> {
               });
             },
             onPanEnd: (_) {
-              final pos = _globalFabOffset ?? defaultOffset;
+              final pos = _globalFabOffset ?? currentPosition;
               final middleX = screenSize.width / 2;
               // Magnetic snap to nearest edge (left or right)
               final targetX = pos.dx < middleX ? 16.0 : (screenSize.width - buttonSize - 16.0);
@@ -289,6 +300,7 @@ class _ModuleLauncherFabState extends State<ModuleLauncherFab> {
                       Icons.apps_rounded,
                       color: Colors.white,
                       size: 24,
+                      semanticLabel: 'Open module',
                     ),
                   ),
                 ),

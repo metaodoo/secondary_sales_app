@@ -103,7 +103,9 @@ class DashboardTab extends StatelessWidget {
       ),
       body: SafeArea(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
+          // Extra bottom space so the last tiles can scroll clear of the
+          // floating module button.
+          padding: const EdgeInsets.fromLTRB(24, 32, 24, 96),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
@@ -622,21 +624,11 @@ class DashboardTab extends StatelessWidget {
                     );
                   }
 
-                  return LayoutBuilder(
-                    builder: (context, constraints) {
-                      final textScale = MediaQuery.textScalerOf(context).scale(1);
-                      final isNarrow = constraints.maxWidth < 340;
-                      final aspectRatio = isNarrow || textScale > 1.1 ? 0.92 : 1.02;
-                      return GridView.count(
-                        crossAxisCount: 2,
-                        crossAxisSpacing: isNarrow ? 12 : 16,
-                        mainAxisSpacing: isNarrow ? 12 : 16,
-                        shrinkWrap: true,
-                        physics: const NeverScrollableScrollPhysics(),
-                        childAspectRatio: aspectRatio,
-                        children: cards,
-                      );
-                    },
+                  return GridView(
+                    gridDelegate: ssTileGridDelegate(context, height: 124),
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    children: cards,
                   );
                 },
               ),
@@ -753,12 +745,9 @@ class _CsReturnCategoriesScreen extends StatelessWidget {
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
       appBar: AppBar(title: const Text('Return')),
-      body: GridView.count(
+      body: GridView(
         padding: const EdgeInsets.all(16),
-        crossAxisCount: 2,
-        crossAxisSpacing: 16,
-        mainAxisSpacing: 16,
-        childAspectRatio: 1.02,
+        gridDelegate: ssTileGridDelegate(context, height: 124),
         children: [
           for (final card in cards)
             _CsReturnCategoryCard(
@@ -815,12 +804,9 @@ class _IsReturnCategoriesScreen extends StatelessWidget {
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
       appBar: AppBar(title: const Text('Return')),
-      body: GridView.count(
+      body: GridView(
         padding: const EdgeInsets.all(16),
-        crossAxisCount: 2,
-        crossAxisSpacing: 16,
-        mainAxisSpacing: 16,
-        childAspectRatio: 1.02,
+        gridDelegate: ssTileGridDelegate(context, height: 124),
         children: [
           for (final card in cards)
             _CsReturnCategoryCard(
