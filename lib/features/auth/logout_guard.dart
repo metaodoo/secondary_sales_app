@@ -21,11 +21,12 @@ Future<bool> logoutWithUnsyncedGuard(
     final openOfflineData = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Unsynced Documents'),
+        title: const Text('You Cannot Log Out Yet'),
         content: Text(
-          'You have $unsyncedCount document${unsyncedCount == 1 ? '' : 's'} '
-          'that ${unsyncedCount == 1 ? 'has' : 'have'} not been synced to the server. '
-          'Sync them before logging out, or they will be stranded on this device.',
+          '$unsyncedCount item${unsyncedCount == 1 ? ' is' : 's are'} not sent '
+          'to the server yet. Open Offline Data and send '
+          '${unsyncedCount == 1 ? 'it' : 'them'} first, so '
+          '${unsyncedCount == 1 ? 'it is' : 'they are'} not lost.',
         ),
         actions: [
           TextButton(
@@ -34,7 +35,7 @@ Future<bool> logoutWithUnsyncedGuard(
           ),
           ElevatedButton(
             onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('View Offline Data'),
+            child: const Text('Open Offline Data'),
           ),
         ],
       ),

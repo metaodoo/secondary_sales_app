@@ -61,7 +61,7 @@ class _OfflineDataScreenState extends State<OfflineDataScreen>
       if (!mounted) return;
       setState(() => _isLoading = false);
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error loading offline data: $e')),
+        const SnackBar(content: Text('Could not load offline data. Please try again.')),
       );
     }
   }
@@ -71,7 +71,7 @@ class _OfflineDataScreenState extends State<OfflineDataScreen>
     if (!_syncEngine.isOnline) {
       messenger.showSnackBar(
         const SnackBar(
-          content: Text('Cannot sync: Device is currently offline.'),
+          content: Text('You are offline. Connect to the internet and try again.'),
           backgroundColor: Colors.orange,
         ),
       );
@@ -81,7 +81,7 @@ class _OfflineDataScreenState extends State<OfflineDataScreen>
     _syncEngine.triggerSync(withJitter: false);
     messenger.showSnackBar(
       const SnackBar(
-        content: Text('Synchronization started in background…'),
+        content: Text('Sending now…'),
         duration: Duration(seconds: 2),
       ),
     );
@@ -108,7 +108,7 @@ class _OfflineDataScreenState extends State<OfflineDataScreen>
         elevation: 0,
         scrolledUnderElevation: 0,
         title: const Text(
-          'Offline & Sync Center',
+          'Offline Data',
           style: TextStyle(
             color: AppColors.primaryStrong,
             fontWeight: FontWeight.bold,
@@ -135,7 +135,7 @@ class _OfflineDataScreenState extends State<OfflineDataScreen>
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const Text('Created Offline (Outbox)'),
+                  const Text('Not Sent'),
                   if (_pendingCount > 0 || _quarantinedCount > 0) ...[
                     const SizedBox(width: 6),
                     Container(
@@ -166,7 +166,7 @@ class _OfflineDataScreenState extends State<OfflineDataScreen>
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const Text('Cached Master Data'),
+                  const Text('Saved Lists'),
                   if (_masterDataList.isNotEmpty) ...[
                     const SizedBox(width: 6),
                     Container(
@@ -210,7 +210,7 @@ class _OfflineDataScreenState extends State<OfflineDataScreen>
                   ),
                   const SizedBox(width: 8),
                   Text(
-                    isOnline ? 'Online (Ready to sync)' : 'Offline (Buffering locally)',
+                    isOnline ? 'Online: ready to send' : 'Offline: saved on this phone',
                     style: TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.bold,
@@ -222,7 +222,7 @@ class _OfflineDataScreenState extends State<OfflineDataScreen>
                     TextButton.icon(
                       onPressed: isOnline ? _triggerSync : null,
                       icon: const Icon(Icons.sync, size: 14),
-                      label: const Text('Sync Now', style: TextStyle(fontSize: 12)),
+                      label: const Text('Send Now', style: TextStyle(fontSize: 12)),
                       style: TextButton.styleFrom(
                         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                         minimumSize: Size.zero,
@@ -269,9 +269,9 @@ class _OfflineDataScreenState extends State<OfflineDataScreen>
               children: [
                 _filterChip('ALL', 'All (${_outboxList.length})'),
                 const SizedBox(width: 8),
-                _filterChip('PENDING', 'Pending ($_pendingCount)'),
+                _filterChip('PENDING', 'Waiting ($_pendingCount)'),
                 const SizedBox(width: 8),
-                _filterChip('QUARANTINED', 'Sync Issues ($_quarantinedCount)'),
+                _filterChip('QUARANTINED', 'Problems ($_quarantinedCount)'),
               ],
             ),
           ),
@@ -290,7 +290,7 @@ class _OfflineDataScreenState extends State<OfflineDataScreen>
                         ),
                         const SizedBox(height: 12),
                         const Text(
-                          'No offline operations in outbox',
+                          'Nothing waiting to send',
                           style: TextStyle(
                             fontSize: 15,
                             fontWeight: FontWeight.bold,
@@ -299,7 +299,7 @@ class _OfflineDataScreenState extends State<OfflineDataScreen>
                         ),
                         const SizedBox(height: 4),
                         const Text(
-                          'All offline created data has synced to Odoo.',
+                          'Everything you saved offline has been sent.',
                           style: TextStyle(
                             fontSize: 12,
                             color: AppColors.textSecondary,
@@ -344,7 +344,6 @@ class _OfflineDataScreenState extends State<OfflineDataScreen>
 
   Widget _buildOutboxCard(Map<String, dynamic> op) {
     final entityType = op['entity_type']?.toString() ?? 'generic';
-    final endpoint = op['endpoint']?.toString() ?? '';
     final status = op['status']?.toString() ?? 'PENDING';
     final createdAt = op['created_at']?.toString() ?? '';
     final retries = op['retry_count'] ?? 0;
@@ -426,26 +425,14 @@ class _OfflineDataScreenState extends State<OfflineDataScreen>
                   ),
                   const SizedBox(width: 8),
                   Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          entityType.toUpperCase(),
-                          style: const TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 13,
-                            color: AppColors.textPrimary,
-                          ),
-                        ),
-                        Text(
-                          endpoint,
-                          style: const TextStyle(
-                            fontSize: 10.5,
-                            color: AppColors.textSecondary,
-                          ),
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ],
+                    child: Text(
+                      _itemLabel(entityType),
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 13,
+                        color: AppColors.textPrimary,
+                      ),
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ),
                   Container(
@@ -459,7 +446,7 @@ class _OfflineDataScreenState extends State<OfflineDataScreen>
                       border: Border.all(color: statusFg.withValues(alpha: 0.3)),
                     ),
                     child: Text(
-                      status,
+                      _statusLabel(status),
                       style: TextStyle(
                         fontSize: 10,
                         fontWeight: FontWeight.bold,
@@ -479,7 +466,7 @@ class _OfflineDataScreenState extends State<OfflineDataScreen>
                     borderRadius: BorderRadius.circular(6),
                   ),
                   child: Text(
-                    'Error: $errorMessage',
+                    'Problem: $errorMessage',
                     style: TextStyle(fontSize: 11, color: Colors.red.shade800),
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
@@ -490,7 +477,7 @@ class _OfflineDataScreenState extends State<OfflineDataScreen>
               Row(
                 children: [
                   Text(
-                    'Created: ${_formatIsoDate(createdAt)}',
+                    'Saved: ${_formatIsoDate(createdAt)}',
                     style: const TextStyle(
                       fontSize: 10.5,
                       color: AppColors.textSecondary,
@@ -499,7 +486,7 @@ class _OfflineDataScreenState extends State<OfflineDataScreen>
                   const Spacer(),
                   if (retries > 0)
                     Text(
-                      'Retries: $retries',
+                      'Tries: $retries',
                       style: const TextStyle(
                         fontSize: 10.5,
                         color: AppColors.textSecondary,
@@ -514,7 +501,7 @@ class _OfflineDataScreenState extends State<OfflineDataScreen>
                         _triggerSync();
                       },
                       child: const Text(
-                        'RETRY',
+                        'Try Again',
                         style: TextStyle(
                           fontSize: 11,
                           fontWeight: FontWeight.bold,
@@ -537,7 +524,7 @@ class _OfflineDataScreenState extends State<OfflineDataScreen>
     String formattedPayload = payloadJson;
     try {
       final decoded = jsonDecode(payloadJson);
-      formattedPayload = const JsonEncoder.withIndent('  ').convert(decoded);
+      formattedPayload = const JsonEncoder.withIndent('  ').convert(_readablePayload(decoded));
     } catch (_) {}
 
     final opUuid = op['operation_uuid']?.toString() ?? '';
@@ -560,20 +547,21 @@ class _OfflineDataScreenState extends State<OfflineDataScreen>
           builder: (_, scrollController) {
             return Padding(
               padding: const EdgeInsets.all(20),
-              child: ListView(
-                controller: scrollController,
+              child: Column(
                 children: [
                   Row(
                     children: [
-                      Text(
-                        '${op['entity_type']?.toString().toUpperCase()} Operation',
-                        style: const TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          color: AppColors.textPrimary,
+                      Expanded(
+                        child: Text(
+                          _itemLabel(op['entity_type']?.toString() ?? ''),
+                          style: const TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: AppColors.textPrimary,
+                          ),
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ),
-                      const Spacer(),
                       IconButton(
                         icon: const Icon(Icons.close),
                         onPressed: () => Navigator.pop(ctx),
@@ -581,35 +569,58 @@ class _OfflineDataScreenState extends State<OfflineDataScreen>
                     ],
                   ),
                   const Divider(),
-                  _detailRow('UUID', opUuid),
-                  _detailRow('Endpoint', op['endpoint']?.toString() ?? ''),
-                  _detailRow('Status', status),
-                  _detailRow('Created', _formatIsoDate(op['created_at']?.toString() ?? '')),
-                  _detailRow('Retries', '${op['retry_count'] ?? 0}'),
-                  if (errorMsg != null && errorMsg.isNotEmpty)
-                    _detailRow('Error Reason', errorMsg, isError: true),
+                  Expanded(
+                    child: ListView(
+                      controller: scrollController,
+                      children: [
+                        _detailRow('Status', _statusLabel(status)),
+                        _detailRow('Saved', _formatIsoDate(op['created_at']?.toString() ?? '')),
+                        _detailRow('Tries', '${op['retry_count'] ?? 0}'),
+                        if (errorMsg != null && errorMsg.isNotEmpty)
+                          _detailRow('Problem', errorMsg, isError: true),
+                        const SizedBox(height: 8),
+                        // For support staff; collapsed so field users are not
+                        // faced with raw data.
+                        ExpansionTile(
+                          tilePadding: EdgeInsets.zero,
+                          childrenPadding: EdgeInsets.zero,
+                          title: const Text(
+                            'Technical details',
+                            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                          ),
+                          children: [
+                            _detailRow('ID', opUuid),
+                            _detailRow('Address', op['endpoint']?.toString() ?? ''),
+                            const SizedBox(height: 6),
+                            // Fixed height with its own scroll, so long data
+                            // never pushes the rest of the sheet away.
+                            Container(
+                              height: 220,
+                              width: double.infinity,
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF1E293B),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Scrollbar(
+                                child: SingleChildScrollView(
+                                  padding: const EdgeInsets.all(12),
+                                  child: SelectableText(
+                                    formattedPayload,
+                                    style: const TextStyle(
+                                      color: Color(0xFFE2E8F0),
+                                      fontFamily: 'monospace',
+                                      fontSize: 11,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
                   const SizedBox(height: 12),
-                  const Text(
-                    'Payload JSON:',
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
-                  ),
-                  const SizedBox(height: 6),
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF1E293B),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: SelectableText(
-                      formattedPayload,
-                      style: const TextStyle(
-                        color: Color(0xFFE2E8F0),
-                        fontFamily: 'monospace',
-                        fontSize: 11,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 20),
                   Row(
                     children: [
                       if (status == 'QUARANTINED')
@@ -622,7 +633,7 @@ class _OfflineDataScreenState extends State<OfflineDataScreen>
                               _triggerSync();
                             },
                             icon: const Icon(Icons.replay, size: 16),
-                            label: const Text('Retry Op'),
+                            label: const Text('Try Again'),
                             style: ElevatedButton.styleFrom(
                               backgroundColor: AppColors.primary,
                               foregroundColor: Colors.white,
@@ -636,9 +647,9 @@ class _OfflineDataScreenState extends State<OfflineDataScreen>
                             final confirm = await showDialog<bool>(
                               context: context,
                               builder: (dCtx) => AlertDialog(
-                                title: const Text('Delete Operation?'),
+                                title: const Text('Delete this item?'),
                                 content: const Text(
-                                  'Are you sure you want to discard this offline record? It will not be synced to Odoo.',
+                                  'It will not be sent to the server. You cannot undo this.',
                                 ),
                                 actions: [
                                   TextButton(
@@ -664,7 +675,7 @@ class _OfflineDataScreenState extends State<OfflineDataScreen>
                           },
                           icon: const Icon(Icons.delete_outline, size: 16, color: Colors.red),
                           label: const Text(
-                            'Discard Op',
+                            'Delete',
                             style: TextStyle(color: Colors.red),
                           ),
                           style: OutlinedButton.styleFrom(
@@ -1010,4 +1021,68 @@ class _OfflineDataScreenState extends State<OfflineDataScreen>
     return '${local.year}-${local.month.toString().padLeft(2, '0')}-${local.day.toString().padLeft(2, '0')} '
         '${local.hour.toString().padLeft(2, '0')}:${local.minute.toString().padLeft(2, '0')}:${local.second.toString().padLeft(2, '0')}';
   }
+}
+
+/// Plain name of an offline item, for field users.
+String _itemLabel(String entityType) {
+  switch (entityType) {
+    case 'order':
+      return 'Order';
+    case 'visit':
+      return 'Visit check-in';
+    case 'visit_update':
+      return 'Visit check-out';
+    case 'outlet':
+      return 'New outlet';
+    case 'outlet_update':
+      return 'Outlet change';
+    case 'outlet_remove':
+      return 'Outlet removal';
+    case 'return':
+      return 'Return';
+    case 'scrap':
+      return 'Scrap';
+    case 'attendance':
+      return 'Attendance';
+    case 'expense':
+      return 'Expense';
+    case 'mt_justification':
+      return 'Visit reason';
+    case 'mt_stock_audit':
+      return 'Stock check';
+    case 'route_create':
+      return 'New route';
+    case 'route_update':
+      return 'Route change';
+    default:
+      return 'Other item';
+  }
+}
+
+/// Plain status of an offline item.
+String _statusLabel(String status) {
+  switch (status) {
+    case 'PENDING':
+      return 'Waiting';
+    case 'SYNCING':
+      return 'Sending';
+    case 'QUARANTINED':
+      return 'Problem';
+    default:
+      return 'Sent';
+  }
+}
+
+/// [value] with long strings (photos are stored as base64) replaced by a
+/// short note, so the data stays readable.
+Object? _readablePayload(Object? value) {
+  if (value is Map) {
+    return value.map((k, v) => MapEntry(k, _readablePayload(v)));
+  }
+  if (value is List) return value.map(_readablePayload).toList();
+  if (value is String && value.length > 300) {
+    final kb = (value.length * 3 / 4 / 1024).round();
+    return '[Photo or file, $kb KB]';
+  }
+  return value;
 }
