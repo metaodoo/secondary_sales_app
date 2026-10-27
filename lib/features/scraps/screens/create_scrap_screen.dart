@@ -696,6 +696,28 @@ class _CreateScrapScreenState extends State<CreateScrapScreen> {
     });
   }
 
+  /// The quantity a line's card shows as its total: what the person
+  /// viewing it enters, by role and stage.
+  double _shownQty(VirtualTransferLineEntry line, AuthProvider auth) {
+    return _scrapSum
+        ? (auth.canEditQcQty
+            ? _lotSum(line, (l) => (l.actualQcQty ?? 0) + (l.qcNonsaleableQty ?? 0))
+            : (auth.canEditQcTeamQty
+                ? _lotSum(line, (l) => (l.qcTeamQcQty ?? 0) + (l.qcTeamNonsaleableQty ?? 0))
+                : _lotSum(line, (l) => (l.wQcQty ?? 0) + (l.wNonsaleableQty ?? 0))))
+        : _allocatedQty(line);
+  }
+
+  /// Price times the quantity the card shows. A lot-tracked line's quantity
+  /// is entered on its lots, so it is the card's lot total.
+  double _lineAmount(VirtualTransferLineEntry line, AuthProvider auth) {
+    if (line.product.requiresLots) return line.priceUnit * _shownQty(line, auth);
+    return line.amountFor(
+      bySoQty: auth.canEditSoQty,
+      byWarehouseQty: auth.canEditWarehouseQty,
+    );
+  }
+
   double _allocatedQty(VirtualTransferLineEntry line) {
     return line.lotLines.fold<double>(0, (sum, lot) => sum + lot.quantity);
   }
@@ -1636,6 +1658,7 @@ class _CreateScrapScreenState extends State<CreateScrapScreen> {
                         else
                           ..._lines.map(
                             (line) => _ScrapLineCard(
+                              amount: _lineAmount(line, auth),
                               line: line,
                               onRemove: () =>
                                   setState(() => _lines.remove(line)),
@@ -1681,13 +1704,7 @@ class _CreateScrapScreenState extends State<CreateScrapScreen> {
                                   _changeLotQty(lotInput, double.infinity, 1),
                               onLotQtyInput: (lotInput, newQty) =>
                                   _setLotQty(lotInput, newQty),
-                              allocatedQty: _scrapSum
-                                  ? (canEditQcQty
-                                      ? _lotSum(line, (l) => (l.actualQcQty ?? 0) + (l.qcNonsaleableQty ?? 0))
-                                      : (canEditQcTeamQty
-                                          ? _lotSum(line, (l) => (l.qcTeamQcQty ?? 0) + (l.qcTeamNonsaleableQty ?? 0))
-                                          : _lotSum(line, (l) => (l.wQcQty ?? 0) + (l.wNonsaleableQty ?? 0))))
-                                  : _allocatedQty(line),
+                              allocatedQty: _shownQty(line, auth),
                               isReadOnly: _isReadOnly,
                               canEditSoQty: canEditSoQty,
                               canEditWarehouseQty: canEditWarehouseQty,
@@ -1776,190 +1793,219 @@ class _CreateScrapScreenState extends State<CreateScrapScreen> {
                   color: Colors.white,
                   border: Border(top: BorderSide(color: Color(0xFFDDE6F2))),
                 ),
-                child: widget.scrapId == null
-                    ? Row(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (_lines.isNotEmpty) ...[
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Expanded(
-                            child: SizedBox(
-                              height: 50,
-                              child: ElevatedButton.icon(
-                                onPressed: provider.isLoading
-                                    ? null
-                                    : () => _createScrap(),
-                                icon: const Icon(Icons.save),
-                                label: const Text('Save'),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: AppColors.primary,
-                                  foregroundColor: Colors.white,
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(8),
-                                  ),
-                                ),
-                              ),
+                          const Text(
+                            'Total Scrap Amount',
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.black87,
                             ),
                           ),
-                          if (auth.canValidateScrapFor(widget.moduleType)) ...[
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: SizedBox(
-                                height: 50,
-                                child: ElevatedButton.icon(
-                                  onPressed: provider.isLoading
-                                      ? null
-                                      : () => _createScrap(autoValidate: true),
-                                  icon: const Icon(Icons.check_circle),
-                                  label: const Text('Save & Validate'),
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: Colors.green,
-                                    foregroundColor: Colors.white,
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(8),
+                          Text(
+                            '৳${_lines.fold(0.0, (s, l) => s + _lineAmount(l, auth)).toStringAsFixed(2)}',
+                            style: const TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                              color: AppColors.primary,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                    ],
+                    widget.scrapId == null
+                        ? Row(
+                            children: [
+                              Expanded(
+                                child: SizedBox(
+                                  height: 50,
+                                  child: ElevatedButton.icon(
+                                    onPressed: provider.isLoading
+                                        ? null
+                                        : () => _createScrap(),
+                                    icon: const Icon(Icons.save),
+                                    label: const Text('Save'),
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: AppColors.primary,
+                                      foregroundColor: Colors.white,
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
                                     ),
                                   ),
                                 ),
                               ),
-                            ),
-                          ],
-                        ],
-                      )
-                    : Row(
-                        children: [
-                          if (_canShowCancel(auth)) ...[
-                            Expanded(
-                              flex: 1,
-                              child: OutlinedButton(
-                                onPressed: provider.isLoading
-                                    ? null
-                                    : () => _runAction('cancel'),
-                                style: OutlinedButton.styleFrom(
-                                  foregroundColor: Colors.red,
-                                  side: const BorderSide(color: Colors.red),
-                                  padding: const EdgeInsets.symmetric(
-                                    vertical: 14,
-                                  ),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(8),
+                              if (auth.canValidateScrapFor(widget.moduleType)) ...[
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: SizedBox(
+                                    height: 50,
+                                    child: ElevatedButton.icon(
+                                      onPressed: provider.isLoading
+                                          ? null
+                                          : () => _createScrap(autoValidate: true),
+                                      icon: const Icon(Icons.check_circle),
+                                      label: const Text('Save & Validate'),
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: Colors.green,
+                                        foregroundColor: Colors.white,
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius: BorderRadius.circular(8),
+                                        ),
+                                      ),
+                                    ),
                                   ),
                                 ),
-                                child: const Text(
-                                  'Cancel',
-                                  style: TextStyle(fontWeight: FontWeight.bold),
-                                ),
-                              ),
-                            ),
-                          ],
-                          if (auth.canSaveScrapFor(widget.moduleType)) ...[
-                            if (_canShowCancel(auth))
-                              const SizedBox(width: 8),
-                            Expanded(
-                              flex: 2,
-                              child: ElevatedButton(
-                                onPressed: provider.isLoading
-                                    ? null
-                                    : () => _createScrap(sendToSalesOperation: false),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: AppColors.primary,
-                                  foregroundColor: Colors.white,
-                                  padding: const EdgeInsets.symmetric(
-                                    vertical: 14,
-                                  ),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(8),
-                                  ),
-                                ),
-                                child: const Text(
-                                  'Save',
-                                  style: TextStyle(fontWeight: FontWeight.bold),
-                                ),
-                              ),
-                            ),
-                          ],
-                          if (_canShowSendToQc(auth)) ...[
-                            if (_canShowCancel(auth) ||
-                                auth.canSaveScrapFor(widget.moduleType))
-                              const SizedBox(width: 8),
-                            Expanded(
-                              flex: 2,
-                              child: ElevatedButton(
-                                onPressed: provider.isLoading
-                                    ? null
-                                    : () => _createScrap(sendToQc: true),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: const Color(0xFF2563EB),
-                                  foregroundColor: Colors.white,
-                                  padding: const EdgeInsets.symmetric(
-                                    vertical: 14,
-                                  ),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(8),
+                              ],
+                            ],
+                          )
+                        : Row(
+                            children: [
+                              if (_canShowCancel(auth)) ...[
+                                Expanded(
+                                  flex: 1,
+                                  child: OutlinedButton(
+                                    onPressed: provider.isLoading
+                                        ? null
+                                        : () => _runAction('cancel'),
+                                    style: OutlinedButton.styleFrom(
+                                      foregroundColor: Colors.red,
+                                      side: const BorderSide(color: Colors.red),
+                                      padding: const EdgeInsets.symmetric(
+                                        vertical: 14,
+                                      ),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                    ),
+                                    child: const Text(
+                                      'Cancel',
+                                      style: TextStyle(fontWeight: FontWeight.bold),
+                                    ),
                                   ),
                                 ),
-                                child: const Text(
-                                  'Send to QC',
-                                  style: TextStyle(fontWeight: FontWeight.bold),
-                                ),
-                              ),
-                            ),
-                          ],
-                          if (_canShowSendToSalesOperation(auth)) ...[
-                            if (_canShowCancel(auth) ||
-                                auth.canSaveScrapFor(widget.moduleType) ||
-                                _canShowSendToQc(auth))
-                              const SizedBox(width: 8),
-                            Expanded(
-                              flex: 2,
-                              child: ElevatedButton(
-                                onPressed: provider.isLoading
-                                    ? null
-                                    : () => _createScrap(sendToSalesOperation: true),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: Colors.orange.shade700,
-                                  foregroundColor: Colors.white,
-                                  padding: const EdgeInsets.symmetric(
-                                    vertical: 14,
-                                  ),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(8),
+                              ],
+                              if (auth.canSaveScrapFor(widget.moduleType)) ...[
+                                if (_canShowCancel(auth))
+                                  const SizedBox(width: 8),
+                                Expanded(
+                                  flex: 2,
+                                  child: ElevatedButton(
+                                    onPressed: provider.isLoading
+                                        ? null
+                                        : () => _createScrap(sendToSalesOperation: false),
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: AppColors.primary,
+                                      foregroundColor: Colors.white,
+                                      padding: const EdgeInsets.symmetric(
+                                        vertical: 14,
+                                      ),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                    ),
+                                    child: const Text(
+                                      'Save',
+                                      style: TextStyle(fontWeight: FontWeight.bold),
+                                    ),
                                   ),
                                 ),
-                                child: const Text(
-                                  'Send to Sales Operation',
-                                  style: TextStyle(fontWeight: FontWeight.bold),
-                                ),
-                              ),
-                            ),
-                          ],
-                          if (_canShowValidate(auth)) ...[
-                            if (_canShowCancel(auth) ||
-                                auth.canSaveScrapFor(widget.moduleType) ||
-                                _canShowSendToQc(auth) ||
-                                _canShowSendToSalesOperation(auth))
-                              const SizedBox(width: 8),
-                            Expanded(
-                              flex: 2,
-                              child: ElevatedButton(
-                                onPressed: provider.isLoading
-                                    ? null
-                                    : () => _runAction('validate'),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: Colors.green,
-                                  foregroundColor: Colors.white,
-                                  padding: const EdgeInsets.symmetric(
-                                    vertical: 14,
-                                  ),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(8),
+                              ],
+                              if (_canShowSendToQc(auth)) ...[
+                                if (_canShowCancel(auth) ||
+                                    auth.canSaveScrapFor(widget.moduleType))
+                                  const SizedBox(width: 8),
+                                Expanded(
+                                  flex: 2,
+                                  child: ElevatedButton(
+                                    onPressed: provider.isLoading
+                                        ? null
+                                        : () => _createScrap(sendToQc: true),
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: const Color(0xFF2563EB),
+                                      foregroundColor: Colors.white,
+                                      padding: const EdgeInsets.symmetric(
+                                        vertical: 14,
+                                      ),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                    ),
+                                    child: const Text(
+                                      'Send to QC',
+                                      style: TextStyle(fontWeight: FontWeight.bold),
+                                    ),
                                   ),
                                 ),
-                                child: const Text(
-                                  'Validate',
-                                  style: TextStyle(fontWeight: FontWeight.bold),
+                              ],
+                              if (_canShowSendToSalesOperation(auth)) ...[
+                                if (_canShowCancel(auth) ||
+                                    auth.canSaveScrapFor(widget.moduleType) ||
+                                    _canShowSendToQc(auth))
+                                  const SizedBox(width: 8),
+                                Expanded(
+                                  flex: 2,
+                                  child: ElevatedButton(
+                                    onPressed: provider.isLoading
+                                        ? null
+                                        : () => _createScrap(sendToSalesOperation: true),
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: Colors.orange.shade700,
+                                      foregroundColor: Colors.white,
+                                      padding: const EdgeInsets.symmetric(
+                                        vertical: 14,
+                                      ),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                    ),
+                                    child: const Text(
+                                      'Send to Sales Operation',
+                                      style: TextStyle(fontWeight: FontWeight.bold),
+                                    ),
+                                  ),
                                 ),
-                              ),
-                            ),
-                          ],
-                        ],
-                      ),
+                              ],
+                              if (_canShowValidate(auth)) ...[
+                                if (_canShowCancel(auth) ||
+                                    auth.canSaveScrapFor(widget.moduleType) ||
+                                    _canShowSendToQc(auth) ||
+                                    _canShowSendToSalesOperation(auth))
+                                  const SizedBox(width: 8),
+                                Expanded(
+                                  flex: 2,
+                                  child: ElevatedButton(
+                                    onPressed: provider.isLoading
+                                        ? null
+                                        : () => _runAction('validate'),
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: Colors.green,
+                                      foregroundColor: Colors.white,
+                                      padding: const EdgeInsets.symmetric(
+                                        vertical: 14,
+                                      ),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                    ),
+                                    child: const Text(
+                                      'Validate',
+                                      style: TextStyle(fontWeight: FontWeight.bold),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ],
+                          ),
+                  ],
+                ),
               ),
           ],
         ),
@@ -1970,6 +2016,7 @@ class _CreateScrapScreenState extends State<CreateScrapScreen> {
 
 class _ScrapLineCard extends StatelessWidget {
   const _ScrapLineCard({
+    required this.amount,
     required this.line,
     required this.onRemove,
     required this.lots,
@@ -2009,6 +2056,8 @@ class _ScrapLineCard extends StatelessWidget {
   onLotChanged;
   final ValueChanged<TransferLotInput> onLotMinus;
   final ValueChanged<TransferLotInput> onLotPlus;
+  /// Price times the quantity entered; see [VirtualTransferLineEntry.amountFor].
+  final double amount;
   final double allocatedQty;
   final bool isReadOnly;
   final bool canEditSoQty;
@@ -2119,6 +2168,32 @@ class _ScrapLineCard extends StatelessWidget {
                           ),
                         ],
                       ),
+                      if (line.priceUnit > 0) ...[
+                        const SizedBox(height: 6),
+                        // Wraps on a 360 dp phone instead of overflowing.
+                        Wrap(
+                          spacing: 12,
+                          runSpacing: 2,
+                          children: [
+                            Text(
+                              'Price: ৳${line.priceUnit.toStringAsFixed(2)}',
+                              style: const TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                color: AppColors.primary,
+                              ),
+                            ),
+                            Text(
+                              'Subtotal: ৳${amount.toStringAsFixed(2)}',
+                              style: const TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.black87,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
                     ],
                   ),
                 ),

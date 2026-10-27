@@ -218,8 +218,25 @@ class VirtualTransferLineEntry {
   final List<TransferLotInput> lotLines;
 
   double get priceUnit => product.priceUnit;
-  double get priceSubtotal {
-    final qty = soQty ?? qcSaleableQty ?? qcQty ?? quantity;
+  /// Price times the quantity the person editing the line enters: the SO
+  /// figure for sales operation ([bySoQty]), the warehouse figure for the
+  /// warehouse ([byWarehouseQty]), otherwise the quantity -- the same choice
+  /// the return and scrap screens make when a lot quantity is typed. A
+  /// lot-tracked line's figures are entered on its lots and only copied to
+  /// the line on save, so its lots are summed.
+  ///
+  /// A saved line carries 0.0, not null, for the stages nobody has filled in
+  /// yet, so the figure is chosen by role rather than by the first non-null
+  /// one -- otherwise an unfilled SO figure would zero every amount.
+  double amountFor({bool bySoQty = false, bool byWarehouseQty = false}) {
+    double entered(double? so, double? warehouse, double qty) =>
+        bySoQty ? (so ?? qty) : (byWarehouseQty ? (warehouse ?? qty) : qty);
+    final qty = lotLines.isEmpty
+        ? entered(soQty, qcQty, quantity)
+        : lotLines.fold<double>(
+            0,
+            (sum, l) => sum + entered(l.soQty, l.qcQty, l.quantity),
+          );
     return priceUnit * qty;
   }
 }

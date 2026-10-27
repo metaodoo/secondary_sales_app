@@ -814,6 +814,34 @@ class _CreateReturnScreenState extends State<CreateReturnScreen> {
     });
   }
 
+  /// The quantity a line's card shows as its total: what the person
+  /// viewing it enters, by role and stage.
+  double _shownQty(VirtualTransferLineEntry line, AuthProvider auth) {
+    return _qcSplit
+        ? (_qcMode == 'scrap_sum'
+            ? (auth.canEditQcQty
+                ? _lotSum(line, (l) => (l.actualQcQty ?? 0) + (l.qcNonsaleableQty ?? 0))
+                : (auth.canEditQcTeamQty
+                    ? _lotSum(line, (l) => (l.qcTeamQcQty ?? 0) + (l.qcTeamNonsaleableQty ?? 0))
+                    : _lotSum(line, (l) => (l.wQcQty ?? 0) + (l.wNonsaleableQty ?? 0))))
+            : _lotSum(line, (l) => l.qcSaleableQty))
+        : (auth.canEditSoQty
+              ? _allocatedSoQty(line)
+              : (auth.canEditWarehouseQty
+                    ? _allocatedQcQty(line)
+                    : _allocatedQty(line)));
+  }
+
+  /// Price times the quantity the card shows. A lot-tracked line's quantity
+  /// is entered on its lots, so it is the card's lot total.
+  double _lineAmount(VirtualTransferLineEntry line, AuthProvider auth) {
+    if (line.product.requiresLots) return line.priceUnit * _shownQty(line, auth);
+    return line.amountFor(
+      bySoQty: auth.canEditSoQty,
+      byWarehouseQty: auth.canEditWarehouseQty,
+    );
+  }
+
   double _allocatedQty(VirtualTransferLineEntry line) {
     return line.lotLines.fold<double>(0, (sum, lot) => sum + lot.quantity);
   }
@@ -1759,6 +1787,7 @@ class _CreateReturnScreenState extends State<CreateReturnScreen> {
                         else
                           ..._lines.map(
                             (line) => _ReturnLineCard(
+                              amount: _lineAmount(line, auth),
                               line: line,
                               onRemove: () =>
                                   setState(() => _lines.remove(line)),
@@ -1804,19 +1833,7 @@ class _CreateReturnScreenState extends State<CreateReturnScreen> {
                                   _changeLotQty(lotInput, double.infinity, 1),
                               onLotQtyInput: (lotInput, newQty) =>
                                   _setLotQty(lotInput, newQty),
-                              allocatedQty: _qcSplit
-                                  ? (_qcMode == 'scrap_sum'
-                                      ? (canEditQcQty
-                                          ? _lotSum(line, (l) => (l.actualQcQty ?? 0) + (l.qcNonsaleableQty ?? 0))
-                                          : (canEditQcTeamQty
-                                              ? _lotSum(line, (l) => (l.qcTeamQcQty ?? 0) + (l.qcTeamNonsaleableQty ?? 0))
-                                              : _lotSum(line, (l) => (l.wQcQty ?? 0) + (l.wNonsaleableQty ?? 0))))
-                                      : _lotSum(line, (l) => l.qcSaleableQty))
-                                  : (canEditSoQty
-                                        ? _allocatedSoQty(line)
-                                        : (canEditWarehouseQty
-                                              ? _allocatedQcQty(line)
-                                              : _allocatedQty(line))),
+                              allocatedQty: _shownQty(line, auth),
                               isReadOnly: _isReadOnly,
                               canEditSoQty: canEditSoQty,
                               canEditWarehouseQty: canEditWarehouseQty,
@@ -1924,7 +1941,7 @@ class _CreateReturnScreenState extends State<CreateReturnScreen> {
                             ),
                           ),
                           Text(
-                            '৳${_lines.fold(0.0, (s, l) => s + l.priceSubtotal).toStringAsFixed(2)}',
+                            '৳${_lines.fold(0.0, (s, l) => s + _lineAmount(l, auth)).toStringAsFixed(2)}',
                             style: const TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.bold,
@@ -2135,6 +2152,7 @@ class _CreateReturnScreenState extends State<CreateReturnScreen> {
 
 class _ReturnLineCard extends StatelessWidget {
   const _ReturnLineCard({
+    required this.amount,
     required this.line,
     required this.onRemove,
     required this.lots,
@@ -2174,6 +2192,8 @@ class _ReturnLineCard extends StatelessWidget {
   onLotChanged;
   final ValueChanged<TransferLotInput> onLotMinus;
   final ValueChanged<TransferLotInput> onLotPlus;
+  /// Price times the quantity entered; see [VirtualTransferLineEntry.amountFor].
+  final double amount;
   final double allocatedQty;
   final bool isReadOnly;
   final bool canEditSoQty;
@@ -2285,7 +2305,10 @@ class _ReturnLineCard extends StatelessWidget {
                       ),
                       if (line.priceUnit > 0) ...[
                         const SizedBox(height: 6),
-                        Row(
+                        // Wraps on a 360 dp phone instead of overflowing.
+                        Wrap(
+                          spacing: 12,
+                          runSpacing: 2,
                           children: [
                             Text(
                               'Price: ৳${line.priceUnit.toStringAsFixed(2)}',
@@ -2295,9 +2318,8 @@ class _ReturnLineCard extends StatelessWidget {
                                 color: AppColors.primary,
                               ),
                             ),
-                            const SizedBox(width: 12),
                             Text(
-                              'Subtotal: ৳${line.priceSubtotal.toStringAsFixed(2)}',
+                              'Subtotal: ৳${amount.toStringAsFixed(2)}',
                               style: const TextStyle(
                                 fontSize: 12,
                                 fontWeight: FontWeight.bold,
