@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:secondary_sales/core/widgets/app_camera_capture_dialog.dart';
 import 'package:secondary_sales/core/services/media_storage_service.dart';
+import 'package:secondary_sales/core/widgets/ss_keyboard_inset.dart';
 import 'package:secondary_sales/core/theme/app_theme.dart';
 import 'package:secondary_sales/core/util/dialog_helper.dart';
 import 'package:secondary_sales/features/hr/expense_provider.dart';
@@ -20,14 +21,17 @@ class PersonalVehicleTripSheet extends StatefulWidget {
     DateTime? initialDate,
     required ExpenseProvider provider,
   }) {
+    // Built once: the sheet route calls builder again on every frame of the
+    // keyboard animation, and a new widget there would rebuild the whole form.
+    final sheet = ChangeNotifierProvider.value(
+      value: provider,
+      child: PersonalVehicleTripSheet(activeTrip: activeTrip, initialDate: initialDate),
+    );
     return showModalBottomSheet<bool>(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (ctx) => ChangeNotifierProvider.value(
-        value: provider,
-        child: PersonalVehicleTripSheet(activeTrip: activeTrip, initialDate: initialDate),
-      ),
+      builder: (_) => sheet,
     );
   }
 
@@ -307,13 +311,10 @@ class _PersonalVehicleTripSheetState extends State<PersonalVehicleTripSheet> {
   Widget build(BuildContext context) {
     final provider = context.watch<ExpenseProvider>();
 
-    return Container(
+    return SsKeyboardInset(
       decoration: const BoxDecoration(
         color: AppColors.surface,
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      padding: EdgeInsets.only(
-        bottom: MediaQuery.of(context).viewInsets.bottom,
       ),
       child: SafeArea(
         child: SingleChildScrollView(
@@ -511,9 +512,12 @@ class _PersonalVehicleTripSheetState extends State<PersonalVehicleTripSheet> {
                             ),
                           ),
                           const SizedBox(width: 8),
-                          const Text(
-                            'Trip already completed today? Record start & end now',
-                            style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                          // Wraps on narrow screens and large text.
+                          const Expanded(
+                            child: Text(
+                              'Trip already completed today? Record start & end now',
+                              style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                            ),
                           ),
                         ],
                       ),
