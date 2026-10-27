@@ -206,6 +206,7 @@ class _VirtualTransferDetailScreenState
                   title: transfer.name,
                   subtitle: subtitle,
                   leading: IconButton(
+                    tooltip: 'Back',
                     onPressed: () => Navigator.pop(context),
                     icon: const Icon(Icons.arrow_back, color: Colors.white),
                   ),
@@ -637,6 +638,7 @@ class _VirtualTransferDetailScreenState
               child: Padding(
                 padding: const EdgeInsets.all(16.0),
                 child: IconButton(
+                  tooltip: 'Close',
                   icon: const Icon(Icons.close, color: Colors.white, size: 30),
                   onPressed: () => Navigator.pop(ctx),
                 ),

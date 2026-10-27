@@ -353,6 +353,7 @@ class _ExpenseCreateSheetState extends State<ExpenseCreateSheet> {
                       ],
                     ),
                     IconButton(
+                      tooltip: 'Close',
                       icon: const Icon(Icons.close),
                       onPressed: () => Navigator.pop(context),
                     ),
@@ -407,6 +408,7 @@ class _ExpenseCreateSheetState extends State<ExpenseCreateSheet> {
                         ),
                         if (_attachmentName != null)
                           IconButton(
+                            tooltip: 'Close',
                             icon: const Icon(Icons.close, size: 20, color: Colors.red),
                             padding: EdgeInsets.zero,
                             constraints: const BoxConstraints(),
@@ -542,6 +544,7 @@ class _ExpenseCreateSheetState extends State<ExpenseCreateSheet> {
                             ),
                           ),
                           trailing: IconButton(
+                            tooltip: 'Delete',
                             icon: const Icon(Icons.delete_outline, color: Colors.red, size: 20),
                             onPressed: provider.isSubmitting ? null : () => _removeItem(index),
                           ),

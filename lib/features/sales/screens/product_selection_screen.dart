@@ -172,6 +172,7 @@ class _ProductSelectionScreenState extends State<ProductSelectionScreen> {
                                 ),
                               ),
                               IconButton(
+                                tooltip: 'Close',
                                 icon: const Icon(Icons.close),
                                 onPressed: () => Navigator.pop(ctx),
                               ),
@@ -353,6 +354,7 @@ class _ProductSelectionScreenState extends State<ProductSelectionScreen> {
         backgroundColor: Colors.white,
         elevation: 0,
         leading: IconButton(
+          tooltip: 'Back',
           icon: const Icon(Icons.arrow_back, color: AppColors.textPrimary),
           onPressed: () => Navigator.pop(context),
         ),

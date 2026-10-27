@@ -210,10 +210,12 @@ class _MtStockAuditListScreenState extends State<MtStockAuditListScreen> {
                   ? widget.outletName!
                   : 'Audit Sales',
               leading: IconButton(
+                tooltip: 'Back',
                 icon: const Icon(Icons.arrow_back, color: Colors.white),
                 onPressed: () => Navigator.pop(context),
               ),
               trailing: IconButton(
+                tooltip: 'Refresh',
                 icon: const Icon(Icons.refresh, color: Colors.white),
                 onPressed: () => _fetchAudits(reset: true),
               ),
@@ -231,6 +233,7 @@ class _MtStockAuditListScreenState extends State<MtStockAuditListScreen> {
                         prefixIcon: const Icon(Icons.search, size: 20),
                         suffixIcon: _searchController.text.isNotEmpty
                             ? IconButton(
+                                tooltip: 'Clear',
                                 icon: const Icon(Icons.clear, size: 18),
                                 onPressed: () {
                                   _searchController.clear();

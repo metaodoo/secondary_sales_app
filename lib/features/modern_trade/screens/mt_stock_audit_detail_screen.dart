@@ -207,10 +207,12 @@ class _MtStockAuditDetailScreenState extends State<MtStockAuditDetailScreen> {
               title: audit?.name ?? 'Stock Audit',
               subtitle: audit?.outletName ?? 'Modern Trade',
               leading: IconButton(
+                tooltip: 'Back',
                 icon: const Icon(Icons.arrow_back, color: Colors.white),
                 onPressed: () => Navigator.pop(context),
               ),
               trailing: IconButton(
+                tooltip: 'Refresh',
                 icon: const Icon(Icons.refresh, color: Colors.white),
                 onPressed: _loadDetail,
               ),

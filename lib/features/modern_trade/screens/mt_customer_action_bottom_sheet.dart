@@ -962,6 +962,7 @@ class _MtCustomerActionBottomSheetState extends State<MtCustomerActionBottomShee
                   ),
                 ),
                 IconButton(
+                  tooltip: 'Close',
                   icon: const Icon(Icons.close, color: AppColors.textSecondary),
                   onPressed: () => Navigator.pop(context),
                 ),

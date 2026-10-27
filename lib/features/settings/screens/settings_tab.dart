@@ -37,6 +37,7 @@ class SettingsTab extends StatelessWidget {
         scrolledUnderElevation: 0,
         leading: onBack != null
             ? IconButton(
+                tooltip: 'Back',
                 icon: const Icon(
                   Icons.arrow_back,
                   color: AppColors.textPrimary,

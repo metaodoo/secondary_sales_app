@@ -35,6 +35,7 @@ class SelectedDistributorCard extends StatelessWidget {
             ),
           ),
           IconButton(
+            tooltip: 'Close',
             onPressed: () => Navigator.pop(context),
             icon: const Icon(Icons.close, color: AppColors.textSecondary),
           ),
@@ -89,6 +90,7 @@ class OrderLineCard extends StatelessWidget {
                 ),
               ),
               IconButton(
+                tooltip: 'Delete',
                 icon: const Icon(Icons.delete_outline, color: Colors.red),
                 onPressed: onRemove,
               ),

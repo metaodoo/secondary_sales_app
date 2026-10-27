@@ -130,6 +130,7 @@ class _SalesOfficerListScreenState extends State<SalesOfficerListScreen> {
         elevation: 0,
         scrolledUnderElevation: 0,
         leading: IconButton(
+          tooltip: 'Back',
           icon: const Icon(
             Icons.arrow_back,
             color: AppColors.textPrimary,

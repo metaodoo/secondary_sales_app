@@ -399,6 +399,7 @@ class _VanLoadFormScreenState extends State<VanLoadFormScreen> {
         elevation: 1,
         shadowColor: Colors.black.withValues(alpha: 0.05),
         leading: IconButton(
+          tooltip: 'Back',
           icon: const Icon(Icons.arrow_back, color: AppColors.primaryStrong),
           onPressed: () => Navigator.pop(context),
         ),

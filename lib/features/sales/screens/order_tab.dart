@@ -38,6 +38,7 @@ class OrderTab extends StatelessWidget {
             subtitle: 'Create sales order',
             leading: onBack != null
                 ? IconButton(
+                    tooltip: 'Back',
                     onPressed: onBack,
                     icon: const Icon(Icons.arrow_back, color: Colors.white),
                   )

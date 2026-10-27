@@ -161,6 +161,7 @@ class _MtReturnProductSelectionSheetState extends State<MtReturnProductSelection
                                 ),
                               ),
                               IconButton(
+                                tooltip: 'Close',
                                 icon: const Icon(Icons.close),
                                 onPressed: () => Navigator.pop(ctx),
                               ),
@@ -394,6 +395,7 @@ class _MtReturnProductSelectionSheetState extends State<MtReturnProductSelection
                   ),
                 ),
                 IconButton(
+                  tooltip: 'Close',
                   onPressed: () => Navigator.of(context).pop(),
                   icon: const Icon(Icons.close, color: AppColors.textSecondary),
                 ),
@@ -427,6 +429,7 @@ class _MtReturnProductSelectionSheetState extends State<MtReturnProductSelection
               prefixIcon: const Icon(Icons.search, size: 20),
               suffixIcon: _searchController.text.isNotEmpty
                   ? IconButton(
+                      tooltip: 'Clear',
                       icon: const Icon(Icons.clear, size: 18),
                       onPressed: () {
                         _searchController.clear();

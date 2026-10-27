@@ -382,6 +382,7 @@ class _OutletSelectionScreenState extends State<OutletSelectionScreen> {
                 ? '$totalCount outlets available on this route'
                 : 'Showing $filteredCount of $totalCount outlets',
             trailing: IconButton(
+              tooltip: 'Back',
               icon: const Icon(Icons.arrow_back, color: Colors.white),
               onPressed: () => Navigator.pop(context),
             ),
@@ -401,6 +402,7 @@ class _OutletSelectionScreenState extends State<OutletSelectionScreen> {
               ).copyWith(
                 suffixIcon: _searchQuery.isNotEmpty
                     ? IconButton(
+                        tooltip: 'Clear',
                         icon: const Icon(Icons.clear, size: 20),
                         onPressed: () {
                           _searchController.clear();

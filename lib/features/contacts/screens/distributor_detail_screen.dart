@@ -49,6 +49,7 @@ class _DistributorDetailScreenState extends State<DistributorDetailScreen> {
               title: _distributor.name,
               subtitle: 'Dealer profile and staff details',
               leading: IconButton(
+                tooltip: 'Back',
                 onPressed: () => Navigator.pop(context),
                 icon: const Icon(Icons.arrow_back, color: Colors.white),
               ),

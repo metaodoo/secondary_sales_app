@@ -131,6 +131,7 @@ class _MtReturnCreateScreenState extends State<MtReturnCreateScreen> {
                       ),
                     ),
                     IconButton(
+                      tooltip: 'Close',
                       icon: const Icon(Icons.close, color: Colors.white, size: 28),
                       onPressed: () => Navigator.pop(ctx),
                     ),
@@ -260,6 +261,7 @@ class _MtReturnCreateScreenState extends State<MtReturnCreateScreen> {
                                 ),
                               ),
                               IconButton(
+                                tooltip: 'Close',
                                 icon: const Icon(Icons.close),
                                 onPressed: () {
                                   modalDebounce?.cancel();

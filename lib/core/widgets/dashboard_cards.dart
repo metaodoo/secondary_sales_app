@@ -187,6 +187,7 @@ class SalesOrderCard extends StatelessWidget {
                       if (isEditable && onDeleteTap != null) ...[
                         const SizedBox(width: 8),
                         IconButton(
+                          tooltip: 'Delete',
                           padding: EdgeInsets.zero,
                           constraints: const BoxConstraints(),
                           icon: const Icon(

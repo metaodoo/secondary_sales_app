@@ -194,6 +194,7 @@ class _MtReturnsListScreenState extends State<MtReturnsListScreen> {
                                 ),
                               ),
                               IconButton(
+                                tooltip: 'Close',
                                 icon: const Icon(Icons.close),
                                 onPressed: () {
                                   modalDebounce?.cancel();
@@ -386,6 +387,7 @@ class _MtReturnsListScreenState extends State<MtReturnsListScreen> {
                     prefixIcon: const Icon(Icons.search, size: 20),
                     suffixIcon: _searchController.text.isNotEmpty
                         ? IconButton(
+                            tooltip: 'Clear',
                             icon: const Icon(Icons.clear, size: 18),
                             onPressed: () {
                               _searchController.clear();

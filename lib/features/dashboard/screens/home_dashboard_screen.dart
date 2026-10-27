@@ -367,6 +367,7 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
         automaticallyImplyLeading: false,
         leading: Navigator.of(context).canPop()
             ? IconButton(
+                tooltip: 'Back',
                 icon: const Icon(
                   Icons.arrow_back,
                   color: AppColors.textPrimary,

@@ -234,6 +234,7 @@ class _VisitListTabState extends State<_VisitListTab> {
               prefixIcon: const Icon(Icons.search, color: AppColors.textSecondary),
               suffixIcon: _searchController.text.isNotEmpty
                   ? IconButton(
+                      tooltip: 'Clear',
                       icon: const Icon(Icons.clear, size: 18),
                       onPressed: () {
                         _searchController.clear();

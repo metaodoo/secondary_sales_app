@@ -310,6 +310,7 @@ class _AppCameraCaptureDialogState extends State<AppCameraCaptureDialog>
       child: Row(
         children: [
           IconButton(
+            tooltip: 'Close',
             icon: const Icon(Icons.close_rounded, color: Colors.white, size: 28),
             onPressed: () => Navigator.of(context).pop(null),
           ),

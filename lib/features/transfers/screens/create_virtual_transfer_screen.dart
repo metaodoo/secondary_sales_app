@@ -244,6 +244,7 @@ class _CreateVirtualTransferScreenState
               title: 'Virtual Transfer',
               subtitle: 'Load stock into van',
               leading: IconButton(
+                tooltip: 'Back',
                 onPressed: () => Navigator.pop(context),
                 icon: const Icon(Icons.arrow_back, color: Colors.white),
               ),
@@ -455,6 +456,7 @@ class _TransferLineCard extends StatelessWidget {
                 ),
               ),
               IconButton(
+                tooltip: 'Close',
                 onPressed: onRemove,
                 icon: const Icon(Icons.close, color: Colors.red),
               ),
@@ -598,6 +600,7 @@ class _TransferLotAllocationRow extends StatelessWidget {
                 ),
               ),
               IconButton(
+                tooltip: 'Close',
                 onPressed: onRemove,
                 icon: const Icon(Icons.close, color: Color(0xFFEF4444)),
               ),

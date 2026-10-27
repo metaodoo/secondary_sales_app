@@ -129,6 +129,7 @@ class _MtOutletsScreenState extends State<MtOutletsScreen> with WidgetsBindingOb
               )
             : widget.onBack != null
             ? IconButton(
+                tooltip: 'Back',
                 onPressed: widget.onBack,
                 icon: const Icon(Icons.arrow_back, color: AppColors.primaryStrong),
               )

@@ -141,6 +141,7 @@ class _CreateScrapScreenState extends State<CreateScrapScreen> {
               child: Padding(
                 padding: const EdgeInsets.all(16.0),
                 child: IconButton(
+                  tooltip: 'Close',
                   icon: const Icon(Icons.close, color: Colors.white, size: 30),
                   onPressed: () => Navigator.pop(ctx),
                 ),
@@ -1578,6 +1579,7 @@ class _CreateScrapScreenState extends State<CreateScrapScreen> {
                                       if (!_isReadOnly &&
                                           _challanImageFile != null)
                                         IconButton(
+                                          tooltip: 'Delete',
                                           icon: const Icon(
                                             Icons.delete_outline,
                                             color: Colors.red,
@@ -2122,6 +2124,7 @@ class _ScrapLineCard extends StatelessWidget {
                 ),
                 if (!isReadOnly)
                   IconButton(
+                    tooltip: 'Delete',
                     icon: const Icon(Icons.delete_outline, color: Colors.red),
                     onPressed: onRemove,
                     padding: EdgeInsets.zero,
@@ -2570,6 +2573,7 @@ class _ScrapLotRow extends StatelessWidget {
         if (!isReadOnly) ...[
           const SizedBox(width: 4),
           IconButton(
+            tooltip: 'Delete',
             icon: const Icon(Icons.delete_outline, color: Colors.red),
             onPressed: onRemove,
             padding: EdgeInsets.zero,

@@ -128,6 +128,7 @@ class _VisitDetailsScreenState extends State<VisitDetailsScreen> {
             title: 'Visit Details',
             subtitle: widget.route.name,
             trailing: IconButton(
+              tooltip: 'Back',
               icon: const Icon(Icons.arrow_back, color: Colors.white),
               onPressed: () => Navigator.pop(context),
             ),

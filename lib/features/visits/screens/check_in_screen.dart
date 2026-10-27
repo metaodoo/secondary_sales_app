@@ -86,6 +86,7 @@ class _CheckInScreenState extends State<CheckInScreen> {
             title: 'Checked In',
             subtitle: widget.outletName,
             trailing: IconButton(
+              tooltip: 'Back',
               icon: const Icon(Icons.arrow_back, color: Colors.white),
               onPressed: () => Navigator.pop(context),
             ),

@@ -289,6 +289,7 @@ class _OfficerCustomerSelectionScreenState
         backgroundColor: AppColors.background,
         elevation: 0,
         leading: IconButton(
+          tooltip: 'Back',
           icon: const Icon(Icons.arrow_back, color: AppColors.textPrimary),
           onPressed: () => Navigator.pop(context),
         ),
@@ -465,6 +466,7 @@ class _OfficerCustomerSelectionScreenState
                         ),
                         suffixIcon: _searchQuery.isNotEmpty
                             ? IconButton(
+                                tooltip: 'Clear',
                                 icon: const Icon(Icons.clear, size: 20),
                                 onPressed: () {
                                   _searchController.clear();

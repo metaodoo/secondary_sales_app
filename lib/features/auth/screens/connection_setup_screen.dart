@@ -119,6 +119,7 @@ class _ConnectionSetupScreenState extends State<ConnectionSetupScreen> {
               backgroundColor: Colors.transparent,
               elevation: 0,
               leading: IconButton(
+                tooltip: 'Back',
                 icon: const Icon(Icons.arrow_back, color: AppColors.textPrimary),
                 onPressed: () => Navigator.pop(context),
               ),

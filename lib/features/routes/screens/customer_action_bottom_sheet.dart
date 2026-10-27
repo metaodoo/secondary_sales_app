@@ -554,6 +554,7 @@ class _CustomerActionBottomSheetState extends State<CustomerActionBottomSheet> {
                     onPressed: _handleArchive,
                   ),
                   IconButton(
+                    tooltip: 'Close',
                     icon: const Icon(Icons.close, color: AppColors.textSecondary),
                     onPressed: () => Navigator.pop(context),
                   ),
@@ -981,6 +982,7 @@ Future<int?> ssShowOrderMediumDialog(
                         ),
                       ),
                       IconButton(
+                        tooltip: 'Close',
                         icon: const Icon(Icons.close, color: AppColors.textSecondary),
                         onPressed: () => Navigator.pop(ctx, null),
                       ),

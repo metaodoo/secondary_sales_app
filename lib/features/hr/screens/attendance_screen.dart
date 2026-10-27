@@ -174,6 +174,7 @@ class _AttendanceScreenContentState extends State<_AttendanceScreenContent>
         elevation: 0,
         scrolledUnderElevation: 0,
         leading: IconButton(
+          tooltip: 'Back',
           icon: const Icon(
             Icons.arrow_back,
             color: AppColors.textPrimary,
@@ -356,6 +357,7 @@ class _AttendanceScreenContentState extends State<_AttendanceScreenContent>
                         ),
                       ),
                       IconButton(
+                        tooltip: 'Refresh',
                         icon: const Icon(Icons.refresh, color: AppColors.textSecondary),
                         onPressed: provider.refresh,
                       ),
@@ -505,6 +507,7 @@ class _AttendanceScreenContentState extends State<_AttendanceScreenContent>
                   ),
                   if (_selectedDateRange != null)
                     IconButton(
+                      tooltip: 'Clear',
                       icon: const Icon(Icons.clear, size: 18),
                       padding: EdgeInsets.zero,
                       constraints: const BoxConstraints(),

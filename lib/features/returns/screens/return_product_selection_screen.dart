@@ -105,6 +105,7 @@ class _ReturnProductSelectionScreenState
               child: Row(
                 children: [
                   IconButton(
+                    tooltip: 'Close',
                     onPressed: () => Navigator.pop(context),
                     icon: const Icon(Icons.close, color: Colors.white),
                   ),

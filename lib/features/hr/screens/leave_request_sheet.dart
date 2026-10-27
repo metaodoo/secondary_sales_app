@@ -568,6 +568,7 @@ class _LeaveRequestSheetState extends State<LeaveRequestSheet> {
                     ],
                   ),
                   IconButton(
+                    tooltip: 'Close',
                     icon: const Icon(Icons.close),
                     onPressed: () => Navigator.pop(context),
                   ),
@@ -891,6 +892,7 @@ class _LeaveRequestSheetState extends State<LeaveRequestSheet> {
                       ),
                       if (_attachmentName != null)
                         IconButton(
+                          tooltip: 'Close',
                           icon: const Icon(Icons.close, size: 20, color: Colors.red),
                           padding: EdgeInsets.zero,
                           constraints: const BoxConstraints(),

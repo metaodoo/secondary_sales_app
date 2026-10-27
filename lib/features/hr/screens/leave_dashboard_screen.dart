@@ -156,6 +156,7 @@ class _LeaveDashboardContentState extends State<_LeaveDashboardContent> with Sin
         elevation: 0,
         scrolledUnderElevation: 0,
         leading: IconButton(
+          tooltip: 'Back',
           icon: const Icon(
             Icons.arrow_back,
             color: AppColors.textPrimary,
@@ -240,6 +241,7 @@ class _LeaveDashboardContentState extends State<_LeaveDashboardContent> with Sin
                             prefixIcon: const Icon(Icons.search, color: Colors.grey, size: 20),
                             suffixIcon: _searchController.text.isNotEmpty
                                 ? IconButton(
+                                    tooltip: 'Clear',
                                     icon: const Icon(Icons.clear, size: 18, color: Colors.grey),
                                     onPressed: () {
                                       _searchController.clear();

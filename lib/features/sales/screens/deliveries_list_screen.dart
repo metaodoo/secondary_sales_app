@@ -251,6 +251,7 @@ class _DeliveriesListScreenState extends State<DeliveriesListScreen>
                                 ),
                               ),
                               IconButton(
+                                tooltip: 'Close',
                                 icon: const Icon(Icons.close),
                                 onPressed: () => Navigator.pop(ctx),
                               ),
@@ -619,6 +620,7 @@ class _DeliveriesListScreenState extends State<DeliveriesListScreen>
         elevation: 0,
         scrolledUnderElevation: 0,
         leading: IconButton(
+          tooltip: 'Back',
           icon: const Icon(
             Icons.arrow_back,
             color: AppColors.textPrimary,
@@ -691,6 +693,7 @@ class _DeliveriesListScreenState extends State<DeliveriesListScreen>
                             prefixIcon: const Icon(Icons.search, color: Colors.grey, size: 20),
                             suffixIcon: _searchController.text.isNotEmpty
                                 ? IconButton(
+                                    tooltip: 'Clear',
                                     icon: const Icon(Icons.clear, size: 18, color: Colors.grey),
                                     onPressed: () {
                                       _searchController.clear();

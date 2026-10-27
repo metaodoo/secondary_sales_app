@@ -305,7 +305,7 @@ class _IsReturnCreateScreenState extends State<IsReturnCreateScreen> {
             ListTile(
               leading: Image.file(_challanImageFile!, width: 48, height: 48, fit: BoxFit.cover),
               title: Text(_challanImageName ?? 'Photo attached'),
-              trailing: IconButton(onPressed: () => setState(() {
+              trailing: IconButton(tooltip: 'Delete', onPressed: () => setState(() {
                 _challanImageFile = null;
                 _challanImageBase64 = null;
                 _challanImageName = null;

@@ -95,6 +95,7 @@ class _LocationBufferScreenState extends State<LocationBufferScreen> {
         centerTitle: true,
         actions: [
           IconButton(
+            tooltip: 'Refresh',
             icon: const Icon(Icons.refresh, color: AppColors.textPrimary),
             onPressed: _load,
           ),

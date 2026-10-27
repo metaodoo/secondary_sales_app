@@ -563,6 +563,7 @@ class _OfflineDataScreenState extends State<OfflineDataScreen>
                         ),
                       ),
                       IconButton(
+                        tooltip: 'Close',
                         icon: const Icon(Icons.close),
                         onPressed: () => Navigator.pop(ctx),
                       ),
@@ -942,6 +943,7 @@ class _OfflineDataScreenState extends State<OfflineDataScreen>
                         },
                       ),
                       IconButton(
+                        tooltip: 'Close',
                         icon: const Icon(Icons.close),
                         onPressed: () => Navigator.pop(ctx),
                       ),

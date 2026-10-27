@@ -194,6 +194,7 @@ class _MtOutletDetailScreenState extends State<MtOutletDetailScreen> {
         backgroundColor: Colors.white,
         elevation: 0,
         leading: IconButton(
+          tooltip: 'Back',
           icon: const Icon(Icons.arrow_back, color: AppColors.primaryStrong),
           onPressed: () => Navigator.pop(context),
         ),

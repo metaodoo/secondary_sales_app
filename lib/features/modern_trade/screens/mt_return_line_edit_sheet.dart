@@ -295,6 +295,7 @@ class _MtReturnLineEditSheetState extends State<MtReturnLineEditSheet> {
                   ),
                 ),
                 IconButton(
+                  tooltip: 'Close',
                   onPressed: () => Navigator.of(context).pop(),
                   icon: const Icon(Icons.close, color: AppColors.textSecondary),
                 ),

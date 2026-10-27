@@ -248,6 +248,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
               title: order?.name ?? widget.fallbackName,
               subtitle: order?.distributor?.name ?? 'Sale Order',
               leading: IconButton(
+                tooltip: 'Back',
                 onPressed: () => Navigator.of(context).pop(),
                 icon: const Icon(Icons.arrow_back, color: Colors.white),
               ),

@@ -508,6 +508,7 @@ class _RouteDetailScreenState extends State<RouteDetailScreen> with WidgetsBindi
                                 ),
                               ),
                               trailing: IconButton(
+                                tooltip: 'Delete',
                                 icon: const Icon(
                                   Icons.delete_outline,
                                   color: Color(0xFFEF4444),

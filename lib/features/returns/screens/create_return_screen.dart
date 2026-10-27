@@ -167,6 +167,7 @@ class _CreateReturnScreenState extends State<CreateReturnScreen> {
               child: Padding(
                 padding: const EdgeInsets.all(16.0),
                 child: IconButton(
+                  tooltip: 'Close',
                   icon: const Icon(Icons.close, color: Colors.white, size: 30),
                   onPressed: () => Navigator.pop(ctx),
                 ),
@@ -1687,6 +1688,7 @@ class _CreateReturnScreenState extends State<CreateReturnScreen> {
                                       if (!_isReadOnly &&
                                           _challanImageFile != null)
                                         IconButton(
+                                          tooltip: 'Delete',
                                           icon: const Icon(
                                             Icons.delete_outline,
                                             color: Colors.red,
@@ -2292,6 +2294,7 @@ class _ReturnLineCard extends StatelessWidget {
                 ),
                 if (!isReadOnly)
                   IconButton(
+                    tooltip: 'Delete',
                     icon: const Icon(Icons.delete_outline, color: Colors.red),
                     onPressed: onRemove,
                     padding: EdgeInsets.zero,
@@ -2739,6 +2742,7 @@ class _ReturnLotRow extends StatelessWidget {
         if (!isReadOnly) ...[
           const SizedBox(width: 4),
           IconButton(
+            tooltip: 'Delete',
             icon: const Icon(Icons.delete_outline, color: Colors.red),
             onPressed: onRemove,
             padding: EdgeInsets.zero,

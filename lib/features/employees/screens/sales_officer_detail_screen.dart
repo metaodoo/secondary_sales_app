@@ -75,6 +75,7 @@ class _SalesOfficerDetailScreenState extends State<SalesOfficerDetailScreen> {
               title: _employee?.name ?? 'Sales Officer Details',
               subtitle: _employee?.jobTitle ?? 'Sales Officer',
               leading: IconButton(
+                tooltip: 'Back',
                 onPressed: () => Navigator.pop(context, true),
                 icon: const Icon(Icons.arrow_back, color: Colors.white),
               ),

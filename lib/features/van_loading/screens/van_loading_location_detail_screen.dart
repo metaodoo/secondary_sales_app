@@ -55,10 +55,12 @@ class _VanLoadingLocationDetailScreenState
               title: widget.initialLocation.name,
               subtitle: 'Van loading location',
               leading: IconButton(
+                tooltip: 'Back',
                 onPressed: () => Navigator.pop(context),
                 icon: const Icon(Icons.arrow_back, color: Colors.white),
               ),
               trailing: IconButton(
+                tooltip: 'Refresh',
                 onPressed: () => setState(() {
                   _locationFuture = context
                       .read<TransferProvider>()

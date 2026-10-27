@@ -103,6 +103,7 @@ class _MyTeamScreenState extends State<MyTeamScreen> {
         elevation: 0,
         scrolledUnderElevation: 0,
         leading: IconButton(
+          tooltip: 'Back',
           icon: const Icon(
             Icons.arrow_back,
             color: AppColors.textPrimary,
@@ -395,6 +396,7 @@ class _FiltersCard extends StatelessWidget {
                 ).copyWith(
                   suffixIcon: searchQuery.isNotEmpty
                       ? IconButton(
+                          tooltip: 'Clear',
                           icon: const Icon(
                             Icons.clear,
                             color: AppColors.textSecondary,

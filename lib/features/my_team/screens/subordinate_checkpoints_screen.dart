@@ -244,6 +244,7 @@ class _SubordinateCheckpointsScreenState
           ),
         ),
         leading: IconButton(
+          tooltip: 'Back',
           icon: const Icon(Icons.arrow_back, color: AppColors.primaryStrong),
           onPressed: () => Navigator.of(context).pop(),
         ),
@@ -421,6 +422,7 @@ class _SubordinateCheckpointsScreenState
                                   ],
                                 ),
                                 IconButton(
+                                  tooltip: 'Close',
                                   icon: const Icon(Icons.close, size: 16),
                                   padding: EdgeInsets.zero,
                                   constraints: const BoxConstraints(),

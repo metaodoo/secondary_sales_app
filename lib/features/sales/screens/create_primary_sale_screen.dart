@@ -242,6 +242,7 @@ class _CreatePrimarySaleScreenState extends State<CreatePrimarySaleScreen> {
         elevation: 0,
         scrolledUnderElevation: 0,
         leading: IconButton(
+          tooltip: 'Back',
           onPressed: () => Navigator.pop(context),
           icon: const Icon(
             Icons.arrow_back,

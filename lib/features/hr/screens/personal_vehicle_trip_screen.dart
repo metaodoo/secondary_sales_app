@@ -226,6 +226,7 @@ class _PersonalVehicleTripContentState extends State<_PersonalVehicleTripContent
         elevation: 0,
         scrolledUnderElevation: 0,
         leading: IconButton(
+          tooltip: 'Back',
           icon: const Icon(Icons.arrow_back, color: AppColors.textPrimary, size: 28),
           onPressed: () => Navigator.pop(context),
         ),
@@ -367,6 +368,7 @@ class _PersonalVehicleTripContentState extends State<_PersonalVehicleTripContent
                         ),
                         if (_filterStartDate != null)
                           IconButton(
+                            tooltip: 'Clear',
                             icon: const Icon(Icons.clear, size: 18, color: Colors.red),
                             padding: EdgeInsets.zero,
                             constraints: const BoxConstraints(),

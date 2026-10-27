@@ -65,6 +65,7 @@ class LeaveDetailsSheet extends StatelessWidget {
                     const SizedBox(width: 48), // balance space
                     const Text('Leave Request Details', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                     IconButton(
+                      tooltip: 'Close',
                       icon: const Icon(Icons.close),
                       onPressed: () => Navigator.pop(context),
                     ),

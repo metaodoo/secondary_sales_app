@@ -665,6 +665,7 @@ class _CsReturnCreateScreenState extends State<CsReturnCreateScreen> {
                 const SizedBox(width: 12),
                 Expanded(child: Text(_challanImageName ?? 'Photo attached', maxLines: 1, overflow: TextOverflow.ellipsis)),
                 IconButton(
+                  tooltip: 'Delete',
                   onPressed: () => setState(() {
                     _challanImageFile = null;
                     _challanImageBase64 = null;
@@ -806,6 +807,7 @@ class _CsReturnCreateScreenState extends State<CsReturnCreateScreen> {
                         : 'Batch ${line['lot_name']} · Qty ${line['requested_qty']}',
                   ),
                   trailing: IconButton(
+                    tooltip: 'Close',
                     icon: const Icon(Icons.close),
                     onPressed: () => setState(() => _lines.removeAt(entry.key)),
                   ),
@@ -1282,7 +1284,7 @@ class _CsReturnProductSheetState extends State<_CsReturnProductSheet> {
           child: Row(
             children: [
               const Expanded(child: Text('Select Product', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700))),
-              IconButton(onPressed: () => Navigator.pop(context), icon: const Icon(Icons.close)),
+              IconButton(tooltip: 'Close', onPressed: () => Navigator.pop(context), icon: const Icon(Icons.close)),
             ],
           ),
         ),
@@ -1343,7 +1345,7 @@ class _CsReturnProductSheetState extends State<_CsReturnProductSheet> {
               Row(
                 children: [
                   const Expanded(child: Text('Requested quantity', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700))),
-                  IconButton(onPressed: () => Navigator.pop(context), icon: const Icon(Icons.close)),
+                  IconButton(tooltip: 'Close', onPressed: () => Navigator.pop(context), icon: const Icon(Icons.close)),
                 ],
               ),
               Text('${product['name'] ?? ''}', style: const TextStyle(fontWeight: FontWeight.w700)),

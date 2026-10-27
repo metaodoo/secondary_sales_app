@@ -111,6 +111,7 @@ class _CreateDistributorScreenState extends State<CreateDistributorScreen> {
                   ? 'Modify details of this dealer'
                   : 'Register a new distributor partner',
               leading: IconButton(
+                tooltip: 'Back',
                 onPressed: () => Navigator.pop(context),
                 icon: const Icon(Icons.arrow_back, color: Colors.white),
               ),

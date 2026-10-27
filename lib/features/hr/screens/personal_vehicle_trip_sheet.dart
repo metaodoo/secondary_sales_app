@@ -351,6 +351,7 @@ class _PersonalVehicleTripSheetState extends State<PersonalVehicleTripSheet> {
                       ],
                     ),
                     IconButton(
+                      tooltip: 'Close',
                       icon: const Icon(Icons.close),
                       onPressed: () => Navigator.pop(context),
                     ),

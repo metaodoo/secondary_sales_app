@@ -219,6 +219,7 @@ class _MtStockAuditCreateScreenState extends State<MtStockAuditCreateScreen> {
                                 ),
                               ),
                               IconButton(
+                                tooltip: 'Close',
                                 icon: const Icon(Icons.close),
                                 onPressed: () => Navigator.pop(ctx),
                               ),
@@ -463,6 +464,7 @@ class _MtStockAuditCreateScreenState extends State<MtStockAuditCreateScreen> {
                   : 'New ${_typeLabel(_selectedType)}',
               subtitle: widget.outletName ?? widget.editAudit?.outletName ?? 'Modern Trade',
               leading: IconButton(
+                tooltip: 'Back',
                 icon: const Icon(Icons.arrow_back, color: Colors.white),
                 onPressed: () => Navigator.pop(context),
               ),
@@ -479,6 +481,7 @@ class _MtStockAuditCreateScreenState extends State<MtStockAuditCreateScreen> {
                   prefixIcon: const Icon(Icons.search, size: 20),
                   suffixIcon: _searchController.text.isNotEmpty
                       ? IconButton(
+                          tooltip: 'Clear',
                           icon: const Icon(Icons.clear, size: 18),
                           onPressed: () {
                             _searchController.clear();

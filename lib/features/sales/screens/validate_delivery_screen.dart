@@ -781,6 +781,7 @@ class _ValidateDeliveryScreenState extends State<ValidateDeliveryScreen> {
                   : (isReadOnly ? 'Delivery Details' : 'Validate Delivery'),
               subtitle: '${widget.orderName} • ${widget.pickingName}',
               leading: IconButton(
+                tooltip: 'Back',
                 onPressed: () => Navigator.pop(context),
                 icon: const Icon(Icons.arrow_back, color: Colors.white),
               ),
@@ -1382,6 +1383,7 @@ class _LocationSearchBottomSheetState
                       ),
                     ),
                     IconButton(
+                      tooltip: 'Close',
                       onPressed: () => Navigator.pop(context),
                       icon: const Icon(Icons.close),
                     ),
@@ -1895,6 +1897,7 @@ class _LotAllocationRow extends StatelessWidget {
                 ),
               ),
               IconButton(
+                tooltip: 'Close',
                 onPressed: onRemove,
                 icon: const Icon(Icons.close, color: Color(0xFFEF4444)),
               ),

@@ -271,6 +271,7 @@ class _GenericLotSearchBottomSheetState<T>
                 ),
               ),
               IconButton(
+                tooltip: 'Close',
                 icon: const Icon(Icons.close, color: AppColors.textSecondary),
                 onPressed: () => Navigator.pop(context),
               ),
@@ -286,6 +287,7 @@ class _GenericLotSearchBottomSheetState<T>
               prefixIcon: const Icon(Icons.search, color: AppColors.primaryStrong),
               suffixIcon: _controller.text.isNotEmpty
                   ? IconButton(
+                      tooltip: 'Clear',
                       icon: const Icon(Icons.clear, size: 18),
                       onPressed: () {
                         _controller.clear();

@@ -137,6 +137,7 @@ class _MtAuditTypeSheetContentState extends State<_MtAuditTypeSheetContent> {
                   ),
                 ),
                 IconButton(
+                  tooltip: 'Close',
                   icon: const Icon(Icons.close, color: AppColors.textSecondary),
                   onPressed: () => Navigator.pop(context),
                 ),
