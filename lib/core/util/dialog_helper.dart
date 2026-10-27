@@ -194,7 +194,7 @@ Future<bool> checkAttendanceRestriction(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
             ),
             child: const Text(
-              'Check In Now',
+              'Log In Now',
               style: TextStyle(
                 color: Colors.white,
                 fontWeight: FontWeight.bold,
