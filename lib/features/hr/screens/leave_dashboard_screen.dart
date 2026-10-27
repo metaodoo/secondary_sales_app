@@ -35,7 +35,7 @@ class _LeaveDashboardContentState extends State<_LeaveDashboardContent> with Sin
   final TextEditingController _searchController = TextEditingController();
 
   final Map<String, String?> _statusFilters = {
-    'All': null,
+    'All': 'all',
     'Pending': 'pending',
     'Approved': 'approved',
     'Rejected': 'rejected',

@@ -21,7 +21,9 @@ class LeaveProvider extends ChangeNotifier {
 
   // Filter state
   String _activeTab = 'own'; // own, pending
-  String? _statusFilter; // all, pending, approved, rejected
+  /// Sent as `status`. 'all' must be explicit: on the Team Approvals tab the
+  /// server falls back to the tab name ('pending') when no status is sent.
+  String _statusFilter = 'all'; // all, pending, approved, rejected
   String? _searchQuery;
   String? _dateFrom;
   String? _dateTo;
@@ -37,7 +39,7 @@ class LeaveProvider extends ChangeNotifier {
   String? get actionError => _actionError;
   String? get requestError => _requestError;
   String get activeTab => _activeTab;
-  String? get statusFilter => _statusFilter;
+  String get statusFilter => _statusFilter;
   String? get dateFrom => _dateFrom;
   String? get dateTo => _dateTo;
   LeaveProvider(this._authProvider) {
@@ -79,13 +81,13 @@ class LeaveProvider extends ChangeNotifier {
   void setActiveTab(String tab) {
     if (_activeTab == tab) return;
     _activeTab = tab;
-    _statusFilter = null;
+    _statusFilter = 'all';
     notifyListeners();
     fetchLeaveList();
   }
 
   void setStatusFilter(String? status) {
-    _statusFilter = status;
+    _statusFilter = status ?? 'all';
     notifyListeners();
     fetchLeaveList();
   }
