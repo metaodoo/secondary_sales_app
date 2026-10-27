@@ -446,33 +446,81 @@ class _VanLoadFormScreenState extends State<VanLoadFormScreen> {
                           ),
                         ),
                         const SizedBox(height: 8),
-                        Container(
-                          width: double.infinity,
-                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFF3F6FA),
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(color: const Color(0xFFDDE6F2)),
-                          ),
-                          child: Row(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const Icon(Icons.local_shipping_outlined, color: AppColors.primary, size: 20),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: Text(
-                                  formatLocationName(selectedDestination?.name),
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.w500,
-                                    color: AppColors.textPrimary,
-                                    fontSize: 14,
-                                  ),
-                                  softWrap: true,
-                                ),
+                        if (destinations.length > 1 && widget.existingTransfer == null)
+                          Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFF3F6FA),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: const Color(0xFFDDE6F2)),
+                            ),
+                            child: DropdownButtonHideUnderline(
+                              child: DropdownButton<int>(
+                                value: _selectedDestinationId,
+                                isExpanded: true,
+                                icon: const Icon(Icons.keyboard_arrow_down, color: AppColors.primary),
+                                items: destinations.map((d) {
+                                  return DropdownMenuItem<int>(
+                                    value: d.id,
+                                    child: Row(
+                                      children: [
+                                        const Icon(Icons.local_shipping_outlined, color: AppColors.primary, size: 20),
+                                        const SizedBox(width: 12),
+                                        Expanded(
+                                          child: Text(
+                                            formatLocationName(d.name),
+                                            style: const TextStyle(
+                                              fontWeight: FontWeight.w500,
+                                              color: AppColors.textPrimary,
+                                              fontSize: 14,
+                                            ),
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  );
+                                }).toList(),
+                                onChanged: (val) {
+                                  if (val != null && val != _selectedDestinationId) {
+                                    setState(() {
+                                      _selectedDestinationId = val;
+                                    });
+                                    _fetchTargets();
+                                  }
+                                },
                               ),
-                            ],
+                            ),
+                          )
+                        else
+                          Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFF3F6FA),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: const Color(0xFFDDE6F2)),
+                            ),
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Icon(Icons.local_shipping_outlined, color: AppColors.primary, size: 20),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Text(
+                                    formatLocationName(selectedDestination.name),
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.w500,
+                                      color: AppColors.textPrimary,
+                                      fontSize: 14,
+                                    ),
+                                    softWrap: true,
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
-                        ),
                         const SizedBox(height: 16),
 
                         Text(

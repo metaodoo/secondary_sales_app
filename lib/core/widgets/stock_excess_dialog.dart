@@ -21,6 +21,8 @@ Future<void> showStockExcessValidationDialog(
   BuildContext context, {
   required List<StockExcessItem> excessItems,
   String title = 'Stock Quantity Exceeded',
+  String? description,
+  String availableLabel = 'Avail',
 }) async {
   return showDialog<void>(
     context: context,
@@ -50,9 +52,10 @@ Future<void> showStockExcessValidationDialog(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
-                'The following items have quantity entered exceeding available stock. Please adjust quantities to proceed:',
-                style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
+              Text(
+                description ??
+                    'The following items have quantity entered exceeding available stock. Please adjust quantities to proceed:',
+                style: const TextStyle(fontSize: 13, color: AppColors.textSecondary),
               ),
               const SizedBox(height: 12),
               Flexible(
@@ -86,7 +89,7 @@ Future<void> showStockExcessValidationDialog(
                           runSpacing: 6,
                           children: [
                             Text(
-                              'Entered: ${item.enteredQty.toStringAsFixed(0)} ${item.uomName}  |  Avail: ${item.availableQty.toStringAsFixed(0)} ${item.uomName}',
+                              'Entered: ${item.enteredQty.toStringAsFixed(0)} ${item.uomName}  |  $availableLabel: ${item.availableQty.toStringAsFixed(0)} ${item.uomName}',
                               style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
                             ),
                             Container(

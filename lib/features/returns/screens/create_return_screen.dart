@@ -378,12 +378,12 @@ class _CreateReturnScreenState extends State<CreateReturnScreen> {
           }
           // On Leg 2 (transit leg), the stock originally debited from the distributor
           // is what the Sales Officer declared and moved on Leg 1 (`so_qty`).
-          // The distributor's total fresh capacity on Leg 2 is:
-          // remaining fresh stock at distributor + stock moved on Leg 1 (`so_qty`).
           final recorded = _isTransitLeg
               ? ((entry.soQty != null && entry.soQty! > 0)
                   ? entry.soQty!
-                  : entry.quantity)
+                  : (entry.quantity > 0
+                      ? entry.quantity
+                      : ((ld['demand_qty'] as num?)?.toDouble() ?? 0.0)))
               : [
                   entry.quantity,
                   entry.soQty ?? 0.0,
@@ -409,7 +409,11 @@ class _CreateReturnScreenState extends State<CreateReturnScreen> {
         }
       });
 
-      await _loadDistributorStock(details['distributor']?['id'] as int?);
+      if (!_isTransitLeg) {
+        await _loadDistributorStock(details['distributor']?['id'] as int?);
+      } else {
+        _distributorStockLoaded = true;
+      }
       if (!mounted) return;
       setState(() {
         _isPreparing = false;
@@ -608,7 +612,7 @@ class _CreateReturnScreenState extends State<CreateReturnScreen> {
   }
 
   /// The SO quantity this line is asking to return -- the only column capped
-  /// for scrap returns.
+  /// for scrap returns on Leg 1.
   ///
   /// `so_qty` is the sales officer's declaration of what came back from the
   /// market, and it is the only column the server builds leg 1's movement
@@ -625,29 +629,76 @@ class _CreateReturnScreenState extends State<CreateReturnScreen> {
         : (line.soQty ?? 0.0);
   }
 
+  /// The quantity delivered into transit from Leg 1, recorded in the DB.
+  /// On Leg 2 (transit leg), the user cannot enter more than this incoming quantity.
+  double _transitDbQtyFor(VirtualTransferLineEntry line) {
+    if (line.soQty != null && line.soQty! > 0) return line.soQty!;
+    if (line.lotLines.isNotEmpty) {
+      final lotSum = line.lotLines
+          .map((l) => (l.soQty != null && l.soQty! > 0)
+              ? l.soQty!
+              : (l.quantity > 0 ? l.quantity : 0.0))
+          .fold(0.0, (a, b) => a + b);
+      if (lotSum > 0) return lotSum;
+    }
+    final recorded = _recordedOnLoad[line.product.id];
+    if (recorded != null && recorded > 0) return recorded;
+    if (line.quantity > 0) return line.quantity;
+    return line.product.availableQty;
+  }
+
   /// The active quantity this line is asking to return for the user's role.
   ///
-  /// On Fresh returns, this checks:
-  /// - Sales Operation / QC: `qcSaleableQty`
-  /// - Logistics / Warehouse Coordinator: `warehouse_qty` / `qcQty` / `wQcQty`
-  /// - Sales Officer (Leg 1): `so_qty`
+  /// On transit legs (Leg 2), this validates the active inputs against transit stock:
+  /// - Fresh Return (QC split): sum of qcSaleableQty + qcNonsaleableQty
+  /// - Quality / Damaged Return: sum of active role quantities
+  /// - Logistics / Warehouse Coordinator: warehouse_qty / w_qc_qty
   ///
-  /// On Scrap / Quality / Damaged returns, this continues checking `so_qty`
-  /// against the 3-location combined stock.
+  /// On Leg 1 (Sales Officer creation): so_qty against distributor stock.
   double _activeEnteredQtyFor(
     VirtualTransferLineEntry line,
     AuthProvider auth,
   ) {
-    if (_isFreshReturn) {
-      if (_qcSplit || auth.canEditQcQty) {
-        return line.product.tracking != 'none'
-            ? _lotSum(line, (l) => l.qcSaleableQty)
-            : (line.qcSaleableQty ?? 0.0);
+    if (_isTransitLeg) {
+      if (_isFreshReturn) {
+        if (_qcSplit || auth.canEditQcQty) {
+          return line.product.tracking != 'none'
+              ? _lotSum(line, (l) => (l.qcSaleableQty ?? 0) + (l.qcNonsaleableQty ?? 0))
+              : ((line.qcSaleableQty ?? 0) + (line.qcNonsaleableQty ?? 0));
+        }
+        if (auth.canEditWarehouseQty) {
+          return line.product.tracking != 'none'
+              ? _allocatedQcQty(line)
+              : (line.qcQty ?? line.wQcQty ?? 0.0);
+        }
+      } else {
+        // Quality / Damaged:
+        if (auth.canEditQcQty) {
+          return line.product.tracking != 'none'
+              ? _lotSum(line, (l) => (l.actualQcQty ?? 0) + (l.qcNonsaleableQty ?? 0))
+              : ((line.actualQcQty ?? 0) + (line.qcNonsaleableQty ?? 0));
+        }
+        if (auth.canEditQcTeamQty) {
+          return line.product.tracking != 'none'
+              ? _lotSum(line, (l) => (l.qcTeamQcQty ?? 0) + (l.qcTeamNonsaleableQty ?? 0))
+              : ((line.qcTeamQcQty ?? 0) + (line.qcTeamNonsaleableQty ?? 0));
+        }
+        if (auth.canEditWarehouseQty) {
+          return line.product.tracking != 'none'
+              ? _lotSum(line, (l) => (l.wQcQty ?? 0) + (l.wNonsaleableQty ?? 0))
+              : ((line.wQcQty ?? 0) + (line.wNonsaleableQty ?? 0) > 0
+                  ? (line.wQcQty ?? 0) + (line.wNonsaleableQty ?? 0)
+                  : (line.qcQty ?? 0.0));
+        }
       }
-      if (auth.canEditWarehouseQty) {
-        return line.product.tracking != 'none'
-            ? _allocatedQcQty(line)
-            : (line.qcQty ?? line.wQcQty ?? 0.0);
+    } else {
+      // Leg 1:
+      if (_isFreshReturn) {
+        if (auth.canEditWarehouseQty) {
+          return line.product.tracking != 'none'
+              ? _allocatedQcQty(line)
+              : (line.qcQty ?? line.wQcQty ?? 0.0);
+        }
       }
     }
     return _enteredSoQtyFor(line);
@@ -691,6 +742,51 @@ class _CreateReturnScreenState extends State<CreateReturnScreen> {
           : 'Distributor Stock Exceeded',
     );
     return false;
+  }
+
+  /// Gate a transit-leg (Leg 2) return on not exceeding what Leg 1 transferred into transit.
+  /// Shows a clear restriction dialog if entered quantity exceeds the DB incoming transit entry.
+  Future<bool> _withinTransitQuantity(AuthProvider auth) async {
+    final excessItems = <StockExcessItem>[];
+    for (final line in _lines) {
+      if (!_lineHasSubmittedQty(line, auth)) continue;
+      final transitQty = _transitDbQtyFor(line);
+      if (transitQty <= 0) continue;
+      final entered = _activeEnteredQtyFor(line, auth);
+      // Tolerance keeps float noise from tripping an exactly-at-stock entry.
+      if (entered > transitQty + 0.0001) {
+        excessItems.add(
+          StockExcessItem(
+            productName: line.product.name,
+            enteredQty: entered,
+            availableQty: transitQty,
+            uomName: line.product.uomName,
+          ),
+        );
+      }
+    }
+    if (excessItems.isEmpty) return true;
+
+    await showStockExcessValidationDialog(
+      context,
+      excessItems: excessItems,
+      title: 'Return Quantity Exceeded',
+      description:
+          'The entered quantity exceeds the declared return quantity in transit. You cannot enter more than the quantity received from Leg 1:',
+      availableLabel: 'In Transit',
+    );
+    return false;
+  }
+
+  /// Gate a primary return on stock availability.
+  /// On Leg 2 (transit leg), validates against the incoming transit DB entry.
+  /// On Leg 1, validates against the distributor's stock on hand.
+  Future<bool> _withinStockValidation(AuthProvider auth) async {
+    if (!_isPrimaryTier) return true;
+    if (_isTransitLeg) {
+      return _withinTransitQuantity(auth);
+    }
+    return _withinDistributorStock(auth);
   }
 
   Future<void> _selectProducts() async {
@@ -1088,7 +1184,7 @@ class _CreateReturnScreenState extends State<CreateReturnScreen> {
       }
     }
 
-    if (!await _withinDistributorStock(auth)) return;
+    if (!await _withinStockValidation(auth)) return;
     if (!mounted) return;
 
     // Mandatory Photo Evidence Validation for Primary Sales Return
@@ -1225,7 +1321,7 @@ class _CreateReturnScreenState extends State<CreateReturnScreen> {
     // Gated before the spinner goes up, so the excess dialog is not raised over
     // a screen that has already replaced the quantities it is asking about.
     if (action == 'validate') {
-      if (!await _withinDistributorStock(context.read<AuthProvider>())) return;
+      if (!await _withinStockValidation(context.read<AuthProvider>())) return;
       if (!mounted) return;
     }
 
