@@ -40,7 +40,7 @@ class _LoginScreenState extends State<LoginScreen> {
     final error = context.read<AuthProvider>().error;
     ScaffoldMessenger.of(
       context,
-    ).showSnackBar(SnackBar(content: Text(error ?? 'Login failed.')));
+    ).showSnackBar(SnackBar(content: Text(error ?? 'Sign in failed.')));
   }
 
   @override

@@ -162,7 +162,7 @@ class ModuleSelectionScreen extends StatelessWidget {
                 _buildLargeModuleCard(
                   context,
                   title: 'Attendance',
-                  description: 'Manage your daily check-ins and check-outs.',
+                  description: 'Log in and log out for work, and see your history.',
                   icon: Icons.access_time_filled_outlined,
                   color: const Color(0xFFF59E0B), // Amber color
                   onTap: () {

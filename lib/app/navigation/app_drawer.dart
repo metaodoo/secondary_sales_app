@@ -115,7 +115,7 @@ class AppDrawer extends StatelessWidget {
             padding: const EdgeInsets.only(top: 2, bottom: 12),
             child: _MenuTile(
               icon: Icons.logout_rounded,
-              label: 'Logout',
+              label: 'Sign Out',
               iconColor: Colors.red.shade600,
               textColor: Colors.red.shade700,
               onTap: () => logoutWithUnsyncedGuard(

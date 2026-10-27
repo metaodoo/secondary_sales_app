@@ -94,7 +94,7 @@ Future<void> showValidationErrorDialog(
   );
 }
 
-/// Checks if the user is actively checked in for today.
+/// Checks if the user is logged in to attendance for today.
 /// If not checked in, displays a popup restriction dialog explaining that
 /// daily attendance is mandatory for operational actions (Van Load, Order Entry, Outlet Visits),
 /// with a direct button to navigate to the Attendance Screen.
@@ -164,7 +164,7 @@ Future<bool> checkAttendanceRestriction(
           ],
         ),
         content: Text(
-          'Daily attendance is mandatory before executing operational actions ($actionName). Please log in (Check In) for today first.',
+          'You need to log in to attendance for today before you can do this ($actionName).',
           style: const TextStyle(
             fontSize: 14,
             height: 1.4,

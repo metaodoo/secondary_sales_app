@@ -552,7 +552,7 @@ class AuthProvider with ChangeNotifier {
   Future<Map<String, dynamic>> syncAccessCatalog() async {
     final session = _session;
     if (session == null) {
-      throw Exception('You must be logged in to sync the access catalog.');
+      throw Exception('You must be signed in to sync the access catalog.');
     }
     _primeApiService(session);
     final result = await ApiService.instance.syncAccessCatalog(

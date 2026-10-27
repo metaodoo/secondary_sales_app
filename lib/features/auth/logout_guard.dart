@@ -21,7 +21,7 @@ Future<bool> logoutWithUnsyncedGuard(
     final openOfflineData = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('You Cannot Log Out Yet'),
+        title: const Text('You Cannot Sign Out Yet'),
         content: Text(
           '$unsyncedCount item${unsyncedCount == 1 ? ' is' : 's are'} not sent '
           'to the server yet. Open Offline Data and send '

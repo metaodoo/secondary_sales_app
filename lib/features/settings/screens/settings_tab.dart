@@ -277,7 +277,7 @@ class SettingsTab extends StatelessWidget {
                   const Divider(height: 1, color: AppColors.borderMuted),
                   _buildSettingItem(
                     icon: Icons.logout,
-                    title: 'Log Out',
+                    title: 'Sign Out',
                     titleColor: Colors.red.shade700,
                     iconColor: Colors.red.shade700,
                     onTap: () async {
