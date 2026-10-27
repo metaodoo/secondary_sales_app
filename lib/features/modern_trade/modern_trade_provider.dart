@@ -358,6 +358,7 @@ class ModernTradeProvider with ChangeNotifier {
     int outletId, {
     required double latitude,
     required double longitude,
+    required String gpsPhoto,
   }) async {
     _loadingCount++;
     _error = null;
@@ -368,6 +369,7 @@ class ModernTradeProvider with ChangeNotifier {
         outletId,
         partnerLatitude: latitude,
         partnerLongitude: longitude,
+        gpsPhoto: gpsPhoto,
       );
 
       final index = _outlets.indexWhere((o) => o.id == outletId);

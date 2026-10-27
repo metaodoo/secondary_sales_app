@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'package:secondary_sales/core/util/outlet_gps_photo.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:secondary_sales/core/services/media_storage_service.dart';
@@ -170,6 +171,9 @@ class _OfficerCustomerSelectionScreenState
     );
 
     if (confirm != true || !mounted) return;
+    // A live photo at the outlet is required before its position moves.
+    final gpsPhoto = await captureOutletGpsPhoto(context);
+    if (gpsPhoto == null || !mounted) return;
 
     try {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -200,6 +204,7 @@ class _OfficerCustomerSelectionScreenState
         outlet.id,
         partnerLatitude: position.latitude,
         partnerLongitude: position.longitude,
+        gpsPhoto: gpsPhoto,
       );
 
       if (!mounted) return;

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:secondary_sales/core/util/outlet_gps_photo.dart';
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:provider/provider.dart';
@@ -393,6 +394,9 @@ class _MtCustomerActionBottomSheetState extends State<MtCustomerActionBottomShee
     );
 
     if (confirm != true || !mounted) return;
+    // A live photo at the outlet is required before its position moves.
+    final gpsPhoto = await captureOutletGpsPhoto(context);
+    if (gpsPhoto == null || !mounted) return;
 
     setState(() => _isRecalibratingGps = true);
     try {
@@ -426,6 +430,7 @@ class _MtCustomerActionBottomSheetState extends State<MtCustomerActionBottomShee
         widget.outlet.id,
         latitude: position.latitude,
         longitude: position.longitude,
+        gpsPhoto: gpsPhoto,
       );
 
       if (!mounted) return;

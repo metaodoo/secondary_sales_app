@@ -1,3 +1,4 @@
+import 'package:secondary_sales/core/util/outlet_gps_photo.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:secondary_sales/core/services/location_service.dart';
@@ -97,6 +98,9 @@ class _MtOutletDetailScreenState extends State<MtOutletDetailScreen> {
     );
 
     if (confirm != true || !mounted) return;
+    // A live photo at the outlet is required before its position moves.
+    final gpsPhoto = await captureOutletGpsPhoto(context);
+    if (gpsPhoto == null || !mounted) return;
 
     setState(() => _isRecalibratingGps = true);
     try {
@@ -130,6 +134,7 @@ class _MtOutletDetailScreenState extends State<MtOutletDetailScreen> {
         widget.outletId,
         latitude: position.latitude,
         longitude: position.longitude,
+        gpsPhoto: gpsPhoto,
       );
 
       if (!mounted) return;

@@ -526,6 +526,7 @@ class RouteProvider with ChangeNotifier {
     int? outletTypeId,
     double? partnerLatitude,
     double? partnerLongitude,
+    String? gpsPhoto,
   }) async {
     _loadingCount++;
     _error = null;
@@ -544,6 +545,7 @@ class RouteProvider with ChangeNotifier {
         outletTypeId: outletTypeId,
         partnerLatitude: partnerLatitude,
         partnerLongitude: partnerLongitude,
+        gpsPhoto: gpsPhoto,
       );
 
       // If updating coordinates for an outlet on the currently active route,
