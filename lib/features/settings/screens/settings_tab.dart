@@ -250,7 +250,65 @@ class SettingsTab extends StatelessWidget {
                   _buildSettingItem(
                     icon: Icons.cloud_outlined,
                     title: 'Server Connection',
-                    trailing: auth.baseUrl.isNotEmpty ? auth.baseUrl : 'Not set',
+                    subtitle: auth.baseUrl.isNotEmpty
+                        ? (auth.dbName.isNotEmpty
+                            ? '${auth.baseUrl} • ${auth.dbName}'
+                            : auth.baseUrl)
+                        : 'Not configured',
+                    trailingWidget: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 3,
+                          ),
+                          decoration: BoxDecoration(
+                            color: auth.baseUrl.isNotEmpty
+                                ? AppColors.successSoft
+                                : AppColors.borderMuted,
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: auth.baseUrl.isNotEmpty
+                                  ? AppColors.success.withValues(alpha: 0.25)
+                                  : AppColors.borderSoft,
+                            ),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Container(
+                                width: 6,
+                                height: 6,
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  color: auth.baseUrl.isNotEmpty
+                                      ? AppColors.success
+                                      : AppColors.textSecondary,
+                                ),
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                auth.baseUrl.isNotEmpty ? 'Active' : 'Not set',
+                                style: TextStyle(
+                                  color: auth.baseUrl.isNotEmpty
+                                      ? AppColors.success
+                                      : AppColors.textSecondary,
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+                        const Icon(
+                          Icons.chevron_right,
+                          color: AppColors.borderSoft,
+                          size: 20,
+                        ),
+                      ],
+                    ),
                     onTap: () {
                       Navigator.push(
                         context,
@@ -265,6 +323,7 @@ class SettingsTab extends StatelessWidget {
                     icon: Icons.language,
                     title: 'Language',
                     trailing: 'English',
+                    showChevron: false,
                     onTap: () {},
                   ),
                   const Divider(height: 1, color: AppColors.borderMuted),
@@ -272,6 +331,7 @@ class SettingsTab extends StatelessWidget {
                     icon: Icons.info_outline,
                     title: 'App Version',
                     trailing: 'v1.0.0',
+                    showChevron: false,
                     onTap: () {},
                   ),
                   const Divider(height: 1, color: AppColors.borderMuted),
@@ -280,6 +340,7 @@ class SettingsTab extends StatelessWidget {
                     title: 'Sign Out',
                     titleColor: Colors.red.shade700,
                     iconColor: Colors.red.shade700,
+                    showChevron: false,
                     onTap: () async {
                       final signedOut = await logoutWithUnsyncedGuard(context);
                       if (signedOut && context.mounted) {
@@ -301,11 +362,38 @@ class SettingsTab extends StatelessWidget {
   Widget _buildSettingItem({
     required IconData icon,
     required String title,
+    String? subtitle,
     String? trailing,
+    Widget? trailingWidget,
     Color? titleColor,
     Color? iconColor,
+    bool showChevron = true,
     required VoidCallback onTap,
   }) {
+    Widget? trailingContent;
+    if (trailingWidget != null) {
+      trailingContent = trailingWidget;
+    } else if (trailing != null) {
+      trailingContent = Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            trailing,
+            style: const TextStyle(
+              color: AppColors.textSecondary,
+              fontSize: 14,
+            ),
+          ),
+          if (showChevron) ...[
+            const SizedBox(width: 4),
+            const Icon(Icons.chevron_right, color: AppColors.borderSoft, size: 20),
+          ],
+        ],
+      );
+    } else if (showChevron) {
+      trailingContent = const Icon(Icons.chevron_right, color: AppColors.borderSoft, size: 20);
+    }
+
     return ListTile(
       leading: Icon(icon, color: iconColor ?? AppColors.textSecondary),
       title: Text(
@@ -316,15 +404,18 @@ class SettingsTab extends StatelessWidget {
           fontSize: 15,
         ),
       ),
-      trailing: trailing != null
+      subtitle: subtitle != null
           ? Text(
-              trailing,
+              subtitle,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
               style: const TextStyle(
                 color: AppColors.textSecondary,
-                fontSize: 14,
+                fontSize: 12,
               ),
             )
-          : const Icon(Icons.chevron_right, color: AppColors.borderSoft),
+          : null,
+      trailing: trailingContent,
       onTap: onTap,
     );
   }

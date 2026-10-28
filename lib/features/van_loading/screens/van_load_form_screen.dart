@@ -636,7 +636,7 @@ class _VanLoadFormScreenState extends State<VanLoadFormScreen> {
                                               crossAxisAlignment: CrossAxisAlignment.start,
                                               children: [
                                                 const Text(
-                                                  'TARGET QTY',
+                                                  'RADS',
                                                   style: TextStyle(
                                                     color: AppColors.primaryStrong,
                                                     fontWeight: FontWeight.bold,

@@ -95,7 +95,7 @@ class _ConnectionSetupScreenState extends State<ConnectionSetupScreen> {
         dbName: _dbController.text.trim(),
       );
       if (mounted && Navigator.canPop(context)) {
-        Navigator.pop(context);
+        Navigator.of(context).popUntil((route) => route.isFirst);
       }
     } catch (e) {
       if (!mounted) return;
@@ -116,12 +116,26 @@ class _ConnectionSetupScreenState extends State<ConnectionSetupScreen> {
       backgroundColor: AppColors.background,
       appBar: canPop
           ? AppBar(
-              backgroundColor: Colors.transparent,
+              backgroundColor: Colors.white,
               elevation: 0,
+              scrolledUnderElevation: 0,
               leading: IconButton(
                 tooltip: 'Back',
                 icon: const Icon(Icons.arrow_back, color: AppColors.textPrimary),
                 onPressed: () => Navigator.pop(context),
+              ),
+              title: const Text(
+                'Server Connection',
+                style: TextStyle(
+                  color: AppColors.primaryStrong,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 20,
+                ),
+              ),
+              centerTitle: true,
+              bottom: PreferredSize(
+                preferredSize: const Size.fromHeight(1),
+                child: Container(color: AppColors.borderMuted, height: 1),
               ),
             )
           : null,
@@ -134,25 +148,94 @@ class _ConnectionSetupScreenState extends State<ConnectionSetupScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  const SizedBox(height: 20),
-                  const Text(
-                    'Connect Server',
-                    style: TextStyle(
-                      color: AppColors.textPrimary,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 32,
+                  if (canPop && AppConstants.hasSavedConnection) ...[
+                    Container(
+                      margin: const EdgeInsets.only(top: 8, bottom: 20),
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: AppColors.primarySoft,
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: AppColors.primaryTint),
+                      ),
+                      child: Row(
+                        children: [
+                          Container(
+                            width: 42,
+                            height: 42,
+                            decoration: const BoxDecoration(
+                              color: AppColors.primaryTint,
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(
+                              Icons.cloud_done_rounded,
+                              color: AppColors.primary,
+                              size: 22,
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text(
+                                  'Current Connection',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                    color: AppColors.primaryStrong,
+                                  ),
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  AppConstants.baseUrl,
+                                  style: const TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w600,
+                                    color: AppColors.textPrimary,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                                if (AppConstants.dbName.isNotEmpty) ...[
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    'Database: ${AppConstants.dbName}',
+                                    style: const TextStyle(
+                                      fontSize: 12,
+                                      color: AppColors.textSecondary,
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ],
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 8),
+                  ],
+                  if (!canPop) ...[
+                    const SizedBox(height: 20),
+                    const Text(
+                      'Connect Server',
+                      style: TextStyle(
+                        color: AppColors.textPrimary,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 32,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                  ],
                   const Text(
                     'Enter your Odoo server URL. Tap Load to pick a database, or '
                     'leave it blank to use the server default.',
                     style: TextStyle(
                       color: AppColors.textSecondary,
-                      fontSize: 16,
+                      fontSize: 14,
                     ),
                   ),
-                  const SizedBox(height: 32),
+                  const SizedBox(height: 20),
                   Container(
                     padding: const EdgeInsets.all(24),
                     decoration: BoxDecoration(
@@ -202,8 +285,18 @@ class _ConnectionSetupScreenState extends State<ConnectionSetupScreen> {
                               return null;
                             },
                           ),
-                          const SizedBox(height: 12),
+                          const SizedBox(height: 16),
+                          const Text(
+                            'Database',
+                            style: TextStyle(
+                              color: Color(0xFF1E293B),
+                              fontWeight: FontWeight.w600,
+                              fontSize: 14,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
                           Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Expanded(
                                 // Free text rather than a dropdown: servers with

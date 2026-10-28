@@ -10,14 +10,33 @@ extension AttendanceApi on ApiService {
 
   Future<Map<String, dynamic>> getAttendanceHistory({
     required int employeeId,
+    String scope = 'own',
+    int? subordinateId,
+    String? startDate,
+    String? endDate,
+    String? search,
     int page = 1,
     int pageSize = 20,
   }) async {
-    return _post('/api/v1/hr/attendance/history', {
+    final body = <String, dynamic>{
       'employee_id': employeeId,
+      'scope': scope,
       'page': page,
       'page_size': pageSize,
-    });
+    };
+    if (subordinateId != null && subordinateId > 0) {
+      body['subordinate_id'] = subordinateId;
+    }
+    if (startDate != null && startDate.isNotEmpty) {
+      body['start_date'] = startDate;
+    }
+    if (endDate != null && endDate.isNotEmpty) {
+      body['end_date'] = endDate;
+    }
+    if (search != null && search.trim().isNotEmpty) {
+      body['search'] = search.trim();
+    }
+    return _post('/api/v1/hr/attendance/history', body);
   }
 
   Future<Map<String, dynamic>> submitAttendanceAction({

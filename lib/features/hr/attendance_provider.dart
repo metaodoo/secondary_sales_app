@@ -37,16 +37,39 @@ class AttendanceProvider extends ChangeNotifier {
   bool _hasMoreHistory = true;
   bool _isLoadingMoreHistory = false;
 
+  // Subordinate / Team Attendance
+  List<Map<String, dynamic>> _teamHistoryLogs = [];
+  List<Map<String, dynamic>> _teamSubordinates = [];
+  int? _selectedSubordinateId;
+  String? _selectedSubordinateName;
+  bool _isLoadingTeamHistory = false;
+  bool _isLoadingMoreTeamHistory = false;
+  bool _hasMoreTeamHistory = true;
+  int _teamHistoryPage = 1;
+  String _teamSearchQuery = '';
+  String? _teamStartDate;
+  String? _teamEndDate;
+
   bool get isLoadingStatus => _isLoadingStatus;
   bool get isLoadingHistory => _isLoadingHistory;
   bool get isLoadingMoreHistory => _isLoadingMoreHistory;
   bool get hasMoreHistory => _hasMoreHistory;
+  bool get isLoadingTeamHistory => _isLoadingTeamHistory;
+  bool get isLoadingMoreTeamHistory => _isLoadingMoreTeamHistory;
+  bool get hasMoreTeamHistory => _hasMoreTeamHistory;
+  String get teamSearchQuery => _teamSearchQuery;
+  String? get teamStartDate => _teamStartDate;
+  String? get teamEndDate => _teamEndDate;
+  List<Map<String, dynamic>> get teamSubordinates => _teamSubordinates;
+  int? get selectedSubordinateId => _selectedSubordinateId;
+  String? get selectedSubordinateName => _selectedSubordinateName;
   bool get isActionLoading => _isActionLoading;
   String get loadingMessage => _loadingMessage;
   bool get isCheckedIn => _isCheckedIn;
   String? get activeCheckInTime => _activeCheckInTime;
   String? get activeCheckInAddress => _activeCheckInAddress;
   List<Map<String, dynamic>> get historyLogs => _historyLogs;
+  List<Map<String, dynamic>> get teamHistoryLogs => _teamHistoryLogs;
   String? get errorMessage => _errorMessage;
 
   /// [autoLoad] defaults to true (the Attendance screen wants status + history
@@ -82,6 +105,7 @@ class AttendanceProvider extends ChangeNotifier {
     Future.microtask(() {
       _loadStatus();
       _loadHistory(reset: true);
+      loadTeamHistory(reset: true);
     });
   }
 
@@ -95,7 +119,10 @@ class AttendanceProvider extends ChangeNotifier {
 
   Future<void> refresh() async {
     await _loadStatus();
-    await _loadHistory(reset: true);
+    await Future.wait([
+      _loadHistory(reset: true),
+      loadTeamHistory(reset: true),
+    ]);
   }
 
   void updateAuth({String? accessToken, String? sessionId, int? employeeId}) {
@@ -235,6 +262,122 @@ class AttendanceProvider extends ChangeNotifier {
   }
 
   Future<void> loadMoreHistory() => _loadHistory(reset: false);
+
+  Future<void> loadTeamHistory({
+    bool reset = false,
+    String? search,
+    String? startDate,
+    String? endDate,
+    int? subordinateId,
+    bool clearSubordinate = false,
+  }) async {
+    if (_employeeId == 0) return;
+    if (search != null) _teamSearchQuery = search;
+    if (startDate != null || reset) _teamStartDate = startDate;
+    if (endDate != null || reset) _teamEndDate = endDate;
+    if (clearSubordinate) {
+      _selectedSubordinateId = null;
+      _selectedSubordinateName = null;
+    } else if (subordinateId != null) {
+      _selectedSubordinateId = subordinateId;
+      final match = _teamSubordinates.firstWhere(
+        (s) => s['id'] == subordinateId,
+        orElse: () => <String, dynamic>{},
+      );
+      if (match.isNotEmpty) {
+        _selectedSubordinateName = match['name']?.toString();
+      }
+    }
+
+    if (reset) {
+      _teamHistoryPage = 1;
+      _hasMoreTeamHistory = true;
+      _isLoadingMoreTeamHistory = false;
+      _isLoadingTeamHistory = true;
+    } else {
+      if (!_hasMoreTeamHistory || _isLoadingMoreTeamHistory) return;
+      _isLoadingMoreTeamHistory = true;
+    }
+    notifyListeners();
+
+    try {
+      final response = await _apiService.getAttendanceHistory(
+        employeeId: _employeeId,
+        scope: 'team',
+        subordinateId: _selectedSubordinateId,
+        page: _teamHistoryPage,
+        pageSize: 20,
+        search: _teamSearchQuery,
+        startDate: _teamStartDate,
+        endDate: _teamEndDate,
+      );
+      if (response['success'] == true) {
+        final List logs = response['data'] ?? [];
+        final list = logs.map((e) => e as Map<String, dynamic>).toList();
+        if (response['subordinates'] is List) {
+          final subs = (response['subordinates'] as List)
+              .map((e) => e as Map<String, dynamic>)
+              .toList();
+          if (subs.isNotEmpty) {
+            _teamSubordinates = subs;
+            if (_selectedSubordinateId != null && _selectedSubordinateName == null) {
+              final match = _teamSubordinates.firstWhere(
+                (s) => s['id'] == _selectedSubordinateId,
+                orElse: () => <String, dynamic>{},
+              );
+              if (match.isNotEmpty) {
+                _selectedSubordinateName = match['name']?.toString();
+              }
+            }
+          }
+        }
+        if (reset) {
+          _teamHistoryLogs = list;
+        } else {
+          _teamHistoryLogs.addAll(list);
+        }
+        _hasMoreTeamHistory = list.length == 20;
+        if (_hasMoreTeamHistory) {
+          _teamHistoryPage += 1;
+        }
+      }
+    } catch (e) {
+      debugPrint('Failed to load team attendance history: $e');
+    } finally {
+      _isLoadingTeamHistory = false;
+      _isLoadingMoreTeamHistory = false;
+      notifyListeners();
+    }
+  }
+
+  Future<void> loadMoreTeamHistory() => loadTeamHistory(reset: false);
+
+  Future<void> filterTeamHistory({
+    String? search,
+    String? startDate,
+    String? endDate,
+    int? subordinateId,
+    bool clearSubordinate = false,
+  }) {
+    return loadTeamHistory(
+      reset: true,
+      search: search ?? _teamSearchQuery,
+      startDate: startDate,
+      endDate: endDate,
+      subordinateId: subordinateId,
+      clearSubordinate: clearSubordinate,
+    );
+  }
+
+  Future<void> selectSubordinate(int? subId, String? subName) {
+    _selectedSubordinateId = subId;
+    _selectedSubordinateName = subName;
+    return loadTeamHistory(
+      reset: true,
+      subordinateId: subId,
+      clearSubordinate: subId == null,
+    );
+  }
 
   Future<Position?> _getCurrentLocation() async {
     bool serviceEnabled;
