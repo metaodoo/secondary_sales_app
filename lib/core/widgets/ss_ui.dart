@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:secondary_sales/core/theme/app_theme.dart';
 import 'package:geolocator/geolocator.dart';
-import 'package:secondary_sales/features/settings/screens/settings_tab.dart';
 
 import 'package:secondary_sales/app/navigation/app_drawer.dart';
 import 'package:secondary_sales/app/navigation/app_shell.dart';
@@ -73,9 +72,13 @@ void openAppMenu(
               onSelectTab: (idx) {
                 shellNav?.setIndex(idx);
               },
-              onExitModule: () {
-                Navigator.of(ctx).pop();
-              },
+              onExitModule: (ModalRoute.of(context)?.isFirst ?? false)
+                  ? null
+                  : () {
+                      if (context.mounted) {
+                        Navigator.of(context).popUntil((route) => route.isFirst);
+                      }
+                    },
             ),
           ),
         ),

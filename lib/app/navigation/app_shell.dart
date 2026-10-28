@@ -124,7 +124,9 @@ class _AppShellState extends State<AppShell> {
   }
 
   void _exitModule() {
-    Navigator.of(context).pop();
+    if (Navigator.of(context).canPop()) {
+      Navigator.of(context).pop();
+    }
   }
 
   void _refreshOrders() {

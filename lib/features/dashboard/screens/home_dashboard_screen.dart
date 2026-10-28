@@ -365,17 +365,6 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
           backgroundColor: AppColors.background,
       appBar: AppBar(
         automaticallyImplyLeading: false,
-        leading: Navigator.of(context).canPop()
-            ? IconButton(
-                tooltip: 'Back',
-                icon: const Icon(
-                  Icons.arrow_back,
-                  color: AppColors.textPrimary,
-                  size: 28,
-                ),
-                onPressed: () => Navigator.of(context).pop(),
-              )
-            : null,
         title: const Text(
           'Sales & Distribution',
           style: TextStyle(
