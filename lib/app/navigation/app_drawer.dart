@@ -8,6 +8,7 @@ import 'package:secondary_sales/core/widgets/ss_ui.dart';
 import 'package:secondary_sales/features/auth/auth_provider.dart';
 import 'package:secondary_sales/features/auth/logout_guard.dart';
 import 'package:secondary_sales/features/settings/screens/settings_tab.dart';
+import 'package:secondary_sales/app/navigation/app_shell.dart';
 
 /// Global navigation drawer, rendered from [visibleMenuSections].
 ///
@@ -55,18 +56,19 @@ class AppDrawer extends StatelessWidget {
   }
 
   void _openProfile(BuildContext context) {
-    Navigator.of(context).pop(); // close the drawer first
+    final nav = Navigator.of(context);
+    final shellNav = AppShellNavigation.of(context);
+    nav.pop(); // close the drawer first
 
-    final isRoot = ModalRoute.of(context)?.isFirst ?? false;
-    if (!isRoot) {
+    if (shellNav != null) {
       // Inside AppShell: switch directly to Settings/Profile tab
-      Navigator.of(context).popUntil((route) => route.isFirst);
+      nav.popUntil((route) => route.isFirst);
       onSelectTab(AppShellIndex.profile);
     } else {
       // On HomeDashboardScreen or standalone: push SettingsTab cleanly
-      Navigator.of(context).push(
+      nav.push(
         MaterialPageRoute(
-          builder: (ctx) => SettingsTab(onBack: () => Navigator.of(ctx).pop()),
+          builder: (ctx) => SettingsTab(onBack: () => nav.pop()),
           settings: const RouteSettings(name: 'Settings'),
         ),
       );
@@ -175,7 +177,8 @@ class _DrawerHeader extends StatelessWidget {
         moduleType == 'primary' ? 'Primary Sales' : 'Secondary Sales';
     final subtitle = [if (role.isNotEmpty) role, moduleLabel].join(' · ');
 
-    return InkWell(
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
       onTap: onTap,
       child: Container(
         width: double.infinity,
