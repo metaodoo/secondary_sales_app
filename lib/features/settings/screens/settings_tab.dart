@@ -132,12 +132,14 @@ class SettingsTab extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 24),
-            Container(
-              decoration: BoxDecoration(
-                color: Colors.white,
+            Material(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(20),
+              shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: AppColors.borderSoft),
+                side: const BorderSide(color: AppColors.borderSoft),
               ),
+              clipBehavior: Clip.antiAlias,
               child: Column(
                 children: [
                   if (auth.canView(AppScreen.moduleAttendance)) ...[
