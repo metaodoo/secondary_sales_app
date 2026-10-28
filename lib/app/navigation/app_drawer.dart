@@ -7,8 +7,6 @@ import 'package:secondary_sales/core/theme/app_theme.dart';
 import 'package:secondary_sales/core/widgets/ss_ui.dart';
 import 'package:secondary_sales/features/auth/auth_provider.dart';
 import 'package:secondary_sales/features/auth/logout_guard.dart';
-
-import 'package:secondary_sales/app/navigation/app_shell.dart';
 import 'package:secondary_sales/features/settings/screens/settings_tab.dart';
 
 /// Global navigation drawer, rendered from [visibleMenuSections].
@@ -99,29 +97,37 @@ class AppDrawer extends StatelessWidget {
             ),
           ),
           const Divider(height: 1, color: AppColors.borderMuted),
-          if (onExitModule != null)
-            Padding(
-              padding: const EdgeInsets.only(top: 6),
-              child: _MenuTile(
-                icon: Icons.swap_horiz_rounded,
-                label: 'Switch Module',
-                onTap: () {
-                  Navigator.of(context).pop();
-                  onExitModule!();
-                },
-              ),
-            ),
-          Padding(
-            padding: const EdgeInsets.only(top: 2, bottom: 12),
-            child: _MenuTile(
-              icon: Icons.logout_rounded,
-              label: 'Sign Out',
-              iconColor: Colors.red.shade600,
-              textColor: Colors.red.shade700,
-              onTap: () => logoutWithUnsyncedGuard(
-                context,
-                onBeforeLogout: () => Navigator.of(context).pop(),
-              ),
+          SafeArea(
+            top: false,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (onExitModule != null)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 6),
+                    child: _MenuTile(
+                      icon: Icons.swap_horiz_rounded,
+                      label: 'Switch Module',
+                      onTap: () {
+                        Navigator.of(context).pop();
+                        onExitModule!();
+                      },
+                    ),
+                  ),
+                Padding(
+                  padding: const EdgeInsets.only(top: 2, bottom: 12),
+                  child: _MenuTile(
+                    icon: Icons.logout_rounded,
+                    label: 'Sign Out',
+                    iconColor: Colors.red.shade600,
+                    textColor: Colors.red.shade700,
+                    onTap: () => logoutWithUnsyncedGuard(
+                      context,
+                      onBeforeLogout: () => Navigator.of(context).pop(),
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
         ],
