@@ -31,44 +31,31 @@ class SettingsTab extends StatelessWidget {
 
     return Scaffold(
       backgroundColor: AppColors.background,
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0,
-        scrolledUnderElevation: 0,
-        leading: onBack != null
-            ? IconButton(
-                tooltip: 'Back',
-                icon: const Icon(
-                  Icons.arrow_back,
-                  color: AppColors.textPrimary,
-                ),
-                onPressed: onBack,
-              )
-            : null,
-        title: const Text(
-          'Settings',
-          style: TextStyle(
-            color: AppColors.primaryStrong,
-            fontWeight: FontWeight.bold,
-            fontSize: 22,
-          ),
-        ),
-        centerTitle: true,
-        actions: [
-          Padding(
-            padding: const EdgeInsets.only(right: 16),
-            child: ProfileAvatar(onTap: onOpenMenu),
-          ),
-        ],
-        bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(1),
-          child: Container(color: AppColors.borderMuted, height: 1),
-        ),
-      ),
       body: SafeArea(
-        child: ListView(
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+        child: Column(
           children: [
+            BlueHeader(
+              title: 'Settings',
+              subtitle: [userName, if (role.isNotEmpty) role].join(' · '),
+              leading: onBack != null
+                  ? IconButton(
+                      tooltip: 'Back',
+                      icon: const Icon(Icons.arrow_back, color: Colors.white),
+                      onPressed: onBack,
+                    )
+                  : null,
+              trailing: Padding(
+                padding: const EdgeInsets.only(right: 4),
+                child: ProfileAvatar(
+                  onTap: onOpenMenu,
+                  borderColor: Colors.white.withValues(alpha: 0.6),
+                ),
+              ),
+            ),
+            Expanded(
+              child: ListView(
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+                children: [
             Container(
               padding: const EdgeInsets.all(24),
               decoration: BoxDecoration(
@@ -295,8 +282,11 @@ class SettingsTab extends StatelessWidget {
           ],
         ),
       ),
-    );
-  }
+    ],
+  ),
+),
+);
+}
 
   Widget _buildSettingItem({
     required IconData icon,

@@ -54,6 +54,25 @@ class AppDrawer extends StatelessWidget {
     }
   }
 
+  void _openProfile(BuildContext context) {
+    Navigator.of(context).pop(); // close the drawer first
+
+    final isRoot = ModalRoute.of(context)?.isFirst ?? false;
+    if (!isRoot) {
+      // Inside AppShell: switch directly to Settings/Profile tab
+      Navigator.of(context).popUntil((route) => route.isFirst);
+      onSelectTab(AppShellIndex.profile);
+    } else {
+      // On HomeDashboardScreen or standalone: push SettingsTab cleanly
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (ctx) => SettingsTab(onBack: () => Navigator.of(ctx).pop()),
+          settings: const RouteSettings(name: 'Settings'),
+        ),
+      );
+    }
+  }
+
   bool _isDestinationSelected(MenuDestination dest, String? activeLabel, int shellIndex) {
     if (activeLabel != null && activeLabel.isNotEmpty && activeLabel.toLowerCase() != 'dashboard') {
       final normActive = activeLabel.toLowerCase().replaceAll(RegExp(r'\s+'), '');
@@ -77,6 +96,7 @@ class AppDrawer extends StatelessWidget {
         children: [
           _DrawerHeader(
             moduleType: moduleType,
+            onTap: () => _openProfile(context),
           ),
           Expanded(
             child: ListView(
@@ -137,9 +157,13 @@ class AppDrawer extends StatelessWidget {
 }
 
 class _DrawerHeader extends StatelessWidget {
-  const _DrawerHeader({required this.moduleType});
+  const _DrawerHeader({
+    required this.moduleType,
+    required this.onTap,
+  });
 
   final String moduleType;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
@@ -152,14 +176,7 @@ class _DrawerHeader extends StatelessWidget {
     final subtitle = [if (role.isNotEmpty) role, moduleLabel].join(' · ');
 
     return InkWell(
-      onTap: () {
-        Navigator.of(context).pop();
-        Navigator.of(context).push(
-          MaterialPageRoute(
-            builder: (ctx) => SettingsTab(onBack: () => Navigator.of(ctx).pop()),
-          ),
-        );
-      },
+      onTap: onTap,
       child: Container(
         width: double.infinity,
         padding: EdgeInsets.fromLTRB(
