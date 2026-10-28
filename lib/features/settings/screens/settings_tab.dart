@@ -43,7 +43,13 @@ class SettingsTab extends StatelessWidget {
                       icon: const Icon(Icons.arrow_back, color: Colors.white),
                       onPressed: onBack,
                     )
-                  : null,
+                  : (Navigator.of(context).canPop()
+                      ? IconButton(
+                          tooltip: 'Back',
+                          icon: const Icon(Icons.arrow_back, color: Colors.white),
+                          onPressed: () => Navigator.of(context).maybePop(),
+                        )
+                      : null),
               trailing: Padding(
                 padding: const EdgeInsets.only(right: 4),
                 child: ProfileAvatar(
@@ -237,7 +243,7 @@ class SettingsTab extends StatelessWidget {
                   _buildSettingItem(
                     icon: Icons.cloud_outlined,
                     title: 'Server Connection',
-                    trailing: auth.baseUrl.isNotEmpty ? auth.baseUrl : 'Not set',
+                    subtitle: auth.baseUrl.isNotEmpty ? auth.baseUrl : 'Not set',
                     onTap: () {
                       Navigator.push(
                         context,
@@ -291,6 +297,7 @@ class SettingsTab extends StatelessWidget {
   Widget _buildSettingItem({
     required IconData icon,
     required String title,
+    String? subtitle,
     String? trailing,
     Color? titleColor,
     Color? iconColor,
@@ -306,12 +313,39 @@ class SettingsTab extends StatelessWidget {
           fontSize: 15,
         ),
       ),
-      trailing: trailing != null
+      subtitle: subtitle != null
           ? Text(
-              trailing,
+              subtitle,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
               style: const TextStyle(
                 color: AppColors.textSecondary,
-                fontSize: 14,
+                fontSize: 13,
+              ),
+            )
+          : null,
+      trailing: trailing != null
+          ? ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 120),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  Flexible(
+                    child: Text(
+                      trailing,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      textAlign: TextAlign.end,
+                      style: const TextStyle(
+                        color: AppColors.textSecondary,
+                        fontSize: 14,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+                  const Icon(Icons.chevron_right, size: 18, color: AppColors.borderSoft),
+                ],
               ),
             )
           : const Icon(Icons.chevron_right, color: AppColors.borderSoft),
