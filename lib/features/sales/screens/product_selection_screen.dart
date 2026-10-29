@@ -1140,11 +1140,23 @@ class _QtyStepper extends StatefulWidget {
 
 class _QtyStepperState extends State<_QtyStepper> {
   late TextEditingController _controller;
+  late FocusNode _focusNode;
 
   @override
   void initState() {
     super.initState();
     _controller = TextEditingController(text: widget.value > 0 ? widget.value.toString() : '');
+    _focusNode = FocusNode()..addListener(_selectAllOnFocus);
+  }
+
+  /// Selects the whole number, so typing replaces it instead of adding
+  /// digits to it ("2", then typing 12, must give 12, not 212).
+  void _selectAll() {
+    _controller.selection = TextSelection(baseOffset: 0, extentOffset: _controller.text.length);
+  }
+
+  void _selectAllOnFocus() {
+    if (_focusNode.hasFocus) _selectAll();
   }
 
   @override
@@ -1160,6 +1172,7 @@ class _QtyStepperState extends State<_QtyStepper> {
 
   @override
   void dispose() {
+    _focusNode.dispose();
     _controller.dispose();
     super.dispose();
   }
@@ -1213,6 +1226,10 @@ class _QtyStepperState extends State<_QtyStepper> {
               Expanded(
                 child: TextField(
                   controller: _controller,
+                  focusNode: _focusNode,
+                  // A tap places the cursor after focus arrives, so select
+                  // again once the tap is done.
+                  onTap: _selectAll,
                   keyboardType: TextInputType.number,
                   textAlign: TextAlign.center,
                   style: TextStyle(

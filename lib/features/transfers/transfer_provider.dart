@@ -192,7 +192,9 @@ class TransferProvider with ChangeNotifier {
       );
     } catch (e) {
       _error = e.toString();
-      return [];
+      // The caller shows why ("Employee is not assigned to any
+      // distributor."); an empty list would look like a van with no stock.
+      rethrow;
     } finally {
       if (_loadingCount > 0) _loadingCount--;
       notifyListeners();

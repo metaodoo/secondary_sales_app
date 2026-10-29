@@ -12,6 +12,16 @@ import 'package:secondary_sales/core/widgets/dashboard_cards.dart';
 import 'package:secondary_sales/core/widgets/ss_ui.dart';
 import 'package:secondary_sales/core/theme/app_theme.dart';
 
+/// Names the order list after the dates it shows. Without a date filter the
+/// server sends the latest orders, not only today's.
+String salesOrdersHeading(DateTime? from, DateTime? to, {DateTime? now}) {
+  if (from == null || to == null) return 'Recent Sales Orders';
+  final today = now ?? DateTime.now();
+  bool isToday(DateTime d) =>
+      d.year == today.year && d.month == today.month && d.day == today.day;
+  return isToday(from) && isToday(to) ? "Today's Sales Orders" : 'Sales Orders';
+}
+
 class HomeTab extends StatelessWidget {
   const HomeTab({
     super.key,
@@ -386,16 +396,18 @@ class HomeTab extends StatelessWidget {
               ],
               const SizedBox(height: 24),
 
-              // Today's Sales Orders Header
+              // Sales Orders Header
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  const Text(
-                    "Today's Sales Orders",
-                    style: TextStyle(
-                      color: AppColors.textPrimary,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 22,
+                  Flexible(
+                    child: Text(
+                      salesOrdersHeading(dateFromFilter, dateToFilter),
+                      style: const TextStyle(
+                        color: AppColors.textPrimary,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 22,
+                      ),
                     ),
                   ),
                   Container(

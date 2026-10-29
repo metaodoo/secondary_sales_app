@@ -615,7 +615,9 @@ class _AttendanceScreenContentState extends State<_AttendanceScreenContent>
   }
 
   Widget _buildEmptyState() {
-    return const Center(
+    // Side padding and centred lines keep long text off the screen edges.
+    return const Padding(
+      padding: EdgeInsets.symmetric(horizontal: 32),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
@@ -623,11 +625,13 @@ class _AttendanceScreenContentState extends State<_AttendanceScreenContent>
           SizedBox(height: 16),
           Text(
             'No attendance history found',
+            textAlign: TextAlign.center,
             style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: AppColors.textPrimary),
           ),
           SizedBox(height: 4),
           Text(
             'Try selecting a different date range',
+            textAlign: TextAlign.center,
             style: TextStyle(color: AppColors.textSecondary, fontSize: 14),
           ),
         ],
@@ -859,7 +863,9 @@ class _AttendanceScreenContentState extends State<_AttendanceScreenContent>
   }
 
   Widget _buildTeamEmptyState() {
-    return const Center(
+    // Side padding and centred lines keep long text off the screen edges.
+    return const Padding(
+      padding: EdgeInsets.symmetric(horizontal: 32),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
@@ -867,11 +873,13 @@ class _AttendanceScreenContentState extends State<_AttendanceScreenContent>
           SizedBox(height: 16),
           Text(
             'No team attendance found',
+            textAlign: TextAlign.center,
             style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: AppColors.textPrimary),
           ),
           SizedBox(height: 4),
           Text(
-            'Subordinates have not logged attendance for this criteria',
+            'Try other dates or team members.',
+            textAlign: TextAlign.center,
             style: TextStyle(color: AppColors.textSecondary, fontSize: 14),
           ),
         ],

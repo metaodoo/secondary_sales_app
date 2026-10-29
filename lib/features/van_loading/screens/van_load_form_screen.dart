@@ -58,6 +58,9 @@ class _VanLoadFormScreenState extends State<VanLoadFormScreen> {
   List<_TargetItem> _items = [];
   bool _isLoading = false;
   String? _error;
+  /// Why the van and source could not be loaded, kept apart from [_error]
+  /// because refreshing the targets clears that one.
+  String? _prepareError;
 
   @override
   void initState() {
@@ -65,7 +68,11 @@ class _VanLoadFormScreenState extends State<VanLoadFormScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<TransferProvider>().prepareVirtualTransfer().then((_) {
         if (!mounted) return;
-        final prepare = context.read<TransferProvider>().transferPrepare;
+        final provider = context.read<TransferProvider>();
+        final prepare = provider.transferPrepare;
+        if (prepare == null && provider.error != null) {
+          setState(() => _prepareError = provider.error);
+        }
         final destinations = _uniqueDestinations(prepare?.destinationLocations ?? []);
         if (widget.existingTransfer != null) {
           setState(() {
@@ -435,7 +442,7 @@ class _VanLoadFormScreenState extends State<VanLoadFormScreen> {
                   : ListView(
                       padding: const EdgeInsets.all(16),
                       children: [
-                        if (_error != null) ErrorPanel(_error!),
+                        if ((_error ?? _prepareError) != null) ErrorPanel((_error ?? _prepareError)!),
                         
                         const Text(
                           'Van Name',
@@ -956,7 +963,10 @@ class _VanLoadFormScreenState extends State<VanLoadFormScreen> {
                 width: double.infinity,
                 height: 50,
                 child: ElevatedButton(
-                  onPressed: provider.isLoading || _isLoading ? null : _validateAndSubmit,
+                  // Nothing to validate when the form could not load.
+                  onPressed: provider.isLoading || _isLoading || _error != null || _prepareError != null
+                      ? null
+                      : _validateAndSubmit,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppColors.primary,
                     foregroundColor: Colors.white,
