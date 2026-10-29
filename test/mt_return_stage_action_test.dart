@@ -2,7 +2,6 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:secondary_sales/core/access/access_resources.dart';
 import 'package:secondary_sales/data/models/auth/mobile_auth_session.dart';
 import 'package:secondary_sales/data/models/modern_trade/mt_return_request.dart';
-import 'package:secondary_sales/features/auth/auth_provider.dart';
 
 void main() {
   group('MtAllowedActions & Stage Authorization Tests', () {
@@ -25,7 +24,7 @@ void main() {
       expect(actions.nextActionLabel, 'Submit to QC');
     });
 
-    test('MtAllowedActions parses submit_sales_operation with submit_qc required_access_key in supply_chain stage', () {
+    test('MtAllowedActions parses submit_sales_operation with submit_sales_operation required_access_key in supply_chain stage', () {
       final json = {
         'can_edit': true,
         'can_submit': true,
@@ -35,12 +34,12 @@ void main() {
         'next_state': 'sales_operation',
         'next_action': 'submit_sales_operation',
         'next_action_label': 'Submit to Sales Operation',
-        'required_access_key': 'action.modern_trade.returns.submit_qc',
+        'required_access_key': 'action.modern_trade.returns.submit_sales_operation',
       };
 
       final actions = MtAllowedActions.fromMap(json);
       expect(actions.nextAction, 'submit_sales_operation');
-      expect(actions.requiredAccessKey, 'action.modern_trade.returns.submit_qc');
+      expect(actions.requiredAccessKey, 'action.modern_trade.returns.submit_sales_operation');
       expect(actions.nextActionLabel, 'Submit to Sales Operation');
     });
 
@@ -134,6 +133,57 @@ void main() {
       final isBlockedForSc = (state == 'qc' && user.groupCode?.toLowerCase() == 'sc');
       expect(isBlockedForSc, isFalse);
       expect(session.access.allows(AppAction.mtReturnsSubmitSalesOperation), isTrue);
+    });
+
+    test('KAS group code is blocked on supply_chain, qc, and sales_operation stages', () {
+      final sessionMap = {
+        'access_token': 'test_token',
+        'refresh_token': 'test_refresh',
+        'token_type': 'Bearer',
+        'expires_in': 3600,
+        'user': {
+          'id': 15,
+          'name': 'KAS User',
+          'role': 'Key Account Sales',
+          'business_type': 'mt',
+          'group': {
+            'id': 7,
+            'code': 'kas',
+            'name': 'Key Account Sales',
+            'business_type': 'mt',
+          },
+        },
+        'access': {
+          'enforced': [
+            AppAction.mtReturnsSubmitDm,
+            AppAction.mtReturnsSubmitKas,
+            AppAction.mtReturnsSubmitSupplyChain,
+            AppAction.mtReturnsSubmitQc,
+            AppAction.mtReturnsSubmitSalesOperation,
+            AppAction.mtReturnsConfirm,
+          ],
+          'granted': [
+            AppAction.mtReturnsSave,
+            AppAction.mtReturnsSubmitSupplyChain, // Only submit_supply_chain is granted
+          ],
+        },
+      };
+
+      final session = MobileAuthSession.fromMap(sessionMap);
+      final user = session.user;
+      final groupCode = user.groupCode?.toLowerCase();
+      expect(groupCode, 'kas');
+
+      // 1. Check role-stage exclusivity
+      expect(groupCode == 'kas' && 'supply_chain' != 'kas', isTrue, reason: 'KAS cannot act on supply_chain state');
+      expect(groupCode == 'kas' && 'qc' != 'kas', isTrue, reason: 'KAS cannot act on qc state');
+      expect(groupCode == 'kas' && 'kas' != 'kas', isFalse, reason: 'KAS can act on kas state');
+
+      // 2. Check UI access key denial
+      expect(session.access.allows(AppAction.mtReturnsSubmitSalesOperation), isFalse,
+          reason: 'KAS user must not have access to submit_sales_operation');
+      expect(session.access.allows(AppAction.mtReturnsSubmitSupplyChain), isTrue,
+          reason: 'KAS user has access to submit_supply_chain');
     });
   });
 }

@@ -1620,9 +1620,6 @@ class _MtReturnDetailScreenState extends State<MtReturnDetailScreen> {
       case 'submit_sales_operation':
       case 'submit_so':
       case 'action_submit_sales_operation':
-        if (state?.toLowerCase() == 'supply_chain') {
-          return AppAction.mtReturnsSubmitQc;
-        }
         return AppAction.mtReturnsSubmitSalesOperation;
       case 'confirm':
       case 'action_confirm':
@@ -1637,21 +1634,29 @@ class _MtReturnDetailScreenState extends State<MtReturnDetailScreen> {
     final state = rr.state.toLowerCase();
     final groupCode = auth.user?.groupCode?.toLowerCase().trim();
 
-    // Supply Chain role cannot act on QC stage once ticket has moved forward
-    if (state == 'qc' && groupCode == 'sc') {
+    // Role-stage boundary enforcement: each role only acts in its designated stage
+    if (groupCode == 'kas' && state != 'kas') {
+      return false;
+    }
+    if (groupCode == 'sc' && state != 'supply_chain') {
+      return false;
+    }
+    if (groupCode == 'qc' && state != 'qc') {
+      return false;
+    }
+    if (groupCode == 'sso' && state != 'sales_operation') {
+      return false;
+    }
+    if (groupCode == 'dm' && state != 'dm') {
+      return false;
+    }
+    if (groupCode == 'kao' && state != 'kao') {
       return false;
     }
 
     final actions = rr.allowedActions;
     final nextAction = actions.nextAction;
     if (nextAction == null) return false;
-
-    // In supply chain state, allow submission if user has QC submit, SC submit, or Sales Operation permission
-    if (state == 'supply_chain') {
-      return auth.canDo(AppAction.mtReturnsSubmitQc) ||
-          auth.canDo(AppAction.mtReturnsSubmitSupplyChain) ||
-          auth.canDo(AppAction.mtReturnsSubmitSalesOperation);
-    }
 
     final actionKey = _getActionAccessKey(
       nextAction,
