@@ -1631,6 +1631,13 @@ class _MtReturnDetailScreenState extends State<MtReturnDetailScreen> {
 
   bool _canUserPerformStage(MtReturnRequest rr, AuthProvider auth) {
     if (rr.isConfirmed) return false;
+    final state = rr.state.toLowerCase();
+    final groupCode = auth.user?.groupCode?.toLowerCase().trim();
+
+    // Supply Chain role cannot act on QC stage once ticket has moved forward
+    if (state == 'qc' && groupCode == 'sc') {
+      return false;
+    }
 
     final actions = rr.allowedActions;
     final nextAction = actions.nextAction;
