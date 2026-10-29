@@ -6,6 +6,27 @@ import 'package:provider/provider.dart';
 import 'package:secondary_sales/features/employees/employee_provider.dart';
 import 'package:secondary_sales/core/widgets/ss_ui.dart';
 
+/// Sorts routes placing today's recommended routes (planned for today's weekday)
+/// at the top, followed by other routes in alphabetical order.
+List<Map<String, dynamic>> sortRoutesByRecommendation(
+  List<Map<String, dynamic>> routes,
+  String odooToday,
+) {
+  final sorted = List<Map<String, dynamic>>.from(routes);
+  sorted.sort((a, b) {
+    final aDays = (a['planned_days'] as List<dynamic>? ?? []);
+    final bDays = (b['planned_days'] as List<dynamic>? ?? []);
+    final aRec = aDays.any((d) => d.toString() == odooToday);
+    final bRec = bDays.any((d) => d.toString() == odooToday);
+    if (aRec && !bRec) return -1;
+    if (!aRec && bRec) return 1;
+    final aName = (a['name'] as String? ?? '').toLowerCase();
+    final bName = (b['name'] as String? ?? '').toLowerCase();
+    return aName.compareTo(bName);
+  });
+  return sorted;
+}
+
 class OfficerRouteSelectionScreen extends StatefulWidget {
   const OfficerRouteSelectionScreen({
     super.key,
@@ -99,6 +120,7 @@ class _OfficerRouteSelectionScreenState
           }
 
           final routes = snapshot.data ?? [];
+          final sortedRoutes = sortRoutesByRecommendation(routes, odooToday);
 
           return RefreshIndicator(
             onRefresh: _refresh,
@@ -133,9 +155,19 @@ class _OfficerRouteSelectionScreenState
                   ),
                 ),
                 const SizedBox(height: 24),
-                ...routes.map((route) {
+                if (sortedRoutes.isEmpty)
+                  const Padding(
+                    padding: EdgeInsets.only(top: 32),
+                    child: Center(
+                      child: Text(
+                        'No routes assigned.',
+                        style: TextStyle(color: AppColors.textSecondary),
+                      ),
+                    ),
+                  ),
+                ...sortedRoutes.map((route) {
                   final List<dynamic> plannedDays = route['planned_days'] ?? [];
-                  final bool isRecommended = plannedDays.contains(odooToday);
+                  final bool isRecommended = plannedDays.any((d) => d.toString() == odooToday);
                   final int outletCount = route['outlet_count'] ?? 0;
 
                   return Padding(
