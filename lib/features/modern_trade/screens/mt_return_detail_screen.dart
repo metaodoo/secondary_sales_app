@@ -106,71 +106,64 @@ class _MtReturnDetailScreenState extends State<MtReturnDetailScreen> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Row(
+              const Row(
                 children: [
-                  Container(
-                    padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(
-                      color: Colors.amber.shade50,
-                      shape: BoxShape.circle,
-                    ),
-                    child: Icon(Icons.camera_alt, color: Colors.amber.shade800, size: 24),
+                  Text(
+                    'Challan Photo Evidence',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                   ),
-                  const SizedBox(width: 12),
-                  const Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Photo Evidence Required',
-                          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                        ),
-                        SizedBox(height: 2),
-                        Text(
-                          'Delivery Man (DM) Submission to KAS',
-                          style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
-                        ),
-                      ],
+                  SizedBox(width: 4),
+                  Text(
+                    '*',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.red,
                     ),
                   ),
                 ],
               ),
-              const SizedBox(height: 16),
-              const Text(
-                'Return Challan photo evidence is mandatory before submitting this request to KAS. Please capture or upload a clear photo of the return document.',
-                style: TextStyle(fontSize: 13, color: AppColors.textSecondary, height: 1.4),
+              const SizedBox(height: 6),
+              Text(
+                'Upload a photo of the return challan document (mandatory for DM before submitting to KAS).',
+                style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
               ),
-              const SizedBox(height: 24),
+              const SizedBox(height: 20),
               Row(
                 children: [
                   Expanded(
-                    child: ElevatedButton.icon(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.primaryStrong,
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                      ),
+                    child: OutlinedButton.icon(
                       onPressed: () async {
                         Navigator.of(ctx).pop(true);
                         await _pickChallanImage(ImageSource.camera);
                       },
-                      icon: const Icon(Icons.camera_alt_outlined, color: Colors.white, size: 20),
-                      label: const Text('Take Photo', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
+                      icon: const Icon(Icons.camera_alt_outlined, size: 18),
+                      label: const Text('Camera'),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: AppColors.primaryStrong,
+                        side: const BorderSide(color: AppColors.primaryStrong),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
                     ),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
                     child: OutlinedButton.icon(
-                      style: OutlinedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                      ),
                       onPressed: () async {
                         Navigator.of(ctx).pop(true);
                         await _pickChallanImage(ImageSource.gallery);
                       },
-                      icon: const Icon(Icons.photo_library_outlined, size: 20),
-                      label: const Text('Gallery', style: TextStyle(fontWeight: FontWeight.w600)),
+                      icon: const Icon(Icons.photo_library_outlined, size: 18),
+                      label: const Text('Gallery'),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: AppColors.primaryStrong,
+                        side: const BorderSide(color: AppColors.primaryStrong),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
                     ),
                   ),
                 ],
@@ -447,6 +440,56 @@ class _MtReturnDetailScreenState extends State<MtReturnDetailScreen> {
     }
   }
 
+  void _openFilePreviewDialog(File file, String title) {
+    showDialog(
+      context: context,
+      builder: (ctx) => Dialog(
+        backgroundColor: Colors.black,
+        insetPadding: EdgeInsets.zero,
+        child: Stack(
+          alignment: Alignment.topRight,
+          children: [
+            InteractiveViewer(
+              minScale: 0.5,
+              maxScale: 4.0,
+              child: Center(
+                child: Image.file(
+                  file,
+                  fit: BoxFit.contain,
+                ),
+              ),
+            ),
+            SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Expanded(
+                      child: Text(
+                        title,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.close, color: Colors.white),
+                      onPressed: () => Navigator.of(ctx).pop(),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   void _openImagePreviewDialog(BuildContext context, String imageUrl, String title) {
     final fullUrl = imageUrl.startsWith('http')
         ? imageUrl
@@ -630,10 +673,8 @@ class _MtReturnDetailScreenState extends State<MtReturnDetailScreen> {
                         const SizedBox(height: 16),
 
                         // Return Challan Photo Evidence Preview Card (available in ALL states)
-                        if (rr.attachments.isNotEmpty) ...[
-                          _buildAttachmentsPreviewCard(rr),
-                          const SizedBox(height: 16),
-                        ],
+                        _buildAttachmentsPreviewCard(rr),
+                        const SizedBox(height: 16),
 
                         // Prominent Return Type Switcher Banner (Non-Saleable & Quality only)
                         if (!rr.isSaleable) ...[
@@ -777,157 +818,20 @@ class _MtReturnDetailScreenState extends State<MtReturnDetailScreen> {
   }
 
   Widget _buildAttachmentsPreviewCard(MtReturnRequest rr) {
-    if (_dmChallanImageFile != null) {
-      return Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: Colors.green.shade300),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Row(
-                  children: [
-                    Icon(Icons.check_circle_outline, color: Colors.green, size: 20),
-                    SizedBox(width: 8),
-                    Text(
-                      'Challan Photo Attached (Pending Submit)',
-                      style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
-                    ),
-                  ],
-                ),
-                TextButton(
-                  onPressed: () {
-                    setState(() {
-                      _dmChallanImageFile = null;
-                      _dmChallanImageBase64 = null;
-                      _dmChallanImageName = null;
-                    });
-                  },
-                  child: const Text('Remove', style: TextStyle(color: Colors.red, fontSize: 13)),
-                ),
-              ],
-            ),
-            const SizedBox(height: 10),
-            Container(
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: Colors.grey.shade50,
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: Colors.grey.shade200),
-              ),
-              child: Row(
-                children: [
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(8),
-                    child: Image.file(
-                      _dmChallanImageFile!,
-                      width: 60,
-                      height: 60,
-                      fit: BoxFit.cover,
-                    ),
-                  ),
-                  const SizedBox(width: 14),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          _dmChallanImageName ?? 'Return Challan',
-                          style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        const SizedBox(height: 4),
-                        const Text(
-                          'Will be uploaded when submitting to KAS',
-                          style: TextStyle(fontSize: 12, color: Colors.green),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      );
-    }
-
     final imageAtt = rr.primaryImageAttachment;
     final firstAtt = imageAtt ?? (rr.attachments.isNotEmpty ? rr.attachments.first : null);
-    if (firstAtt == null) {
-      if (rr.state.toLowerCase() == 'dm') {
-        return Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: Colors.amber.shade50,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: Colors.amber.shade300),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Icon(Icons.camera_alt_outlined, color: Colors.amber.shade900, size: 22),
-                  const SizedBox(width: 8),
-                  Text(
-                    'Photo Evidence Required for DM',
-                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: Colors.amber.shade900),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 6),
-              Text(
-                'Return Challan photo is mandatory before submitting to KAS. You can capture or upload it now.',
-                style: TextStyle(fontSize: 12, color: Colors.amber.shade900),
-              ),
-              const SizedBox(height: 12),
-              Row(
-                children: [
-                  Expanded(
-                    child: ElevatedButton.icon(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.primaryStrong,
-                        padding: const EdgeInsets.symmetric(vertical: 10),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                      ),
-                      onPressed: () => _pickChallanImage(ImageSource.camera),
-                      icon: const Icon(Icons.camera_alt_outlined, color: Colors.white, size: 18),
-                      label: const Text('Take Photo', style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600)),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      style: OutlinedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 10),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                      ),
-                      onPressed: () => _pickChallanImage(ImageSource.gallery),
-                      icon: const Icon(Icons.photo_library_outlined, size: 18),
-                      label: const Text('Gallery', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        );
-      }
-      return const SizedBox.shrink();
-    }
+    final hasServerImage = firstAtt != null;
+    final hasLocalImage = _dmChallanImageFile != null;
+    final hasAnyImage = hasServerImage || hasLocalImage;
+    final isDmState = rr.state.toLowerCase() == 'dm';
 
-    final rawUrl = firstAtt.imageUrl.isNotEmpty ? firstAtt.imageUrl : firstAtt.url;
-    final fullUrl = rawUrl.startsWith('http')
-        ? rawUrl
-        : '${AppConstants.baseUrl}$rawUrl';
+    final String serverFullUrl;
+    if (firstAtt != null) {
+      final rawUrl = firstAtt.imageUrl.isNotEmpty ? firstAtt.imageUrl : firstAtt.url;
+      serverFullUrl = rawUrl.startsWith('http') ? rawUrl : '${AppConstants.baseUrl}$rawUrl';
+    } else {
+      serverFullUrl = '';
+    }
 
     return Container(
       padding: const EdgeInsets.all(16),
@@ -942,19 +846,40 @@ class _MtReturnDetailScreenState extends State<MtReturnDetailScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Row(
+              Row(
                 children: [
-                  Icon(Icons.receipt_long_outlined, color: AppColors.primaryStrong, size: 20),
-                  SizedBox(width: 8),
-                  Text(
-                    'Return Challan Document',
-                    style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
+                  const Text(
+                    'Challan Photo Evidence',
+                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
                   ),
+                  if (!hasAnyImage && isDmState) ...[
+                    const SizedBox(width: 4),
+                    const Text(
+                      '*',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.red,
+                      ),
+                    ),
+                  ],
                 ],
               ),
-              if (firstAtt.isImage)
+              if (hasServerImage && firstAtt.isImage)
                 TextButton.icon(
-                  onPressed: () => _openImagePreviewDialog(context, fullUrl, firstAtt.name),
+                  onPressed: () => _openImagePreviewDialog(context, serverFullUrl, firstAtt.name),
+                  icon: const Icon(Icons.fullscreen, size: 18, color: AppColors.primaryStrong),
+                  label: const Text(
+                    'Preview',
+                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.primaryStrong),
+                  ),
+                )
+              else if (hasLocalImage)
+                TextButton.icon(
+                  onPressed: () => _openFilePreviewDialog(
+                    _dmChallanImageFile!,
+                    _dmChallanImageName ?? 'Return Challan Photo',
+                  ),
                   icon: const Icon(Icons.fullscreen, size: 18, color: AppColors.primaryStrong),
                   label: const Text(
                     'Preview',
@@ -963,78 +888,255 @@ class _MtReturnDetailScreenState extends State<MtReturnDetailScreen> {
                 ),
             ],
           ),
+          const SizedBox(height: 4),
+          Text(
+            hasAnyImage
+                ? 'Upload a photo of the return challan document.'
+                : (isDmState
+                    ? 'Return Challan photo is mandatory before submitting to KAS.'
+                    : 'Upload a clear photo of the return challan document.'),
+            style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+          ),
           const SizedBox(height: 12),
-          InkWell(
-            borderRadius: BorderRadius.circular(10),
-            onTap: firstAtt.isImage
-                ? () => _openImagePreviewDialog(context, fullUrl, firstAtt.name)
-                : null,
-            child: Container(
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: Colors.grey.shade50,
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: Colors.grey.shade200),
-              ),
-              child: Row(
-                children: [
-                  if (firstAtt.isImage)
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(8),
-                      child: Image.network(
-                        fullUrl,
-                        headers: context.read<AuthProvider>().authHeaders,
-                        width: 60,
-                        height: 60,
-                        fit: BoxFit.cover,
-                        errorBuilder: (context, error, stackTrace) => Container(
-                          width: 60,
-                          height: 60,
-                          color: Colors.grey.shade200,
-                          child: const Icon(Icons.broken_image, color: Colors.grey),
+          if (hasLocalImage)
+            Row(
+              children: [
+                InkWell(
+                  borderRadius: BorderRadius.circular(6),
+                  onTap: () => _openFilePreviewDialog(
+                    _dmChallanImageFile!,
+                    _dmChallanImageName ?? 'Return Challan Photo',
+                  ),
+                  child: Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(6),
+                        child: Image.file(
+                          _dmChallanImageFile!,
+                          width: 50,
+                          height: 50,
+                          fit: BoxFit.cover,
                         ),
                       ),
-                    )
-                  else
-                    Container(
-                      width: 60,
-                      height: 60,
-                      decoration: BoxDecoration(
-                        color: Colors.blue.shade50,
-                        borderRadius: BorderRadius.circular(8),
+                      Container(
+                        width: 50,
+                        height: 50,
+                        decoration: BoxDecoration(
+                          color: Colors.black.withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: const Icon(Icons.zoom_in, color: Colors.white, size: 20),
                       ),
-                      child: const Icon(Icons.description_outlined, color: Colors.blue, size: 30),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(6),
+                    onTap: () => _openFilePreviewDialog(
+                      _dmChallanImageFile!,
+                      _dmChallanImageName ?? 'Return Challan Photo',
                     ),
-                  const SizedBox(width: 14),
-                  Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
                       children: [
                         Text(
-                          firstAtt.name,
-                          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
+                          _dmChallanImageName ?? 'Photo Attached',
+                          style: const TextStyle(
+                            fontWeight: FontWeight.w600,
+                            fontSize: 13,
+                          ),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                         ),
-                        const SizedBox(height: 4),
-                        Text(
-                          firstAtt.isImage
-                              ? 'Challan Photo Evidence • Tap to preview'
-                              : 'Document Attachment',
-                          style: TextStyle(fontSize: 11, color: Colors.grey.shade600, fontWeight: FontWeight.w500),
+                        const SizedBox(height: 2),
+                        const Text(
+                          'Tap to preview photo evidence',
+                          style: TextStyle(
+                            color: Colors.green,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
                       ],
                     ),
                   ),
-                  if (firstAtt.isImage)
-                    const Padding(
-                      padding: EdgeInsets.only(right: 6),
-                      child: Icon(Icons.zoom_in, color: AppColors.primaryStrong, size: 22),
+                ),
+                IconButton(
+                  icon: const Icon(
+                    Icons.visibility_outlined,
+                    color: AppColors.primaryStrong,
+                  ),
+                  tooltip: 'Preview Photo',
+                  onPressed: () => _openFilePreviewDialog(
+                    _dmChallanImageFile!,
+                    _dmChallanImageName ?? 'Return Challan Photo',
+                  ),
+                ),
+                if (isDmState)
+                  IconButton(
+                    icon: const Icon(
+                      Icons.delete_outline,
+                      color: Colors.red,
                     ),
+                    tooltip: 'Remove Photo',
+                    onPressed: () {
+                      setState(() {
+                        _dmChallanImageFile = null;
+                        _dmChallanImageBase64 = null;
+                        _dmChallanImageName = null;
+                      });
+                    },
+                  ),
+              ],
+            )
+          else if (hasServerImage)
+            Row(
+              children: [
+                InkWell(
+                  borderRadius: BorderRadius.circular(6),
+                  onTap: firstAtt.isImage
+                      ? () => _openImagePreviewDialog(context, serverFullUrl, firstAtt.name)
+                      : null,
+                  child: Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(6),
+                        child: firstAtt.isImage
+                            ? Image.network(
+                                serverFullUrl,
+                                headers: context.read<AuthProvider>().authHeaders,
+                                width: 50,
+                                height: 50,
+                                fit: BoxFit.cover,
+                                errorBuilder: (context, error, stackTrace) => Container(
+                                  width: 50,
+                                  height: 50,
+                                  color: Colors.grey.shade200,
+                                  child: const Icon(Icons.broken_image, color: Colors.grey, size: 20),
+                                ),
+                              )
+                            : Container(
+                                width: 50,
+                                height: 50,
+                                color: Colors.blue.shade50,
+                                child: const Icon(Icons.description_outlined, color: Colors.blue, size: 24),
+                              ),
+                      ),
+                      if (firstAtt.isImage)
+                        Container(
+                          width: 50,
+                          height: 50,
+                          decoration: BoxDecoration(
+                            color: Colors.black.withValues(alpha: 0.15),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: const Icon(Icons.zoom_in, color: Colors.white, size: 20),
+                        ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(6),
+                    onTap: firstAtt.isImage
+                        ? () => _openImagePreviewDialog(context, serverFullUrl, firstAtt.name)
+                        : null,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          firstAtt.name,
+                          style: const TextStyle(
+                            fontWeight: FontWeight.w600,
+                            fontSize: 13,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          firstAtt.isImage ? 'Tap to preview photo evidence' : 'Document Attachment',
+                          style: const TextStyle(
+                            color: Colors.green,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                if (firstAtt.isImage)
+                  IconButton(
+                    icon: const Icon(
+                      Icons.visibility_outlined,
+                      color: AppColors.primaryStrong,
+                    ),
+                    tooltip: 'Preview Photo',
+                    onPressed: () => _openImagePreviewDialog(context, serverFullUrl, firstAtt.name),
+                  ),
+              ],
+            )
+          else if (isDmState)
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: () => _pickChallanImage(ImageSource.camera),
+                    icon: const Icon(Icons.camera_alt_outlined, size: 18),
+                    label: const Text('Camera'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: AppColors.primaryStrong,
+                      side: const BorderSide(color: AppColors.primaryStrong),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: () => _pickChallanImage(ImageSource.gallery),
+                    icon: const Icon(Icons.photo_library_outlined, size: 18),
+                    label: const Text('Gallery'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: AppColors.primaryStrong,
+                      side: const BorderSide(color: AppColors.primaryStrong),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            )
+          else
+            Container(
+              padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
+              decoration: BoxDecoration(
+                color: Colors.grey.shade50,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.grey.shade200),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.image_not_supported_outlined, color: Colors.grey.shade400, size: 18),
+                  const SizedBox(width: 8),
+                  Text(
+                    'No photo evidence attached',
+                    style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                  ),
                 ],
               ),
             ),
-          ),
         ],
       ),
     );
