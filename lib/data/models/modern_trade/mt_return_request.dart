@@ -167,6 +167,7 @@ class MtAllowedActions {
   final String? nextState;
   final String? nextAction;
   final String? nextActionLabel;
+  final String? requiredAccessKey;
 
   MtAllowedActions({
     this.canEdit = false,
@@ -177,6 +178,7 @@ class MtAllowedActions {
     this.nextState,
     this.nextAction,
     this.nextActionLabel,
+    this.requiredAccessKey,
   });
 
   factory MtAllowedActions.fromMap(Map<String, dynamic> map) {
@@ -189,6 +191,7 @@ class MtAllowedActions {
       nextState: map['next_state']?.toString(),
       nextAction: map['next_action']?.toString(),
       nextActionLabel: map['next_action_label']?.toString(),
+      requiredAccessKey: map['required_access_key']?.toString(),
     );
   }
 }

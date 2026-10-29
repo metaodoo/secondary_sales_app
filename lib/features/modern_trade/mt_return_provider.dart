@@ -291,13 +291,25 @@ class MtReturnProvider extends ChangeNotifier {
     }
   }
 
-  Future<bool> executeAction(int returnId, String action, {List<Map<String, dynamic>>? lines}) async {
+  Future<bool> executeAction(
+    int returnId,
+    String action, {
+    List<Map<String, dynamic>>? lines,
+    String? attachmentBase64,
+    String? attachmentFilename,
+  }) async {
     _isActionLoading = true;
     _errorMessage = null;
     notifyListeners();
 
     try {
-      final updated = await _api.executeMtReturnAction(returnId, action: action, lines: lines);
+      final updated = await _api.executeMtReturnAction(
+        returnId,
+        action: action,
+        lines: lines,
+        attachmentBase64: attachmentBase64,
+        attachmentFilename: attachmentFilename,
+      );
       _selectedReturn = updated;
       final idx = _returns.indexWhere((r) => r.id == returnId);
       if (idx != -1) {

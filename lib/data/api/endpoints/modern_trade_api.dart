@@ -127,6 +127,8 @@ extension ModernTradeApi on ApiService {
   }) async {
     final params = <String, dynamic>{
       'employee_id': employeeId ?? _activeEmployeeId,
+      if (employeeId != null) 'subordinate_id': employeeId,
+      if (employeeId != null) 'filter_employee_id': employeeId,
       'page': page,
       'page_size': pageSize,
       if (outletId != null) 'outlet_id': outletId,
@@ -290,6 +292,8 @@ extension ModernTradeApi on ApiService {
   }) async {
     final params = <String, dynamic>{
       'employee_id': employeeId ?? _activeEmployeeId,
+      if (employeeId != null) 'subordinate_id': employeeId,
+      if (employeeId != null) 'filter_employee_id': employeeId,
       'page': page,
       'page_size': pageSize,
       if (outletId != null) 'outlet_id': outletId,
@@ -459,11 +463,15 @@ extension ModernTradeApi on ApiService {
     int returnId, {
     required String action,
     List<Map<String, dynamic>>? lines,
+    String? attachmentBase64,
+    String? attachmentFilename,
   }) async {
     final params = <String, dynamic>{
       'employee_id': _activeEmployeeId,
       'action': action,
       if (lines != null) 'lines': lines,
+      if (attachmentBase64 != null) 'attachment_base64': attachmentBase64,
+      if (attachmentFilename != null) 'attachment_filename': attachmentFilename,
     };
 
     final result = await _post(

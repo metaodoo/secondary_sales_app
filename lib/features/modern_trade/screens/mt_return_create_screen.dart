@@ -389,16 +389,6 @@ class _MtReturnCreateScreenState extends State<MtReturnCreateScreen> {
       }
     }
 
-    if (_challanImageBase64 == null || _challanImageBase64!.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Return Challan Photo Evidence is mandatory for Modern Trade Return.'),
-          backgroundColor: Colors.red,
-        ),
-      );
-      return;
-    }
-
     final dateStr = "${_selectedDate.year}-${_selectedDate.month.toString().padLeft(2, '0')}-${_selectedDate.day.toString().padLeft(2, '0')}";
     final linesPayload = _lines.map((l) {
       return {
@@ -1022,26 +1012,30 @@ class _MtReturnCreateScreenState extends State<MtReturnCreateScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Row(
+          Row(
             children: [
-              Text(
+              const Text(
                 'Challan Photo Evidence',
                 style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
               ),
-              SizedBox(width: 4),
-              Text(
-                '*',
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.red,
+              const SizedBox(width: 6),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade100,
+                  borderRadius: BorderRadius.circular(4),
+                  border: Border.all(color: Colors.grey.shade300),
+                ),
+                child: Text(
+                  'Optional for KAO',
+                  style: TextStyle(fontSize: 10, color: Colors.grey.shade700, fontWeight: FontWeight.w600),
                 ),
               ),
             ],
           ),
           const SizedBox(height: 4),
           Text(
-            'Upload a clear photo of the return challan document.',
+            'Upload a photo of the return challan document (can also be captured later by DM).',
             style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
           ),
           const SizedBox(height: 12),

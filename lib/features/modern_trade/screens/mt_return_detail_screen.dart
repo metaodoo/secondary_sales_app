@@ -1,8 +1,13 @@
+import 'dart:convert';
+import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 import 'package:secondary_sales/core/access/access_resources.dart';
 import 'package:secondary_sales/core/constants.dart';
+import 'package:secondary_sales/core/services/media_storage_service.dart';
 import 'package:secondary_sales/core/theme/app_theme.dart';
+import 'package:secondary_sales/core/widgets/app_camera_capture_dialog.dart';
 import 'package:secondary_sales/data/models/modern_trade/mt_return_request.dart';
 import 'package:secondary_sales/features/auth/auth_provider.dart';
 import 'package:secondary_sales/features/modern_trade/mt_return_provider.dart';
@@ -25,6 +30,10 @@ class MtReturnDetailScreen extends StatefulWidget {
 }
 
 class _MtReturnDetailScreenState extends State<MtReturnDetailScreen> {
+  File? _dmChallanImageFile;
+  String? _dmChallanImageBase64;
+  String? _dmChallanImageName;
+
   @override
   void initState() {
     super.initState();
@@ -33,7 +42,179 @@ class _MtReturnDetailScreenState extends State<MtReturnDetailScreen> {
     });
   }
 
+  Future<bool> _pickChallanImage(ImageSource source) async {
+    try {
+      final XFile? picked;
+      if (source == ImageSource.camera) {
+        picked = await AppCameraCaptureDialog.capture(
+          context,
+          title: 'Capture Return Challan',
+          helperTip: 'Align the return challan document inside the frame',
+        );
+      } else {
+        final picker = ImagePicker();
+        picked = await picker.pickImage(
+          source: source,
+          maxWidth: 1280,
+          maxHeight: 1280,
+          imageQuality: 70,
+        );
+      }
+      if (picked == null) return false;
+      final photo = picked;
+      final file = await MediaStorageService.persistPickedFile(photo, category: MediaCategory.damages);
+      if (file == null) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Image file is invalid or empty. Please retake.')),
+          );
+        }
+        return false;
+      }
+      final bytes = await file.readAsBytes();
+      final base64Str = base64Encode(bytes);
+      setState(() {
+        _dmChallanImageFile = file;
+        _dmChallanImageBase64 = base64Str;
+        _dmChallanImageName = photo.name.isNotEmpty
+            ? photo.name
+            : 'return_challan_${DateTime.now().millisecondsSinceEpoch}.jpg';
+      });
+      return true;
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to pick photo: $e')),
+        );
+      }
+      return false;
+    }
+  }
+
+  Future<bool> _promptDmCaptureImage(BuildContext context) async {
+    return await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: Colors.amber.shade50,
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(Icons.camera_alt, color: Colors.amber.shade800, size: 24),
+                  ),
+                  const SizedBox(width: 12),
+                  const Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Photo Evidence Required',
+                          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                        ),
+                        SizedBox(height: 2),
+                        Text(
+                          'Delivery Man (DM) Submission to KAS',
+                          style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              const Text(
+                'Return Challan photo evidence is mandatory before submitting this request to KAS. Please capture or upload a clear photo of the return document.',
+                style: TextStyle(fontSize: 13, color: AppColors.textSecondary, height: 1.4),
+              ),
+              const SizedBox(height: 24),
+              Row(
+                children: [
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primaryStrong,
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      ),
+                      onPressed: () async {
+                        Navigator.of(ctx).pop(true);
+                        await _pickChallanImage(ImageSource.camera);
+                      },
+                      icon: const Icon(Icons.camera_alt_outlined, color: Colors.white, size: 20),
+                      label: const Text('Take Photo', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      ),
+                      onPressed: () async {
+                        Navigator.of(ctx).pop(true);
+                        await _pickChallanImage(ImageSource.gallery);
+                      },
+                      icon: const Icon(Icons.photo_library_outlined, size: 20),
+                      label: const Text('Gallery', style: TextStyle(fontWeight: FontWeight.w600)),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              SizedBox(
+                width: double.infinity,
+                child: TextButton(
+                  onPressed: () => Navigator.of(ctx).pop(false),
+                  child: const Text('Cancel', style: TextStyle(color: Colors.grey)),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    ) ?? false;
+  }
+
   void _onExecuteAction(String action, String actionLabel) async {
+    final provider = context.read<MtReturnProvider>();
+    final rr = provider.selectedReturn;
+    final isSubmittingToKas = action.toLowerCase().contains('submit_kas') ||
+        (rr != null && rr.state.toLowerCase() == 'dm');
+
+    final hasExistingAttachment = (rr != null && rr.attachments.isNotEmpty) || _dmChallanImageBase64 != null;
+
+    if (isSubmittingToKas && !hasExistingAttachment) {
+      await _promptDmCaptureImage(context);
+      if (_dmChallanImageBase64 == null) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Cannot submit to KAS: Return Challan photo evidence is mandatory for DM.'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+        return;
+      }
+    }
+
+    if (!mounted) return;
+
     final isConfirmAction = actionLabel.toLowerCase().startsWith('confirm');
     final dialogTitle = isConfirmAction ? 'Confirm Return Request' : 'Confirm $actionLabel';
     final dialogContent = isConfirmAction
@@ -44,7 +225,37 @@ class _MtReturnDetailScreenState extends State<MtReturnDetailScreen> {
       context: context,
       builder: (ctx) => AlertDialog(
         title: Text(dialogTitle),
-        content: Text(dialogContent),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(dialogContent),
+            if (_dmChallanImageFile != null) ...[
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.green.shade50,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.green.shade200),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.check_circle, color: Colors.green, size: 18),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Photo attached: ${_dmChallanImageName ?? "Return Challan"}',
+                        style: TextStyle(fontSize: 12, color: Colors.green.shade800, fontWeight: FontWeight.w500),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ],
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(false),
@@ -60,9 +271,18 @@ class _MtReturnDetailScreenState extends State<MtReturnDetailScreen> {
     );
 
     if (confirmed == true && mounted) {
-      final provider = context.read<MtReturnProvider>();
-      final success = await provider.executeAction(widget.returnId, action);
+      final success = await provider.executeAction(
+        widget.returnId,
+        action,
+        attachmentBase64: _dmChallanImageBase64,
+        attachmentFilename: _dmChallanImageName,
+      );
       if (success && mounted) {
+        setState(() {
+          _dmChallanImageFile = null;
+          _dmChallanImageBase64 = null;
+          _dmChallanImageName = null;
+        });
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('$actionLabel completed successfully!'),
@@ -557,9 +777,152 @@ class _MtReturnDetailScreenState extends State<MtReturnDetailScreen> {
   }
 
   Widget _buildAttachmentsPreviewCard(MtReturnRequest rr) {
+    if (_dmChallanImageFile != null) {
+      return Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: Colors.green.shade300),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Row(
+                  children: [
+                    Icon(Icons.check_circle_outline, color: Colors.green, size: 20),
+                    SizedBox(width: 8),
+                    Text(
+                      'Challan Photo Attached (Pending Submit)',
+                      style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
+                    ),
+                  ],
+                ),
+                TextButton(
+                  onPressed: () {
+                    setState(() {
+                      _dmChallanImageFile = null;
+                      _dmChallanImageBase64 = null;
+                      _dmChallanImageName = null;
+                    });
+                  },
+                  child: const Text('Remove', style: TextStyle(color: Colors.red, fontSize: 13)),
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: Colors.grey.shade50,
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: Colors.grey.shade200),
+              ),
+              child: Row(
+                children: [
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(8),
+                    child: Image.file(
+                      _dmChallanImageFile!,
+                      width: 60,
+                      height: 60,
+                      fit: BoxFit.cover,
+                    ),
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          _dmChallanImageName ?? 'Return Challan',
+                          style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        const SizedBox(height: 4),
+                        const Text(
+                          'Will be uploaded when submitting to KAS',
+                          style: TextStyle(fontSize: 12, color: Colors.green),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
     final imageAtt = rr.primaryImageAttachment;
     final firstAtt = imageAtt ?? (rr.attachments.isNotEmpty ? rr.attachments.first : null);
-    if (firstAtt == null) return const SizedBox.shrink();
+    if (firstAtt == null) {
+      if (rr.state.toLowerCase() == 'dm') {
+        return Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Colors.amber.shade50,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: Colors.amber.shade300),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Icon(Icons.camera_alt_outlined, color: Colors.amber.shade900, size: 22),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Photo Evidence Required for DM',
+                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: Colors.amber.shade900),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 6),
+              Text(
+                'Return Challan photo is mandatory before submitting to KAS. You can capture or upload it now.',
+                style: TextStyle(fontSize: 12, color: Colors.amber.shade900),
+              ),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primaryStrong,
+                        padding: const EdgeInsets.symmetric(vertical: 10),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      ),
+                      onPressed: () => _pickChallanImage(ImageSource.camera),
+                      icon: const Icon(Icons.camera_alt_outlined, color: Colors.white, size: 18),
+                      label: const Text('Take Photo', style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600)),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 10),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      ),
+                      onPressed: () => _pickChallanImage(ImageSource.gallery),
+                      icon: const Icon(Icons.photo_library_outlined, size: 18),
+                      label: const Text('Gallery', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        );
+      }
+      return const SizedBox.shrink();
+    }
 
     final rawUrl = firstAtt.imageUrl.isNotEmpty ? firstAtt.imageUrl : firstAtt.url;
     final fullUrl = rawUrl.startsWith('http')
@@ -962,9 +1325,7 @@ class _MtReturnDetailScreenState extends State<MtReturnDetailScreen> {
   Widget _buildLinesSection(MtReturnRequest rr, AuthProvider auth) {
     final isSaleable = rr.isSaleable;
     final lines = rr.lines;
-    final nextAction = rr.allowedActions.nextAction;
-    final actionKey = _getActionAccessKey(nextAction);
-    final canPerformCurrentStage = nextAction != null && (actionKey == null || auth.canDo(actionKey));
+    final canPerformCurrentStage = _canUserPerformStage(rr, auth);
     final canEditLines = !rr.isConfirmed &&
         auth.canDo(AppAction.mtReturnsSave) &&
         canPerformCurrentStage;
@@ -1135,7 +1496,10 @@ class _MtReturnDetailScreenState extends State<MtReturnDetailScreen> {
     );
   }
 
-  String? _getActionAccessKey(String? action) {
+  String? _getActionAccessKey(String? action, {String? state, String? backendKey}) {
+    if (backendKey != null && backendKey.isNotEmpty) {
+      return backendKey;
+    }
     if (action == null) return null;
     switch (action.toLowerCase()) {
       case 'submit_dm':
@@ -1154,6 +1518,9 @@ class _MtReturnDetailScreenState extends State<MtReturnDetailScreen> {
       case 'submit_sales_operation':
       case 'submit_so':
       case 'action_submit_sales_operation':
+        if (state?.toLowerCase() == 'supply_chain') {
+          return AppAction.mtReturnsSubmitQc;
+        }
         return AppAction.mtReturnsSubmitSalesOperation;
       case 'confirm':
       case 'action_confirm':
@@ -1163,17 +1530,45 @@ class _MtReturnDetailScreenState extends State<MtReturnDetailScreen> {
     }
   }
 
+  bool _canUserPerformStage(MtReturnRequest rr, AuthProvider auth) {
+    if (rr.isConfirmed) return false;
+    final state = rr.state.toLowerCase();
+    final groupCode = auth.user?.groupCode?.toLowerCase().trim();
+
+    // Supply Chain role cannot act on QC stage once ticket has moved forward
+    if (state == 'qc' && groupCode == 'sc') {
+      return false;
+    }
+
+    final actions = rr.allowedActions;
+    final nextAction = actions.nextAction;
+    if (nextAction == null) return false;
+
+    // In supply chain state, allow submission if user has QC submit, SC submit, or Sales Operation permission
+    if (state == 'supply_chain') {
+      return auth.canDo(AppAction.mtReturnsSubmitQc) ||
+          auth.canDo(AppAction.mtReturnsSubmitSupplyChain) ||
+          auth.canDo(AppAction.mtReturnsSubmitSalesOperation);
+    }
+
+    final actionKey = _getActionAccessKey(
+      nextAction,
+      state: rr.state,
+      backendKey: actions.requiredAccessKey,
+    );
+    return actionKey == null || auth.canDo(actionKey);
+  }
+
   Widget? _buildBottomActionBar(MtReturnRequest rr, AuthProvider auth, MtReturnProvider provider) {
     if (rr.isConfirmed) return null;
 
     final actions = rr.allowedActions;
     final nextAction = actions.nextAction;
     final nextLabel = actions.nextActionLabel ?? 'Submit Next Stage';
-    final actionKey = _getActionAccessKey(nextAction);
 
-    final canPerformNext = nextAction != null && (actionKey == null || auth.canDo(actionKey));
+    final canPerformNext = _canUserPerformStage(rr, auth);
 
-    if (!canPerformNext) {
+    if (!canPerformNext || nextAction == null) {
       return null;
     }
 
