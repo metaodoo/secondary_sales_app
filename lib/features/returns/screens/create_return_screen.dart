@@ -280,6 +280,7 @@ class _CreateReturnScreenState extends State<CreateReturnScreen> {
           'distributor': details['distributor'],
           'source_location': details['source_location'],
           'warehouse': details['destination_location'],
+          'destination_location': details['destination_location'],
           'return_book_number': details['return_book_number'],
           'ss_stock_bucket': details['ss_stock_bucket'] ??
               details['ss_return_type'] ??
@@ -1552,7 +1553,7 @@ class _CreateReturnScreenState extends State<CreateReturnScreen> {
                               ),
                               const SizedBox(height: 16),
                               const Text(
-                                'Warehouse',
+                                'Destination Location',
                                 style: TextStyle(
                                   color: Colors.black54,
                                   fontSize: 12,
@@ -1567,30 +1568,21 @@ class _CreateReturnScreenState extends State<CreateReturnScreen> {
                                   vertical: 12,
                                 ),
                                 decoration: BoxDecoration(
-                                  color: Colors.white,
+                                  color: AppColors.primarySoft,
                                   borderRadius: BorderRadius.circular(8),
                                   border: Border.all(
                                     color: const Color(0xFFDDE6F2),
                                   ),
                                 ),
-                                child: Row(
-                                  mainAxisAlignment:
-                                      MainAxisAlignment.spaceBetween,
-                                  children: [
-                                    Expanded(
-                                      child: Text(
-                                        _nameOf(_prepareData?['warehouse']),
-                                        style: const TextStyle(
-                                          color: Colors.black87,
-                                          fontSize: 16,
-                                        ),
-                                      ),
-                                    ),
-                                    const Icon(
-                                      Icons.keyboard_arrow_down,
-                                      color: Colors.black54,
-                                    ),
-                                  ],
+                                child: Text(
+                                  _nameOf(
+                                    _prepareData?['destination_location'] ??
+                                        _prepareData?['warehouse'],
+                                  ),
+                                  style: const TextStyle(
+                                    color: Colors.black54,
+                                    fontSize: 16,
+                                  ),
                                 ),
                               ),
                               if (widget.moduleType.toLowerCase() ==
