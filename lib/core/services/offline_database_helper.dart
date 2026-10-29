@@ -15,7 +15,7 @@ class OfflineDatabaseHelper {
   static final OfflineDatabaseHelper instance = OfflineDatabaseHelper._();
 
   static const String _dbName = 'offline_store.db';
-  static const int _dbVersion = 4;
+  static const int _dbVersion = 5;
 
   static const String tableOutbox = 'outbox_operations';
   static const String tableMasterCache = 'cached_master_data';
@@ -102,10 +102,11 @@ class OfflineDatabaseHelper {
           'CREATE INDEX idx_cache_type ON $tableMasterCache(entity_type);',
         );
 
-        // 3. Relational Master Tables (v2, v3, & v4)
+        // 3. Relational Master Tables (v2, v3, v4, & v5)
         await _createV2Tables(db);
         await _upgradeToV3(db);
         await _upgradeToV4(db);
+        await _upgradeToV5(db);
       },
       onUpgrade: (db, oldVersion, newVersion) async {
         if (oldVersion < 2) {
@@ -116,6 +117,9 @@ class OfflineDatabaseHelper {
         }
         if (oldVersion < 4) {
           await _upgradeToV4(db);
+        }
+        if (oldVersion < 5) {
+          await _upgradeToV5(db);
         }
       },
     );
@@ -794,6 +798,7 @@ class OfflineDatabaseHelper {
         distributor_id INTEGER NOT NULL,
         outlet_count INTEGER DEFAULT 0,
         sequence INTEGER DEFAULT 10,
+        planned_days_json TEXT,
         updated_at TEXT NOT NULL
       );
     ''');
@@ -979,6 +984,12 @@ class OfflineDatabaseHelper {
     await db.execute('CREATE INDEX IF NOT EXISTS idx_mt_jp_pjp ON $tableMtJourneyPlans(pjp_id);');
   }
 
+  Future<void> _upgradeToV5(Database db) async {
+    try {
+      await db.execute('ALTER TABLE $tableRoutes ADD COLUMN planned_days_json TEXT;');
+    } catch (_) {}
+  }
+
   /// Runs an atomic batch transaction across SQLite tables.
   Future<T> runInTransaction<T>(Future<T> Function(Transaction txn) action) async {
     final db = await database;
@@ -1050,6 +1061,16 @@ class OfflineDatabaseHelper {
         distId = int.tryParse(r['distributor_id'].toString()) ?? 0;
       }
 
+      String? plannedDaysJson;
+      final rawDays = r['planned_days'];
+      if (rawDays != null) {
+        if (rawDays is String) {
+          plannedDaysJson = rawDays;
+        } else if (rawDays is List) {
+          plannedDaysJson = jsonEncode(rawDays);
+        }
+      }
+
       await executor.insert(
         tableRoutes,
         {
@@ -1058,6 +1079,7 @@ class OfflineDatabaseHelper {
           'distributor_id': distId,
           'outlet_count': r['outlet_count'] is int ? r['outlet_count'] : 0,
           'sequence': r['sequence'] is int ? r['sequence'] : 10,
+          'planned_days_json': plannedDaysJson,
           'updated_at': nowIso,
         },
         conflictAlgorithm: ConflictAlgorithm.replace,
@@ -1065,17 +1087,42 @@ class OfflineDatabaseHelper {
     }
   }
 
+  List<Map<String, dynamic>> _hydrateRouteRows(List<Map<String, dynamic>> rows) {
+    return rows.map((row) {
+      final map = Map<String, dynamic>.from(row);
+      final raw = map['planned_days_json'];
+      if (raw != null && raw is String && raw.isNotEmpty) {
+        try {
+          final decoded = jsonDecode(raw);
+          if (decoded is List) {
+            map['planned_days'] = decoded;
+          } else {
+            map['planned_days'] = <dynamic>[];
+          }
+        } catch (_) {
+          map['planned_days'] = <dynamic>[];
+        }
+      } else {
+        map['planned_days'] = <dynamic>[];
+      }
+      return map;
+    }).toList();
+  }
+
   Future<List<Map<String, dynamic>>> getLocalRoutes({int? distributorId}) async {
     final db = await database;
+    final List<Map<String, dynamic>> rows;
     if (distributorId != null && distributorId > 0) {
-      return db.query(
+      rows = await db.query(
         tableRoutes,
         where: 'distributor_id = ?',
         whereArgs: [distributorId],
         orderBy: 'sequence ASC, name ASC',
       );
+    } else {
+      rows = await db.query(tableRoutes, orderBy: 'sequence ASC, name ASC');
     }
-    return db.query(tableRoutes, orderBy: 'sequence ASC, name ASC');
+    return _hydrateRouteRows(rows);
   }
 
   Future<Map<String, dynamic>?> getLocalRouteById(int routeId) async {
@@ -1086,7 +1133,10 @@ class OfflineDatabaseHelper {
       whereArgs: [routeId],
       limit: 1,
     );
-    return rows.isNotEmpty ? rows.first : null;
+    if (rows.isNotEmpty) {
+      return _hydrateRouteRows(rows).first;
+    }
+    return null;
   }
 
   // --- OUTLETS ---

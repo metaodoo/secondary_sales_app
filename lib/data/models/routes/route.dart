@@ -8,6 +8,7 @@ class RouteModel {
   final List<RouteEmployee> employees;
   final List<RouteOutlet> outlets;
   final int outletCount;
+  final List<dynamic> plannedDays;
 
   RouteModel({
     required this.id,
@@ -18,12 +19,14 @@ class RouteModel {
     required this.employees,
     required this.outlets,
     required this.outletCount,
+    this.plannedDays = const [],
   });
 
   factory RouteModel.fromMap(Map<String, dynamic> map) {
     final dist = map['distributor'];
     final emps = map['employees'] as List? ?? [];
     final outs = map['outlets'] as List? ?? [];
+    final planned = (map['planned_days'] as List?) ?? [];
 
     return RouteModel(
       id: asInt(map['id']),
@@ -38,7 +41,20 @@ class RouteModel {
           .map((o) => RouteOutlet.fromMap(Map<String, dynamic>.from(o)))
           .toList(),
       outletCount: asInt(map['outlet_count'] ?? map['outletCount'] ?? outs.length),
+      plannedDays: planned,
     );
+  }
+
+  Map<String, dynamic> toMap() {
+    return {
+      'id': id,
+      'name': name,
+      'active': active,
+      'distributor_id': distributorId,
+      'distributor_name': distributorName,
+      'outlet_count': outletCount,
+      'planned_days': plannedDays,
+    };
   }
 
 }
