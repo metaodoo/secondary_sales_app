@@ -6,15 +6,20 @@ import 'package:secondary_sales/core/theme/app_theme.dart';
 import 'package:secondary_sales/data/models/modern_trade/mt_stock_audit.dart';
 import 'package:secondary_sales/features/modern_trade/modern_trade_provider.dart';
 import 'package:secondary_sales/features/modern_trade/screens/mt_sec_order_detail_screen.dart';
+import 'package:secondary_sales/features/modern_trade/screens/mt_employee_filter_sheet.dart';
 
 class MtSecOrdersListScreen extends StatefulWidget {
   final int? outletId;
   final String? outletName;
+  final int? initialEmployeeId;
+  final String? initialEmployeeName;
 
   const MtSecOrdersListScreen({
     super.key,
     this.outletId,
     this.outletName,
+    this.initialEmployeeId,
+    this.initialEmployeeName,
   });
 
   @override
@@ -27,8 +32,10 @@ class _MtSecOrdersListScreenState extends State<MtSecOrdersListScreen> {
   final TextEditingController _searchController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   Timer? _searchDebounce;
-  DateTime? _dateFrom = DateTime.now();
-  DateTime? _dateTo = DateTime.now();
+  DateTime? _dateFrom;
+  DateTime? _dateTo;
+  int? _selectedEmployeeId;
+  String? _selectedEmployeeName;
   int _page = 1;
   bool _hasMore = true;
   bool _isLoadingMore = false;
@@ -36,6 +43,8 @@ class _MtSecOrdersListScreenState extends State<MtSecOrdersListScreen> {
   @override
   void initState() {
     super.initState();
+    _selectedEmployeeId = widget.initialEmployeeId;
+    _selectedEmployeeName = widget.initialEmployeeName;
     _scrollController.addListener(_onScroll);
     WidgetsBinding.instance.addPostFrameCallback((_) => _fetchOrders(reset: true));
   }
@@ -94,6 +103,7 @@ class _MtSecOrdersListScreenState extends State<MtSecOrdersListScreen> {
       page: _page,
       pageSize: _pageSize,
       outletId: widget.outletId,
+      employeeId: _selectedEmployeeId,
       dateFrom: dateFromStr,
       dateTo: dateToStr,
       search: searchStr,
@@ -211,99 +221,184 @@ class _MtSecOrdersListScreenState extends State<MtSecOrdersListScreen> {
             color: AppColors.surface,
             child: Column(
               children: [
+                Container(
+                  height: 44,
+                  decoration: BoxDecoration(
+                    color: AppColors.background,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: AppColors.borderSoft),
+                  ),
+                  child: TextField(
+                    controller: _searchController,
+                    onChanged: _onSearchChanged,
+                    decoration: InputDecoration(
+                      hintText: 'Search order ref, outlet...',
+                      hintStyle: const TextStyle(
+                        color: AppColors.textSecondary,
+                        fontSize: 13,
+                      ),
+                      prefixIcon: const Icon(
+                        Icons.search,
+                        color: AppColors.textSecondary,
+                        size: 20,
+                      ),
+                      suffixIcon: _searchController.text.isNotEmpty
+                          ? IconButton(
+                              tooltip: 'Clear',
+                              icon: const Icon(Icons.clear, size: 18),
+                              onPressed: () {
+                                _searchController.clear();
+                                _fetchOrders(reset: true);
+                              },
+                            )
+                          : null,
+                      border: InputBorder.none,
+                      contentPadding: const EdgeInsets.symmetric(
+                        vertical: 10,
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 8),
                 Row(
                   children: [
+                    // Date range picker
                     Expanded(
-                      child: Container(
-                        height: 44,
-                        decoration: BoxDecoration(
-                          color: AppColors.background,
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: AppColors.borderSoft),
-                        ),
-                        child: TextField(
-                          controller: _searchController,
-                          onChanged: _onSearchChanged,
-                          decoration: InputDecoration(
-                            hintText: 'Search order ref, outlet...',
-                            hintStyle: const TextStyle(
-                              color: AppColors.textSecondary,
-                              fontSize: 13,
+                      child: InkWell(
+                        onTap: _selectDateRange,
+                        borderRadius: BorderRadius.circular(8),
+                        child: Container(
+                          height: 40,
+                          padding: const EdgeInsets.symmetric(horizontal: 10),
+                          decoration: BoxDecoration(
+                            color: (_dateFrom != null || _dateTo != null)
+                                ? AppColors.primarySoft.withValues(alpha: 0.3)
+                                : AppColors.background,
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(
+                              color: (_dateFrom != null || _dateTo != null)
+                                  ? AppColors.primaryStrong
+                                  : AppColors.borderSoft,
                             ),
-                            prefixIcon: const Icon(
-                              Icons.search,
-                              color: AppColors.textSecondary,
-                              size: 20,
-                            ),
-                            suffixIcon: _searchController.text.isNotEmpty
-                                ? IconButton(
-                                    tooltip: 'Clear',
-                                    icon: const Icon(Icons.clear, size: 18),
-                                    onPressed: () {
-                                      _searchController.clear();
-                                      _fetchOrders(reset: true);
-                                    },
-                                  )
-                                : null,
-                            border: InputBorder.none,
-                            contentPadding: const EdgeInsets.symmetric(
-                              vertical: 10,
-                            ),
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(
+                                Icons.calendar_month,
+                                size: 16,
+                                color: (_dateFrom != null || _dateTo != null)
+                                    ? AppColors.primaryStrong
+                                    : AppColors.textSecondary,
+                              ),
+                              const SizedBox(width: 6),
+                              Expanded(
+                                child: Text(
+                                  _dateRangeDisplay,
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                    color: (_dateFrom != null || _dateTo != null)
+                                        ? AppColors.primaryStrong
+                                        : AppColors.textPrimary,
+                                  ),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                              if (_dateFrom != null || _dateTo != null)
+                                GestureDetector(
+                                  onTap: _clearDateFilter,
+                                  child: const Icon(
+                                    Icons.close,
+                                    size: 14,
+                                    color: AppColors.primaryStrong,
+                                  ),
+                                )
+                              else
+                                const Icon(Icons.keyboard_arrow_down, size: 16, color: AppColors.textSecondary),
+                            ],
                           ),
                         ),
                       ),
                     ),
                     const SizedBox(width: 8),
-                    InkWell(
-                      onTap: _selectDateRange,
-                      borderRadius: BorderRadius.circular(8),
-                      child: Container(
-                        height: 44,
-                        padding: const EdgeInsets.symmetric(horizontal: 12),
-                        decoration: BoxDecoration(
-                          color: (_dateFrom != null || _dateTo != null)
-                              ? AppColors.primarySoft
-                              : AppColors.background,
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(
-                            color: (_dateFrom != null || _dateTo != null)
-                              ? AppColors.primaryStrong
-                              : AppColors.borderSoft,
-                          ),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              Icons.calendar_month,
-                              size: 18,
-                              color: (_dateFrom != null || _dateTo != null)
+                    // Employee filter
+                    Expanded(
+                      child: InkWell(
+                        onTap: () {
+                          MtEmployeeFilterSheet.show(
+                            context,
+                            selectedEmployeeId: _selectedEmployeeId,
+                            extraEmployees: [
+                              for (final o in provider.secSaleOrders)
+                                if (o.employeeId != null && o.employeeName != null)
+                                  {'id': o.employeeId!, 'name': o.employeeName!},
+                            ],
+                            onSelected: (id, name) {
+                              setState(() {
+                                _selectedEmployeeId = id;
+                                _selectedEmployeeName = name;
+                              });
+                              _fetchOrders(reset: true);
+                            },
+                          );
+                        },
+                        borderRadius: BorderRadius.circular(8),
+                        child: Container(
+                          height: 40,
+                          padding: const EdgeInsets.symmetric(horizontal: 10),
+                          decoration: BoxDecoration(
+                            color: _selectedEmployeeId != null
+                                ? AppColors.primarySoft.withValues(alpha: 0.3)
+                                : AppColors.background,
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(
+                              color: _selectedEmployeeId != null
                                   ? AppColors.primaryStrong
-                                  : AppColors.textSecondary,
+                                  : AppColors.borderSoft,
                             ),
-                            const SizedBox(width: 6),
-                            Text(
-                              _dateRangeDisplay,
-                              style: TextStyle(
-                                fontSize: 13,
-                                fontWeight: FontWeight.w600,
-                                color: (_dateFrom != null || _dateTo != null)
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(
+                                Icons.person_outline,
+                                size: 16,
+                                color: _selectedEmployeeId != null
                                     ? AppColors.primaryStrong
-                                    : AppColors.textPrimary,
+                                    : AppColors.textSecondary,
                               ),
-                            ),
-                            if (_dateFrom != null || _dateTo != null) ...[
-                              const SizedBox(width: 4),
-                              GestureDetector(
-                                onTap: _clearDateFilter,
-                                child: const Icon(
-                                  Icons.close,
-                                  size: 14,
-                                  color: AppColors.primaryStrong,
+                              const SizedBox(width: 6),
+                              Expanded(
+                                child: Text(
+                                  _selectedEmployeeName ?? 'All Members',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: _selectedEmployeeId != null ? FontWeight.bold : FontWeight.w600,
+                                    color: _selectedEmployeeId != null
+                                        ? AppColors.primaryStrong
+                                        : AppColors.textPrimary,
+                                  ),
+                                  overflow: TextOverflow.ellipsis,
                                 ),
                               ),
+                              if (_selectedEmployeeId != null)
+                                GestureDetector(
+                                  onTap: () {
+                                    setState(() {
+                                      _selectedEmployeeId = null;
+                                      _selectedEmployeeName = null;
+                                    });
+                                    _fetchOrders(reset: true);
+                                  },
+                                  child: const Icon(
+                                    Icons.close,
+                                    size: 14,
+                                    color: AppColors.primaryStrong,
+                                  ),
+                                )
+                              else
+                                const Icon(Icons.keyboard_arrow_down, size: 16, color: AppColors.textSecondary),
                             ],
-                          ],
+                          ),
                         ),
                       ),
                     ),

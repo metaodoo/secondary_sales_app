@@ -12,8 +12,8 @@ import 'package:secondary_sales/features/returns/screens/returns_list_screen.dar
 import 'package:secondary_sales/features/scraps/screens/scraps_list_screen.dart';
 import 'package:secondary_sales/features/routes/screens/visits_list_screen.dart';
 import 'package:secondary_sales/features/modern_trade/screens/mt_outlets_screen.dart';
-import 'package:secondary_sales/features/modern_trade/screens/mt_stock_audit_list_screen.dart';
-import 'package:secondary_sales/features/modern_trade/screens/mt_sec_orders_list_screen.dart';
+import 'package:secondary_sales/features/modern_trade/screens/mt_stock_audit_outlets_screen.dart';
+import 'package:secondary_sales/features/modern_trade/screens/mt_sec_sales_outlets_screen.dart';
 import 'package:secondary_sales/features/modern_trade/screens/mt_returns_list_screen.dart';
 import 'package:secondary_sales/features/employees/screens/sales_officer_list_screen.dart';
 import 'package:secondary_sales/features/hr/screens/attendance_screen.dart';
@@ -183,13 +183,13 @@ List<MenuSection> buildMenuSections(String moduleType) {
           label: 'Stock Audits',
           icon: Icons.inventory_2_outlined,
           screenKey: AppScreen.mtSecStockAuditsList,
-          builder: (_) => const MtStockAuditListScreen(),
+          builder: (_) => const MtStockAuditOutletsScreen(),
         ),
         MenuDestination(
           label: 'Audit Sales',
           icon: Icons.receipt_long_outlined,
           screenKey: AppScreen.mtSecOrdersList,
-          builder: (_) => const MtSecOrdersListScreen(),
+          builder: (_) => const MtSecSalesOutletsScreen(),
         ),
         MenuDestination(
           label: 'Visit History',

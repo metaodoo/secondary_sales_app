@@ -13,17 +13,22 @@ import 'package:secondary_sales/features/modern_trade/modern_trade_provider.dart
 import 'package:secondary_sales/features/modern_trade/screens/mt_outlets_screen.dart';
 import 'package:secondary_sales/features/modern_trade/screens/mt_stock_audit_detail_screen.dart';
 import 'package:secondary_sales/features/modern_trade/screens/mt_stock_audit_type_sheet.dart';
+import 'package:secondary_sales/features/modern_trade/screens/mt_employee_filter_sheet.dart';
 
 class MtStockAuditListScreen extends StatefulWidget {
   final int? outletId;
   final String? outletName;
   final int? visitId;
+  final int? initialEmployeeId;
+  final String? initialEmployeeName;
 
   const MtStockAuditListScreen({
     super.key,
     this.outletId,
     this.outletName,
     this.visitId,
+    this.initialEmployeeId,
+    this.initialEmployeeName,
   });
 
   @override
@@ -39,8 +44,10 @@ class _MtStockAuditListScreenState extends State<MtStockAuditListScreen> {
 
   String _selectedType = 'all';
   final String _selectedState = 'all';
-  DateTime? _dateFrom = DateTime.now();
-  DateTime? _dateTo = DateTime.now();
+  DateTime? _dateFrom;
+  DateTime? _dateTo;
+  int? _selectedEmployeeId;
+  String? _selectedEmployeeName;
   int _page = 1;
   bool _hasMore = true;
   bool _isLoadingMore = false;
@@ -48,6 +55,8 @@ class _MtStockAuditListScreenState extends State<MtStockAuditListScreen> {
   @override
   void initState() {
     super.initState();
+    _selectedEmployeeId = widget.initialEmployeeId;
+    _selectedEmployeeName = widget.initialEmployeeName;
     _scrollController.addListener(_onScroll);
     WidgetsBinding.instance.addPostFrameCallback((_) => _fetchAudits(reset: true));
   }
@@ -99,6 +108,7 @@ class _MtStockAuditListScreenState extends State<MtStockAuditListScreen> {
       page: _page,
       pageSize: _pageSize,
       outletId: widget.outletId,
+      employeeId: _selectedEmployeeId,
       type: _selectedType,
       state: _selectedState,
       dateFrom: dateFromStr,
@@ -222,69 +232,151 @@ class _MtStockAuditListScreenState extends State<MtStockAuditListScreen> {
             ),
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-              child: Row(
+              child: Column(
                 children: [
-                  Expanded(
-                    child: TextField(
-                      controller: _searchController,
-                      onChanged: _onSearchChanged,
-                      decoration: InputDecoration(
-                        hintText: 'Search audit, outlet...',
-                        prefixIcon: const Icon(Icons.search, size: 20),
-                        suffixIcon: _searchController.text.isNotEmpty
-                            ? IconButton(
-                                tooltip: 'Clear',
-                                icon: const Icon(Icons.clear, size: 18),
-                                onPressed: () {
-                                  _searchController.clear();
-                                  _fetchAudits(reset: true);
-                                },
-                              )
-                            : null,
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 16),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(10),
-                          borderSide: const BorderSide(color: AppColors.borderSoft),
-                        ),
-                        filled: true,
-                        fillColor: Colors.white,
+                  TextField(
+                    controller: _searchController,
+                    onChanged: _onSearchChanged,
+                    decoration: InputDecoration(
+                      hintText: 'Search audit, outlet...',
+                      prefixIcon: const Icon(Icons.search, size: 20),
+                      suffixIcon: _searchController.text.isNotEmpty
+                          ? IconButton(
+                              tooltip: 'Clear',
+                              icon: const Icon(Icons.clear, size: 18),
+                              onPressed: () {
+                                _searchController.clear();
+                                _fetchAudits(reset: true);
+                              },
+                            )
+                          : null,
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10),
+                        borderSide: const BorderSide(color: AppColors.borderSoft),
                       ),
+                      filled: true,
+                      fillColor: Colors.white,
                     ),
                   ),
-                  const SizedBox(width: 8),
-                  InkWell(
-                    onTap: _selectDateRange,
-                    borderRadius: BorderRadius.circular(10),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(10),
-                        border: Border.all(
-                          color: (_dateFrom != null || _dateTo != null)
-                              ? AppColors.primaryStrong
-                              : AppColors.borderSoft,
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      // Date range picker
+                      Expanded(
+                        child: InkWell(
+                          onTap: _selectDateRange,
+                          borderRadius: BorderRadius.circular(10),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+                            decoration: BoxDecoration(
+                              color: (_dateFrom != null || _dateTo != null)
+                                  ? AppColors.primarySoft.withValues(alpha: 0.3)
+                                  : Colors.white,
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(
+                                color: (_dateFrom != null || _dateTo != null)
+                                    ? AppColors.primaryStrong
+                                    : AppColors.borderSoft,
+                              ),
+                            ),
+                            child: Row(
+                              children: [
+                                const Icon(Icons.calendar_month_outlined, size: 16, color: AppColors.primaryStrong),
+                                const SizedBox(width: 6),
+                                Expanded(
+                                  child: Text(
+                                    _dateRangeDisplay,
+                                    style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 12),
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                                if (_dateFrom != null || _dateTo != null)
+                                  InkWell(
+                                    onTap: _clearDateFilter,
+                                    child: const Icon(Icons.close, size: 16, color: AppColors.textSecondary),
+                                  )
+                                else
+                                  const Icon(Icons.keyboard_arrow_down, size: 16, color: AppColors.textSecondary),
+                              ],
+                            ),
+                          ),
                         ),
                       ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Icon(Icons.calendar_month_outlined, size: 18, color: AppColors.primaryStrong),
-                          const SizedBox(width: 6),
-                          Text(
-                            _dateRangeDisplay,
-                            style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 12),
-                          ),
-                          if (_dateFrom != null || _dateTo != null) ...[
-                            const SizedBox(width: 4),
-                            InkWell(
-                              onTap: _clearDateFilter,
-                              child: const Icon(Icons.close, size: 16, color: AppColors.textSecondary),
+                      const SizedBox(width: 8),
+                      // Employee filter
+                      Expanded(
+                        child: InkWell(
+                          onTap: () {
+                            MtEmployeeFilterSheet.show(
+                              context,
+                              selectedEmployeeId: _selectedEmployeeId,
+                              extraEmployees: [
+                                for (final a in provider.stockAudits)
+                                  if (a.employeeId != null && a.employeeName != null)
+                                    {'id': a.employeeId!, 'name': a.employeeName!},
+                              ],
+                              onSelected: (id, name) {
+                                setState(() {
+                                  _selectedEmployeeId = id;
+                                  _selectedEmployeeName = name;
+                                });
+                                _fetchAudits(reset: true);
+                              },
+                            );
+                          },
+                          borderRadius: BorderRadius.circular(10),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+                            decoration: BoxDecoration(
+                              color: _selectedEmployeeId != null
+                                  ? AppColors.primarySoft.withValues(alpha: 0.3)
+                                  : Colors.white,
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(
+                                color: _selectedEmployeeId != null
+                                    ? AppColors.primaryStrong
+                                    : AppColors.borderSoft,
+                              ),
                             ),
-                          ],
-                        ],
+                            child: Row(
+                              children: [
+                                Icon(
+                                  Icons.person_outline,
+                                  size: 16,
+                                  color: _selectedEmployeeId != null ? AppColors.primaryStrong : AppColors.textSecondary,
+                                ),
+                                const SizedBox(width: 6),
+                                Expanded(
+                                  child: Text(
+                                    _selectedEmployeeName ?? 'All Members',
+                                    style: TextStyle(
+                                      fontWeight: _selectedEmployeeId != null ? FontWeight.bold : FontWeight.w600,
+                                      fontSize: 12,
+                                      color: _selectedEmployeeId != null ? AppColors.primaryStrong : AppColors.textPrimary,
+                                    ),
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                                if (_selectedEmployeeId != null)
+                                  InkWell(
+                                    onTap: () {
+                                      setState(() {
+                                        _selectedEmployeeId = null;
+                                        _selectedEmployeeName = null;
+                                      });
+                                      _fetchAudits(reset: true);
+                                    },
+                                    child: const Icon(Icons.close, size: 16, color: AppColors.textSecondary),
+                                  )
+                                else
+                                  const Icon(Icons.keyboard_arrow_down, size: 16, color: AppColors.textSecondary),
+                              ],
+                            ),
+                          ),
+                        ),
                       ),
-                    ),
+                    ],
                   ),
                 ],
               ),
@@ -565,6 +657,22 @@ class _StockAuditCard extends StatelessWidget {
                   ),
                 ],
               ),
+            if (audit.employeeName != null && audit.employeeName!.isNotEmpty) ...[
+              const SizedBox(height: 4),
+              Row(
+                children: [
+                  const Icon(Icons.person_outline, size: 14, color: AppColors.textSecondary),
+                  const SizedBox(width: 4),
+                  Expanded(
+                    child: Text(
+                      audit.employeeName!,
+                      style: const TextStyle(color: AppColors.textSecondary, fontSize: 12),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
+              ),
+            ],
             const SizedBox(height: 6),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,

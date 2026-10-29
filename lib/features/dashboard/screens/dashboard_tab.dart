@@ -15,8 +15,8 @@ import 'package:secondary_sales/core/widgets/ss_ui.dart';
 import 'package:secondary_sales/features/sales/screens/secondary_orders_list_screen.dart';
 import 'package:secondary_sales/features/routes/screens/visits_list_screen.dart';
 import 'package:secondary_sales/features/modern_trade/screens/mt_outlets_screen.dart';
-import 'package:secondary_sales/features/modern_trade/screens/mt_stock_audit_list_screen.dart';
-import 'package:secondary_sales/features/modern_trade/screens/mt_sec_orders_list_screen.dart';
+import 'package:secondary_sales/features/modern_trade/screens/mt_stock_audit_outlets_screen.dart';
+import 'package:secondary_sales/features/modern_trade/screens/mt_sec_sales_outlets_screen.dart';
 import 'package:secondary_sales/features/modern_trade/screens/mt_returns_list_screen.dart';
 import 'package:secondary_sales/features/corporate_institutional_sale/screens/cs_return_screen.dart';
 import 'package:secondary_sales/features/corporate_institutional_sale/screens/is_return_screen.dart';
@@ -174,7 +174,7 @@ class DashboardTab extends StatelessWidget {
                             Navigator.push(
                               context,
                               MaterialPageRoute(
-                                builder: (_) => const MtStockAuditListScreen(),
+                                builder: (_) => const MtStockAuditOutletsScreen(),
                               ),
                             );
                           },
@@ -189,7 +189,7 @@ class DashboardTab extends StatelessWidget {
                             Navigator.push(
                               context,
                               MaterialPageRoute(
-                                builder: (_) => const MtSecOrdersListScreen(),
+                                builder: (_) => const MtSecSalesOutletsScreen(),
                               ),
                             );
                           },
