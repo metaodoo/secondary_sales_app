@@ -135,7 +135,7 @@ void main() {
       expect(session.access.allows(AppAction.mtReturnsSubmitSalesOperation), isTrue);
     });
 
-    test('KAS group code is blocked on supply_chain, qc, and sales_operation stages', () {
+    test('KAS user cannot perform submit_sales_operation via backend UI resource gating', () {
       final sessionMap = {
         'access_token': 'test_token',
         'refresh_token': 'test_refresh',
@@ -164,24 +164,32 @@ void main() {
           ],
           'granted': [
             AppAction.mtReturnsSave,
-            AppAction.mtReturnsSubmitSupplyChain, // Only submit_supply_chain is granted
+            AppAction.mtReturnsSubmitSupplyChain, // Only submit_supply_chain is granted; submit_sales_operation is hidden
           ],
         },
       };
 
       final session = MobileAuthSession.fromMap(sessionMap);
-      final user = session.user;
-      final groupCode = user.groupCode?.toLowerCase();
-      expect(groupCode, 'kas');
+      
+      // Backend action payload for supply_chain without defects
+      final actionsMap = {
+        'can_edit': true,
+        'can_submit': true,
+        'can_confirm': false,
+        'can_reset': false,
+        'requires_qc': false,
+        'next_state': 'sales_operation',
+        'next_action': 'submit_sales_operation',
+        'next_action_label': 'Submit to Sales Operation',
+        'required_access_key': 'action.modern_trade.returns.submit_sales_operation',
+      };
+      final actions = MtAllowedActions.fromMap(actionsMap);
 
-      // 1. Check role-stage exclusivity
-      expect(groupCode == 'kas' && 'supply_chain' != 'kas', isTrue, reason: 'KAS cannot act on supply_chain state');
-      expect(groupCode == 'kas' && 'qc' != 'kas', isTrue, reason: 'KAS cannot act on qc state');
-      expect(groupCode == 'kas' && 'kas' != 'kas', isFalse, reason: 'KAS can act on kas state');
+      // Verify that access control denies KAS from performing submit_sales_operation
+      final canPerform = session.access.allows(actions.requiredAccessKey!);
+      expect(canPerform, isFalse, reason: 'KAS user must not have access to submit_sales_operation button');
 
-      // 2. Check UI access key denial
-      expect(session.access.allows(AppAction.mtReturnsSubmitSalesOperation), isFalse,
-          reason: 'KAS user must not have access to submit_sales_operation');
+      // Verify that KAS can perform submit_supply_chain
       expect(session.access.allows(AppAction.mtReturnsSubmitSupplyChain), isTrue,
           reason: 'KAS user has access to submit_supply_chain');
     });

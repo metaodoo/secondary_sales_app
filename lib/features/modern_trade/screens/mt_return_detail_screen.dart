@@ -1631,28 +1631,6 @@ class _MtReturnDetailScreenState extends State<MtReturnDetailScreen> {
 
   bool _canUserPerformStage(MtReturnRequest rr, AuthProvider auth) {
     if (rr.isConfirmed) return false;
-    final state = rr.state.toLowerCase();
-    final groupCode = auth.user?.groupCode?.toLowerCase().trim();
-
-    // Role-stage boundary enforcement: each role only acts in its designated stage
-    if (groupCode == 'kas' && state != 'kas') {
-      return false;
-    }
-    if (groupCode == 'sc' && state != 'supply_chain') {
-      return false;
-    }
-    if (groupCode == 'qc' && state != 'qc') {
-      return false;
-    }
-    if (groupCode == 'sso' && state != 'sales_operation') {
-      return false;
-    }
-    if (groupCode == 'dm' && state != 'dm') {
-      return false;
-    }
-    if (groupCode == 'kao' && state != 'kao') {
-      return false;
-    }
 
     final actions = rr.allowedActions;
     final nextAction = actions.nextAction;
