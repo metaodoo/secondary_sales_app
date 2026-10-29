@@ -111,12 +111,14 @@ class SalesOrderCard extends StatelessWidget {
     required this.onTap,
     this.onEditTap,
     this.onDeleteTap,
+    this.allowConfirmedEdit = true,
   });
 
   final PrimaryOrder order;
   final VoidCallback onTap;
   final VoidCallback? onEditTap;
   final VoidCallback? onDeleteTap;
+  final bool allowConfirmedEdit;
 
   @override
   Widget build(BuildContext context) {
@@ -124,14 +126,16 @@ class SalesOrderCard extends StatelessWidget {
 
     final orderState = order.state.toLowerCase();
     final delivStatus = order.deliveryStatus.toLowerCase();
-    final isEditable =
-        (orderState == 'draft' ||
-            orderState == 'sent' ||
-            orderState == 'quotation') ||
-        (orderState == 'sale' &&
-            (delivStatus == 'no' ||
-                delivStatus == 'pending' ||
-                delivStatus.isEmpty));
+    final isDraft =
+        orderState == 'draft' ||
+        orderState == 'sent' ||
+        orderState == 'quotation';
+    final isOpenDelivery = delivStatus == 'no' ||
+        delivStatus == 'pending' ||
+        delivStatus.isEmpty;
+    final canDelete = isDraft || (orderState == 'sale' && isOpenDelivery);
+    final isEditable = isDraft ||
+        (allowConfirmedEdit && orderState == 'sale' && isOpenDelivery);
 
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
@@ -184,7 +188,7 @@ class SalesOrderCard extends StatelessWidget {
                           ),
                           onPressed: onEditTap,
                         ),
-                      if (isEditable && onDeleteTap != null) ...[
+                      if (canDelete && onDeleteTap != null) ...[
                         const SizedBox(width: 8),
                         IconButton(
                           tooltip: 'Delete',

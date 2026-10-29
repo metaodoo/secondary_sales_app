@@ -53,6 +53,18 @@ class _CreatePrimarySaleScreenState extends State<CreatePrimarySaleScreen> {
     await provider.fetchOrderDetail(widget.editOrderId!);
     final detail = provider.selectedOrder;
     if (detail != null && mounted) {
+      final channel = provider.channelBusinessType;
+      if ((channel == 'cs' || channel == 'is') &&
+          detail.state.toLowerCase() == 'sale') {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('A confirmed order cannot be changed.'),
+            backgroundColor: Colors.red,
+          ),
+        );
+        Navigator.pop(context);
+        return;
+      }
       setState(() {
         // Resolve distributor details
         if (detail.distributor != null) {

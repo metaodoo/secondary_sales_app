@@ -435,6 +435,7 @@ class HomeTab extends StatelessWidget {
                     final order = orders[index];
                     return SalesOrderCard(
                       order: order,
+                      allowConfirmedEdit: channel != 'cs' && channel != 'is',
                       onTap: () async {
                         await Navigator.of(context).push(
                           MaterialPageRoute(
