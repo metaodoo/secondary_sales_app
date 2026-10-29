@@ -492,8 +492,13 @@ class _SmallStepperState extends State<SmallStepper> {
   @override
   void didUpdateWidget(SmallStepper oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.value != widget.value && !_focusNode.hasFocus) {
+    if (widget.value != _controller.text) {
       _controller.text = widget.value;
+      if (_focusNode.hasFocus) {
+        _controller.selection = TextSelection.fromPosition(
+          TextPosition(offset: _controller.text.length),
+        );
+      }
     }
   }
 
@@ -544,7 +549,10 @@ class _SmallStepperState extends State<SmallStepper> {
         mainAxisSize: MainAxisSize.min,
         children: [
           IconButton(
-            onPressed: widget.onMinus,
+            onPressed: () {
+              _focusNode.unfocus();
+              widget.onMinus();
+            },
             style: IconButton.styleFrom(
               tapTargetSize: MaterialTapTargetSize.shrinkWrap,
             ),
@@ -595,7 +603,10 @@ class _SmallStepperState extends State<SmallStepper> {
             ),
           ),
           IconButton(
-            onPressed: widget.onPlus,
+            onPressed: () {
+              _focusNode.unfocus();
+              widget.onPlus();
+            },
             style: IconButton.styleFrom(
               tapTargetSize: MaterialTapTargetSize.shrinkWrap,
             ),
@@ -662,8 +673,13 @@ class _SSQtyFieldState extends State<SSQtyField> {
   @override
   void didUpdateWidget(SSQtyField oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.value != widget.value && !_focusNode.hasFocus) {
+    if (widget.value != _controller.text) {
       _controller.text = widget.value;
+      if (_focusNode.hasFocus) {
+        _controller.selection = TextSelection.fromPosition(
+          TextPosition(offset: _controller.text.length),
+        );
+      }
     }
   }
 

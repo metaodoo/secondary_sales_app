@@ -671,14 +671,19 @@ class _CreateScrapScreenState extends State<CreateScrapScreen> {
         final current = lotInput.soQty ?? lotInput.quantity;
         final next = current + delta;
         lotInput.soQty = next.clamp(0, double.infinity).toDouble();
+        if (_isPrimaryTier && !_scrapSum) {
+          lotInput.quantity = lotInput.soQty!;
+        }
       } else if (auth.canEditWarehouseQty) {
         final current = lotInput.qcQty ?? lotInput.quantity;
         final next = current + delta;
         lotInput.qcQty = next.clamp(0, double.infinity).toDouble();
+        if (_isPrimaryTier && !_scrapSum) {
+          lotInput.quantity = lotInput.qcQty!;
+        }
       } else {
         final next = lotInput.quantity + delta;
         lotInput.quantity = next.clamp(0, double.infinity).toDouble();
-
       }
     });
   }
@@ -688,8 +693,14 @@ class _CreateScrapScreenState extends State<CreateScrapScreen> {
     setState(() {
       if (auth.canEditSoQty) {
         lotInput.soQty = newQty.clamp(0, double.infinity).toDouble();
+        if (_isPrimaryTier && !_scrapSum) {
+          lotInput.quantity = lotInput.soQty!;
+        }
       } else if (auth.canEditWarehouseQty) {
         lotInput.qcQty = newQty.clamp(0, double.infinity).toDouble();
+        if (_isPrimaryTier && !_scrapSum) {
+          lotInput.quantity = lotInput.qcQty!;
+        }
       } else {
         lotInput.quantity = newQty.clamp(0, double.infinity).toDouble();
       }
@@ -705,7 +716,11 @@ class _CreateScrapScreenState extends State<CreateScrapScreen> {
             : (auth.canEditQcTeamQty
                 ? _lotSum(line, (l) => (l.qcTeamQcQty ?? 0) + (l.qcTeamNonsaleableQty ?? 0))
                 : _lotSum(line, (l) => (l.wQcQty ?? 0) + (l.wNonsaleableQty ?? 0))))
-        : _allocatedQty(line);
+        : (auth.canEditSoQty
+            ? _allocatedSoQty(line)
+            : (auth.canEditWarehouseQty
+                ? _allocatedQcQty(line)
+                : _allocatedQty(line)));
   }
 
   /// Price times the quantity the card shows. A lot-tracked line's quantity
@@ -720,6 +735,20 @@ class _CreateScrapScreenState extends State<CreateScrapScreen> {
 
   double _allocatedQty(VirtualTransferLineEntry line) {
     return line.lotLines.fold<double>(0, (sum, lot) => sum + lot.quantity);
+  }
+
+  double _allocatedSoQty(VirtualTransferLineEntry line) {
+    return line.lotLines.fold<double>(
+      0,
+      (sum, lot) => sum + (lot.soQty ?? lot.quantity),
+    );
+  }
+
+  double _allocatedQcQty(VirtualTransferLineEntry line) {
+    return line.lotLines.fold<double>(
+      0,
+      (sum, lot) => sum + (lot.qcQty ?? lot.quantity),
+    );
   }
 
   void _syncSingleLotFromLine(VirtualTransferLineEntry line) {
@@ -1677,13 +1706,17 @@ class _CreateScrapScreenState extends State<CreateScrapScreen> {
                                           lotInput.soQty! <= 0) {
                                         lotInput.soQty = initVal;
                                       }
-                                      lotInput.quantity = 0;
+                                      lotInput.quantity = (_isPrimaryTier && !_scrapSum)
+                                          ? lotInput.soQty!
+                                          : 0;
                                     } else if (canEditWarehouseQty) {
                                       if (lotInput.qcQty == null ||
                                           lotInput.qcQty! <= 0) {
                                         lotInput.qcQty = initVal;
                                       }
-                                      lotInput.quantity = 0;
+                                      lotInput.quantity = (_isPrimaryTier && !_scrapSum)
+                                          ? lotInput.qcQty!
+                                          : 0;
                                     } else if (canEditQcTeamQty) {
                                       if (lotInput.qcTeamQcQty == null ||
                                           lotInput.qcTeamQcQty! <= 0) {
@@ -2616,7 +2649,10 @@ class _ScrapLotRow extends StatelessWidget {
                     if (!isReadOnly) ...[
                       const SizedBox(width: 4),
                       InkWell(
-                        onTap: onMinus,
+                        onTap: () {
+                          FocusScope.of(context).unfocus();
+                          onMinus();
+                        },
                         borderRadius: BorderRadius.circular(4),
                         child: const Padding(
                           padding: EdgeInsets.all(4.0),
@@ -2629,7 +2665,10 @@ class _ScrapLotRow extends StatelessWidget {
                       ),
                       const SizedBox(width: 2),
                       InkWell(
-                        onTap: onPlus,
+                        onTap: () {
+                          FocusScope.of(context).unfocus();
+                          onPlus();
+                        },
                         borderRadius: BorderRadius.circular(4),
                         child: const Padding(
                           padding: EdgeInsets.all(4.0),
