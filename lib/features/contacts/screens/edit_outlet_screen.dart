@@ -1,10 +1,17 @@
+import 'dart:convert';
+import 'dart:io';
+
 import 'package:flutter/material.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:secondary_sales/core/widgets/ss_ui.dart';
 import 'package:secondary_sales/core/theme/app_theme.dart';
 import 'package:provider/provider.dart';
 import 'package:secondary_sales/data/models/contacts/outlet_type.dart';
 import 'package:secondary_sales/features/routes/route_provider.dart';
 import 'package:secondary_sales/core/util/dialog_helper.dart';
+import 'package:secondary_sales/core/widgets/app_camera_capture_dialog.dart';
+import 'package:secondary_sales/core/services/media_storage_service.dart';
+import 'package:secondary_sales/core/services/location_service.dart';
 
 class EditOutletScreen extends StatefulWidget {
   final Map<String, dynamic> outlet;
@@ -25,6 +32,39 @@ class _EditOutletScreenState extends State<EditOutletScreen> {
   int? _selectedOutletClassId;
   int? _selectedOutletTypeId;
   bool _isSaving = false;
+  File? _capturedPhoto;
+  String? _capturedPhotoBase64;
+
+  Future<void> _capturePhoto() async {
+    final photo = await AppCameraCaptureDialog.capture(
+      context,
+      title: 'Outlet Photo',
+      helperTip: 'Take a photo of the shop front or signboard',
+    );
+    if (photo == null) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Take a photo of the outlet to update its information.'),
+          ),
+        );
+      }
+      return;
+    }
+    final saved = await MediaStorageService.persistPickedFile(
+      photo,
+      category: MediaCategory.outlets,
+      customPrefix: 'outlet_update',
+    );
+    final file = saved ?? File(photo.path);
+    final bytes = await file.readAsBytes();
+    if (mounted) {
+      setState(() {
+        _capturedPhoto = file;
+        _capturedPhotoBase64 = base64Encode(bytes);
+      });
+    }
+  }
 
   @override
   void initState() {
@@ -85,11 +125,27 @@ class _EditOutletScreenState extends State<EditOutletScreen> {
   Future<void> _saveOutlet() async {
     if (!_formKey.currentState!.validate()) return;
 
+    if (_capturedPhotoBase64 == null) {
+      await _capturePhoto();
+      if (_capturedPhotoBase64 == null || !mounted) {
+        return;
+      }
+    }
+
     setState(() => _isSaving = true);
 
     final provider = Provider.of<RouteProvider>(context, listen: false);
 
     try {
+      Position? position;
+      try {
+        position = await LocationService.getAccuratePosition(
+          desiredAccuracyInMeters: 25.0,
+          maxAcceptableAccuracyInMeters: 50.0,
+          timeLimit: const Duration(seconds: 10),
+        );
+      } catch (_) {}
+
       final updatedOutlet = await provider.updateOutlet(
         widget.outlet['id'] as int,
         name: _nameController.text.trim(),
@@ -98,6 +154,9 @@ class _EditOutletScreenState extends State<EditOutletScreen> {
         street: _addressController.text.trim(),
         outletClassId: _selectedOutletClassId,
         outletTypeId: _selectedOutletTypeId,
+        partnerLatitude: position?.latitude,
+        partnerLongitude: position?.longitude,
+        gpsPhoto: _capturedPhotoBase64,
       );
 
       setState(() => _isSaving = false);
@@ -431,6 +490,107 @@ class _EditOutletScreenState extends State<EditOutletScreen> {
                             color: AppColors.borderSoft,
                           ),
                         ),
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    const Text(
+                      'Outlet Photo *',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w500,
+                        fontSize: 14,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    GestureDetector(
+                      onTap: _capturePhoto,
+                      child: Container(
+                        width: double.infinity,
+                        height: 160,
+                        decoration: BoxDecoration(
+                          color: AppColors.background,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: _capturedPhoto == null
+                                ? AppColors.borderSoft
+                                : const Color(0xFF10B981),
+                            width: 1.5,
+                          ),
+                        ),
+                        child: _capturedPhoto == null
+                            ? Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: const [
+                                  Icon(
+                                    Icons.camera_alt_outlined,
+                                    size: 40,
+                                    color: AppColors.textSecondary,
+                                  ),
+                                  SizedBox(height: 8),
+                                  Text(
+                                    'Take Outlet Photo *',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 14,
+                                      color: AppColors.textPrimary,
+                                    ),
+                                  ),
+                                  SizedBox(height: 4),
+                                  Text(
+                                    'Live camera photo required to update',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: AppColors.textSecondary,
+                                    ),
+                                  ),
+                                ],
+                              )
+                            : ClipRRect(
+                                borderRadius: BorderRadius.circular(10),
+                                child: Stack(
+                                  children: [
+                                    Positioned.fill(
+                                      child: Image.file(
+                                        _capturedPhoto!,
+                                        fit: BoxFit.cover,
+                                      ),
+                                    ),
+                                    Positioned(
+                                      bottom: 8,
+                                      right: 8,
+                                      child: Container(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 10,
+                                          vertical: 6,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color: Colors.black.withValues(alpha: 0.65),
+                                          borderRadius: BorderRadius.circular(20),
+                                        ),
+                                        child: const Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            Icon(
+                                              Icons.refresh,
+                                              size: 14,
+                                              color: Colors.white,
+                                            ),
+                                            SizedBox(width: 4),
+                                            Text(
+                                              'Retake',
+                                              style: TextStyle(
+                                                color: Colors.white,
+                                                fontSize: 12,
+                                                fontWeight: FontWeight.bold,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
                       ),
                     ),
                   ],

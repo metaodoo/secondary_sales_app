@@ -46,6 +46,7 @@ class OfficerRouteSelectionScreen extends StatefulWidget {
 
 class _OfficerRouteSelectionScreenState
     extends State<OfficerRouteSelectionScreen> {
+  bool _sortByRecommended = true;
   // Loaded once, not on every build: a load started in build ran again on
   // each rebuild and notified listeners while the screen was building.
   late Future<List<Map<String, dynamic>>> _routes = _loadRoutes();
@@ -120,7 +121,9 @@ class _OfficerRouteSelectionScreenState
           }
 
           final routes = snapshot.data ?? [];
-          final sortedRoutes = sortRoutesByRecommendation(routes, odooToday);
+          final displayRoutes = _sortByRecommended
+              ? sortRoutesByRecommendation(routes, odooToday)
+              : routes;
 
           return RefreshIndicator(
             onRefresh: _refresh,
@@ -154,8 +157,69 @@ class _OfficerRouteSelectionScreenState
                     height: 1.4,
                   ),
                 ),
-                const SizedBox(height: 24),
-                if (sortedRoutes.isEmpty)
+                const SizedBox(height: 16),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      '${displayRoutes.length} Routes',
+                      style: const TextStyle(
+                        color: AppColors.textSecondary,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    InkWell(
+                      onTap: () {
+                        setState(() => _sortByRecommended = !_sortByRecommended);
+                      },
+                      borderRadius: BorderRadius.circular(20),
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 200),
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: _sortByRecommended
+                              ? const Color(0xFF10B981)
+                              : Colors.white,
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(
+                            color: _sortByRecommended
+                                ? const Color(0xFF10B981)
+                                : AppColors.borderSoft,
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withValues(alpha: 0.04),
+                              blurRadius: 4,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              _sortByRecommended ? Icons.check_circle : Icons.sort,
+                              size: 15,
+                              color: _sortByRecommended ? Colors.white : AppColors.textSecondary,
+                            ),
+                            const SizedBox(width: 6),
+                            Text(
+                              _sortByRecommended ? 'Recommended First' : 'Default Order',
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                                color: _sortByRecommended ? Colors.white : AppColors.textPrimary,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                if (displayRoutes.isEmpty)
                   const Padding(
                     padding: EdgeInsets.only(top: 32),
                     child: Center(
@@ -165,7 +229,7 @@ class _OfficerRouteSelectionScreenState
                       ),
                     ),
                   ),
-                ...sortedRoutes.map((route) {
+                ...displayRoutes.map((route) {
                   final List<dynamic> plannedDays = route['planned_days'] ?? [];
                   final bool isRecommended = plannedDays.any((d) => d.toString() == odooToday);
                   final int outletCount = route['outlet_count'] ?? 0;

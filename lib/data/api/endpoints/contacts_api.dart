@@ -242,8 +242,11 @@ extension ContactsApi on ApiService {
       if (chainShopId != null) 'chain_shop_id': chainShopId,
       if (partnerLatitude != null) 'partner_latitude': partnerLatitude,
       if (partnerLongitude != null) 'partner_longitude': partnerLongitude,
-      // Required by the server whenever the position moves.
-      if (gpsPhoto != null) 'gps_photo': gpsPhoto,
+      // Required by the server whenever the position moves, and also updates outlet image.
+      if (gpsPhoto != null) ...{
+        'gps_photo': gpsPhoto,
+        'image_1920': gpsPhoto,
+      },
     };
 
     final result = await _post(
