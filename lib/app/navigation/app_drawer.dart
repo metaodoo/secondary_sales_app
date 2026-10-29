@@ -8,7 +8,6 @@ import 'package:secondary_sales/core/widgets/ss_ui.dart';
 import 'package:secondary_sales/features/auth/auth_provider.dart';
 import 'package:secondary_sales/features/auth/logout_guard.dart';
 
-import 'package:secondary_sales/app/navigation/app_shell.dart';
 import 'package:secondary_sales/features/settings/screens/settings_tab.dart';
 
 /// Global navigation drawer, rendered from [visibleMenuSections].
@@ -111,6 +110,63 @@ class AppDrawer extends StatelessWidget {
                 },
               ),
             ),
+          Padding(
+            padding: const EdgeInsets.only(top: 2),
+            child: _MenuTile(
+              icon: Icons.security_update_good_outlined,
+              label: 'Refresh Access Rights',
+              onTap: () async {
+                Navigator.of(context).pop();
+                final messenger = ScaffoldMessenger.of(context);
+                messenger.showSnackBar(
+                  const SnackBar(
+                    content: Text('Refreshing access rights...'),
+                    duration: Duration(seconds: 1),
+                  ),
+                );
+                try {
+                  await context.read<AuthProvider>().refreshAccessControl(throwOnError: true);
+                  messenger.showSnackBar(
+                    const SnackBar(
+                      backgroundColor: AppColors.success,
+                      content: Row(
+                        children: [
+                          Icon(Icons.check_circle_outline, color: Colors.white, size: 20),
+                          SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              'Access rights refreshed successfully.',
+                              style: TextStyle(color: Colors.white),
+                            ),
+                          ),
+                        ],
+                      ),
+                      duration: Duration(seconds: 3),
+                    ),
+                  );
+                } catch (e) {
+                  messenger.showSnackBar(
+                    SnackBar(
+                      backgroundColor: Colors.red.shade700,
+                      content: Row(
+                        children: [
+                          const Icon(Icons.error_outline, color: Colors.white, size: 20),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              'Failed to refresh access rights: ${e.toString().replaceAll('Exception: ', '')}',
+                              style: const TextStyle(color: Colors.white),
+                            ),
+                          ),
+                        ],
+                      ),
+                      duration: const Duration(seconds: 4),
+                    ),
+                  );
+                }
+              },
+            ),
+          ),
           Padding(
             padding: const EdgeInsets.only(top: 2, bottom: 12),
             child: _MenuTile(

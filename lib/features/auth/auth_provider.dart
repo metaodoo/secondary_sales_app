@@ -345,8 +345,8 @@ class AuthProvider with ChangeNotifier {
       var access = const AccessControl();
       if (accessRaw != null && accessRaw.isNotEmpty) {
         final decodedAccess = jsonDecode(accessRaw);
-        if (decodedAccess is Map<String, dynamic>) {
-          access = AccessControl.fromMap(decodedAccess);
+        if (decodedAccess is Map) {
+          access = AccessControl.fromMap(decodedAccess.cast<String, dynamic>());
         }
       }
 
@@ -531,11 +531,11 @@ class AuthProvider with ChangeNotifier {
   }
 
   /// Best-effort refresh of the current user's UI access grants (e.g. on
-  /// resume or after an admin changes grants). Keeps the login-embedded access
-  /// if the call fails (backend not upgraded, offline, etc.).
-  Future<void> refreshAccessControl() async {
+  /// resume, after an admin changes grants, or via user refresh button).
+  /// Keeps the login-embedded access if the call fails (backend not upgraded, offline, etc.).
+  Future<bool> refreshAccessControl({bool throwOnError = false}) async {
     final session = _session;
-    if (session == null) return;
+    if (session == null) return false;
     try {
       _primeApiService(session);
       final access = await ApiService.instance.getAccessPermissions();
@@ -546,8 +546,11 @@ class AuthProvider with ChangeNotifier {
         jsonEncode(access.toMap()),
       );
       notifyListeners();
-    } catch (_) {
-      // Non-fatal: keep the existing (login-embedded) access.
+      return true;
+    } catch (e) {
+      debugPrint('[AuthProvider] Failed to refresh access control: $e');
+      if (throwOnError) rethrow;
+      return false;
     }
   }
 

@@ -13,11 +13,72 @@ import 'package:secondary_sales/features/hr/screens/location_buffer_screen.dart'
 import 'package:secondary_sales/features/settings/screens/offline_data_screen.dart';
 import 'package:secondary_sales/core/widgets/ss_ui.dart';
 
-class SettingsTab extends StatelessWidget {
+class SettingsTab extends StatefulWidget {
   const SettingsTab({super.key, this.onBack, this.onOpenMenu});
 
   final VoidCallback? onBack;
   final VoidCallback? onOpenMenu;
+
+  @override
+  State<SettingsTab> createState() => _SettingsTabState();
+}
+
+class _SettingsTabState extends State<SettingsTab> {
+  bool _isRefreshingAccess = false;
+
+  Future<void> _refreshAccessRights() async {
+    if (_isRefreshingAccess) return;
+    setState(() => _isRefreshingAccess = true);
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      await context.read<AuthProvider>().refreshAccessControl(throwOnError: true);
+      if (mounted) {
+        messenger.showSnackBar(
+          const SnackBar(
+            backgroundColor: AppColors.success,
+            content: Row(
+              children: [
+                Icon(Icons.check_circle_outline, color: Colors.white, size: 20),
+                SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Access rights refreshed successfully.',
+                    style: TextStyle(color: Colors.white),
+                  ),
+                ),
+              ],
+            ),
+            duration: Duration(seconds: 3),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        messenger.showSnackBar(
+          SnackBar(
+            backgroundColor: Colors.red.shade700,
+            content: Row(
+              children: [
+                const Icon(Icons.error_outline, color: Colors.white, size: 20),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Failed to refresh access rights: ${e.toString().replaceAll('Exception: ', '')}',
+                    style: const TextStyle(color: Colors.white),
+                  ),
+                ),
+              ],
+            ),
+            duration: const Duration(seconds: 4),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isRefreshingAccess = false);
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -35,14 +96,14 @@ class SettingsTab extends StatelessWidget {
         backgroundColor: Colors.white,
         elevation: 0,
         scrolledUnderElevation: 0,
-        leading: onBack != null
+        leading: widget.onBack != null
             ? IconButton(
                 tooltip: 'Back',
                 icon: const Icon(
                   Icons.arrow_back,
                   color: AppColors.textPrimary,
                 ),
-                onPressed: onBack,
+                onPressed: widget.onBack,
               )
             : null,
         title: const Text(
@@ -57,7 +118,7 @@ class SettingsTab extends StatelessWidget {
         actions: [
           Padding(
             padding: const EdgeInsets.only(right: 16),
-            child: ProfileAvatar(onTap: onOpenMenu),
+            child: ProfileAvatar(onTap: widget.onOpenMenu),
           ),
         ],
         bottom: PreferredSize(
@@ -218,6 +279,23 @@ class SettingsTab extends StatelessWidget {
                     ),
                     const Divider(height: 1, color: AppColors.borderMuted),
                   ],
+                  _buildSettingItem(
+                    icon: Icons.security_update_good_outlined,
+                    title: 'Refresh Access Rights',
+                    subtitle: 'Sync latest permissions from server without re-login',
+                    trailingWidget: _isRefreshingAccess
+                        ? const SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: AppColors.primary,
+                            ),
+                          )
+                        : null,
+                    onTap: _isRefreshingAccess ? () {} : _refreshAccessRights,
+                  ),
+                  const Divider(height: 1, color: AppColors.borderMuted),
                   _buildSettingItem(
                     icon: Icons.sync,
                     title: 'Sync Access Catalog',
