@@ -951,7 +951,9 @@ class _OfficerCustomerSelectionScreenState
                       ],
                     ),
                   ),
-                  Container(
+                  if (context.watch<AuthProvider>().canDo(AppAction.outletCreate) &&
+                      context.watch<AuthProvider>().canView(AppScreen.createOutlet))
+                    Container(
                     padding: const EdgeInsets.symmetric(
                       horizontal: AppSpacing.screen,
                       vertical: AppSpacing.sm,
