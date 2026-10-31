@@ -6,7 +6,6 @@ name: Android Release Build & Distribution
 on:
   push:
     branches:
-      - production
       - main
     paths-ignore:
       - '**.md'
