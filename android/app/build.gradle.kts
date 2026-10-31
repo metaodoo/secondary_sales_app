@@ -101,25 +101,81 @@ dependencies {
     implementation(platform("com.google.firebase:firebase-bom:34.15.0"))
 }
 
-val copySplitApksWithPrefix = tasks.register("copySplitApksWithPrefix") {
+val copyReleaseApksWithNamingConventions = tasks.register("copyReleaseApksWithNamingConventions") {
     doLast {
         val flutterApkDir = project.layout.buildDirectory.dir("outputs/flutter-apk").get().asFile
-        if (flutterApkDir.exists()) {
-            val v8a = File(flutterApkDir, "app-arm64-v8a-release.apk")
-            val v7a = File(flutterApkDir, "app-armeabi-v7a-release.apk")
+        if (!flutterApkDir.exists()) return@doLast
 
-            if (v8a.exists()) {
-                v8a.copyTo(File(flutterApkDir, "GDFL_64bit.apk"), overwrite = true)
-                v8a.copyTo(rootProject.file("GDFL_64bit.apk"), overwrite = true)
-            }
-            if (v7a.exists()) {
-                v7a.copyTo(File(flutterApkDir, "GDFL_32bit.apk"), overwrite = true)
-                v7a.copyTo(rootProject.file("GDFL_32bit.apk"), overwrite = true)
+        val flutterRootDir = rootProject.projectDir.parentFile ?: rootProject.projectDir
+        val outputApkDir = File(flutterRootDir, "output/apk")
+        outputApkDir.mkdirs()
+
+        val vName = android.defaultConfig.versionName ?: flutter.versionName ?: "1.0.0"
+        val vCode = android.defaultConfig.versionCode ?: flutter.versionCode ?: 1
+
+        val universalApk = File(flutterApkDir, "app-release.apk")
+        val v8aApk = File(flutterApkDir, "app-arm64-v8a-release.apk")
+        val v7aApk = File(flutterApkDir, "app-armeabi-v7a-release.apk")
+
+        fun copyToAll(src: File, standardName: String, cleanAlias: String, extraAliases: List<String> = emptyList()) {
+            if (!src.exists()) return
+            // 1. In Flutter APK build directory
+            src.copyTo(File(flutterApkDir, standardName), overwrite = true)
+            // 2. In project output/apk/
+            src.copyTo(File(outputApkDir, standardName), overwrite = true)
+            // 3. In project root and android root directories
+            src.copyTo(File(flutterRootDir, cleanAlias), overwrite = true)
+            src.copyTo(File(rootProject.projectDir, cleanAlias), overwrite = true)
+            // 4. Any extra aliases
+            for (alias in extraAliases) {
+                src.copyTo(File(flutterApkDir, alias), overwrite = true)
+                src.copyTo(File(outputApkDir, alias), overwrite = true)
+                if (alias.endsWith(".apk") && !alias.contains("/")) {
+                    src.copyTo(File(flutterRootDir, alias), overwrite = true)
+                }
             }
         }
+
+        // 1. Universal Fat APK (or dual ARM fat APK)
+        copyToAll(
+            universalApk,
+            standardName = "Shokti+_v${vName}_Universal.apk",
+            cleanAlias = "Shokti+_Universal.apk",
+            extraAliases = listOf(
+                "Shokti_Plus_v${vName}_Universal.apk",
+                "Shokti+_v${vName}+${vCode}_Universal.apk",
+                "GDFL_Secondary_Sales_v${vName}_Universal.apk"
+            )
+        )
+
+        // 2. ARM 64-bit APK
+        copyToAll(
+            v8aApk,
+            standardName = "Shokti+_v${vName}_arm64-v8a.apk",
+            cleanAlias = "Shokti+_64bit.apk",
+            extraAliases = listOf(
+                "Shokti_Plus_v${vName}_arm64-v8a.apk",
+                "Shokti+_v${vName}+${vCode}_arm64-v8a.apk",
+                "GDFL_64bit.apk",
+                "GDFL_Secondary_Sales_v${vName}_arm64-v8a.apk"
+            )
+        )
+
+        // 3. ARM 32-bit APK
+        copyToAll(
+            v7aApk,
+            standardName = "Shokti+_v${vName}_armeabi-v7a.apk",
+            cleanAlias = "Shokti+_32bit.apk",
+            extraAliases = listOf(
+                "Shokti_Plus_v${vName}_armeabi-v7a.apk",
+                "Shokti+_v${vName}+${vCode}_armeabi-v7a.apk",
+                "GDFL_32bit.apk",
+                "GDFL_Secondary_Sales_v${vName}_armeabi-v7a.apk"
+            )
+        )
     }
 }
 
 tasks.matching { it.name == "assembleRelease" }.configureEach {
-    finalizedBy(copySplitApksWithPrefix)
+    finalizedBy(copyReleaseApksWithNamingConventions)
 }
