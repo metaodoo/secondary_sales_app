@@ -411,6 +411,7 @@ extension ModernTradeApi on ApiService {
     String? date,
     bool autoSubmit = false,
     required List<Map<String, dynamic>> lines,
+    String? notes,
     String? attachmentBase64,
     String? attachmentFilename,
   }) async {
@@ -421,6 +422,7 @@ extension ModernTradeApi on ApiService {
       if (returnType != null) 'return_type': returnType,
       'auto_submit': autoSubmit,
       'lines': lines,
+      if (notes != null && notes.isNotEmpty) 'notes': notes,
       if (date != null) 'date': date,
       if (attachmentBase64 != null) 'attachment_base64': attachmentBase64,
       if (attachmentFilename != null) 'attachment_filename': attachmentFilename,

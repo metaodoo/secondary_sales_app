@@ -100,6 +100,7 @@ extension ReturnsApi on ApiService {
     String? type,
     String? challanNumber,
     String? damageType,
+    String? note,
     String? attachmentBase64,
     String? attachmentFilename,
     String endpoint = AppConstants.returnsEndpoint,
@@ -115,6 +116,9 @@ extension ReturnsApi on ApiService {
     }
     if (damageType != null && damageType.isNotEmpty) {
       params['damage_type'] = damageType;
+    }
+    if (note != null && note.isNotEmpty) {
+      params['note'] = note;
     }
     if (attachmentBase64 != null && attachmentBase64.isNotEmpty) {
       params['attachment_base64'] = attachmentBase64;
@@ -157,6 +161,7 @@ extension ReturnsApi on ApiService {
     String? type,
     String? challanNumber,
     String? damageType,
+    String? note,
     bool sendToQc = false,
     bool sendToSalesOperation = false,
     String endpoint = AppConstants.returnsEndpoint,
@@ -173,6 +178,9 @@ extension ReturnsApi on ApiService {
     }
     if (damageType != null && damageType.isNotEmpty) {
       params['damage_type'] = damageType;
+    }
+    if (note != null && note.isNotEmpty) {
+      params['note'] = note;
     }
 
     final result = await _post(

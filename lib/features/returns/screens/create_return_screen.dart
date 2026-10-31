@@ -129,6 +129,8 @@ class _CreateReturnScreenState extends State<CreateReturnScreen> {
 
   final TextEditingController _challanNumberController =
       TextEditingController();
+  final TextEditingController _noteController =
+      TextEditingController();
   String? _selectedDamageType = 'saleable';
 
   File? _challanImageFile;
@@ -228,6 +230,7 @@ class _CreateReturnScreenState extends State<CreateReturnScreen> {
   @override
   void dispose() {
     _challanNumberController.dispose();
+    _noteController.dispose();
     super.dispose();
   }
 
@@ -262,6 +265,7 @@ class _CreateReturnScreenState extends State<CreateReturnScreen> {
         _qcMode = details['qc_mode'] as String?;
         _returnReceiptStatus = details['return_recipt_status'] as String?;
         _challanNumberController.text = details['challan_number'] ?? '';
+        _noteController.text = (details['note'] ?? details['notes'] ?? details['remarks'] ?? '').toString();
         _selectedDamageType = details['damage_type'] ?? 'saleable';
         final atts = details['attachments'] as List<dynamic>?;
         if (atts != null && atts.isNotEmpty) {
@@ -1212,6 +1216,7 @@ class _CreateReturnScreenState extends State<CreateReturnScreen> {
         lines: linesData,
         type: widget.moduleType,
         challanNumber: _challanNumberController.text,
+        note: _noteController.text.trim(),
         damageType: _selectedDamageType,
         sendToQc: sendToQc,
         sendToSalesOperation: sendToSalesOperation,
@@ -1223,6 +1228,7 @@ class _CreateReturnScreenState extends State<CreateReturnScreen> {
         distributorId: distributorId is int ? distributorId : null,
         type: widget.moduleType,
         challanNumber: _challanNumberController.text,
+        note: _noteController.text.trim(),
         damageType: _selectedDamageType,
         attachmentBase64: _challanImageBase64,
         attachmentFilename: _challanImageName,
@@ -1341,6 +1347,7 @@ class _CreateReturnScreenState extends State<CreateReturnScreen> {
               lines: linesData,
               type: widget.moduleType,
               challanNumber: _challanNumberController.text,
+              note: _noteController.text.trim(),
               damageType: _selectedDamageType,
               endpoint: widget.endpoint,
             );
@@ -1835,6 +1842,62 @@ class _CreateReturnScreenState extends State<CreateReturnScreen> {
                                   ),
                           ),
                         ],
+                        const SizedBox(height: 16),
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: const Color(0xFFDDE6F2)),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Row(
+                                children: [
+                                  Icon(Icons.notes, size: 18, color: AppColors.primary),
+                                  SizedBox(width: 8),
+                                  Text(
+                                    'Remarks / Notes',
+                                    style: TextStyle(
+                                      color: Colors.black87,
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 8),
+                              TextField(
+                                controller: _noteController,
+                                readOnly: _isReadOnly,
+                                maxLines: 3,
+                                decoration: InputDecoration(
+                                  hintText: _isReadOnly
+                                      ? 'No remarks recorded'
+                                      : 'Enter return reason or remarks...',
+                                  hintStyle: const TextStyle(fontSize: 13, color: Colors.grey),
+                                  filled: true,
+                                  fillColor: _isReadOnly ? const Color(0xFFF8FAFC) : Colors.white,
+                                  contentPadding: const EdgeInsets.all(12),
+                                  border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(8),
+                                    borderSide: const BorderSide(color: Color(0xFFDDE6F2)),
+                                  ),
+                                  enabledBorder: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(8),
+                                    borderSide: const BorderSide(color: Color(0xFFDDE6F2)),
+                                  ),
+                                  focusedBorder: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(8),
+                                    borderSide: const BorderSide(color: AppColors.primary),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
                         const SizedBox(height: 24),
 
                         // Return Items Header

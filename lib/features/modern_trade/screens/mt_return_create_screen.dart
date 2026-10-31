@@ -36,6 +36,13 @@ class _MtReturnCreateScreenState extends State<MtReturnCreateScreen> {
   File? _challanImageFile;
   String? _challanImageBase64;
   String? _challanImageName;
+  final TextEditingController _notesController = TextEditingController();
+
+  @override
+  void dispose() {
+    _notesController.dispose();
+    super.dispose();
+  }
 
   @override
   void initState() {
@@ -406,6 +413,7 @@ class _MtReturnCreateScreenState extends State<MtReturnCreateScreen> {
       returnType: _selectedReturnType,
       date: dateStr,
       lines: linesPayload,
+      notes: _notesController.text.trim(),
       attachmentBase64: _challanImageBase64,
       attachmentFilename: _challanImageName,
     );
@@ -683,6 +691,11 @@ class _MtReturnCreateScreenState extends State<MtReturnCreateScreen> {
 
             // Photo Evidence Card
             _buildPhotoEvidenceSection(),
+
+            const SizedBox(height: 16),
+
+            // Remarks / Notes Section
+            _buildRemarksSection(),
 
             const SizedBox(height: 20),
 
@@ -992,6 +1005,56 @@ class _MtReturnCreateScreenState extends State<MtReturnCreateScreen> {
           fontWeight: isBold ? FontWeight.w700 : FontWeight.w500,
           color: color,
         ),
+      ),
+    );
+  }
+
+  Widget _buildRemarksSection() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.grey.shade200),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Row(
+            children: [
+              Icon(Icons.notes, size: 18, color: AppColors.primaryStrong),
+              SizedBox(width: 8),
+              Text(
+                'Remarks / Notes (Optional)',
+                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          TextField(
+            controller: _notesController,
+            maxLines: 3,
+            decoration: InputDecoration(
+              hintText: 'Enter return reason or remarks for this request...',
+              hintStyle: const TextStyle(fontSize: 13, color: Colors.grey),
+              filled: true,
+              fillColor: const Color(0xFFF8FAFC),
+              contentPadding: const EdgeInsets.all(12),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: BorderSide(color: Colors.grey.shade300),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: BorderSide(color: Colors.grey.shade300),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: const BorderSide(color: AppColors.primaryStrong),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

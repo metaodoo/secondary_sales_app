@@ -216,6 +216,7 @@ class MtReturnProvider extends ChangeNotifier {
     String? date,
     bool autoSubmit = false,
     required List<Map<String, dynamic>> lines,
+    String? notes,
     String? attachmentBase64,
     String? attachmentFilename,
   }) async {
@@ -231,6 +232,7 @@ class MtReturnProvider extends ChangeNotifier {
         date: date,
         autoSubmit: autoSubmit,
         lines: lines,
+        notes: notes,
         attachmentBase64: attachmentBase64,
         attachmentFilename: attachmentFilename,
       );

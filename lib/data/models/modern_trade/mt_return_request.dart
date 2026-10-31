@@ -38,6 +38,7 @@ class MtReturnRequest {
   final List<MtReturnRequestLine> lines;
   final List<MtReturnTransfer> transfers;
   final List<MtReturnAttachment> attachments;
+  final String? notes;
 
   MtReturnRequest({
     required this.id,
@@ -77,6 +78,7 @@ class MtReturnRequest {
     this.lines = const [],
     this.transfers = const [],
     this.attachments = const [],
+    this.notes,
   });
 
   bool get isSaleable => returnBucket == 'saleable';
@@ -145,6 +147,7 @@ class MtReturnRequest {
           (bucket == 'quality') ||
           (bucket == 'non_saleable' && asDouble(map['total_quality_qty']) > 0),
       allowedActions: MtAllowedActions.fromMap(actMap),
+      notes: asNullableString(map['notes'] ?? map['note'] ?? map['remarks']),
       lines: rawLines
           .map((l) => MtReturnRequestLine.fromMap(Map<String, dynamic>.from(l as Map)))
           .toList(),
