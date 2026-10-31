@@ -419,7 +419,10 @@ class _ProductSelectionScreenState extends State<ProductSelectionScreen> {
                           ],
                         ),
                       ),
-                      if (widget.hub?.totalDue != null) ...[
+                      if (widget.hub?.totalDue != null &&
+                          widget.hub?.customerType != 'outlet' &&
+                          widget.businessType != 'mt' &&
+                          widget.saleType != 'secondary') ...[
                         const SizedBox(width: 8),
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),

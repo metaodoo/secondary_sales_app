@@ -11,6 +11,8 @@ class SaleOrderDetail {
     this.dateTimeOrder,
     this.expectedDeliveryDate,
     this.note,
+    this.saleType,
+    this.businessType,
     this.distributor,
     this.warehouse,
     required this.amounts,
@@ -28,6 +30,8 @@ class SaleOrderDetail {
   final DateTime? dateTimeOrder;
   final String? expectedDeliveryDate;
   final String? note;
+  final String? saleType;
+  final String? businessType;
   final OrderPartner? distributor;
   final Warehouse? warehouse;
   final OrderAmounts amounts;
@@ -52,6 +56,8 @@ class SaleOrderDetail {
       dateOrder: formattedDateOrder,
       expectedDeliveryDate: asNullableString(map['expected_delivery_date']),
       note: asNullableString(map['note']),
+      saleType: asNullableString(map['sale_type']),
+      businessType: asNullableString(map['business_type']),
       distributor: distributor is Map
           ? OrderPartner.fromMap(distributor.cast<String, dynamic>())
           : null,
@@ -93,6 +99,7 @@ class OrderPartner {
     this.phone,
     this.address,
     this.totalDue,
+    this.customerType,
   });
 
   final int id;
@@ -100,14 +107,19 @@ class OrderPartner {
   final String? phone;
   final String? address;
   final double? totalDue;
+  final String? customerType;
 
   factory OrderPartner.fromMap(Map<String, dynamic> map) {
+    final customerType = asNullableString(map['customer_type'] ?? map['ss_customer_type']);
+    final isOutlet = customerType == 'outlet';
     return OrderPartner(
       id: asInt(map['id']),
       name: (map['name'] ?? '').toString(),
       phone: asNullableString(map['phone']),
       address: asNullableString(map['address']),
-      totalDue: asNullableDouble(map['total_due'] ?? map['due_amount'] ?? map['credit']),
+      customerType: customerType,
+      // Outlets must NEVER show balance/due
+      totalDue: isOutlet ? null : asNullableDouble(map['total_due'] ?? map['due_amount'] ?? map['credit']),
     );
   }
 }

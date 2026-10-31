@@ -13,6 +13,7 @@ class DistributionHub {
   final String? email;
   final String? vat;
   final double? totalDue;
+  final String? customerType;
 
   DistributionHub({
     required this.id,
@@ -28,6 +29,7 @@ class DistributionHub {
     this.email,
     this.vat,
     this.totalDue,
+    this.customerType,
   });
 
   String get displayNameWithCode {
@@ -38,10 +40,13 @@ class DistributionHub {
   }
 
   factory DistributionHub.fromMap(Map<String, dynamic> map) {
+    final customerType = asNullableString(map['customer_type'] ?? map['ss_customer_type']);
+    final isOutlet = customerType == 'outlet';
     return DistributionHub(
       id: asInt(map['id']),
       name: map['display_name'] ?? map['name'] ?? '',
       code: map['code'] ?? map['ss_code'],
+      customerType: customerType,
       address: _buildAddress(map),
       street: map['street'],
       street2: map['street2'],
@@ -51,7 +56,7 @@ class DistributionHub {
       mobile: map['mobile'] ?? map['phone'],
       email: map['email'],
       vat: map['vat'],
-      totalDue: asNullableDouble(map['total_due'] ?? map['due_amount'] ?? map['credit']),
+      totalDue: isOutlet ? null : asNullableDouble(map['total_due'] ?? map['due_amount'] ?? map['credit']),
     );
   }
 

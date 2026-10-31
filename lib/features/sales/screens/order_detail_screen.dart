@@ -277,9 +277,13 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                     else ...[
                       _OrderStatusPanel(
                         order: order,
-                        // The distributor's balance is for distributor
-                        // (primary) orders, not outlet orders.
-                        showDistributorDue: widget.saleType != 'secondary',
+                        // Balances are only for distributors (primary GT orders).
+                        // Outlets (GT or MT) must never show balance.
+                        showDistributorDue: (order.distributor?.customerType != 'outlet') &&
+                            (widget.businessType != 'mt') &&
+                            (order.businessType != 'mt') &&
+                            ((order.distributor?.customerType == 'distributor') ||
+                                ((order.saleType ?? widget.saleType) == 'primary')),
                       ),
                       const SizedBox(height: 16),
                       _OrderLinesPanel(order: order),
@@ -469,7 +473,10 @@ class _OrderStatusPanel extends StatelessWidget {
               'Expected Delivery: ${_formatServerDate(asDateTime(order.expectedDeliveryDate))}',
             ),
           ],
-          if (showDistributorDue && order.distributor?.totalDue != null) ...[
+          if (showDistributorDue &&
+              order.distributor?.customerType != 'outlet' &&
+              order.businessType != 'mt' &&
+              order.distributor?.totalDue != null) ...[
             const SizedBox(height: 10),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
