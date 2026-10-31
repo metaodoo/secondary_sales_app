@@ -13,8 +13,7 @@ import 'package:secondary_sales/features/auth/auth_provider.dart';
 import 'package:secondary_sales/features/modern_trade/modern_trade_provider.dart';
 import 'package:secondary_sales/features/routes/screens/customer_action_bottom_sheet.dart';
 import 'package:secondary_sales/features/routes/screens/outlet_visit_history_screen.dart';
-import 'package:secondary_sales/data/models/routes/visit_reason.dart';
-import 'package:secondary_sales/features/routes/screens/visit_reason_dialog.dart';
+import 'package:secondary_sales/features/modern_trade/screens/mt_visit_reason_dialog.dart';
 import 'package:secondary_sales/features/sales/screens/product_selection_screen.dart';
 import 'package:secondary_sales/features/sales/screens/secondary_orders_list_screen.dart';
 import 'package:secondary_sales/features/modern_trade/screens/mt_outlet_detail_screen.dart';
@@ -316,19 +315,17 @@ class _MtCustomerActionBottomSheetState extends State<MtCustomerActionBottomShee
     );
 
     if (confirm == true) {
-      VisitReasonSelection? selection;
+      String? reasonNotes;
       if (provider.requiresVisitReason) {
         if (!mounted) return;
-        selection = await VisitReasonDialog.show(context);
-        if (selection == null) return;
+        reasonNotes = await MtVisitReasonDialog.show(context);
+        if (reasonNotes == null) return;
       }
 
       setState(() => _isCheckingOut = true);
       try {
         await provider.checkOut(
-          visitReasonId: selection?.reasonId,
-          reasonNotes: selection?.notes,
-          saleAmount: selection?.saleAmount,
+          reasonNotes: reasonNotes,
         );
         _timer?.cancel();
         if (mounted) {
