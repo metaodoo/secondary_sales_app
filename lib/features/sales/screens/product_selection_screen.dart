@@ -341,12 +341,7 @@ class _ProductSelectionScreenState extends State<ProductSelectionScreen> {
   @override
   Widget build(BuildContext context) {
     final provider = context.watch<PrimarySaleProvider>();
-    final bool isGtSecondary = widget.saleType == 'secondary' && widget.businessType != 'mt';
     final int selectedItemsCount = _selectedLines.length;
-    final int totalUnits = _selectedLines.values.fold(
-      0,
-      (sum, line) => sum + (isGtSecondary ? line.customerOrderQty : line.totalQty),
-    );
     final bool hasItems = selectedItemsCount > 0;
 
     return Scaffold(
@@ -797,7 +792,7 @@ class _ProductSelectionScreenState extends State<ProductSelectionScreen> {
                   ),
                   label: Text(
                     hasItems
-                        ? 'Add $selectedItemsCount Items ($totalUnits Units)'
+                        ? 'Add $selectedItemsCount ${selectedItemsCount == 1 ? 'Item' : 'Items'}'
                         : 'Select Items',
                     style: TextStyle(
                       color: hasItems ? Colors.white : AppColors.textSecondary,
@@ -908,8 +903,6 @@ class ProductSelectionCard extends StatelessWidget {
     final int orderQty = lineEntry?.quantity ?? 0;
     final int damagedQty = lineEntry?.damagedQty ?? 0;
     final int qualityQty = lineEntry?.qualityQty ?? 0;
-    final bool isGtSecondary = saleType == 'secondary' && businessType != 'mt';
-    final int displayQty = isGtSecondary ? orderQty : (lineEntry?.totalQty ?? 0);
 
     return Container(
       margin: const EdgeInsets.only(bottom: 14),
@@ -1001,7 +994,7 @@ class ProductSelectionCard extends StatelessWidget {
                           ),
                           const SizedBox(width: 4),
                           Text(
-                            isSelected ? 'Selected ($displayQty)' : 'Select',
+                            isSelected ? 'Selected' : 'Select',
                             style: TextStyle(
                               fontSize: 12,
                               fontWeight: FontWeight.bold,
