@@ -557,32 +557,43 @@ class ModernTradeProvider with ChangeNotifier {
           "${now.year.toString().padLeft(4, '0')}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}";
       final res = await _apiService.getStockAudits(
         outletId: outletId,
+        employeeId: _lastEmployeeId,
         date: dateStr,
         pageSize: 50,
       );
-      final hasOpening = res.audits.any((a) => a.type == 'opening_stock');
-      final closingAudit = res.audits.where((a) => a.type == 'closing_stock').firstOrNull;
+      final myAudits = _lastEmployeeId == null
+          ? res.audits
+          : res.audits
+              .where((a) => a.employeeId == null || a.employeeId == _lastEmployeeId)
+              .toList();
+      final hasOpening = myAudits.any((a) => a.type == 'opening_stock');
+      final closingAudit = myAudits.where((a) => a.type == 'closing_stock').firstOrNull;
       final hasClosing = closingAudit != null;
       final isClosingConfirmed = closingAudit?.isConfirmed ?? false;
       return (
         hasOpening: hasOpening,
         hasClosing: hasClosing,
         isClosingConfirmed: isClosingConfirmed,
-        audits: res.audits,
+        audits: myAudits,
       );
     } catch (e) {
       // Offline fallback: Check local session audits (MF-57)
       final sessionAudits = await OfflineDatabaseHelper.instance.getMtSessionStockAudits(outletId: outletId);
       final audits = sessionAudits.map((m) => MtStockAudit.fromMap(m)).toList();
-      final hasOpening = audits.any((a) => a.type == 'opening_stock');
-      final closingAudit = audits.where((a) => a.type == 'closing_stock').firstOrNull;
+      final myAudits = _lastEmployeeId == null
+          ? audits
+          : audits
+              .where((a) => a.employeeId == null || a.employeeId == _lastEmployeeId)
+              .toList();
+      final hasOpening = myAudits.any((a) => a.type == 'opening_stock');
+      final closingAudit = myAudits.where((a) => a.type == 'closing_stock').firstOrNull;
       final hasClosing = closingAudit != null;
       final isClosingConfirmed = closingAudit?.isConfirmed ?? false;
       return (
         hasOpening: hasOpening,
         hasClosing: hasClosing,
         isClosingConfirmed: isClosingConfirmed,
-        audits: audits,
+        audits: myAudits,
       );
     }
   }
