@@ -167,6 +167,10 @@ class VirtualTransferLineEntry {
     this.freshQty,
     this.scrapQty,
     this.damagedQualityQty,
+    this.soRemark,
+    this.logisticRemark,
+    this.qcRemark,
+    this.salesopsRemark,
     List<TransferLotInput>? lotLines,
   }) : lotLines = lotLines ?? [];
 
@@ -215,6 +219,10 @@ class VirtualTransferLineEntry {
   double? freshQty;
   double? scrapQty;
   double? damagedQualityQty;
+  String? soRemark;
+  String? logisticRemark;
+  String? qcRemark;
+  String? salesopsRemark;
   final List<TransferLotInput> lotLines;
 
   double get priceUnit => product.priceUnit;
@@ -257,6 +265,10 @@ class TransferLotInput {
     this.freshQty,
     this.scrapQty,
     this.damagedQualityQty,
+    this.soRemark,
+    this.logisticRemark,
+    this.qcRemark,
+    this.salesopsRemark,
   });
 
   TransferLot? lot;
@@ -278,6 +290,10 @@ class TransferLotInput {
   double? freshQty;
   double? scrapQty;
   double? damagedQualityQty;
+  String? soRemark;
+  String? logisticRemark;
+  String? qcRemark;
+  String? salesopsRemark;
 }
 
 /// The QC columns a picking uses, in display order, as (label, wire name) matching Option B.
@@ -529,6 +545,10 @@ class VirtualTransferLine {
   final double priceSubtotal;
   final Map<String, dynamic>? uom;
   final List<Map<String, dynamic>> lotLines;
+  final String? soRemark;
+  final String? logisticRemark;
+  final String? qcRemark;
+  final String? salesopsRemark;
 
   VirtualTransferLine({
     required this.moveId,
@@ -546,6 +566,10 @@ class VirtualTransferLine {
     this.priceSubtotal = 0.0,
     this.uom,
     required this.lotLines,
+    this.soRemark,
+    this.logisticRemark,
+    this.qcRemark,
+    this.salesopsRemark,
   });
 
   factory VirtualTransferLine.fromMap(Map<String, dynamic> map) {
@@ -573,6 +597,10 @@ class VirtualTransferLine {
       priceSubtotal: pSubtotal,
       uom: asMapOrNull(map['uom']),
       lotLines: rawLots is List ? rawLots.map(asMap).toList() : [],
+      soRemark: map['so_remark']?.toString(),
+      logisticRemark: map['logistic_remark']?.toString(),
+      qcRemark: map['qc_remark']?.toString(),
+      salesopsRemark: map['salesops_remark']?.toString(),
     );
   }
 

@@ -270,6 +270,10 @@ class _CreateScrapScreenState extends State<CreateScrapScreen> {
               qcTeamQcQty: (ld['qc_team_qc_qty'] as num?)?.toDouble(),
               actualQcQty: (ld['actual_qc_qty'] as num?)?.toDouble(),
               qcNonsaleableQty: (ld['qc_nonsaleable_qty'] as num?)?.toDouble(),
+              soRemark: ld['so_remark']?.toString(),
+              logisticRemark: ld['logistic_remark']?.toString(),
+              qcRemark: ld['qc_remark']?.toString(),
+              salesopsRemark: ld['salesops_remark']?.toString(),
             );
 
             final lotLinesData = ld['lot_lines'] as List<dynamic>? ?? [];
@@ -331,7 +335,11 @@ class _CreateScrapScreenState extends State<CreateScrapScreen> {
                     ..qcTeamNonsaleableQty = qcTeamNonsaleableQty
                     ..qcTeamQcQty = qcTeamQcQty
                     ..actualQcQty = actualQcQty
-                    ..qcNonsaleableQty = qcNonsaleableQty,
+                    ..qcNonsaleableQty = qcNonsaleableQty
+                    ..soRemark = ll['so_remark']?.toString()
+                    ..logisticRemark = ll['logistic_remark']?.toString()
+                    ..qcRemark = ll['qc_remark']?.toString()
+                    ..salesopsRemark = ll['salesops_remark']?.toString(),
                 );
               }
             }
@@ -902,11 +910,12 @@ class _CreateScrapScreenState extends State<CreateScrapScreen> {
           ? _submittedTrackedQcQty(line)
           : line.qcQty;
 
+      final Map<String, dynamic> itemMap;
       if (_scrapSum) {
         // `quantity` is deliberately absent: the backend derives the movement
         // from actual_qc_qty + qc_nonsaleable_qty, so anything sent here would
         // be ignored and would only imply the app still decides what moves.
-        return {
+        itemMap = {
           'product_id': line.product.id,
           if (soQty != null && soQty > 0) 'so_qty': soQty,
           ..._scrapSumLineValues(line),
@@ -921,30 +930,52 @@ class _CreateScrapScreenState extends State<CreateScrapScreen> {
                   'qc_team_qc_qty': l.qcTeamQcQty ?? 0.0,
                   'actual_qc_qty': l.actualQcQty ?? 0.0,
                   'qc_nonsaleable_qty': l.qcNonsaleableQty ?? 0.0,
+                  if (l.soRemark != null && l.soRemark!.isNotEmpty) 'so_remark': l.soRemark,
+                  if (l.logisticRemark != null && l.logisticRemark!.isNotEmpty) 'logistic_remark': l.logisticRemark,
+                  if (l.qcRemark != null && l.qcRemark!.isNotEmpty) 'qc_remark': l.qcRemark,
+                  if (l.salesopsRemark != null && l.salesopsRemark!.isNotEmpty) 'salesops_remark': l.salesopsRemark,
+                },
+              )
+              .toList(),
+        };
+      } else {
+        itemMap = {
+          'product_id': line.product.id,
+          'product_uom_qty': 0.0,
+          'quantity': qty,
+          if (soQty != null && soQty > 0) 'so_qty': soQty,
+          if (qcQty != null && qcQty > 0) 'warehouse_qty': qcQty,
+          'lot_lines': selectedLots
+              .map(
+                (l) => {
+                  'lot_id': l.lot!.lotId,
+                  'product_uom_qty': 0.0,
+                  'quantity': _submittedTrackedLotQty(l, auth),
+                  if (l.soQty != null && l.soQty! > 0) 'so_qty': l.soQty,
+                  if (l.qcQty != null && l.qcQty! > 0) 'warehouse_qty': l.qcQty,
+                  if (l.soRemark != null && l.soRemark!.isNotEmpty) 'so_remark': l.soRemark,
+                  if (l.logisticRemark != null && l.logisticRemark!.isNotEmpty) 'logistic_remark': l.logisticRemark,
+                  if (l.qcRemark != null && l.qcRemark!.isNotEmpty) 'qc_remark': l.qcRemark,
+                  if (l.salesopsRemark != null && l.salesopsRemark!.isNotEmpty) 'salesops_remark': l.salesopsRemark,
                 },
               )
               .toList(),
         };
       }
 
-      return {
-        'product_id': line.product.id,
-        'product_uom_qty': 0.0,
-        'quantity': qty,
-        if (soQty != null && soQty > 0) 'so_qty': soQty,
-        if (qcQty != null && qcQty > 0) 'warehouse_qty': qcQty,
-        'lot_lines': selectedLots
-            .map(
-              (l) => {
-                'lot_id': l.lot!.lotId,
-                'product_uom_qty': 0.0,
-                'quantity': _submittedTrackedLotQty(l, auth),
-                if (l.soQty != null && l.soQty! > 0) 'so_qty': l.soQty,
-                if (l.qcQty != null && l.qcQty! > 0) 'warehouse_qty': l.qcQty,
-              },
-            )
-            .toList(),
-      };
+      if (line.soRemark != null && line.soRemark!.isNotEmpty) {
+        itemMap['so_remark'] = line.soRemark;
+      }
+      if (line.logisticRemark != null && line.logisticRemark!.isNotEmpty) {
+        itemMap['logistic_remark'] = line.logisticRemark;
+      }
+      if (line.qcRemark != null && line.qcRemark!.isNotEmpty) {
+        itemMap['qc_remark'] = line.qcRemark;
+      }
+      if (line.salesopsRemark != null && line.salesopsRemark!.isNotEmpty) {
+        itemMap['salesops_remark'] = line.salesopsRemark;
+      }
+      return itemMap;
     }).toList();
   }
 
@@ -2413,6 +2444,163 @@ class _ScrapLineCard extends StatelessWidget {
               ),
             ),
           ],
+          _buildRemarksSection(),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildRemarksSection() {
+    final List<Widget> children = [];
+
+    // 1. SO Remark
+    final bool canEditSo = !isReadOnly && canEditSoQty && (returnReceiptStatus == null);
+    final bool hasSo = line.soRemark != null && line.soRemark!.trim().isNotEmpty;
+    if (canEditSo) {
+      children.add(_EditableRemarkField(
+        label: 'SO Remark',
+        initialValue: line.soRemark,
+        icon: Icons.rate_review_outlined,
+        color: const Color(0xFF2563EB),
+        onChanged: (val) => line.soRemark = val.trim(),
+      ));
+    } else if (hasSo) {
+      children.add(_buildReadOnlyRemarkCard(
+        label: 'SO Remark',
+        text: line.soRemark!.trim(),
+        icon: Icons.notes_rounded,
+        color: const Color(0xFF2563EB),
+      ));
+    }
+
+    // 2. Logistic Remark
+    final bool canEditLog = !isReadOnly && canEditWarehouseQty && (returnReceiptStatus == null || returnReceiptStatus == 'warehouse_receipt');
+    final bool hasLog = line.logisticRemark != null && line.logisticRemark!.trim().isNotEmpty;
+    if (canEditLog) {
+      children.add(_EditableRemarkField(
+        label: 'Logistic Remark',
+        initialValue: line.logisticRemark,
+        icon: Icons.local_shipping_outlined,
+        color: const Color(0xFF0D9488),
+        onChanged: (val) => line.logisticRemark = val.trim(),
+      ));
+    } else if (hasLog) {
+      children.add(_buildReadOnlyRemarkCard(
+        label: 'Logistic Remark',
+        text: line.logisticRemark!.trim(),
+        icon: Icons.local_shipping_outlined,
+        color: const Color(0xFF0D9488),
+      ));
+    }
+
+    // 3. QC Remark
+    final bool canEditQc = !isReadOnly && canEditQcTeamQty && (returnReceiptStatus == 'qc_receipt');
+    final bool hasQc = line.qcRemark != null && line.qcRemark!.trim().isNotEmpty;
+    if (canEditQc) {
+      children.add(_EditableRemarkField(
+        label: 'QC Remark',
+        initialValue: line.qcRemark,
+        icon: Icons.verified_outlined,
+        color: const Color(0xFF9333EA),
+        onChanged: (val) => line.qcRemark = val.trim(),
+      ));
+    } else if (hasQc) {
+      children.add(_buildReadOnlyRemarkCard(
+        label: 'QC Remark',
+        text: line.qcRemark!.trim(),
+        icon: Icons.verified_outlined,
+        color: const Color(0xFF9333EA),
+      ));
+    }
+
+    // 4. Sales Ops Remark
+    final bool canEditOps = !isReadOnly && canEditEffectiveQty && (returnReceiptStatus == 'sales_operation_receipt' || returnReceiptStatus == 'salesops_receipt');
+    final bool hasOps = line.salesopsRemark != null && line.salesopsRemark!.trim().isNotEmpty;
+    if (canEditOps) {
+      children.add(_EditableRemarkField(
+        label: 'Sales Ops Remark',
+        initialValue: line.salesopsRemark,
+        icon: Icons.assignment_turned_in_outlined,
+        color: const Color(0xFFEA580C),
+        onChanged: (val) => line.salesopsRemark = val.trim(),
+      ));
+    } else if (hasOps) {
+      children.add(_buildReadOnlyRemarkCard(
+        label: 'Sales Ops Remark',
+        text: line.salesopsRemark!.trim(),
+        icon: Icons.assignment_turned_in_outlined,
+        color: const Color(0xFFEA580C),
+      ));
+    }
+
+    if (children.isEmpty) return const SizedBox.shrink();
+
+    return Container(
+      width: double.infinity,
+      color: Colors.white,
+      padding: const EdgeInsets.only(left: 16, right: 16, bottom: 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Divider(height: 16, color: Color(0xFFDDE6F2)),
+          const Row(
+            children: [
+              Icon(Icons.notes_rounded, size: 14, color: AppColors.textSecondary),
+              SizedBox(width: 4),
+              Text(
+                'REMARKS',
+                style: TextStyle(
+                  color: Colors.black54,
+                  fontSize: 10,
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: 0.5,
+                ),
+              ),
+            ],
+          ),
+          ...children,
+        ],
+      ),
+    );
+  }
+
+  Widget _buildReadOnlyRemarkCard({
+    required String label,
+    required String text,
+    required Color color,
+    required IconData icon,
+  }) {
+    return Container(
+      margin: const EdgeInsets.only(top: 6),
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.05),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: color.withValues(alpha: 0.2)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(icon, size: 14, color: color),
+              const SizedBox(width: 6),
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.bold,
+                  color: color,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Text(
+            text,
+            style: const TextStyle(fontSize: 12, color: AppColors.textPrimary),
+          ),
         ],
       ),
     );
@@ -2848,6 +3036,86 @@ class _StockBadgeSmall extends StatelessWidget {
           fontSize: 11,
           fontWeight: FontWeight.w700,
           color: color,
+        ),
+      ),
+    );
+  }
+}
+
+class _EditableRemarkField extends StatefulWidget {
+  const _EditableRemarkField({
+    super.key,
+    required this.label,
+    required this.initialValue,
+    required this.icon,
+    required this.color,
+    required this.onChanged,
+  });
+
+  final String label;
+  final String? initialValue;
+  final IconData icon;
+  final Color color;
+  final ValueChanged<String> onChanged;
+
+  @override
+  State<_EditableRemarkField> createState() => _EditableRemarkFieldState();
+}
+
+class _EditableRemarkFieldState extends State<_EditableRemarkField> {
+  late final TextEditingController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TextEditingController(text: widget.initialValue ?? '');
+  }
+
+  @override
+  void didUpdateWidget(covariant _EditableRemarkField oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.initialValue != oldWidget.initialValue &&
+        widget.initialValue != _controller.text) {
+      _controller.text = widget.initialValue ?? '';
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 8),
+      child: TextField(
+        controller: _controller,
+        onChanged: widget.onChanged,
+        style: const TextStyle(fontSize: 13, color: AppColors.textPrimary),
+        decoration: InputDecoration(
+          labelText: '${widget.label} (optional)',
+          labelStyle: TextStyle(fontSize: 12, color: widget.color),
+          hintText: 'Enter ${widget.label.toLowerCase()}...',
+          hintStyle: TextStyle(fontSize: 12, color: Colors.grey),
+          prefixIcon: Icon(widget.icon, size: 18, color: widget.color),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(8),
+            borderSide: BorderSide(color: widget.color.withValues(alpha: 0.3)),
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(8),
+            borderSide: BorderSide(color: Colors.grey.shade300),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(8),
+            borderSide: BorderSide(color: widget.color, width: 1.5),
+          ),
+          filled: true,
+          fillColor: Colors.white,
+          isDense: true,
+          contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
         ),
       ),
     );
