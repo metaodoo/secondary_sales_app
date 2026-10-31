@@ -1628,6 +1628,30 @@ class _MtReturnDetailScreenState extends State<MtReturnDetailScreen> {
                       _buildQtyChip('Total Qty', line.totalQty, AppColors.primaryStrong, isBold: true),
                     ],
                   ),
+                  if (line.notes != null && line.notes!.trim().isNotEmpty) ...[
+                    const SizedBox(height: 8),
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: Colors.grey.shade50,
+                        borderRadius: BorderRadius.circular(6),
+                        border: Border.all(color: Colors.grey.shade200),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.notes_rounded, size: 14, color: AppColors.textSecondary),
+                          const SizedBox(width: 6),
+                          Expanded(
+                            child: Text(
+                              line.notes!,
+                              style: const TextStyle(fontSize: 12, color: AppColors.textPrimary),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                 ],
               );
             },

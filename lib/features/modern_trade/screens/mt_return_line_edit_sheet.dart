@@ -48,6 +48,7 @@ class _LotAllocationEntry {
   final TextEditingController saleableCtrl;
   final TextEditingController nonSaleableCtrl;
   final TextEditingController qualityCtrl;
+  final TextEditingController notesCtrl;
 
   _LotAllocationEntry({
     this.lineId,
@@ -56,6 +57,7 @@ class _LotAllocationEntry {
     required double saleableQty,
     required double nonSaleableQty,
     required double qualityQty,
+    String? notes,
   })  : saleableCtrl = TextEditingController(
           text: saleableQty > 0
               ? saleableQty.toStringAsFixed(saleableQty.truncateToDouble() == saleableQty ? 0 : 2)
@@ -70,12 +72,14 @@ class _LotAllocationEntry {
           text: qualityQty > 0
               ? qualityQty.toStringAsFixed(qualityQty.truncateToDouble() == qualityQty ? 0 : 2)
               : '0',
-        );
+        ),
+        notesCtrl = TextEditingController(text: notes ?? '');
 
   void dispose() {
     saleableCtrl.dispose();
     nonSaleableCtrl.dispose();
     qualityCtrl.dispose();
+    notesCtrl.dispose();
   }
 }
 
@@ -94,6 +98,7 @@ class _MtReturnLineEditSheetState extends State<MtReturnLineEditSheet> {
       saleableQty: widget.line.saleableQty,
       nonSaleableQty: widget.line.nonSaleableQty,
       qualityQty: widget.line.qualityQty,
+      notes: widget.line.notes,
     ));
 
     // Fetch product lots
@@ -203,6 +208,7 @@ class _MtReturnLineEditSheetState extends State<MtReturnLineEditSheet> {
         'saleable_qty': showSaleable ? sQty : 0.0,
         'non_saleable_qty': showNonSaleable ? nsQty : 0.0,
         'quality_qty': showQuality ? qQty : 0.0,
+        'notes': entry.notesCtrl.text.trim(),
       };
       if (entry.lineId != null) {
         item['id'] = entry.lineId;
@@ -580,6 +586,19 @@ class _MtReturnLineEditSheetState extends State<MtReturnLineEditSheet> {
                             ),
                           ),
                       ],
+                      const SizedBox(height: 10),
+                      TextField(
+                        controller: entry.notesCtrl,
+                        decoration: InputDecoration(
+                          labelText: 'Remarks / Notes (optional)',
+                          hintText: 'Enter line remark...',
+                          prefixIcon: const Icon(Icons.notes_rounded, size: 18),
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                          filled: true,
+                          fillColor: Colors.white,
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                        ),
+                      ),
                     ],
                   ),
                 );

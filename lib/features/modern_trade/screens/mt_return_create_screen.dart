@@ -404,6 +404,7 @@ class _MtReturnCreateScreenState extends State<MtReturnCreateScreen> {
         'saleable_qty': l['saleable_qty'],
         'non_saleable_qty': l['non_saleable_qty'],
         'quality_qty': l['quality_qty'],
+        if (l['notes'] != null && l['notes'].toString().isNotEmpty) 'notes': l['notes'],
       };
     }).toList();
 
@@ -884,6 +885,30 @@ class _MtReturnCreateScreenState extends State<MtReturnCreateScreen> {
                                 _buildLineQtyBadge('Total Qty', totalLineQty, AppColors.primaryStrong, isBold: true),
                               ],
                             ),
+                            if (line['notes'] != null && line['notes'].toString().trim().isNotEmpty) ...[
+                              const SizedBox(height: 8),
+                              Container(
+                                width: double.infinity,
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                decoration: BoxDecoration(
+                                  color: Colors.grey.shade50,
+                                  borderRadius: BorderRadius.circular(6),
+                                  border: Border.all(color: Colors.grey.shade200),
+                                ),
+                                child: Row(
+                                  children: [
+                                    const Icon(Icons.notes_rounded, size: 14, color: AppColors.textSecondary),
+                                    const SizedBox(width: 6),
+                                    Expanded(
+                                      child: Text(
+                                        line['notes'].toString(),
+                                        style: const TextStyle(fontSize: 12, color: AppColors.textPrimary),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
                           ],
                         ),
                       ),

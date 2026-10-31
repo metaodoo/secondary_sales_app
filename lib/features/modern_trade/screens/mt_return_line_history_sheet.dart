@@ -260,6 +260,38 @@ class MtReturnLineHistorySheet extends StatelessWidget {
                                 _buildQtyChip('Total', item.totalQty, AppColors.primaryStrong, isBold: true),
                               ],
                             ),
+                            if (item.notes != null && item.notes!.trim().isNotEmpty) ...[
+                              const SizedBox(height: 10),
+                              Container(
+                                width: double.infinity,
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+                                decoration: BoxDecoration(
+                                  color: Colors.white,
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(color: Colors.grey.shade200),
+                                ),
+                                child: Row(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    const Icon(
+                                      Icons.notes_rounded,
+                                      size: 14,
+                                      color: AppColors.textSecondary,
+                                    ),
+                                    const SizedBox(width: 6),
+                                    Expanded(
+                                      child: Text(
+                                        item.notes!,
+                                        style: const TextStyle(
+                                          fontSize: 12,
+                                          color: AppColors.textPrimary,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
                           ],
                         ),
                       );

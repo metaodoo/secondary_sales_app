@@ -217,6 +217,7 @@ class MtReturnRequestLine {
   final double totalQty;
   final double priceUnit;
   final double subtotal;
+  final String? notes;
   final List<MtReturnLineUserHistory> userHistory;
 
   MtReturnRequestLine({
@@ -237,6 +238,7 @@ class MtReturnRequestLine {
     this.totalQty = 0.0,
     this.priceUnit = 0.0,
     this.subtotal = 0.0,
+    this.notes,
     this.userHistory = const [],
   });
 
@@ -269,6 +271,7 @@ class MtReturnRequestLine {
       totalQty: totQty,
       priceUnit: pUnit,
       subtotal: subTot,
+      notes: map['notes']?.toString() ?? map['note']?.toString(),
       userHistory: rawHist
           .map((h) => MtReturnLineUserHistory.fromMap(Map<String, dynamic>.from(h as Map)))
           .toList(),
@@ -282,6 +285,7 @@ class MtReturnRequestLine {
       'non_saleable_qty': nonSaleableQty,
       'quality_qty': qualityQty,
       if (lotId != null) 'lot_id': lotId,
+      if (notes != null) 'notes': notes,
     };
   }
 }
@@ -297,6 +301,7 @@ class MtReturnLineUserHistory {
   final double nonSaleableQty;
   final double qualityQty;
   final double totalQty;
+  final String? notes;
 
   MtReturnLineUserHistory({
     required this.id,
@@ -309,6 +314,7 @@ class MtReturnLineUserHistory {
     this.nonSaleableQty = 0.0,
     this.qualityQty = 0.0,
     this.totalQty = 0.0,
+    this.notes,
   });
 
   factory MtReturnLineUserHistory.fromMap(Map<String, dynamic> map) {
@@ -330,6 +336,7 @@ class MtReturnLineUserHistory {
       nonSaleableQty: asDouble(map['non_saleable_qty']),
       qualityQty: asDouble(map['quality_qty']),
       totalQty: asDouble(map['total_qty']),
+      notes: map['notes']?.toString() ?? map['note']?.toString(),
     );
   }
 }

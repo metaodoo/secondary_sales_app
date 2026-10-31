@@ -50,6 +50,7 @@ class _MtReturnProductSelectionSheetState extends State<MtReturnProductSelection
   final TextEditingController _saleableQtyController = TextEditingController(text: '0');
   final TextEditingController _nonSaleableQtyController = TextEditingController(text: '0');
   final TextEditingController _qualityQtyController = TextEditingController(text: '0');
+  final TextEditingController _notesController = TextEditingController();
   Timer? _searchDebounce;
 
   Map<String, dynamic>? _selectedProduct;
@@ -77,6 +78,7 @@ class _MtReturnProductSelectionSheetState extends State<MtReturnProductSelection
       _qualityQtyController.text = qQty > 0
           ? qQty.toStringAsFixed(qQty.truncateToDouble() == qQty ? 0 : 2)
           : '0';
+      _notesController.text = line['notes']?.toString() ?? line['note']?.toString() ?? '';
 
       WidgetsBinding.instance.addPostFrameCallback((_) {
         context.read<MtReturnProvider>().fetchAppCategories();
@@ -105,6 +107,7 @@ class _MtReturnProductSelectionSheetState extends State<MtReturnProductSelection
     _saleableQtyController.dispose();
     _nonSaleableQtyController.dispose();
     _qualityQtyController.dispose();
+    _notesController.dispose();
     super.dispose();
   }
 
@@ -344,6 +347,7 @@ class _MtReturnProductSelectionSheetState extends State<MtReturnProductSelection
       'saleable_qty': saleableQty,
       'non_saleable_qty': nonSaleableQty,
       'quality_qty': qualityQty,
+      'notes': _notesController.text.trim(),
     });
   }
 
@@ -771,8 +775,38 @@ class _MtReturnProductSelectionSheetState extends State<MtReturnProductSelection
               hint: 'Units returned for quality inspection',
             ),
           ],
+          const SizedBox(height: 14),
 
-          const SizedBox(height: 28),
+          // Remarks / Notes
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Row(
+                children: [
+                  Icon(Icons.notes_rounded, size: 16, color: AppColors.textSecondary),
+                  SizedBox(width: 6),
+                  Text(
+                    'Line Remarks / Notes (optional)',
+                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              TextField(
+                controller: _notesController,
+                decoration: InputDecoration(
+                  hintText: 'Enter reason or remark for this item...',
+                  hintStyle: const TextStyle(fontSize: 13, color: AppColors.textSecondary),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                  filled: true,
+                  fillColor: Colors.white,
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                ),
+              ),
+            ],
+          ),
+
+          const SizedBox(height: 24),
 
           // Add Button
           SizedBox(
