@@ -17,8 +17,20 @@ import 'package:shared_preferences/shared_preferences.dart';
 // );
 
 class AppConstants {
-  static String _baseUrl = '';
-  static String _dbName = '';
+  // Production server & database defaults
+  static const String prodBaseUrl = 'https://gdfl-odoo-odoov18.odoo.com';
+  static const String prodDbName = 'gdfl-odoo-odoov18-production-24544933';
+
+  // Field UAT server & database presets
+  static const String uatBaseUrl =
+      'https://gdfl-odoo-odoov18-field-uat-39817379.dev.odoo.com';
+  static const String uatDbName = 'gdfl-odoo-odoov18-field-uat-39817379';
+
+  static const String defaultBaseUrl = prodBaseUrl;
+  static const String defaultDbName = prodDbName;
+
+  static String _baseUrl = defaultBaseUrl;
+  static String _dbName = defaultDbName;
   static bool _hasSavedConnection = false;
 
   static String get baseUrl => _baseUrl;
@@ -29,9 +41,17 @@ class AppConstants {
     final prefs = await SharedPreferences.getInstance();
     final savedBaseUrl = prefs.getString(baseUrlKey);
     final savedDbName = prefs.getString(dbNameKey);
-    _hasSavedConnection = savedBaseUrl != null && savedDbName != null;
-    _baseUrl = savedBaseUrl ?? '';
-    _dbName = savedDbName ?? '';
+
+    if (savedBaseUrl != null && savedBaseUrl.trim().isNotEmpty) {
+      _hasSavedConnection = true;
+      _baseUrl = savedBaseUrl;
+      _dbName = savedDbName ?? '';
+    } else {
+      // First run: show connection setup screen with production pre-filled as default
+      _hasSavedConnection = false;
+      _baseUrl = defaultBaseUrl;
+      _dbName = defaultDbName;
+    }
   }
 
   static Future<void> saveConnection({

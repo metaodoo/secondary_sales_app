@@ -255,6 +255,60 @@ class _ConnectionSetupScreenState extends State<ConnectionSetupScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
+                          Row(
+                            children: [
+                              Expanded(
+                                child: OutlinedButton.icon(
+                                  onPressed: isBusy
+                                      ? null
+                                      : () {
+                                          setState(() {
+                                            _serverController.text =
+                                                AppConstants.prodBaseUrl;
+                                            _dbController.text =
+                                                AppConstants.prodDbName;
+                                            _databases = [];
+                                            _error = null;
+                                          });
+                                        },
+                                  icon: const Icon(Icons.cloud_done_outlined, size: 16),
+                                  label: const Text('Production'),
+                                  style: OutlinedButton.styleFrom(
+                                    padding: const EdgeInsets.symmetric(vertical: 10),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(10),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: OutlinedButton.icon(
+                                  onPressed: isBusy
+                                      ? null
+                                      : () {
+                                          setState(() {
+                                            _serverController.text =
+                                                AppConstants.uatBaseUrl;
+                                            _dbController.text =
+                                                AppConstants.uatDbName;
+                                            _databases = [];
+                                            _error = null;
+                                          });
+                                        },
+                                  icon: const Icon(Icons.science_outlined, size: 16),
+                                  label: const Text('Field UAT'),
+                                  style: OutlinedButton.styleFrom(
+                                    padding: const EdgeInsets.symmetric(vertical: 10),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(10),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 20),
                           const Text(
                             'Server',
                             style: TextStyle(
@@ -270,7 +324,7 @@ class _ConnectionSetupScreenState extends State<ConnectionSetupScreen> {
                             keyboardType: TextInputType.url,
                             textInputAction: TextInputAction.next,
                             decoration: _inputDecoration(
-                              hintText: 'http://127.0.0.1:8069',
+                              hintText: AppConstants.defaultBaseUrl,
                             ),
                             onChanged: (_) {
                               setState(() {
@@ -308,7 +362,7 @@ class _ConnectionSetupScreenState extends State<ConnectionSetupScreen> {
                                   enabled: !isBusy,
                                   textInputAction: TextInputAction.done,
                                   decoration: _inputDecoration(
-                                    hintText: 'Database (optional)',
+                                    hintText: AppConstants.defaultDbName,
                                   ),
                                 ),
                               ),

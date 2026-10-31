@@ -18,12 +18,44 @@ class _LoginScreenState extends State<LoginScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   bool _obscurePassword = true;
+  int _logoTapCount = 0;
+  DateTime? _lastLogoTapTime;
+  bool _showServerConfig = false;
 
   @override
   void dispose() {
     _emailController.dispose();
     _passwordController.dispose();
     super.dispose();
+  }
+
+  void _onLogoTapped() {
+    final now = DateTime.now();
+    if (_lastLogoTapTime == null ||
+        now.difference(_lastLogoTapTime!) > const Duration(seconds: 3)) {
+      _logoTapCount = 1;
+    } else {
+      _logoTapCount++;
+    }
+    _lastLogoTapTime = now;
+
+    if (_logoTapCount >= 5) {
+      _logoTapCount = 0;
+      setState(() {
+        _showServerConfig = !_showServerConfig;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            _showServerConfig
+                ? 'Developer options enabled: Server settings visible'
+                : 'Server settings hidden',
+          ),
+          duration: const Duration(seconds: 2),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
   }
 
   Future<void> _submit() async {
@@ -58,35 +90,41 @@ class _LoginScreenState extends State<LoginScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  const SizedBox(height: 10),
+                  const SizedBox(height: 8),
                   Center(
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(16),
+                    child: GestureDetector(
+                      onTap: _onLogoTapped,
+                      behavior: HitTestBehavior.opaque,
                       child: Image.asset(
                         'assets/images/logo.png',
-                        height: 90,
+                        height: 160,
                         fit: BoxFit.contain,
+                        filterQuality: FilterQuality.high,
+                        semanticLabel: 'Shokti+ Logo',
                       ),
                     ),
                   ),
-                  const SizedBox(height: 20),
+                  const SizedBox(height: 16),
                   const Text(
                     'Welcome Back',
+                    textAlign: TextAlign.center,
                     style: TextStyle(
                       color: AppColors.textPrimary,
                       fontWeight: FontWeight.bold,
-                      fontSize: 32,
+                      fontSize: 26,
+                      letterSpacing: -0.5,
                     ),
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 6),
                   const Text(
                     'Sign in to continue to your dashboard.',
+                    textAlign: TextAlign.center,
                     style: TextStyle(
                       color: AppColors.textSecondary,
-                      fontSize: 16,
+                      fontSize: 14,
                     ),
                   ),
-                  const SizedBox(height: 32),
+                  const SizedBox(height: 24),
                   Container(
                     padding: const EdgeInsets.all(24),
                     decoration: BoxDecoration(
@@ -146,7 +184,7 @@ class _LoginScreenState extends State<LoginScreen> {
                             const SizedBox(height: 20),
                           ],
                           const Text(
-                            'Email',
+                            'Employee ID',
                             style: TextStyle(
                               color: Color(0xFF1E293B),
                               fontWeight: FontWeight.w600,
@@ -156,12 +194,18 @@ class _LoginScreenState extends State<LoginScreen> {
                           const SizedBox(height: 8),
                           TextFormField(
                             controller: _emailController,
-                            keyboardType: TextInputType.emailAddress,
+                            keyboardType: TextInputType.text,
                             textInputAction: TextInputAction.next,
+                            autofillHints: const [AutofillHints.username],
                             decoration: InputDecoration(
-                              hintText: 'name@company.com',
+                              hintText: 'Employee ID',
                               hintStyle: const TextStyle(
                                 color: AppColors.textSecondary,
+                              ),
+                              prefixIcon: const Icon(
+                                Icons.badge_outlined,
+                                color: AppColors.textSecondary,
+                                size: 20,
                               ),
                               fillColor: Colors.white,
                               filled: true,
@@ -205,7 +249,7 @@ class _LoginScreenState extends State<LoginScreen> {
                             ),
                             validator: (value) {
                               if (value == null || value.trim().isEmpty) {
-                                return 'Email or phone is required';
+                                return 'Employee ID is required';
                               }
                               return null;
                             },
@@ -225,10 +269,16 @@ class _LoginScreenState extends State<LoginScreen> {
                             obscureText: _obscurePassword,
                             textInputAction: TextInputAction.done,
                             onFieldSubmitted: (_) => _submit(),
+                            autofillHints: const [AutofillHints.password],
                             decoration: InputDecoration(
-                              hintText: '........',
+                              hintText: '••••••••',
                               hintStyle: const TextStyle(
                                 color: AppColors.textSecondary,
+                              ),
+                              prefixIcon: const Icon(
+                                Icons.lock_outline,
+                                color: AppColors.textSecondary,
+                                size: 20,
                               ),
                               fillColor: Colors.white,
                               filled: true,
@@ -327,85 +377,87 @@ class _LoginScreenState extends State<LoginScreen> {
                       ),
                     ),
                   ),
-                  const SizedBox(height: 20),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 12,
-                    ),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: AppColors.borderSoft),
-                    ),
-                    child: Row(
-                      children: [
-                        const Icon(
-                          Icons.cloud_outlined,
-                          size: 20,
-                          color: AppColors.textSecondary,
-                        ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Text(
-                                auth.baseUrl.isNotEmpty
-                                    ? auth.baseUrl
-                                    : 'No Server Configured',
-                                style: const TextStyle(
-                                  color: Color(0xFF1E293B),
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                              if (auth.dbName.isNotEmpty)
+                  if (_showServerConfig) ...[
+                    const SizedBox(height: 20),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 12,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: AppColors.borderSoft),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(
+                            Icons.cloud_outlined,
+                            size: 20,
+                            color: AppColors.textSecondary,
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
                                 Text(
-                                  'Database: ${auth.dbName}',
+                                  auth.baseUrl.isNotEmpty
+                                      ? auth.baseUrl
+                                      : 'No Server Configured',
                                   style: const TextStyle(
-                                    color: AppColors.textSecondary,
-                                    fontSize: 11,
+                                    color: Color(0xFF1E293B),
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
                                   ),
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
                                 ),
-                            ],
+                                if (auth.dbName.isNotEmpty)
+                                  Text(
+                                    'Database: ${auth.dbName}',
+                                    style: const TextStyle(
+                                      color: AppColors.textSecondary,
+                                      fontSize: 11,
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                              ],
+                            ),
                           ),
-                        ),
-                        const SizedBox(width: 8),
-                        TextButton(
-                          onPressed: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => const ConnectionSetupScreen(),
+                          const SizedBox(width: 8),
+                          TextButton(
+                            onPressed: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => const ConnectionSetupScreen(),
+                                ),
+                              );
+                            },
+                            style: TextButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 10,
+                                vertical: 6,
                               ),
-                            );
-                          },
-                          style: TextButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 10,
-                              vertical: 6,
+                              minimumSize: Size.zero,
+                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                             ),
-                            minimumSize: Size.zero,
-                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                          ),
-                          child: const Text(
-                            'Change Server',
-                            style: TextStyle(
-                              color: AppColors.primary,
-                              fontSize: 12,
-                              fontWeight: FontWeight.bold,
+                            child: const Text(
+                              'Change Server',
+                              style: TextStyle(
+                                color: AppColors.primary,
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                              ),
                             ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
-                  ),
+                  ],
                 ],
               ),
             ),

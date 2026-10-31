@@ -307,7 +307,7 @@ class _MyAppState extends State<MyApp> {
       splitScreenMode: true,
       builder: (context, child) {
         return MaterialApp(
-          title: 'Sales Force Management',
+          title: 'Shokti+',
           navigatorKey: appNavigatorKey,
           debugShowCheckedModeBanner: false,
           theme: buildAppTheme(),

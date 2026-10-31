@@ -53,6 +53,10 @@ android {
         // Firebase App Distribution. If it is ever published to Play, switch this to
         // "production" for the Play build.
         missingDimensionStrategy("default", "staging")
+
+        ndk {
+            abiFilters.addAll(listOf("armeabi-v7a", "arm64-v8a"))
+        }
     }
 
     signingConfigs {
